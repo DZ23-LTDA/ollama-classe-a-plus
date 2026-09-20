@@ -193,6 +193,45 @@ func TestGenericAPIKeyAuthDoesNotInjectAnthropicHeader(t *testing.T) {
 	}
 }
 
+func TestOpenAIToolCallsAreConvertedToNativeArguments(t *testing.T) {
+	calls, err := normalizeOpenAIToolCalls(json.RawMessage(`[{"id":"call_1","type":"function","function":{"name":"weather","arguments":"{\"city\":\"Recife\"}"}}]`))
+	if err != nil || len(calls) != 1 {
+		t.Fatalf("calls=%#v err=%v", calls, err)
+	}
+	function := calls[0]["function"].(map[string]any)
+	arguments := function["arguments"].(map[string]any)
+	if arguments["city"] != "Recife" {
+		t.Fatalf("arguments=%#v", arguments)
+	}
+
+	accumulator := make(map[int]*openAIToolCall)
+	accumulateOpenAIToolCalls(accumulator, json.RawMessage(`[{"index":0,"id":"call_1","type":"function","function":{"name":"weather","arguments":"{\"city\":"}}]`))
+	accumulateOpenAIToolCalls(accumulator, json.RawMessage(`[{"index":0,"function":{"arguments":"\"Recife\"}"}}]`))
+	completed, err := normalizeOpenAIToolCalls(normalizedAccumulatedToolCalls(accumulator))
+	if err != nil || completed[0]["function"].(map[string]any)["arguments"].(map[string]any)["city"] != "Recife" {
+		t.Fatalf("completed=%#v err=%v", completed, err)
+	}
+}
+
+func TestNativeToolHistoryIsConvertedToOpenAIShape(t *testing.T) {
+	messages, err := openAICompatibleMessages(json.RawMessage(`[
+      {"role":"assistant","content":"","tool_calls":[{"function":{"name":"weather","arguments":{"city":"Recife"}}}]},
+      {"role":"tool","tool_name":"weather","content":"sunny"}
+    ]`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	calls := messages[0]["tool_calls"].([]any)
+	call := calls[0].(map[string]any)
+	function := call["function"].(map[string]any)
+	if function["arguments"] != `{"city":"Recife"}` || call["id"] == "" {
+		t.Fatalf("call=%#v", call)
+	}
+	if messages[1]["tool_call_id"] != call["id"] || messages[1]["tool_name"] != nil {
+		t.Fatalf("tool result=%#v", messages[1])
+	}
+}
+
 func TestRemoteCallerCannotSpendProviderKeyWithoutGatewayAuthentication(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := &Registry{
@@ -256,5 +295,40 @@ func TestNativeChatRoutesRemoteModelAndReturnsOllamaShape(t *testing.T) {
 	router.ServeHTTP(recorder, request)
 	if recorder.Code != http.StatusOK || !strings.Contains(recorder.Body.String(), `"content":"remote answer"`) || !strings.Contains(recorder.Body.String(), `"done":true`) {
 		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+}
+
+func TestAnthropicProviderTranslatesNativeChat(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	var gotPath, gotModel, gotSystem string
+	upstream := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		if r.Header.Get("Anthropic-Version") == "" || r.Header.Get("X-API-Key") != "anthropic-secret" {
+			t.Fatalf("missing Anthropic authentication headers: %#v", r.Header)
+		}
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		gotModel, _ = body["model"].(string)
+		gotSystem, _ = body["system"].(string)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"msg_1","model":"claude-test","content":[{"type":"text","text":"anthropic answer"}],"stop_reason":"end_turn"}`))
+	}))
+	defer upstream.Close()
+	t.Setenv("ANTHROPIC_API_KEY", "anthropic-secret")
+	r := &Registry{
+		providers: map[string]Provider{"anthropic": {Name: "anthropic", Type: ProviderTypeAnthropic, BaseURL: upstream.URL, APIKeyEnv: "ANTHROPIC_API_KEY", AllowPrivate: true}},
+		models:    map[string]Model{"anthropic/claude-test": {ID: "anthropic/claude-test", UpstreamID: "claude-test", Provider: "anthropic", Available: true}},
+	}
+	router := gin.New()
+	router.Use(NewGateway(r, upstream.Client()).Middleware())
+	router.POST("/api/chat", func(c *gin.Context) { t.Fatal("request was not proxied") })
+	request := httptest.NewRequest(http.MethodPost, "/api/chat", strings.NewReader(`{"model":"anthropic/claude-test","stream":false,"messages":[{"role":"system","content":"be concise"},{"role":"user","content":"hello"}]}`))
+	request.RemoteAddr = "127.0.0.1:12345"
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusOK || gotPath != "/v1/messages" || gotModel != "claude-test" || gotSystem != "be concise" || !strings.Contains(recorder.Body.String(), `"content":"anthropic answer"`) {
+		t.Fatalf("status=%d path=%q model=%q system=%q body=%s", recorder.Code, gotPath, gotModel, gotSystem, recorder.Body.String())
 	}
 }

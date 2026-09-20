@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -52,6 +53,14 @@ func TestDZ23ConfiguredProviderAppearsInModelCatalog(t *testing.T) {
 	}
 	if !containsBytes(recorder.Body.Bytes(), []byte(`"model":"test/model"`)) {
 		t.Fatalf("remote model missing: %s", recorder.Body.String())
+	}
+
+	show := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/show", strings.NewReader(`{"model":"test/model"}`))
+	request.Header.Set("Content-Type", "application/json")
+	handler.ServeHTTP(show, request)
+	if show.Code != http.StatusOK || !containsBytes(show.Body.Bytes(), []byte(`"format":"remote"`)) || !containsBytes(show.Body.Bytes(), []byte(`"chat"`)) {
+		t.Fatalf("remote show status=%d body=%s", show.Code, show.Body.String())
 	}
 }
 

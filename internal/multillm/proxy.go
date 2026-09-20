@@ -14,6 +14,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"sort"
 	"strings"
 	"time"
 
@@ -112,6 +113,16 @@ func (g *Gateway) Middleware() gin.HandlerFunc {
 				slog.Warn("DZ23 CLI request failed", "provider", provider.Name, "error", err)
 				c.AbortWithStatusJSON(http.StatusBadGateway, gin.H{"error": "CLI execution failed"})
 			}
+			return
+		}
+		if provider.Type == ProviderTypeAnthropic {
+			if err := g.forwardAnthropic(c, provider, model, envelope); err != nil {
+				slog.Warn("DZ23 Anthropic request failed", "provider", provider.Name, "error", err)
+				if !c.Writer.Written() {
+					c.AbortWithStatusJSON(http.StatusBadGateway, gin.H{"error": "provider request failed"})
+				}
+			}
+			c.Abort()
 			return
 		}
 		if c.Request.URL.Path == "/api/chat" || c.Request.URL.Path == "/api/generate" {
@@ -260,8 +271,8 @@ func (g *Gateway) forwardNative(c *gin.Context, provider Provider, model Model, 
 		messages = append(messages, map[string]any{"role": "user", "content": prompt})
 		request["messages"] = messages
 	} else {
-		var messages any
-		if err := json.Unmarshal(envelope["messages"], &messages); err != nil {
+		messages, err := openAICompatibleMessages(envelope["messages"])
+		if err != nil {
 			return errors.New("native chat request requires messages")
 		}
 		request["messages"] = messages
@@ -414,6 +425,7 @@ func translateChatStream(c *gin.Context, body io.Reader, modelID, nativePath str
 	buffer := make([]byte, 64<<10)
 	scanner.Buffer(buffer, maxResponseBytes)
 	doneWritten := false
+	toolCalls := make(map[int]*openAIToolCall)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if !strings.HasPrefix(line, "data:") {
@@ -439,9 +451,14 @@ func translateChatStream(c *gin.Context, body io.Reader, modelID, nativePath str
 			continue
 		}
 		choice := chunk.Choices[0]
+		accumulateOpenAIToolCalls(toolCalls, choice.Delta.ToolCalls)
 		done := choice.FinishReason != ""
 		doneWritten = doneWritten || done
-		writeNativeChunk(c, modelID, nativePath, choice.Delta.Content, choice.Delta.ToolCalls, done, choice.FinishReason, true)
+		var completedCalls json.RawMessage
+		if done {
+			completedCalls = normalizedAccumulatedToolCalls(toolCalls)
+		}
+		writeNativeChunk(c, modelID, nativePath, choice.Delta.Content, completedCalls, done, choice.FinishReason, true)
 		if flusher, ok := c.Writer.(http.Flusher); ok {
 			flusher.Flush()
 		}
@@ -472,8 +489,8 @@ func writeNativeChunk(c *gin.Context, modelID, nativePath, content string, toolC
 	} else {
 		message := map[string]any{"role": "assistant", "content": content}
 		if len(toolCalls) > 0 && string(toolCalls) != "null" {
-			var calls any
-			if json.Unmarshal(toolCalls, &calls) == nil {
+			calls, err := normalizeOpenAIToolCalls(toolCalls)
+			if err == nil && len(calls) > 0 {
 				message["tool_calls"] = calls
 			}
 		}
@@ -481,6 +498,126 @@ func writeNativeChunk(c *gin.Context, modelID, nativePath, content string, toolC
 	}
 	b, _ := json.Marshal(result)
 	_, _ = c.Writer.Write(append(b, '\n'))
+}
+
+type openAIToolCall struct {
+	Index    int    `json:"index,omitempty"`
+	ID       string `json:"id,omitempty"`
+	Type     string `json:"type,omitempty"`
+	Function struct {
+		Name      string `json:"name,omitempty"`
+		Arguments string `json:"arguments,omitempty"`
+	} `json:"function"`
+}
+
+func normalizeOpenAIToolCalls(raw json.RawMessage) ([]map[string]any, error) {
+	var calls []openAIToolCall
+	if err := json.Unmarshal(raw, &calls); err != nil {
+		return nil, err
+	}
+	result := make([]map[string]any, 0, len(calls))
+	for _, call := range calls {
+		arguments := map[string]any{}
+		if call.Function.Arguments != "" {
+			if err := json.Unmarshal([]byte(call.Function.Arguments), &arguments); err != nil {
+				return nil, err
+			}
+		}
+		nativeCall := map[string]any{"function": map[string]any{"name": call.Function.Name, "arguments": arguments}}
+		if call.ID != "" {
+			nativeCall["id"] = call.ID
+		}
+		result = append(result, nativeCall)
+	}
+	return result, nil
+}
+
+func openAICompatibleMessages(raw json.RawMessage) ([]map[string]any, error) {
+	var messages []map[string]any
+	if err := json.Unmarshal(raw, &messages); err != nil {
+		return nil, err
+	}
+	callIDs := make(map[string]string)
+	for messageIndex, message := range messages {
+		if calls, ok := message["tool_calls"].([]any); ok {
+			for callIndex, value := range calls {
+				call, ok := value.(map[string]any)
+				if !ok {
+					continue
+				}
+				id, _ := call["id"].(string)
+				if id == "" {
+					id = fmt.Sprintf("call_dz23_%d_%d", messageIndex, callIndex)
+					call["id"] = id
+				}
+				call["type"] = "function"
+				if function, ok := call["function"].(map[string]any); ok {
+					name, _ := function["name"].(string)
+					if name != "" {
+						callIDs[name] = id
+					}
+					if _, isString := function["arguments"].(string); !isString {
+						encoded, err := json.Marshal(function["arguments"])
+						if err != nil {
+							return nil, err
+						}
+						function["arguments"] = string(encoded)
+					}
+				}
+			}
+		}
+		if message["role"] == "tool" {
+			if _, ok := message["tool_call_id"].(string); !ok {
+				if name, ok := message["tool_name"].(string); ok {
+					message["tool_call_id"] = callIDs[name]
+				}
+			}
+			delete(message, "tool_name")
+		}
+	}
+	return messages, nil
+}
+
+func accumulateOpenAIToolCalls(accumulator map[int]*openAIToolCall, raw json.RawMessage) {
+	if len(raw) == 0 || string(raw) == "null" {
+		return
+	}
+	var chunks []openAIToolCall
+	if json.Unmarshal(raw, &chunks) != nil {
+		return
+	}
+	for _, chunk := range chunks {
+		call := accumulator[chunk.Index]
+		if call == nil {
+			call = &openAIToolCall{Index: chunk.Index}
+			accumulator[chunk.Index] = call
+		}
+		if chunk.ID != "" {
+			call.ID = chunk.ID
+		}
+		if chunk.Type != "" {
+			call.Type = chunk.Type
+		}
+		call.Function.Name += chunk.Function.Name
+		call.Function.Arguments += chunk.Function.Arguments
+	}
+}
+
+func normalizedAccumulatedToolCalls(accumulator map[int]*openAIToolCall) json.RawMessage {
+	if len(accumulator) == 0 {
+		return nil
+	}
+	indexes := make([]int, 0, len(accumulator))
+	for index := range accumulator {
+		indexes = append(indexes, index)
+	}
+	sort.Ints(indexes)
+	calls := make([]openAIToolCall, 0, len(indexes))
+	for _, index := range indexes {
+		calls = append(calls, *accumulator[index])
+	}
+	raw, _ := json.Marshal(calls)
+	return raw
 }
 
 func (g *Gateway) forward(c *gin.Context, provider Provider, body []byte) error {
@@ -569,9 +706,13 @@ func sameHostRedirects(host string, configured func(*http.Request, []*http.Reque
 func applyProviderAuth(req *http.Request, provider Provider) {
 	key := ""
 	if provider.APIKeyEnv != "" {
-		key = os.Getenv(provider.APIKeyEnv)
+		key = credentialValue(provider.APIKeyEnv)
 	}
-	switch provider.AuthStyle {
+	style := provider.AuthStyle
+	if style == "" && provider.Type == ProviderTypeAnthropic {
+		style = AuthStyleAnthropic
+	}
+	switch style {
 	case AuthStyleAPIKey:
 		req.Header.Set("X-API-Key", key)
 	case AuthStyleAnthropic:

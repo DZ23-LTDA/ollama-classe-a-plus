@@ -1352,6 +1352,38 @@ func (s *Server) ShowHandler(c *gin.Context) {
 		return
 	}
 	requestedModel := req.Model
+	if s.multiRegistry != nil {
+		if remote, ok := s.multiRegistry.Model(requestedModel); ok {
+			caps := make([]model.Capability, 0, len(remote.Capabilities))
+			for _, capability := range remote.Capabilities {
+				caps = append(caps, model.Capability(capability))
+			}
+			family := remote.Provider
+			if !remote.Available {
+				family += "-unavailable"
+			}
+			c.JSON(http.StatusOK, api.ShowResponse{
+				Details: api.ModelDetails{Format: "remote", Family: family}, Capabilities: caps,
+				ModelInfo: map[string]any{"general.basename": requestedModel, "dz23.provider": remote.Provider},
+			})
+			return
+		}
+		if strings.HasPrefix(requestedModel, "auto/") || requestedModel == "auto" || requestedModel == "local/private" {
+			resolvedModel, resolved := s.multiRegistry.Resolve(requestedModel, multillm.Policy{})
+			localConfigured := requestedModel == "local/private" && strings.TrimSpace(os.Getenv("OLLAMA_DZ23_LOCAL_MODEL")) != ""
+			if resolved || localConfigured {
+				caps := make([]model.Capability, 0, len(resolvedModel.Capabilities))
+				for _, capability := range resolvedModel.Capabilities {
+					caps = append(caps, model.Capability(capability))
+				}
+				c.JSON(http.StatusOK, api.ShowResponse{
+					Details: api.ModelDetails{Format: "virtual", Family: "dz23-router"}, Capabilities: caps,
+					ModelInfo: map[string]any{"general.basename": requestedModel},
+				})
+				return
+			}
+		}
+	}
 
 	modelRef, err := parseAndValidateModelRef(req.Model)
 	if err != nil {

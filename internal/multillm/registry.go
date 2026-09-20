@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 )
@@ -39,6 +40,7 @@ type Provider struct {
 
 const (
 	ProviderTypeOpenAICompatible = "openai-compatible"
+	ProviderTypeAnthropic        = "anthropic"
 	ProviderTypeCLI              = "cli"
 	AuthStyleBearer              = "bearer"
 	AuthStyleAPIKey              = "x-api-key"
@@ -97,7 +99,7 @@ func Load(path string) (*Registry, error) {
 		}
 		r.providers[p.Name] = p
 		enabled := p.Enabled == nil || *p.Enabled
-		available := enabled && (p.APIKeyEnv == "" || os.Getenv(p.APIKeyEnv) != "")
+		available := enabled && (p.APIKeyEnv == "" || credentialValue(p.APIKeyEnv) != "")
 		for _, item := range p.Models {
 			id := p.Name + "/" + item.ID
 			if _, exists := r.models[id]; exists {
@@ -111,7 +113,7 @@ func Load(path string) (*Registry, error) {
 
 func (r *Registry) Authorize(request *http.Request) bool {
 	if r.gatewayAPIKeyEnv != "" {
-		expected := os.Getenv(r.gatewayAPIKeyEnv)
+		expected := credentialValue(r.gatewayAPIKeyEnv)
 		provided := strings.TrimSpace(strings.TrimPrefix(request.Header.Get("Authorization"), "Bearer "))
 		return expected != "" && subtle.ConstantTimeCompare([]byte(expected), []byte(provided)) == 1
 	}
@@ -130,13 +132,16 @@ func validateProvider(p Provider) error {
 		return errors.New("provider name must be non-empty and may not contain separators")
 	}
 	switch p.Type {
-	case ProviderTypeOpenAICompatible, ProviderTypeCLI:
+	case ProviderTypeOpenAICompatible, ProviderTypeAnthropic, ProviderTypeCLI:
 	default:
 		return fmt.Errorf("provider %q has unsupported type %q", p.Name, p.Type)
 	}
 	if p.Type == ProviderTypeCLI {
 		if strings.TrimSpace(p.Executable) == "" {
 			return fmt.Errorf("CLI provider %q requires executable", p.Name)
+		}
+		if !filepath.IsAbs(p.Executable) {
+			return fmt.Errorf("CLI provider %q requires an absolute executable path", p.Name)
 		}
 		if !p.AllowExecution {
 			return fmt.Errorf("CLI provider %q requires allow_execution=true", p.Name)
@@ -175,6 +180,9 @@ func validateProvider(p Provider) error {
 
 func (p Provider) SupportsPath(path string) bool {
 	if len(p.Paths) == 0 {
+		if p.Type == ProviderTypeAnthropic {
+			return path == "/v1/messages" || path == "/v1/chat/completions" || path == "/api/chat" || path == "/api/generate"
+		}
 		return path == "/v1/chat/completions" || path == "/api/chat" || path == "/api/generate"
 	}
 	for _, allowed := range p.Paths {
@@ -252,7 +260,7 @@ func (r *Registry) modelAvailable(m Model) bool {
 	if !ok || (p.Enabled != nil && !*p.Enabled) {
 		return false
 	}
-	return p.APIKeyEnv == "" || os.Getenv(p.APIKeyEnv) != ""
+	return p.APIKeyEnv == "" || credentialValue(p.APIKeyEnv) != ""
 }
 
 func unsafeProviderIP(ip net.IP) bool {
@@ -291,7 +299,7 @@ func (r *Registry) SafeSnapshot() string {
 	}
 	providers := make([]safeProvider, 0, len(r.providers))
 	for _, p := range r.providers {
-		providers = append(providers, safeProvider{Name: p.Name, Type: p.Type, Available: p.APIKeyEnv == "" || os.Getenv(p.APIKeyEnv) != ""})
+		providers = append(providers, safeProvider{Name: p.Name, Type: p.Type, Available: p.APIKeyEnv == "" || credentialValue(p.APIKeyEnv) != ""})
 	}
 	sort.Slice(providers, func(i, j int) bool { return providers[i].Name < providers[j].Name })
 	b, _ := json.Marshal(struct {
