@@ -1,9 +1,11 @@
 package multillm
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -12,6 +14,58 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
+
+func TestResolvedPrivateProviderHostIsRejected(t *testing.T) {
+	_, err := resolveProviderDestination(context.Background(), Provider{BaseURL: "https://localhost/v1"})
+	if err == nil {
+		t.Fatal("expected hostname resolving to loopback to be rejected")
+	}
+	if _, err := resolveProviderDestination(context.Background(), Provider{BaseURL: "https://localhost/v1", AllowPrivate: true}); err != nil {
+		t.Fatalf("explicitly trusted private provider was rejected: %v", err)
+	}
+}
+
+func TestProviderTransportDialsOnlyApprovedIP(t *testing.T) {
+	var dialed string
+	base := &http.Transport{DialContext: func(_ context.Context, _, address string) (net.Conn, error) {
+		dialed = address
+		return nil, errors.New("test stop")
+	}}
+	roundTripper, err := pinnedProviderTransport(base, []net.IP{net.ParseIP("192.0.2.10")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	transport := roundTripper.(*http.Transport)
+	_, _ = transport.DialContext(context.Background(), "tcp", "provider.example:443")
+	if dialed != "192.0.2.10:443" {
+		t.Fatalf("dialed %q instead of the approved address", dialed)
+	}
+}
+
+func TestProviderTransportDisablesTLSHooksThatBypassPinnedDial(t *testing.T) {
+	base := &http.Transport{
+		DialTLS: func(_, _ string) (net.Conn, error) { return nil, errors.New("unsafe legacy hook") },
+		DialTLSContext: func(context.Context, string, string) (net.Conn, error) {
+			return nil, errors.New("unsafe context hook")
+		},
+	}
+	roundTripper, err := pinnedProviderTransport(base, []net.IP{net.ParseIP("192.0.2.10")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	transport := roundTripper.(*http.Transport)
+	if transport.DialTLS != nil || transport.DialTLSContext != nil {
+		t.Fatal("custom TLS dial hooks can bypass destination pinning")
+	}
+}
+
+func TestProviderRedirectRejectsHTTPSDowngrade(t *testing.T) {
+	check := sameHostRedirects("provider.example", nil)
+	next := httptest.NewRequest(http.MethodGet, "http://provider.example/v1", nil)
+	if err := check(next, nil); err == nil {
+		t.Fatal("expected plaintext redirect to be rejected")
+	}
+}
 
 func TestProxyRoutesConfiguredModelAndRedactsClientAuthorization(t *testing.T) {
 	gin.SetMode(gin.TestMode)
@@ -123,6 +177,19 @@ func TestOversizedSSEEmitsClientVisibleErrorEvent(t *testing.T) {
 	}
 	if output.String() != "123\nevent: error\ndata: {\"error\":{\"message\":\"provider response exceeded limit\",\"type\":\"response_too_large\"}}\n\n" {
 		t.Fatalf("output = %q", output.String())
+	}
+}
+
+func TestGenericAPIKeyAuthDoesNotInjectAnthropicHeader(t *testing.T) {
+	t.Setenv("REMOTE_KEY", "secret")
+	req := httptest.NewRequest(http.MethodPost, "https://example.com/v1/chat/completions", nil)
+	applyProviderAuth(req, Provider{APIKeyEnv: "REMOTE_KEY", AuthStyle: AuthStyleAPIKey})
+	if req.Header.Get("X-API-Key") != "secret" || req.Header.Get("Anthropic-Version") != "" {
+		t.Fatalf("headers = %#v", req.Header)
+	}
+	applyProviderAuth(req, Provider{APIKeyEnv: "REMOTE_KEY", AuthStyle: AuthStyleAnthropic})
+	if req.Header.Get("Anthropic-Version") == "" {
+		t.Fatal("Anthropic auth did not add required version header")
 	}
 }
 

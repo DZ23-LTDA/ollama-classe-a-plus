@@ -1,10 +1,63 @@
 package multillm
 
 import (
+	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
 )
+
+func TestGatewayKeyIsRequiredForLoopbackWhenConfigured(t *testing.T) {
+	t.Setenv("DZ23_GATEWAY_KEY", "expected")
+	r := &Registry{gatewayAPIKeyEnv: "DZ23_GATEWAY_KEY"}
+	req, _ := http.NewRequest(http.MethodPost, "http://localhost/v1/chat/completions", nil)
+	req.RemoteAddr = "127.0.0.1:1234"
+	if r.Authorize(req) {
+		t.Fatal("loopback must not bypass an explicitly configured gateway key")
+	}
+	req.Header.Set("Authorization", "Bearer expected")
+	if !r.Authorize(req) {
+		t.Fatal("valid gateway key was rejected")
+	}
+}
+
+func TestLoadRegistryRejectsLinkLocalProviderURL(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "providers.json")
+	config := `{"providers":[{"name":"metadata","type":"openai-compatible","base_url":"https://169.254.169.254/v1","models":[{"id":"x"}]}]}`
+	if err := os.WriteFile(path, []byte(config), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Load(path); err == nil {
+		t.Fatal("expected link-local provider URL to be rejected")
+	}
+}
+
+func TestModelAvailabilityTracksCredentialEnvironment(t *testing.T) {
+	r := &Registry{
+		providers: map[string]Provider{"remote": {Name: "remote", APIKeyEnv: "DYNAMIC_KEY"}},
+		models:    map[string]Model{"remote/model": {ID: "remote/model", Provider: "remote"}},
+	}
+	if model, _ := r.Model("remote/model"); model.Available {
+		t.Fatal("model unexpectedly available without credential")
+	}
+	t.Setenv("DYNAMIC_KEY", "now-present")
+	if model, _ := r.Model("remote/model"); !model.Available {
+		t.Fatal("model did not become available after credential was set")
+	}
+}
+
+func TestLoadRegistryRejectsUnsupportedCLIEmbeddings(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "providers.json")
+	config := `{"providers":[{"name":"cli","type":"cli","executable":"tool","allow_execution":true,"paths":["/v1/embeddings"],"models":[{"id":"x"}]}]}`
+	if err := os.WriteFile(path, []byte(config), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Load(path); err == nil {
+		t.Fatal("expected unsupported CLI embeddings path to be rejected")
+	}
+}
 
 func TestLoadRegistryPublishesConfiguredModelsWithoutSecrets(t *testing.T) {
 	t.Setenv("OPENAI_API_KEY", "test-secret")

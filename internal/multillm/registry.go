@@ -42,6 +42,7 @@ const (
 	ProviderTypeCLI              = "cli"
 	AuthStyleBearer              = "bearer"
 	AuthStyleAPIKey              = "x-api-key"
+	AuthStyleAnthropic           = "anthropic"
 	AuthStyleGoogleQuery         = "google-query"
 )
 
@@ -109,6 +110,11 @@ func Load(path string) (*Registry, error) {
 }
 
 func (r *Registry) Authorize(request *http.Request) bool {
+	if r.gatewayAPIKeyEnv != "" {
+		expected := os.Getenv(r.gatewayAPIKeyEnv)
+		provided := strings.TrimSpace(strings.TrimPrefix(request.Header.Get("Authorization"), "Bearer "))
+		return expected != "" && subtle.ConstantTimeCompare([]byte(expected), []byte(provided)) == 1
+	}
 	host, _, err := net.SplitHostPort(request.RemoteAddr)
 	if err != nil {
 		host = request.RemoteAddr
@@ -116,12 +122,7 @@ func (r *Registry) Authorize(request *http.Request) bool {
 	if ip := net.ParseIP(host); ip != nil && ip.IsLoopback() {
 		return true
 	}
-	if r.gatewayAPIKeyEnv == "" {
-		return false
-	}
-	expected := os.Getenv(r.gatewayAPIKeyEnv)
-	provided := strings.TrimSpace(strings.TrimPrefix(request.Header.Get("Authorization"), "Bearer "))
-	return expected != "" && subtle.ConstantTimeCompare([]byte(expected), []byte(provided)) == 1
+	return false
 }
 
 func validateProvider(p Provider) error {
@@ -145,12 +146,17 @@ func validateProvider(p Provider) error {
 				return fmt.Errorf("CLI provider %q has an invalid argument", p.Name)
 			}
 		}
+		for _, path := range p.Paths {
+			if path == "/v1/embeddings" || path == "/v1/messages" {
+				return fmt.Errorf("CLI provider %q cannot implement protocol path %q", p.Name, path)
+			}
+		}
 	} else {
 		u, err := url.Parse(p.BaseURL)
 		if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil {
 			return fmt.Errorf("provider %q requires an HTTPS base_url without userinfo", p.Name)
 		}
-		if ip := net.ParseIP(u.Hostname()); ip != nil && !p.AllowPrivate && (ip.IsLoopback() || ip.IsPrivate() || ip.IsUnspecified()) {
+		if ip := net.ParseIP(u.Hostname()); ip != nil && !p.AllowPrivate && unsafeProviderIP(ip) {
 			return fmt.Errorf("provider %q targets a private address; set allow_private explicitly for trusted local services", p.Name)
 		}
 	}
@@ -182,6 +188,7 @@ func (p Provider) SupportsPath(path string) bool {
 func (r *Registry) Models() []Model {
 	models := make([]Model, 0, len(r.models))
 	for _, m := range r.models {
+		m.Available = r.modelAvailable(m)
 		models = append(models, m)
 	}
 	sort.Slice(models, func(i, j int) bool { return models[i].ID < models[j].ID })
@@ -195,6 +202,9 @@ func (r *Registry) Provider(name string) (Provider, bool) {
 
 func (r *Registry) Model(name string) (Model, bool) {
 	m, ok := r.models[name]
+	if ok {
+		m.Available = r.modelAvailable(m)
+	}
 	return m, ok
 }
 
@@ -202,7 +212,7 @@ func (r *Registry) Resolve(name string, policy Policy) (Model, bool) {
 	if policy.LocalOnly || name == "local/private" {
 		return Model{}, false
 	}
-	if m, ok := r.models[name]; ok && m.Available && supports(m, policy.Required) && r.supportsPath(m, policy.Path) {
+	if m, ok := r.Model(name); ok && m.Available && supports(m, policy.Required) && r.supportsPath(m, policy.Path) {
 		return m, true
 	}
 	if !strings.HasPrefix(name, "auto/") && name != "auto" {
@@ -220,6 +230,7 @@ func (r *Registry) Resolve(name string, policy Policy) (Model, bool) {
 	}
 	var candidates []Model
 	for _, m := range r.models {
+		m.Available = r.modelAvailable(m)
 		if m.Available && supports(m, policy.Required) && r.supportsPath(m, policy.Path) {
 			candidates = append(candidates, m)
 		}
@@ -234,6 +245,18 @@ func (r *Registry) Resolve(name string, policy Policy) (Model, bool) {
 		return Model{}, false
 	}
 	return candidates[0], true
+}
+
+func (r *Registry) modelAvailable(m Model) bool {
+	p, ok := r.providers[m.Provider]
+	if !ok || (p.Enabled != nil && !*p.Enabled) {
+		return false
+	}
+	return p.APIKeyEnv == "" || os.Getenv(p.APIKeyEnv) != ""
+}
+
+func unsafeProviderIP(ip net.IP) bool {
+	return ip.IsLoopback() || ip.IsPrivate() || ip.IsUnspecified() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast()
 }
 
 func (r *Registry) supportsPath(m Model, path string) bool {

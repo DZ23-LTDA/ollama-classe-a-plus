@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -322,6 +323,10 @@ func (g *Gateway) doProviderRequest(c *gin.Context, provider Provider, path stri
 	if err != nil {
 		return nil, err
 	}
+	approvedIPs, err := resolveProviderDestination(c.Request.Context(), provider)
+	if err != nil {
+		return nil, err
+	}
 	if strings.HasSuffix(base.Path, "/v1") && strings.HasPrefix(path, "/v1/") {
 		path = strings.TrimPrefix(path, "/v1")
 	}
@@ -333,14 +338,81 @@ func (g *Gateway) doProviderRequest(c *gin.Context, provider Provider, path stri
 	copyRequestHeaders(req.Header, c.Request.Header)
 	applyProviderAuth(req, provider)
 	client := *g.client
+	transport, err := pinnedProviderTransport(client.Transport, approvedIPs)
+	if err != nil {
+		return nil, err
+	}
+	client.Transport = transport
 	client.CheckRedirect = sameHostRedirects(base.Host, client.CheckRedirect)
 	return client.Do(req)
+}
+
+func resolveProviderDestination(ctx context.Context, provider Provider) ([]net.IP, error) {
+	if provider.AllowPrivate {
+		return nil, nil
+	}
+	base, err := url.Parse(provider.BaseURL)
+	if err != nil {
+		return nil, err
+	}
+	addresses, err := net.DefaultResolver.LookupIPAddr(ctx, base.Hostname())
+	if err != nil {
+		return nil, fmt.Errorf("resolve provider host: %w", err)
+	}
+	if len(addresses) == 0 {
+		return nil, errors.New("provider host resolved to no addresses")
+	}
+	approved := make([]net.IP, 0, len(addresses))
+	for _, address := range addresses {
+		if unsafeProviderIP(address.IP) {
+			return nil, errors.New("provider host resolved to a private or link-local address")
+		}
+		approved = append(approved, append(net.IP(nil), address.IP...))
+	}
+	return approved, nil
+}
+
+func pinnedProviderTransport(source http.RoundTripper, approved []net.IP) (http.RoundTripper, error) {
+	if len(approved) == 0 {
+		return source, nil
+	}
+	if source == nil {
+		source = http.DefaultTransport
+	}
+	base, ok := source.(*http.Transport)
+	if !ok {
+		return nil, errors.New("provider client transport cannot enforce destination pinning")
+	}
+	transport := base.Clone()
+	transport.Proxy = nil
+	transport.DialTLS = nil
+	transport.DialTLSContext = nil
+	dial := transport.DialContext
+	if dial == nil {
+		dial = (&net.Dialer{}).DialContext
+	}
+	transport.DialContext = func(ctx context.Context, network, address string) (net.Conn, error) {
+		_, port, err := net.SplitHostPort(address)
+		if err != nil {
+			return nil, err
+		}
+		var lastErr error
+		for _, ip := range approved {
+			connection, err := dial(ctx, network, net.JoinHostPort(ip.String(), port))
+			if err == nil {
+				return connection, nil
+			}
+			lastErr = err
+		}
+		return nil, lastErr
+	}
+	return transport, nil
 }
 
 func translateChatStream(c *gin.Context, body io.Reader, modelID, nativePath string) error {
 	scanner := bufio.NewScanner(&boundedReader{reader: body, remaining: maxResponseBytes})
 	buffer := make([]byte, 64<<10)
-	scanner.Buffer(buffer, 4<<20)
+	scanner.Buffer(buffer, maxResponseBytes)
 	doneWritten := false
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
@@ -478,6 +550,9 @@ func copySSEBounded(writer io.Writer, reader io.Reader, limit int64) error {
 
 func sameHostRedirects(host string, configured func(*http.Request, []*http.Request) error) func(*http.Request, []*http.Request) error {
 	return func(next *http.Request, via []*http.Request) error {
+		if next.URL.Scheme != "https" {
+			return errors.New("provider redirect must use HTTPS")
+		}
 		if next.URL.Host != host {
 			return errors.New("provider redirect changed host")
 		}
@@ -498,6 +573,8 @@ func applyProviderAuth(req *http.Request, provider Provider) {
 	}
 	switch provider.AuthStyle {
 	case AuthStyleAPIKey:
+		req.Header.Set("X-API-Key", key)
+	case AuthStyleAnthropic:
 		req.Header.Set("X-API-Key", key)
 		req.Header.Set("Anthropic-Version", "2023-06-01")
 	case AuthStyleGoogleQuery:
