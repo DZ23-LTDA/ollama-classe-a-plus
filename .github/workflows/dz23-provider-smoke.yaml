@@ -2,11 +2,6 @@ name: dz23-provider-smoke
 
 on:
   workflow_dispatch:
-  push:
-    branches: [feat/dz23-multi-provider-foundation]
-    paths:
-      - scripts/dz23_provider_smoke.py
-      - .github/workflows/dz23-provider-smoke.yaml
 
 permissions:
   contents: read
