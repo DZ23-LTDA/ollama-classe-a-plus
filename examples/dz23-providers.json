@@ -1,0 +1,60 @@
+{
+  "gateway_api_key_env": "OLLAMA_DZ23_GATEWAY_KEY",
+  "providers": [
+    {
+      "name": "openai",
+      "type": "openai-compatible",
+      "base_url": "https://api.openai.com/v1",
+      "api_key_env": "OPENAI_API_KEY",
+      "paths": ["/v1/chat/completions", "/v1/completions", "/v1/responses", "/v1/embeddings", "/api/chat", "/api/generate"],
+      "priority": 100,
+      "models": [
+        { "id": "replace-with-an-enabled-openai-model", "capabilities": ["chat", "tools", "vision", "coding"], "priority": 20 }
+      ]
+    },
+    {
+      "name": "anthropic",
+      "type": "openai-compatible",
+      "base_url": "https://api.anthropic.com/v1",
+      "api_key_env": "ANTHROPIC_API_KEY",
+      "auth_style": "x-api-key",
+      "paths": ["/v1/chat/completions", "/api/chat", "/api/generate"],
+      "priority": 90,
+      "models": [
+        { "id": "replace-with-an-enabled-anthropic-model", "capabilities": ["chat", "tools", "vision", "coding"], "priority": 20 }
+      ]
+    },
+    {
+      "name": "gemini",
+      "type": "openai-compatible",
+      "base_url": "https://generativelanguage.googleapis.com/v1beta/openai",
+      "api_key_env": "GEMINI_API_KEY",
+      "paths": ["/v1/chat/completions", "/api/chat", "/api/generate"],
+      "priority": 80,
+      "models": [
+        { "id": "replace-with-an-enabled-gemini-model", "capabilities": ["chat", "tools", "vision", "coding"], "priority": 20 }
+      ]
+    },
+    {
+      "name": "deepseek",
+      "type": "openai-compatible",
+      "base_url": "https://api.deepseek.com/v1",
+      "api_key_env": "DEEPSEEK_API_KEY",
+      "paths": ["/v1/chat/completions", "/api/chat", "/api/generate"],
+      "priority": 70,
+      "models": [
+        { "id": "deepseek-chat", "capabilities": ["chat", "tools"], "priority": 20 },
+        { "id": "deepseek-reasoner", "capabilities": ["chat", "reasoning"], "priority": 30 }
+      ]
+    },
+    {
+      "name": "openrouter",
+      "type": "openai-compatible",
+      "base_url": "https://openrouter.ai/api/v1",
+      "api_key_env": "OPENROUTER_API_KEY",
+      "paths": ["/v1/chat/completions", "/api/chat", "/api/generate"],
+      "priority": 60,
+      "models": []
+    }
+  ]
+}
