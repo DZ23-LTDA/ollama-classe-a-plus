@@ -51,3 +51,25 @@ next_action: Criar contratos agentic e implementar uma missão vertical persiste
 ## Regra de retomada
 
 Antes de continuar, conferir este arquivo contra `git status`, o commit atual, os testes e os artefatos. Retomar pela primeira tarefa não concluída; não repetir a ponte Claude/Codex já validada.
+
+
+## Adendo — fase agentic multimodal, builders, auth e colaboração — 2026-09-21
+
+```yaml
+state: VERIFIED_LOCAL_PHASE
+completed:
+  - auth: organizations, memberships, RBAC, revocable tokens, OAuth PKCE state, AES-GCM credential storage and refresh contract
+  - jobs: persistent queue, retries, dead-letter queue, replay, trace spans and SSE events
+  - media: HTTPS image/video/speech/transcription adapters plus deterministic WAV smoke fixture
+  - builders: website/app/game/slides/dashboard templates, preview containment, ZIP export and local versioned publish
+  - desktop: Linux implementation preserved, Darwin and Windows adapters compile cross-platform
+  - collaboration: persistent comments, presence, snapshots and SSE stream
+  - mobile: Expo SecureStore session, EAS profiles, Android/iOS identifiers and typecheck
+proofs:
+  - CGO_ENABLED=0 go test ./internal/agent -count=1: PASS
+  - GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build ./internal/agent: PASS
+  - GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build ./internal/agent: PASS
+  - apps/mobile-agentic npm ci && npm run typecheck: PASS
+  - server gate: BLOCKED by existing upstream MLX symbols/toolchain, not by internal/agent tests
+next_action: Resolve MLX build environment, then commit/review/push the verified phase.
+```

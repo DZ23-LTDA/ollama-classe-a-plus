@@ -75,10 +75,20 @@ O Desktop será um companion local pareado por capability report e heartbeat. A 
 
 O Browser Operator utilizará um adapter de browser controlado, com perfis isolados, cookies separados, logs de navegação e takeover explícito para login/CAPTCHA/ações sensíveis. A superfície Mobile será um cliente de missão e aprovação; operações locais do celular só existirão por um companion autorizado, nunca por suposição do servidor.
 
+## Mídia e builders
+
+O subsistema multimídia é provider-agnostic e aceita um endpoint HTTPS compatível para imagem, vídeo, speech e transcrição. Cada output entra no workspace da missão como artifact com tamanho, MIME e SHA-256. O modo `media.tone` existe somente como fixture determinística de áudio; não substitui um modelo generativo.
+
+O BuilderService cria projetos de website, app, game, slides e dashboard com templates ou arquivos declarados, oferece preview local com containment, export ZIP e publicação local versionada. Um adapter de deploy público deverá implementar credenciais por organização, domínio, rollback, logs e health checks antes de ser habilitado.
+
+## Identidade, OAuth e colaboração
+
+AuthStore mantém organizações, memberships, RBAC, tokens revogáveis e OAuth state com PKCE. Access/refresh tokens de providers externos são cifrados com AES-GCM e uma chave somente de ambiente; nenhum token é enviado ao cliente ou escrito em eventos. O CollaborationStore mantém comentários, presença e stream SSE por project ID; produção deve trocar o store local por SQLite/PostgreSQL e aplicar isolamento de tenant em cada consulta.
+
 ## Métricas e auditoria
 
 Cada missão emite eventos estruturados com correlação. Métricas mínimas incluem tempo de planejamento, duração por passo, retries, falhas, fila, aprovação, uso de tokens, custo estimado, bytes de artefatos e latência de tools. Logs não podem conter tokens, cookies, conteúdo secreto ou dados pessoais sem redaction.
 
 ## Definição de pronto da primeira fatia
 
-A primeira fatia será considerada pronta quando uma missão textual puder ser criada por API, persistir plano e eventos, executar uma ferramenta de leitura limitada do workspace, produzir um artifact manifest, sobreviver a restart, bloquear um passo que exige aprovação e expor o estado por API. Browser, desktop, mídia, conectores e mobile entrarão depois, cada um com adapter real e teste de integração, nunca como mock apresentado como capacidade final.
+A primeira fatia foi considerada pronta quando uma missão textual pôde ser criada por API, persistir plano e eventos, executar uma ferramenta de leitura limitada do workspace, produzir um artifact manifest, sobreviver a restart, bloquear um passo que exige aprovação e expor o estado por API. Browser, desktop, mídia, builders, conectores, OAuth e mobile agora possuem adapters/testes focados; a definição de produção ainda exige credenciais, deploy, assinatura nativa, testes em dispositivos reais e auditoria independente.

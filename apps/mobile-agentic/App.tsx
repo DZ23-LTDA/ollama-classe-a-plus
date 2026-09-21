@@ -1,13 +1,18 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SecureStore from "expo-secure-store";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 type Mission = { id: string; objective: string; state: string; approvals?: Array<{ id: string; step_id: string; status: string }>; last_error?: string };
 type Event = { id: string; type: string; step_id?: string; created_at: string };
+type Session = { access_token: string; user: { email: string }; organization: { name: string } };
 
-async function request<T>(base: string, path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${base.replace(/\/$/, "")}${path}`, { ...init, headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) } });
+async function request<T>(base: string, path: string, token?: string, init?: RequestInit): Promise<T> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  if (init?.headers && !(init.headers instanceof Headers)) Object.assign(headers, init.headers);
+  const response = await fetch(`${base.replace(/\/$/, "")}${path}`, { ...init, headers });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(body.error ?? response.statusText);
   return body as T;
@@ -16,6 +21,8 @@ async function request<T>(base: string, path: string, init?: RequestInit): Promi
 export default function App() {
   const [base, setBase] = useState("http://localhost:11434");
   const [draftBase, setDraftBase] = useState(base);
+  const [token, setToken] = useState("");
+  const [draftToken, setDraftToken] = useState("");
   const [objective, setObjective] = useState("");
   const [mission, setMission] = useState<Mission | null>(null);
   const [events, setEvents] = useState<Event[]>([]);
@@ -25,41 +32,51 @@ export default function App() {
   const refresh = async (missionId = mission?.id) => {
     if (!missionId) return;
     const [nextMission, nextEvents] = await Promise.all([
-      request<Mission>(base, `/api/agent/v1/missions/${encodeURIComponent(missionId)}`),
-      request<{ events: Event[] }>(base, `/api/agent/v1/missions/${encodeURIComponent(missionId)}/events`),
+      request<Mission>(base, `/api/agent/v1/missions/${encodeURIComponent(missionId)}`, token),
+      request<{ events: Event[] }>(base, `/api/agent/v1/missions/${encodeURIComponent(missionId)}/events`, token),
     ]);
     setMission(nextMission);
     setEvents(nextEvents.events);
   };
 
-  useEffect(() => { void AsyncStorage.getItem("dz23.agent.base").then((value) => { if (value) { setBase(value); setDraftBase(value); } }); }, []);
-  useEffect(() => { const timer = setInterval(() => void refresh().catch(() => undefined), 3000); return () => clearInterval(timer); }, [mission?.id, base]);
+  useEffect(() => {
+    void AsyncStorage.getItem("dz23.agent.base").then((value) => { if (value) { setBase(value); setDraftBase(value); } });
+    void SecureStore.getItemAsync("dz23.agent.token").then((value) => { if (value) { setToken(value); setDraftToken(value); } });
+  }, []);
+  useEffect(() => { const timer = setInterval(() => void refresh().catch(() => undefined), 3000); return () => clearInterval(timer); }, [mission?.id, base, token]);
 
   const approvals = useMemo(() => mission?.approvals?.filter((approval) => approval.status === "PENDING") ?? [], [mission]);
   const create = async () => {
     setBusy(true); setError("");
     try {
-      const created = await request<Mission>(base, "/api/agent/v1/missions", { method: "POST", body: JSON.stringify({ objective, auto_run: false }) });
+      const created = await request<Mission>(base, "/api/agent/v1/missions", token, { method: "POST", body: JSON.stringify({ objective, auto_run: false }) });
       setMission(created); setObjective(""); await refresh(created.id);
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Falha de rede"); } finally { setBusy(false); }
   };
   const decide = async (approvalId: string, approved: boolean) => {
     if (!mission) return;
     setBusy(true); setError("");
-    try { await request(base, `/api/agent/v1/missions/${mission.id}/approvals/${approvalId}`, { method: "POST", body: JSON.stringify({ approved, reason: "Mobile operator" }) }); await refresh(); }
+    try { await request(base, `/api/agent/v1/missions/${mission.id}/approvals/${approvalId}`, token, { method: "POST", body: JSON.stringify({ approved, reason: "Mobile operator" }) }); await refresh(); }
     catch (cause) { setError(cause instanceof Error ? cause.message : "Falha ao decidir approval"); } finally { setBusy(false); }
   };
   const run = async () => {
     if (!mission) return;
     setBusy(true); setError("");
-    try { await request(base, `/api/agent/v1/missions/${mission.id}/run`, { method: "POST", body: "{}" }); await refresh(); }
+    try { await request(base, `/api/agent/v1/missions/${mission.id}/run`, token, { method: "POST", body: "{}" }); await refresh(); }
     catch (cause) { setError(cause instanceof Error ? cause.message : "Falha ao executar"); } finally { setBusy(false); }
   };
-  const saveBase = async () => { const value = draftBase.trim(); if (!value) return; await AsyncStorage.setItem("dz23.agent.base", value); setBase(value); };
+  const saveSession = async () => {
+    const nextBase = draftBase.trim();
+    if (!nextBase) return;
+    await AsyncStorage.setItem("dz23.agent.base", nextBase);
+    if (draftToken.trim()) await SecureStore.setItemAsync("dz23.agent.token", draftToken.trim());
+    setBase(nextBase); setToken(draftToken.trim());
+  };
+  const clearSession = async () => { await SecureStore.deleteItemAsync("dz23.agent.token"); setToken(""); setDraftToken(""); };
 
   return <SafeAreaView style={styles.safe}><StatusBar style="auto" /><ScrollView contentContainerStyle={styles.container}>
     <Text style={styles.eyebrow}>DZ23 AGENTIC</Text><Text style={styles.title}>Mission mobile</Text><Text style={styles.subtitle}>Acompanhe, aprove e execute missões do seu dispositivo.</Text>
-    <View style={styles.card}><Text style={styles.label}>Servidor</Text><TextInput value={draftBase} onChangeText={setDraftBase} autoCapitalize="none" style={styles.input} /><Pressable onPress={() => void saveBase()} style={styles.secondary}><Text style={styles.secondaryText}>Salvar servidor</Text></Pressable></View>
+    <View style={styles.card}><Text style={styles.label}>Servidor</Text><TextInput value={draftBase} onChangeText={setDraftBase} autoCapitalize="none" autoCorrect={false} style={styles.input} /><Text style={styles.label}>Token Bearer (armazenado no SecureStore)</Text><TextInput value={draftToken} onChangeText={setDraftToken} autoCapitalize="none" autoCorrect={false} secureTextEntry style={styles.input} /><View style={styles.row}><Pressable onPress={() => void saveSession()} style={[styles.secondary, { flex: 1 }]}><Text style={styles.secondaryText}>Salvar sessão</Text></Pressable><Pressable onPress={() => void clearSession()} style={styles.secondary}><Text style={styles.secondaryText}>Sair</Text></Pressable></View></View>
     <View style={styles.card}><Text style={styles.label}>Novo objetivo</Text><TextInput value={objective} onChangeText={setObjective} multiline placeholder="Ex.: verificar os testes do projeto" style={[styles.input, styles.multiline]} /><Pressable disabled={busy || !objective.trim()} onPress={() => void create()} style={[styles.primary, (!objective.trim() || busy) && styles.disabled]}>{busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>Criar missão</Text>}</Pressable></View>
     {error ? <Text style={styles.error}>{error}</Text> : null}
     {mission ? <View style={styles.card}><View style={styles.row}><View style={{ flex: 1 }}><Text style={styles.muted}>{mission.id}</Text><Text style={styles.mission}>{mission.objective}</Text></View><Text style={styles.status}>{mission.state}</Text></View>

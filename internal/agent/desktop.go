@@ -1,15 +1,11 @@
 package agent
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
-	"strconv"
 	"strings"
-	"time"
 )
 
 type desktopCompanionTool struct{}
@@ -30,7 +26,7 @@ func (desktopCompanionTool) Execute(ctx context.Context, toolContext ToolContext
 		if err != nil {
 			return ToolResult{}, err
 		}
-		if err := runDesktop(ctx, "import", "-window", "root", path); err != nil {
+		if err := desktopScreenshot(ctx, path); err != nil {
 			return ToolResult{}, err
 		}
 		manifest, err := BuildArtifactManifest(toolContext.Workspace, toolContext.MissionID, toolContext.StepID, "desktop-screenshot", relativePath)
@@ -47,7 +43,7 @@ func (desktopCompanionTool) Execute(ctx context.Context, toolContext ToolContext
 		if y < 0 || y > 10000 {
 			return ToolResult{}, errors.New("mouse y must be between 0 and 10000")
 		}
-		if err := runDesktop(ctx, "xdotool", "mousemove", "--sync", strconv.Itoa(x), strconv.Itoa(y), "click", "1"); err != nil {
+		if err := desktopMouseClick(ctx, x, y); err != nil {
 			return ToolResult{}, err
 		}
 		return ToolResult{Value: map[string]any{"action": action, "x": x, "y": y}}, nil
@@ -56,12 +52,12 @@ func (desktopCompanionTool) Execute(ctx context.Context, toolContext ToolContext
 		if len(text) > 4096 || strings.ContainsRune(text, '\x00') {
 			return ToolResult{}, errors.New("keyboard text is empty/too long or contains NUL")
 		}
-		if err := runDesktop(ctx, "xdotool", "type", "--clearmodifiers", "--delay", "1", text); err != nil {
+		if err := desktopKeyboardType(ctx, text); err != nil {
 			return ToolResult{}, err
 		}
 		return ToolResult{Value: map[string]any{"action": action, "bytes": len(text)}}, nil
 	case "clipboard_get":
-		output, err := runDesktopOutput(ctx, "xclip", "-selection", "clipboard", "-o")
+		output, err := desktopClipboardGet(ctx)
 		if err != nil {
 			return ToolResult{}, err
 		}
@@ -71,12 +67,12 @@ func (desktopCompanionTool) Execute(ctx context.Context, toolContext ToolContext
 		if len(text) > 64<<10 || strings.ContainsRune(text, '\x00') {
 			return ToolResult{}, errors.New("clipboard text is empty/too long or contains NUL")
 		}
-		if err := runDesktopWithInput(ctx, text, "xclip", "-selection", "clipboard"); err != nil {
+		if err := desktopClipboardSet(ctx, text); err != nil {
 			return ToolResult{}, err
 		}
 		return ToolResult{Value: map[string]any{"action": action, "bytes": len(text)}}, nil
 	case "process_list":
-		output, err := runDesktopOutput(ctx, "ps", "-eo", "pid=,comm=,args=")
+		output, err := desktopProcessList(ctx)
 		if err != nil {
 			return ToolResult{}, err
 		}
@@ -86,41 +82,13 @@ func (desktopCompanionTool) Execute(ctx context.Context, toolContext ToolContext
 		if pid <= 1 || pid == os.Getpid() {
 			return ToolResult{}, errors.New("refusing to terminate invalid or current process")
 		}
-		if err := runDesktop(ctx, "kill", "-TERM", strconv.Itoa(pid)); err != nil {
+		if err := desktopProcessTerminate(ctx, pid); err != nil {
 			return ToolResult{}, err
 		}
 		return ToolResult{Value: map[string]any{"action": action, "pid": pid, "signal": "TERM"}}, nil
 	default:
 		return ToolResult{}, fmt.Errorf("unsupported desktop action %q", action)
 	}
-}
-
-func runDesktop(ctx context.Context, name string, args ...string) error {
-	_, err := runDesktopOutput(ctx, name, args...)
-	return err
-}
-
-func runDesktopOutput(ctx context.Context, name string, args ...string) (string, error) {
-	deadline, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-	command := exec.CommandContext(deadline, name, args...)
-	command.Env = append(os.Environ(), "LC_ALL=C")
-	var stdout, stderr bytes.Buffer
-	command.Stdout = &limitedBuffer{Buffer: &stdout, Limit: 128 << 10}
-	command.Stderr = &limitedBuffer{Buffer: &stderr, Limit: 32 << 10}
-	if err := command.Run(); err != nil {
-		return stdout.String(), fmt.Errorf("desktop %s: %w: %s", name, err, strings.TrimSpace(stderr.String()))
-	}
-	return stdout.String(), nil
-}
-
-func runDesktopWithInput(ctx context.Context, input, name string, args ...string) error {
-	deadline, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-	command := exec.CommandContext(deadline, name, args...)
-	command.Env = append(os.Environ(), "LC_ALL=C")
-	command.Stdin = strings.NewReader(input)
-	return command.Run()
 }
 
 func limitString(value string, limit int) string {

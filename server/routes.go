@@ -1976,7 +1976,11 @@ func (s *Server) GenerateRoutes() (http.Handler, error) {
 	r.GET("/api/dz23/cli-catalog", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"tools": multillm.DetectCLIs()})
 	})
-	newAgentAPI(s.agentRuntime).register(r)
+	agentAPI, err := newAgentAPI(s.agentRuntime)
+	if err != nil {
+		return nil, err
+	}
+	agentAPI.register(r)
 	// Codex uses this existing Ollama listener for both native and Ollama
 	// models. The proxy selects the upstream per request.
 	r.Any(proxy.CodexDesktopPathPrefix+"/*path", gin.WrapH(codexDesktopProxy))

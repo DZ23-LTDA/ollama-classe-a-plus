@@ -110,13 +110,13 @@ This fork can expose explicitly configured API and CLI providers beside local mo
 
 ### DZ23 agentic runtime
 
-The fork now includes an agentic runtime with persistent missions, validated plans, approval-gated tools, workspace isolation, artifact manifests, event history, recovery-aware execution, Playwright Browser Operator, Linux Desktop companion actions, MCP stdio lifecycle, semantic memory, HTTP connectors, scheduler/webhooks and Prometheus metrics. Configure `OLLAMA_AGENT_ROOT`, optionally set `OLLAMA_AGENT_STORE`, `OLLAMA_AGENT_MODEL`, `OLLAMA_AGENT_EMBED_MODEL`, `OLLAMA_AGENT_CONNECTORS` and `OLLAMA_AGENT_MCP`, then use the API or the CLI:
+The fork now includes an agentic runtime with persistent missions, validated plans, approval-gated tools, workspace isolation, artifact manifests, event history, recovery-aware execution, a persistent queue with retries/dead-letter/replay, SSE events, trace spans, Playwright Browser Operator, Linux/macOS/Windows Desktop companion adapters, MCP stdio lifecycle, semantic memory, HTTP connectors, scheduler/webhooks, Prometheus metrics, optional encrypted OAuth credentials, organization/RBAC boundaries, collaboration comments/presence, multimodal provider adapters and builders for websites, apps, games, slides and dashboards. Configure `OLLAMA_AGENT_ROOT`, optionally set `OLLAMA_AGENT_STORE`, `OLLAMA_AGENT_MODEL`, `OLLAMA_AGENT_EMBED_MODEL`, `OLLAMA_AGENT_CONNECTORS`, `OLLAMA_AGENT_MCP`, `OLLAMA_AGENT_AUTH_STORE`, `OLLAMA_AGENT_AUTH_REQUIRED`, `OLLAMA_AGENT_MEDIA_BASE_URL` and `OLLAMA_AGENT_MEDIA_API_KEY`, then use the API or the CLI:
 
 ```shell
 ollama agent create --objective "inspecionar o workspace" --auto-run
 ```
 
-Read [the agentic architecture](docs/agentic/ARCHITECTURE.md), [the integrations guide](docs/agentic/INTEGRATIONS.md), [the executable roadmap](docs/agentic/ROADMAP.md), and [the API guide](docs/agentic/API.md). The Web Agentic Console and an Expo mobile client are included as operator surfaces. Media generation, builder de sites/apps/jogos/slides/dashboards, native Windows/macOS companion and multi-tenant collaboration remain subsequent phases and are not represented as completed capabilities without platform-specific proofs.
+Read [the agentic architecture](docs/agentic/ARCHITECTURE.md), [the integrations guide](docs/agentic/INTEGRATIONS.md), [the executable roadmap](docs/agentic/ROADMAP.md), and [the API guide](docs/agentic/API.md). The Web Agentic Console and an Expo mobile client are included as operator surfaces. Provider credentials, EAS signing, external OAuth configuration and production hosting remain deployment responsibilities; the code does not pretend that a local preview is a public production deployment.
 
 ### Python
 

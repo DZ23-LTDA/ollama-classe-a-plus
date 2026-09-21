@@ -22,6 +22,11 @@ type Runtime struct {
 	metrics       *RuntimeMetrics
 	connectors    *ConnectorManager
 	mcp           *MCPManager
+	queue         *JobQueue
+	traces        *TraceStore
+	media         *MediaManager
+	builder       *BuilderService
+	collaboration *CollaborationStore
 	mu            sync.Mutex
 	running       map[string]bool
 }
@@ -34,6 +39,11 @@ type RuntimeConfig struct {
 	Context       *ContextStore
 	Connectors    *ConnectorManager
 	MCP           *MCPManager
+	Queue         *JobQueue
+	Traces        *TraceStore
+	Media         *MediaManager
+	Builder       *BuilderService
+	Collaboration *CollaborationStore
 }
 
 func NewRuntime(config RuntimeConfig) (*Runtime, error) {
@@ -73,7 +83,35 @@ func NewRuntime(config RuntimeConfig) (*Runtime, error) {
 			return nil, err
 		}
 	}
-	return &Runtime{store: store, planner: planner, tools: tools, workspaceRoot: root, context: contextStore, metrics: &RuntimeMetrics{}, connectors: config.Connectors, mcp: config.MCP, running: make(map[string]bool)}, nil
+	queue := config.Queue
+	if queue == nil {
+		queue, err = NewJobQueue(filepath.Join(root, ".agent-queue"))
+		if err != nil {
+			return nil, err
+		}
+	}
+	traces := config.Traces
+	if traces == nil {
+		traces, err = NewTraceStore(filepath.Join(root, ".agent-traces"))
+		if err != nil {
+			return nil, err
+		}
+	}
+	builder := config.Builder
+	if builder == nil {
+		builder, err = NewBuilderService(filepath.Join(root, ".agent-builders"))
+		if err != nil {
+			return nil, err
+		}
+	}
+	collaboration := config.Collaboration
+	if collaboration == nil {
+		collaboration, err = NewCollaborationStore(filepath.Join(root, ".agent-collaboration"))
+		if err != nil {
+			return nil, err
+		}
+	}
+	return &Runtime{store: store, planner: planner, tools: tools, workspaceRoot: root, context: contextStore, metrics: &RuntimeMetrics{}, connectors: config.Connectors, mcp: config.MCP, queue: queue, traces: traces, media: config.Media, builder: builder, collaboration: collaboration, running: make(map[string]bool)}, nil
 }
 
 func (r *Runtime) Context() *ContextStore {
@@ -97,6 +135,16 @@ func (r *Runtime) MCPServers() []MCPServerConfig {
 	}
 	return r.mcp.List()
 }
+
+func (r *Runtime) Traces(traceID string) []TraceSpan {
+	return r.traces.List(traceID, 500)
+}
+
+func (r *Runtime) Media() *MediaManager { return r.media }
+
+func (r *Runtime) Builder() *BuilderService { return r.builder }
+
+func (r *Runtime) Collaboration() *CollaborationStore { return r.collaboration }
 
 func (r *Runtime) CreateMission(ctx context.Context, request CreateMissionRequest) (Mission, error) {
 	objective := strings.TrimSpace(request.Objective)
@@ -153,7 +201,7 @@ func (r *Runtime) CreateMission(ctx context.Context, request CreateMissionReques
 	}
 	_ = r.event(mission, "mission.planned", "", map[string]any{"steps": len(plan), "approvals": len(mission.Approvals)})
 	if request.AutoRun && mission.State == MissionReady {
-		go func() { _ = r.Run(context.Background(), mission.ID) }()
+		_, _ = r.EnqueueMission(mission.ID)
 	}
 	return mission, nil
 }
@@ -163,6 +211,9 @@ func (r *Runtime) GetMission(id string) (Mission, error) {
 }
 
 func (r *Runtime) Start(ctx context.Context) {
+	r.queue.Start(ctx, "agent-runtime", func(jobContext context.Context, job QueueJob) error {
+		return r.Run(jobContext, job.MissionID)
+	})
 	go func() {
 		r.resumePending(ctx)
 		ticker := time.NewTicker(2 * time.Second)
@@ -191,16 +242,33 @@ func (r *Runtime) resumePending(ctx context.Context) {
 		if !resume || !r.approvalsReady(mission) {
 			continue
 		}
-		go func(id string) { _ = r.Run(ctx, id) }(mission.ID)
+		_, _ = r.EnqueueMission(mission.ID)
 	}
+}
+
+func (r *Runtime) EnqueueMission(missionID string) (QueueJob, error) {
+	if _, err := r.store.GetMission(strings.TrimSpace(missionID)); err != nil {
+		return QueueJob{}, err
+	}
+	return r.queue.Enqueue(missionID, 3)
+}
+
+func (r *Runtime) QueueJobs(status QueueStatus) []QueueJob {
+	return r.queue.List(status)
+}
+
+func (r *Runtime) ReplayJob(jobID string) (QueueJob, error) {
+	return r.queue.Replay(jobID)
 }
 
 func (r *Runtime) ListTools() []ToolDescriptor {
 	return r.tools.Descriptors()
 }
 
-func (r *Runtime) Run(ctx context.Context, id string) error {
+func (r *Runtime) Run(ctx context.Context, id string) (runErr error) {
 	id = strings.TrimSpace(id)
+	missionSpan := r.traces.Start("tr_"+id, "", "mission.run", map[string]any{"mission_id": id})
+	defer func() { missionSpan.End("ok", runErr) }()
 	if id == "" {
 		return errors.New("mission id is required")
 	}
@@ -267,7 +335,9 @@ func (r *Runtime) Run(ctx context.Context, id string) error {
 			return err
 		}
 		_ = r.event(mission, "step.started", step.ID, map[string]any{"tool": step.Kind, "attempt": step.Attempts})
+		toolSpan := r.traces.Start("tr_"+mission.ID, missionSpan.ID(), "tool."+step.Kind, map[string]any{"mission_id": mission.ID, "step_id": step.ID, "tool": step.Kind})
 		result, executeErr := tool.Execute(ctx, ToolContext{MissionID: mission.ID, StepID: step.ID, Workspace: mission.Workspace}, step.Input)
+		toolSpan.End("ok", executeErr)
 		if executeErr != nil {
 			if step.Attempts < 2 {
 				r.metrics.retries.Add(1)
