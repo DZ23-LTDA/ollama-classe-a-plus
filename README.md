@@ -110,13 +110,13 @@ This fork can expose explicitly configured API and CLI providers beside local mo
 
 ### DZ23 agentic runtime
 
-The fork also includes the first vertical slice of an agentic runtime: persistent missions, validated plans, approval-gated tools, workspace isolation, artifact manifests, event history, and recovery-aware execution. Configure `OLLAMA_AGENT_ROOT`, optionally set `OLLAMA_AGENT_STORE` and `OLLAMA_AGENT_MODEL`, then use the API or the CLI:
+The fork now includes an agentic runtime with persistent missions, validated plans, approval-gated tools, workspace isolation, artifact manifests, event history, recovery-aware execution, Playwright Browser Operator, Linux Desktop companion actions, MCP stdio lifecycle, semantic memory, HTTP connectors, scheduler/webhooks and Prometheus metrics. Configure `OLLAMA_AGENT_ROOT`, optionally set `OLLAMA_AGENT_STORE`, `OLLAMA_AGENT_MODEL`, `OLLAMA_AGENT_EMBED_MODEL`, `OLLAMA_AGENT_CONNECTORS` and `OLLAMA_AGENT_MCP`, then use the API or the CLI:
 
 ```shell
 ollama agent create --objective "inspecionar o workspace" --auto-run
 ```
 
-Read [the agentic architecture](docs/agentic/ARCHITECTURE.md), [the executable roadmap](docs/agentic/ROADMAP.md), and [the API guide](docs/agentic/API.md). Browser control, computer use, external connectors, media generation, mobile surfaces, and dedicated code sandboxes remain subsequent adapters and are not represented as completed capabilities until they have real implementations and tests.
+Read [the agentic architecture](docs/agentic/ARCHITECTURE.md), [the integrations guide](docs/agentic/INTEGRATIONS.md), [the executable roadmap](docs/agentic/ROADMAP.md), and [the API guide](docs/agentic/API.md). The Web Agentic Console and an Expo mobile client are included as operator surfaces. Media generation, builder de sites/apps/jogos/slides/dashboards, native Windows/macOS companion and multi-tenant collaboration remain subsequent phases and are not represented as completed capabilities without platform-specific proofs.
 
 ### Python
 

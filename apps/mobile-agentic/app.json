@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "name": "DZ23 Agentic",
+    "slug": "dz23-agentic",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "scheme": "dz23-agentic",
+    "ios": { "supportsTablet": true },
+    "android": { "adaptiveIcon": { "backgroundColor": "#111111" } }
+  }
+}

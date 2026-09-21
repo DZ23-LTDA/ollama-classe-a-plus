@@ -56,7 +56,7 @@ func (p OllamaPlanner) Plan(ctx context.Context, mission Mission) ([]Step, error
 		Stream: &stream,
 		Format: format,
 		Messages: []api.Message{
-			{Role: "system", Content: "You are a mission planner. Return only JSON with a top-level steps array. Each step must have kind, title, risk, requires_approval, and input. Allowed kinds are workspace.list, workspace.read, workspace.write, terminal.exec, sandbox.exec. Never invent completed results. Use read risk for inspection, write risk for filesystem changes, and require approval for write, terminal, or sandbox steps."},
+			{Role: "system", Content: "You are a mission planner. Return only JSON with a top-level steps array. Each step must have kind, title, risk, requires_approval, and input. Allowed kinds are workspace.list, workspace.read, workspace.write, terminal.exec, sandbox.exec, browser.operator, desktop.companion, mcp.call, connector.http. Never invent completed results. Use read risk for inspection, write risk for filesystem changes, external_side_effect for browser, desktop, MCP, and connector actions, and require approval for write, terminal, sandbox, browser, desktop, MCP, or connector steps."},
 			{Role: "user", Content: fmt.Sprintf("Objective: %s\nWorkspace: %s\nProject: %s", mission.Objective, mission.Workspace, mission.ProjectID)},
 		},
 	}
@@ -105,11 +105,15 @@ func normalizeSteps(steps []Step) ([]Step, error) {
 		return nil, errors.New("planner step count is outside the allowed range")
 	}
 	allowed := map[string]RiskClass{
-		"workspace.list":  RiskRead,
-		"workspace.read":  RiskRead,
-		"workspace.write": RiskWrite,
-		"terminal.exec":   RiskWrite,
-		"sandbox.exec":    RiskWrite,
+		"workspace.list":    RiskRead,
+		"workspace.read":    RiskRead,
+		"workspace.write":   RiskWrite,
+		"terminal.exec":     RiskWrite,
+		"sandbox.exec":      RiskWrite,
+		"browser.operator":  RiskExternalSideEffect,
+		"desktop.companion": RiskExternalSideEffect,
+		"mcp.call":          RiskExternalSideEffect,
+		"connector.http":    RiskExternalSideEffect,
 	}
 	for i := range steps {
 		if _, ok := allowed[steps[i].Kind]; !ok {

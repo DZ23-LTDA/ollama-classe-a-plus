@@ -3,6 +3,8 @@ package agent
 import (
 	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -186,5 +188,28 @@ func TestScheduleClaimIsIdempotent(t *testing.T) {
 	}
 	if again := store.ClaimDueSchedules(checkAt); len(again) != 0 {
 		t.Fatalf("schedule claimed twice: %+v", again)
+	}
+}
+
+func TestBrowserOperatorNavigateAndSnapshot(t *testing.T) {
+	t.Setenv("OLLAMA_AGENT_BROWSER_ALLOW_PRIVATE", "1")
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		_, _ = w.Write([]byte("<html><head><title>DZ23</title></head><body><h1>Hello Browser</h1></body></html>"))
+	}))
+	defer server.Close()
+	root := t.TempDir()
+	tool := browserOperatorTool{}
+	toolContext := ToolContext{MissionID: "browser-test", StepID: "step_1", Workspace: root}
+	if _, err := tool.Execute(context.Background(), toolContext, map[string]any{"action": "navigate", "url": server.URL}); err != nil {
+		t.Fatal(err)
+	}
+	result, err := tool.Execute(context.Background(), toolContext, map[string]any{"action": "snapshot"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	content, ok := result.Value.(map[string]any)["content"].(string)
+	if !ok || !strings.Contains(content, "Hello Browser") {
+		t.Fatalf("browser result = %+v", result.Value)
 	}
 }

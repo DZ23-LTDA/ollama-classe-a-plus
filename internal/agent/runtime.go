@@ -19,6 +19,9 @@ type Runtime struct {
 	tools         *Registry
 	workspaceRoot string
 	context       *ContextStore
+	metrics       *RuntimeMetrics
+	connectors    *ConnectorManager
+	mcp           *MCPManager
 	mu            sync.Mutex
 	running       map[string]bool
 }
@@ -29,6 +32,8 @@ type RuntimeConfig struct {
 	Tools         *Registry
 	WorkspaceRoot string
 	Context       *ContextStore
+	Connectors    *ConnectorManager
+	MCP           *MCPManager
 }
 
 func NewRuntime(config RuntimeConfig) (*Runtime, error) {
@@ -43,6 +48,12 @@ func NewRuntime(config RuntimeConfig) (*Runtime, error) {
 	tools := config.Tools
 	if tools == nil {
 		tools = NewRegistry()
+	}
+	if config.Connectors != nil {
+		tools.Register(connectorTool{manager: config.Connectors})
+	}
+	if config.MCP != nil {
+		tools.Register(mcpCallTool{manager: config.MCP})
 	}
 	root := config.WorkspaceRoot
 	if strings.TrimSpace(root) == "" {
@@ -62,11 +73,29 @@ func NewRuntime(config RuntimeConfig) (*Runtime, error) {
 			return nil, err
 		}
 	}
-	return &Runtime{store: store, planner: planner, tools: tools, workspaceRoot: root, context: contextStore, running: make(map[string]bool)}, nil
+	return &Runtime{store: store, planner: planner, tools: tools, workspaceRoot: root, context: contextStore, metrics: &RuntimeMetrics{}, connectors: config.Connectors, mcp: config.MCP, running: make(map[string]bool)}, nil
 }
 
 func (r *Runtime) Context() *ContextStore {
 	return r.context
+}
+
+func (r *Runtime) Metrics() MetricsSnapshot {
+	return r.metrics.Snapshot()
+}
+
+func (r *Runtime) Connectors() []ConnectorConfig {
+	if r.connectors == nil {
+		return nil
+	}
+	return r.connectors.List()
+}
+
+func (r *Runtime) MCPServers() []MCPServerConfig {
+	if r.mcp == nil {
+		return nil
+	}
+	return r.mcp.List()
 }
 
 func (r *Runtime) CreateMission(ctx context.Context, request CreateMissionRequest) (Mission, error) {
@@ -86,6 +115,7 @@ func (r *Runtime) CreateMission(ctx context.Context, request CreateMissionReques
 	if err := r.store.PutMission(mission); err != nil {
 		return Mission{}, err
 	}
+	r.metrics.missionsCreated.Add(1)
 	_ = r.event(mission, "mission.created", "", map[string]any{"objective": objective})
 	plan, err := r.planner.Plan(ctx, mission)
 	if err != nil {
@@ -94,6 +124,17 @@ func (r *Runtime) CreateMission(ctx context.Context, request CreateMissionReques
 	plan, err = normalizeSteps(plan)
 	if err != nil {
 		return r.failMission(mission, err)
+	}
+	for index := range plan {
+		tool, ok := r.tools.Get(plan[index].Kind)
+		if !ok {
+			return r.failMission(mission, fmt.Errorf("planner returned unregistered tool %q", plan[index].Kind))
+		}
+		descriptor := tool.Descriptor()
+		plan[index].RequiresApproval = plan[index].RequiresApproval || descriptor.RequiresApproval
+		if riskRank(descriptor.Risk) > riskRank(plan[index].Risk) {
+			plan[index].Risk = descriptor.Risk
+		}
 	}
 	mission.Plan = plan
 	mission.State = MissionReady
@@ -217,6 +258,8 @@ func (r *Runtime) Run(ctx context.Context, id string) error {
 		}
 		step.State = StepRunning
 		step.Attempts++
+		r.metrics.stepsStarted.Add(1)
+		r.metrics.toolCalls.Add(1)
 		mission.State = MissionObserving
 		mission.Version++
 		mission.UpdatedAt = time.Now().UTC()
@@ -227,6 +270,7 @@ func (r *Runtime) Run(ctx context.Context, id string) error {
 		result, executeErr := tool.Execute(ctx, ToolContext{MissionID: mission.ID, StepID: step.ID, Workspace: mission.Workspace}, step.Input)
 		if executeErr != nil {
 			if step.Attempts < 2 {
+				r.metrics.retries.Add(1)
 				step.State = StepPending
 				mission.State = MissionRecovering
 				mission.Version++
@@ -239,6 +283,7 @@ func (r *Runtime) Run(ctx context.Context, id string) error {
 			return r.failStep(mission, step, executeErr)
 		}
 		step.State = StepSucceeded
+		r.metrics.stepsSucceeded.Add(1)
 		step.Result = result.Value
 		step.Error = ""
 		mission.Artifacts = append(mission.Artifacts, result.Artifacts...)
@@ -252,6 +297,7 @@ func (r *Runtime) Run(ctx context.Context, id string) error {
 	}
 	completed := time.Now().UTC()
 	mission.State = MissionCompleted
+	r.metrics.missionsCompleted.Add(1)
 	mission.CompletedAt = &completed
 	mission.Version++
 	mission.UpdatedAt = completed
@@ -310,6 +356,7 @@ func (r *Runtime) DecideApproval(missionID, approvalID string, approved bool, re
 		if err := r.store.PutMission(mission); err != nil {
 			return Mission{}, err
 		}
+		r.metrics.approvals.Add(1)
 		_ = r.event(mission, "approval.decided", mission.Approvals[index].StepID, map[string]any{"approved": approved, "reason": reason})
 		return mission, nil
 	}
@@ -358,6 +405,7 @@ func (r *Runtime) stepApproved(mission Mission, stepID string) bool {
 
 func (r *Runtime) failMission(mission Mission, err error) (Mission, error) {
 	mission.State = MissionFailed
+	r.metrics.missionsFailed.Add(1)
 	mission.LastError = err.Error()
 	mission.Version++
 	mission.UpdatedAt = time.Now().UTC()
@@ -370,6 +418,7 @@ func (r *Runtime) failMission(mission Mission, err error) (Mission, error) {
 
 func (r *Runtime) failStep(mission Mission, step *Step, err error) error {
 	step.State = StepFailed
+	r.metrics.stepsFailed.Add(1)
 	step.Error = err.Error()
 	mission.State = MissionFailed
 	mission.LastError = err.Error()
@@ -384,6 +433,21 @@ func (r *Runtime) failStep(mission Mission, step *Step, err error) error {
 
 func (r *Runtime) event(mission Mission, eventType, stepID string, payload any) error {
 	return r.store.AppendEvent(Event{ID: "evt_" + uuid.NewString(), MissionID: mission.ID, Type: eventType, StepID: stepID, Payload: payload, CreatedAt: time.Now().UTC()})
+}
+
+func riskRank(risk RiskClass) int {
+	switch risk {
+	case RiskRead:
+		return 0
+	case RiskWrite:
+		return 1
+	case RiskExternalSideEffect:
+		return 2
+	case RiskDestructive:
+		return 3
+	default:
+		return 2
+	}
 }
 
 func (r *Runtime) resolveWorkspace(requested string) (string, error) {

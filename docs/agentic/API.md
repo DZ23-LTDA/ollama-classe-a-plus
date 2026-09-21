@@ -4,12 +4,15 @@ A primeira API agentic roda no mesmo listener do Ollama e é local-first. Ela cr
 
 ## Configuração
 
-Defina `OLLAMA_AGENT_ROOT` para o diretório que pode ser usado pelas missões. Por padrão, o runtime usa um diretório temporário do sistema. Defina `OLLAMA_AGENT_STORE` para o diretório persistente de missões e eventos. Se `OLLAMA_AGENT_MODEL` estiver definido, o runtime tenta usar esse modelo para gerar o plano JSON; em caso de erro, usa o planner determinístico seguro.
+Defina `OLLAMA_AGENT_ROOT` para o diretório que pode ser usado pelas missões. Por padrão, o runtime usa um diretório temporário do sistema. Defina `OLLAMA_AGENT_STORE` para o diretório persistente de missões e eventos. Se `OLLAMA_AGENT_MODEL` estiver definido, o runtime tenta usar esse modelo para gerar o plano JSON; em caso de erro, usa o planner determinístico seguro. `OLLAMA_AGENT_EMBED_MODEL` ativa memória semântica sobre a API `/api/embed`; `OLLAMA_AGENT_CONNECTORS` e `OLLAMA_AGENT_MCP` apontam para os manifestos de integração descritos em [INTEGRATIONS.md](INTEGRATIONS.md).
 
 ```bash
 export OLLAMA_AGENT_ROOT=/home/usuario/dz23-workspaces
 export OLLAMA_AGENT_STORE=/home/usuario/dz23-data/agent-store
 export OLLAMA_AGENT_MODEL=qwen3-coder:latest
+export OLLAMA_AGENT_EMBED_MODEL=nomic-embed-text
+export OLLAMA_AGENT_CONNECTORS=/etc/ollama-dz23/agent-connectors.json
+export OLLAMA_AGENT_MCP=/etc/ollama-dz23/agent-mcp.json
 ollama serve
 ```
 
@@ -71,7 +74,19 @@ curl -sS -X POST http://localhost:11434/api/agent/v1/projects/PROJECT_ID/memorie
 curl -sS 'http://localhost:11434/api/agent/v1/projects/PROJECT_ID/memories?q=contrato'
 ```
 
-Memórias são persistidas por projeto, têm fonte e confiança e podem ser recuperadas por busca lexical. A camada de embeddings e retenção semântica será adicionada sem alterar esse contrato.
+Memórias são persistidas por projeto, têm fonte, confiança e, quando `OLLAMA_AGENT_EMBED_MODEL` está configurado, vetor embedding. A busca usa similaridade coseno e mantém fallback lexical quando o embedder não está disponível.
+
+## Capabilities e observabilidade
+
+```bash
+curl -sS http://localhost:11434/api/agent/v1/tools
+curl -sS http://localhost:11434/api/agent/v1/connectors
+curl -sS http://localhost:11434/api/agent/v1/mcp
+curl -sS http://localhost:11434/api/agent/v1/metrics
+curl -sS http://localhost:11434/api/agent/v1/metrics/prometheus
+```
+
+O endpoint Prometheus expõe counters de missões, passos, retries, approvals e chamadas de tool.
 
 ## Agendamentos e webhooks
 
@@ -95,6 +110,6 @@ curl -sS -X POST http://localhost:11434/api/agent/v1/webhooks/SCHEDULE_ID \
 
 ## Tools da primeira fatia
 
-`workspace.list` lê entradas do workspace autorizado e limita a quantidade retornada. `workspace.read` lê no máximo 1 MiB e rejeita traversal. `workspace.write` exige approval, limita o payload, escreve com permissões restritas e cria um manifesto com tamanho e SHA-256. `terminal.exec` existe em modo conservador e só permite `pwd`, `ls` e `git status` com argumentos separados; shell interpolation e outros executáveis são bloqueados. `sandbox.exec` executa Python ou Node em user namespace, sem rede, com um bind apenas do workspace e limite de tempo/output; ainda exige approval.
+`workspace.list` lê entradas do workspace autorizado e limita a quantidade retornada. `workspace.read` lê no máximo 1 MiB e rejeita traversal. `workspace.write` exige approval, limita o payload, escreve com permissões restritas e cria um manifesto com tamanho e SHA-256. `terminal.exec` existe em modo conservador e só permite `pwd`, `ls` e `git status` com argumentos separados; shell interpolation e outros executáveis são bloqueados. `sandbox.exec` executa Python ou Node em user namespace, sem rede, com um bind apenas do workspace e limite de tempo/output; ainda exige approval. `browser.operator` usa Chromium/Playwright com perfil persistente por sessão, bloqueio SSRF, snapshot, click, fill, press, upload, download, screenshot e estado `approval_required` para takeover humano. `desktop.companion` expõe, na plataforma Linux, screenshot, mouse, teclado, clipboard e processos através de executáveis separados e sem shell. `mcp.call` usa JSON-RPC stdio com lifecycle, timeout, env allowlist e methods allowlisted. `connector.http` chama GitHub, Google, Slack, Discord ou WhatsApp somente por operação HTTPS declarada.
 
-Browser, computer use, MCP, conectores, mídia e código em sandbox dedicado ainda são adapters das fases seguintes. A API não finge que essas ferramentas estão disponíveis antes de receber implementação e testes reais.
+Mídia, builder de sites/apps/jogos/slides/dashboards e o companion nativo Windows/macOS/Android/iOS ainda são fases posteriores. Essas capacidades não são marcadas como concluídas apenas por existirem no roadmap.

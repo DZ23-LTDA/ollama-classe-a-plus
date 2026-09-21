@@ -157,6 +157,7 @@ type Memory struct {
 	Content    string    `json:"content"`
 	Source     string    `json:"source,omitempty"`
 	Confidence float64   `json:"confidence,omitempty"`
+	Embedding  []float32 `json:"embedding,omitempty"`
 	CreatedAt  time.Time `json:"created_at"`
 }
 

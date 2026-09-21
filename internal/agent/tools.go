@@ -24,6 +24,8 @@ func NewRegistry() *Registry {
 	registry.Register(workspaceWriteTool{})
 	registry.Register(terminalExecTool{allowed: map[string]bool{"pwd": true, "ls": true, "git": true}})
 	registry.Register(sandboxExecTool{})
+	registry.Register(browserOperatorTool{})
+	registry.Register(desktopCompanionTool{})
 	return registry
 }
 

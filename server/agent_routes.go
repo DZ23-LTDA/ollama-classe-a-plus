@@ -44,6 +44,17 @@ func newDefaultAgentRuntime() (*agent.Runtime, error) {
 	if err != nil {
 		return nil, err
 	}
+	if embedModel := strings.TrimSpace(os.Getenv("OLLAMA_AGENT_EMBED_MODEL")); embedModel != "" {
+		contextStore.SetEmbedder(agent.OllamaEmbedder{Client: api.NewClient(envconfig.ConnectableHost(), http.DefaultClient), Model: embedModel})
+	}
+	connectors, err := loadAgentConnectors()
+	if err != nil {
+		return nil, err
+	}
+	mcp, err := loadAgentMCP()
+	if err != nil {
+		return nil, err
+	}
 	var planner agent.Planner = agent.RulePlanner{}
 	if model := strings.TrimSpace(os.Getenv("OLLAMA_AGENT_MODEL")); model != "" {
 		planner = agent.OllamaPlanner{
@@ -52,13 +63,61 @@ func newDefaultAgentRuntime() (*agent.Runtime, error) {
 			Fallback: agent.RulePlanner{},
 		}
 	}
-	return agent.NewRuntime(agent.RuntimeConfig{Store: store, Context: contextStore, Planner: planner, WorkspaceRoot: workspaceRoot})
+	return agent.NewRuntime(agent.RuntimeConfig{Store: store, Context: contextStore, Planner: planner, WorkspaceRoot: workspaceRoot, Connectors: connectors, MCP: mcp})
+}
+
+func loadAgentConnectors() (*agent.ConnectorManager, error) {
+	configPath := strings.TrimSpace(os.Getenv("OLLAMA_AGENT_CONNECTORS"))
+	if configPath == "" {
+		return nil, nil
+	}
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return nil, err
+	}
+	var configs []agent.ConnectorConfig
+	if err := json.Unmarshal(data, &configs); err != nil {
+		return nil, err
+	}
+	manager := agent.NewConnectorManager()
+	for _, config := range configs {
+		if err := manager.Register(config); err != nil {
+			return nil, err
+		}
+	}
+	return manager, nil
+}
+
+func loadAgentMCP() (*agent.MCPManager, error) {
+	configPath := strings.TrimSpace(os.Getenv("OLLAMA_AGENT_MCP"))
+	if configPath == "" {
+		return nil, nil
+	}
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return nil, err
+	}
+	var configs []agent.MCPServerConfig
+	if err := json.Unmarshal(data, &configs); err != nil {
+		return nil, err
+	}
+	manager := agent.NewMCPManager()
+	for _, config := range configs {
+		if err := manager.Register(config); err != nil {
+			return nil, err
+		}
+	}
+	return manager, nil
 }
 
 func (a *agentAPI) register(r *gin.Engine) {
 	group := r.Group("/api/agent/v1")
 	group.GET("/health", a.health)
+	group.GET("/metrics", a.metrics)
+	group.GET("/metrics/prometheus", a.prometheus)
 	group.GET("/tools", a.tools)
+	group.GET("/connectors", a.connectors)
+	group.GET("/mcp", a.mcp)
 	group.GET("/skills", a.skills)
 	group.GET("/schedules", a.schedules)
 	group.POST("/schedules", a.createSchedule)
@@ -78,6 +137,22 @@ func (a *agentAPI) register(r *gin.Engine) {
 
 func (a *agentAPI) health(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "ok", "runtime": "agent-v1"})
+}
+
+func (a *agentAPI) metrics(c *gin.Context) {
+	c.JSON(http.StatusOK, a.runtime.Metrics())
+}
+
+func (a *agentAPI) prometheus(c *gin.Context) {
+	c.Data(http.StatusOK, "text/plain; version=0.0.4", []byte(a.runtime.Metrics().Prometheus()))
+}
+
+func (a *agentAPI) connectors(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{"connectors": a.runtime.Connectors()})
+}
+
+func (a *agentAPI) mcp(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{"servers": a.runtime.MCPServers()})
 }
 
 func (a *agentAPI) tools(c *gin.Context) {
@@ -174,7 +249,7 @@ func (a *agentAPI) addMemory(c *gin.Context) {
 		return
 	}
 	memory.ProjectID = c.Param("id")
-	created, err := a.context.AddMemory(memory)
+	created, err := a.context.AddMemoryContext(c.Request.Context(), memory)
 	if err != nil {
 		writeAgentError(c, http.StatusBadRequest, err)
 		return
@@ -183,7 +258,12 @@ func (a *agentAPI) addMemory(c *gin.Context) {
 }
 
 func (a *agentAPI) searchMemories(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"project_id": c.Param("id"), "memories": a.context.SearchMemories(c.Param("id"), c.Query("q"), 20)})
+	memories, err := a.context.SearchMemoriesContext(c.Request.Context(), c.Param("id"), c.Query("q"), 20)
+	if err != nil {
+		writeAgentError(c, http.StatusBadRequest, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"project_id": c.Param("id"), "memories": memories})
 }
 
 func (a *agentAPI) createMission(c *gin.Context) {

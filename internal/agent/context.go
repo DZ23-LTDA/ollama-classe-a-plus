@@ -1,9 +1,11 @@
 package agent
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"sort"
@@ -21,6 +23,11 @@ type ContextStore struct {
 	memories  map[string][]Memory
 	skills    map[string]SkillManifest
 	schedules map[string]Schedule
+	embedder  Embedder
+}
+
+type Embedder interface {
+	Embed(ctx context.Context, text string) ([]float32, error)
 }
 
 func NewContextStore(root string) (*ContextStore, error) {
@@ -114,7 +121,17 @@ func (s *ContextStore) GetProject(id string) (Project, error) {
 	return project, nil
 }
 
+func (s *ContextStore) SetEmbedder(embedder Embedder) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.embedder = embedder
+}
+
 func (s *ContextStore) AddMemory(memory Memory) (Memory, error) {
+	return s.AddMemoryContext(context.Background(), memory)
+}
+
+func (s *ContextStore) AddMemoryContext(ctx context.Context, memory Memory) (Memory, error) {
 	memory.Content = strings.TrimSpace(memory.Content)
 	if memory.Content == "" {
 		return Memory{}, errors.New("memory content is required")
@@ -131,6 +148,19 @@ func (s *ContextStore) AddMemory(memory Memory) (Memory, error) {
 	if memory.Confidence < 0 || memory.Confidence > 1 {
 		return Memory{}, errors.New("memory confidence must be between 0 and 1")
 	}
+	s.mu.RLock()
+	embedder := s.embedder
+	s.mu.RUnlock()
+	if embedder != nil && len(memory.Embedding) == 0 {
+		embedding, err := embedder.Embed(ctx, memory.Content)
+		if err != nil {
+			return Memory{}, fmt.Errorf("embed memory: %w", err)
+		}
+		if len(embedding) == 0 || len(embedding) > 16384 {
+			return Memory{}, errors.New("embedder returned an invalid vector")
+		}
+		memory.Embedding = embedding
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.memories[memory.ProjectID] = append(s.memories[memory.ProjectID], memory)
@@ -143,23 +173,75 @@ func (s *ContextStore) AddMemory(memory Memory) (Memory, error) {
 }
 
 func (s *ContextStore) SearchMemories(projectID, query string, limit int) []Memory {
+	result, _ := s.SearchMemoriesContext(context.Background(), projectID, query, limit)
+	return result
+}
+
+func (s *ContextStore) SearchMemoriesContext(ctx context.Context, projectID, query string, limit int) ([]Memory, error) {
 	query = strings.ToLower(strings.TrimSpace(query))
 	if limit <= 0 || limit > 100 {
 		limit = 20
 	}
 	s.mu.RLock()
-	defer s.mu.RUnlock()
-	var matches []Memory
-	for _, memory := range s.memories[projectID] {
-		if query == "" || strings.Contains(strings.ToLower(memory.Content), query) || strings.Contains(strings.ToLower(memory.Kind), query) {
-			matches = append(matches, memory)
+	embedder := s.embedder
+	memories := append([]Memory(nil), s.memories[projectID]...)
+	s.mu.RUnlock()
+	var queryVector []float32
+	var err error
+	if embedder != nil && query != "" {
+		queryVector, err = embedder.Embed(ctx, query)
+		if err != nil {
+			return nil, fmt.Errorf("embed query: %w", err)
 		}
 	}
-	sort.SliceStable(matches, func(i, j int) bool { return matches[i].CreatedAt.After(matches[j].CreatedAt) })
+	type scoredMemory struct {
+		memory Memory
+		score  float64
+	}
+	scored := make([]scoredMemory, 0, len(memories))
+	for _, memory := range memories {
+		score := float64(0)
+		if len(queryVector) > 0 && len(memory.Embedding) > 0 {
+			score = cosineSimilarity(queryVector, memory.Embedding)
+		} else if query == "" || strings.Contains(strings.ToLower(memory.Content), query) || strings.Contains(strings.ToLower(memory.Kind), query) {
+			score = 1
+		} else {
+			continue
+		}
+		scored = append(scored, scoredMemory{memory: memory, score: score})
+	}
+	sort.SliceStable(scored, func(i, j int) bool {
+		if scored[i].score == scored[j].score {
+			return scored[i].memory.CreatedAt.After(scored[j].memory.CreatedAt)
+		}
+		return scored[i].score > scored[j].score
+	})
+	matches := make([]Memory, 0, len(scored))
+	for _, item := range scored {
+		matches = append(matches, item.memory)
+	}
 	if len(matches) > limit {
 		matches = matches[:limit]
 	}
-	return matches
+	return matches, nil
+}
+
+func cosineSimilarity(a, b []float32) float64 {
+	length := len(a)
+	if len(b) < length {
+		length = len(b)
+	}
+	var dot, normA, normB float64
+	for i := 0; i < length; i++ {
+		x, y := float64(a[i]), float64(b[i])
+		dot += x * y
+		normA += x * x
+		normB += y * y
+	}
+	if normA == 0 || normB == 0 {
+		return 0
+	}
+	return dot / (math.Sqrt(normA) * math.Sqrt(normB))
 }
 
 func (s *ContextStore) LoadSkills(dir string, trusted bool) error {
