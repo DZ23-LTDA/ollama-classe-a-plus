@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"encoding/base32"
 	"testing"
 	"time"
 )
@@ -100,5 +101,28 @@ func TestOAuthCredentialIsEncryptedAtRest(t *testing.T) {
 	}
 	if _, err := decryptCredential(credential.RefreshTokenCiphertext); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestAuthStoreMFAUsesTOTPAndPersistsEncryptedSecret(t *testing.T) {
+	t.Setenv("OLLAMA_AGENT_CREDENTIAL_KEY", "mfa-test-key-long-enough")
+	store, err := NewAuthStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	user, err := store.CreateUser("mfa@example.com", "MFA User")
+	if err != nil {
+		t.Fatal(err)
+	}
+	secret := base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString([]byte("0123456789012345"))
+	if _, err := store.EnableMFA(user.ID, secret); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Unix(1_700_000_000, 0).UTC()
+	if err := store.VerifyMFA(user.ID, totpCode(secret, now.Unix()/30), now); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.VerifyMFA(user.ID, "000000", now); err == nil {
+		t.Fatal("invalid MFA code accepted")
 	}
 }

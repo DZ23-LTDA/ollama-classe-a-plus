@@ -28,24 +28,37 @@ const (
 )
 
 type BuilderProject struct {
-	ID            string      `json:"id"`
-	Name          string      `json:"name"`
-	Kind          BuilderKind `json:"kind"`
-	Entry         string      `json:"entry"`
-	Version       int         `json:"version"`
-	Status        string      `json:"status"`
-	Root          string      `json:"root"`
-	PreviewPath   string      `json:"preview_path,omitempty"`
-	PublishedPath string      `json:"published_path,omitempty"`
-	CreatedAt     time.Time   `json:"created_at"`
-	UpdatedAt     time.Time   `json:"updated_at"`
+	ID            string            `json:"id"`
+	Name          string            `json:"name"`
+	Kind          BuilderKind       `json:"kind"`
+	Entry         string            `json:"entry"`
+	Version       int               `json:"version"`
+	Status        string            `json:"status"`
+	Root          string            `json:"root"`
+	PreviewPath   string            `json:"preview_path,omitempty"`
+	PublishedPath string            `json:"published_path,omitempty"`
+	CreatedAt     time.Time         `json:"created_at"`
+	UpdatedAt     time.Time         `json:"updated_at"`
+	Components    []VisualComponent `json:"components,omitempty"`
+}
+
+type VisualComponent struct {
+	ID       string            `json:"id"`
+	Type     string            `json:"type"`
+	Props    map[string]string `json:"props,omitempty"`
+	Children []VisualComponent `json:"children,omitempty"`
+	X        int               `json:"x,omitempty"`
+	Y        int               `json:"y,omitempty"`
+	Width    int               `json:"width,omitempty"`
+	Height   int               `json:"height,omitempty"`
 }
 
 type BuilderSpec struct {
-	Name  string            `json:"name"`
-	Kind  BuilderKind       `json:"kind"`
-	Entry string            `json:"entry"`
-	Files map[string]string `json:"files"`
+	Name       string            `json:"name"`
+	Kind       BuilderKind       `json:"kind"`
+	Entry      string            `json:"entry"`
+	Files      map[string]string `json:"files"`
+	Components []VisualComponent `json:"components,omitempty"`
 }
 
 type BuilderService struct {
@@ -84,8 +97,14 @@ func (b *BuilderService) Create(ctx context.Context, spec BuilderSpec) (BuilderP
 	if !validBuilderKind(spec.Kind) {
 		return BuilderProject{}, errors.New("unsupported builder kind")
 	}
-	if len(spec.Files) == 0 {
+	if len(spec.Files) == 0 && len(spec.Components) == 0 {
 		spec.Files = templateFiles(spec.Kind, name)
+	}
+	if len(spec.Components) > 200 {
+		return BuilderProject{}, errors.New("too many visual components")
+	}
+	if len(spec.Components) > 0 && len(spec.Files) == 0 {
+		spec.Files = map[string]string{"index.html": renderVisualHTML(name, spec.Components), "visual.json": mustJSON(spec.Components)}
 	}
 	if len(spec.Files) > 200 {
 		return BuilderProject{}, errors.New("too many builder files")
@@ -111,7 +130,7 @@ func (b *BuilderService) Create(ctx context.Context, spec BuilderSpec) (BuilderP
 			return BuilderProject{}, err
 		}
 	}
-	project := BuilderProject{ID: id, Name: name, Kind: spec.Kind, Entry: filepath.ToSlash(entry), Version: 1, Status: "draft", Root: projectRoot, CreatedAt: now, UpdatedAt: now}
+	project := BuilderProject{ID: id, Name: name, Kind: spec.Kind, Entry: filepath.ToSlash(entry), Version: 1, Status: "draft", Root: projectRoot, Components: spec.Components, CreatedAt: now, UpdatedAt: now}
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.projects[id] = project
@@ -119,6 +138,35 @@ func (b *BuilderService) Create(ctx context.Context, spec BuilderSpec) (BuilderP
 		return BuilderProject{}, err
 	}
 	return project, nil
+}
+
+func (b *BuilderService) ApplyVisualComponents(ctx context.Context, id string, components []VisualComponent) (BuilderProject, error) {
+	if err := ctx.Err(); err != nil {
+		return BuilderProject{}, err
+	}
+	if len(components) > 200 {
+		return BuilderProject{}, errors.New("too many visual components")
+	}
+	project, err := b.Get(id)
+	if err != nil {
+		return BuilderProject{}, err
+	}
+	indexPath := filepath.Join(project.Root, filepath.FromSlash(project.Entry))
+	if err := os.WriteFile(indexPath, []byte(renderVisualHTML(project.Name, components)), 0o600); err != nil {
+		return BuilderProject{}, err
+	}
+	if err := os.WriteFile(filepath.Join(project.Root, "visual.json"), []byte(mustJSON(components)), 0o600); err != nil {
+		return BuilderProject{}, err
+	}
+	project.Components = components
+	project.Version++
+	project.Status = "draft"
+	project.UpdatedAt = time.Now().UTC()
+	b.mu.Lock()
+	b.projects[id] = project
+	err = b.persistLocked()
+	b.mu.Unlock()
+	return project, err
 }
 
 func (b *BuilderService) Get(id string) (BuilderProject, error) {
@@ -281,6 +329,24 @@ func templateFiles(kind BuilderKind, name string) map[string]string {
 		return map[string]string{"index.html": "<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>" + title + "</title></head><body><main><h1>" + title + "</h1><p>Builder preview ready.</p></main></body></html>"}
 	}
 }
+func mustJSON(value any) string {
+	data, _ := json.MarshalIndent(value, "", "  ")
+	return string(data)
+}
+
+func renderVisualHTML(name string, components []VisualComponent) string {
+	data := mustJSON(components)
+	return "<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>" + htmlEscape(name) + "</title><style>body{font-family:system-ui;margin:0;padding:24px} [data-dz23-component]{border:1px dashed #bbb;padding:12px;margin:8px;border-radius:8px}</style></head><body><main id=\"dz23-canvas\"></main><script type=\"application/json\" id=\"dz23-visual\">" + scriptEscape(data) + "</script><script>const tree=JSON.parse(document.querySelector('#dz23-visual').textContent); const render=(nodes,parent)=>nodes.forEach(n=>{const el=document.createElement('section');el.dataset.dz23Component=n.type;el.textContent=(n.props&&n.props.text)||n.type;Object.assign(el.style,{position:n.x||n.y?'absolute':'static',left:(n.x||0)+'px',top:(n.y||0)+'px',width:n.width?(n.width+'px'):'auto',height:n.height?(n.height+'px'):'auto'});parent.appendChild(el);render(n.children||[],el)});render(tree,document.querySelector('#dz23-canvas'));</script></body></html>"
+}
+
+func htmlEscape(value string) string {
+	return strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;", "\"", "&quot;").Replace(value)
+}
+
+func scriptEscape(value string) string {
+	return strings.NewReplacer("&", "\\u0026", "<", "\\u003c", ">", "\\u003e").Replace(value)
+}
+
 func copyFiles(src, dst string) error {
 	return filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
 		if err != nil {

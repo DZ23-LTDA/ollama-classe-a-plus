@@ -20,6 +20,8 @@ func TestMediaManagerGeneratesArtifactsThroughHTTPSProvider(t *testing.T) {
 			_ = json.NewEncoder(w).Encode(map[string]any{"data": []any{map[string]any{"b64_json": base64.StdEncoding.EncodeToString([]byte("png-bytes"))}}})
 		case "/audio/transcriptions":
 			_ = json.NewEncoder(w).Encode(map[string]any{"text": "transcrição aprovada"})
+		case "/chat/completions":
+			_ = json.NewEncoder(w).Encode(map[string]any{"choices": []any{map[string]any{"message": map[string]any{"content": "OCR: texto visível"}}}})
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -45,6 +47,14 @@ func TestMediaManagerGeneratesArtifactsThroughHTTPSProvider(t *testing.T) {
 	transcript, err := manager.Transcribe(context.Background(), workspace, input, "")
 	if err != nil || transcript.Text != "transcrição aprovada" {
 		t.Fatalf("transcript=%+v err=%v", transcript, err)
+	}
+	inputImage := filepath.Join(workspace, "input.png")
+	if err := os.WriteFile(inputImage, []byte("fake-png"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	vision, err := manager.AnalyzeImage(context.Background(), workspace, inputImage, "Extraia o texto da imagem", "vision-test")
+	if err != nil || vision.Text != "OCR: texto visível" {
+		t.Fatalf("vision=%+v err=%v", vision, err)
 	}
 }
 

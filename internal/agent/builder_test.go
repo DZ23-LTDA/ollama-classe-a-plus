@@ -5,6 +5,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -55,5 +56,30 @@ func TestBuilderRejectsTraversal(t *testing.T) {
 	}
 	if _, err := service.Create(context.Background(), BuilderSpec{Name: "bad", Kind: BuilderWebsite, Files: map[string]string{"../secret": "no"}}); err == nil {
 		t.Fatal("path traversal accepted")
+	}
+}
+
+func TestBuilderVisualCanvasPersistsAndRenders(t *testing.T) {
+	service, err := NewBuilderService(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	project, err := service.Create(context.Background(), BuilderSpec{Name: "Visual", Kind: BuilderWebsite, Components: []VisualComponent{{ID: "hero", Type: "hero", Props: map[string]string{"text": "Hello"}, Width: 640, Height: 120}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(project.Components) != 1 {
+		t.Fatalf("components=%+v", project.Components)
+	}
+	updated, err := service.ApplyVisualComponents(context.Background(), project.ID, []VisualComponent{{ID: "button", Type: "button", Props: map[string]string{"text": "Go"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.Version != project.Version+1 || len(updated.Components) != 1 {
+		t.Fatalf("updated=%+v", updated)
+	}
+	data, err := os.ReadFile(filepath.Join(project.Root, project.Entry))
+	if err != nil || !strings.Contains(string(data), "dz23-canvas") {
+		t.Fatalf("visual preview invalid: err=%v", err)
 	}
 }

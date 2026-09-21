@@ -45,13 +45,18 @@ func (p MediaProvider) Validate() error {
 		return errors.New("media provider base URL is required")
 	}
 	u, err := url.Parse(p.BaseURL)
-	if err != nil || u.Host == "" || u.Scheme != "https" {
-		return errors.New("media provider must use an HTTPS base URL")
+	if err != nil || u.Host == "" || (u.Scheme != "https" && !(u.Scheme == "http" && isLoopbackHost(u.Hostname()))) {
+		return errors.New("media provider must use HTTPS or a loopback HTTP endpoint")
 	}
-	if strings.TrimSpace(p.APIKey) == "" {
+	if u.Scheme == "https" && strings.TrimSpace(p.APIKey) == "" {
 		return errors.New("media provider API key is required")
 	}
 	return nil
+}
+
+func isLoopbackHost(host string) bool {
+	host = strings.ToLower(strings.TrimSpace(host))
+	return host == "localhost" || host == "127.0.0.1" || host == "::1"
 }
 
 func NewMediaManager(provider MediaProvider) (*MediaManager, error) {
@@ -190,6 +195,67 @@ func (m *MediaManager) Transcribe(ctx context.Context, workspace, inputPath, mod
 	return MediaResult{Path: transcriptPath, MediaType: "text/plain", Text: text, Artifact: artifact}, nil
 }
 
+// AnalyzeImage sends an image to a vision-capable chat model. It supports both
+// hosted OpenAI-compatible providers and a loopback Ollama /v1 endpoint.
+func (m *MediaManager) AnalyzeImage(ctx context.Context, workspace, inputPath, prompt, model string) (MediaResult, error) {
+	if strings.TrimSpace(inputPath) == "" || strings.TrimSpace(prompt) == "" {
+		return MediaResult{}, errors.New("image input and vision prompt are required")
+	}
+	root, err := filepath.Abs(workspace)
+	if err != nil {
+		return MediaResult{}, err
+	}
+	input, err := filepath.Abs(inputPath)
+	if err != nil {
+		return MediaResult{}, err
+	}
+	relative, err := filepath.Rel(root, input)
+	if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) || filepath.IsAbs(relative) {
+		return MediaResult{}, errors.New("image input escapes workspace")
+	}
+	data, err := os.ReadFile(input)
+	if err != nil {
+		return MediaResult{}, err
+	}
+	if len(data) > 25<<20 {
+		return MediaResult{}, errors.New("image input exceeds 25 MiB")
+	}
+	if model == "" {
+		model = m.Provider.ImageModel
+	}
+	mimeType := http.DetectContentType(data)
+	payload, err := m.postJSON(ctx, "/chat/completions", map[string]any{
+		"model": model,
+		"messages": []any{map[string]any{"role": "user", "content": []any{
+			map[string]any{"type": "text", "text": prompt},
+			map[string]any{"type": "image_url", "image_url": map[string]string{"url": "data:" + mimeType + ";base64," + base64.StdEncoding.EncodeToString(data)}},
+		}}},
+	})
+	if err != nil {
+		return MediaResult{}, err
+	}
+	text := ""
+	if choices, ok := payload["choices"].([]any); ok && len(choices) > 0 {
+		if choice, ok := choices[0].(map[string]any); ok {
+			if message, ok := choice["message"].(map[string]any); ok {
+				text, _ = message["content"].(string)
+			}
+		}
+	}
+	if strings.TrimSpace(text) == "" {
+		return MediaResult{}, errors.New("vision provider returned no text")
+	}
+	output := filepath.Join(workspace, ".agent-media", "vision-"+strconv.FormatInt(time.Now().UnixNano(), 10)+".txt")
+	if err := writeLimitedFile(output, []byte(text+"\n"), 4<<20); err != nil {
+		return MediaResult{}, err
+	}
+	artifact, err := BuildArtifactManifest(workspace, "", "", filepath.Base(output), filepath.ToSlash(filepath.Join(".agent-media", filepath.Base(output))))
+	if err != nil {
+		return MediaResult{}, err
+	}
+	return MediaResult{Path: output, MediaType: "text/plain", Text: text, Artifact: artifact}, nil
+}
+
 func GenerateTone(workspace string, frequency float64, duration time.Duration) (MediaResult, error) {
 	if frequency <= 0 || frequency > 20000 {
 		frequency = 440
@@ -325,7 +391,9 @@ func (m *MediaManager) client() *http.Client {
 	return http.DefaultClient
 }
 func (m *MediaManager) headers(request *http.Request) {
-	request.Header.Set("Authorization", "Bearer "+m.Provider.APIKey)
+	if strings.TrimSpace(m.Provider.APIKey) != "" {
+		request.Header.Set("Authorization", "Bearer "+m.Provider.APIKey)
+	}
 	request.Header.Set("User-Agent", "ollama-dz23-agentic-media/1")
 }
 func firstData(payload map[string]any) (map[string]any, error) {

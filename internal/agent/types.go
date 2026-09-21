@@ -48,29 +48,31 @@ const (
 )
 
 type CreateMissionRequest struct {
-	Objective string `json:"objective"`
-	Model     string `json:"model,omitempty"`
-	Workspace string `json:"workspace,omitempty"`
-	ProjectID string `json:"project_id,omitempty"`
-	AutoRun   bool   `json:"auto_run,omitempty"`
+	Objective      string `json:"objective"`
+	Model          string `json:"model,omitempty"`
+	Workspace      string `json:"workspace,omitempty"`
+	ProjectID      string `json:"project_id,omitempty"`
+	OrganizationID string `json:"organization_id,omitempty"`
+	AutoRun        bool   `json:"auto_run,omitempty"`
 }
 
 type Mission struct {
-	ID          string             `json:"id"`
-	Version     int64              `json:"version"`
-	Objective   string             `json:"objective"`
-	Model       string             `json:"model,omitempty"`
-	Workspace   string             `json:"workspace,omitempty"`
-	ProjectID   string             `json:"project_id,omitempty"`
-	AutoRun     bool               `json:"auto_run,omitempty"`
-	State       MissionState       `json:"state"`
-	Plan        []Step             `json:"plan"`
-	Approvals   []Approval         `json:"approvals,omitempty"`
-	Artifacts   []ArtifactManifest `json:"artifacts,omitempty"`
-	LastError   string             `json:"last_error,omitempty"`
-	CreatedAt   time.Time          `json:"created_at"`
-	UpdatedAt   time.Time          `json:"updated_at"`
-	CompletedAt *time.Time         `json:"completed_at,omitempty"`
+	ID             string             `json:"id"`
+	Version        int64              `json:"version"`
+	Objective      string             `json:"objective"`
+	Model          string             `json:"model,omitempty"`
+	Workspace      string             `json:"workspace,omitempty"`
+	ProjectID      string             `json:"project_id,omitempty"`
+	OrganizationID string             `json:"organization_id,omitempty"`
+	AutoRun        bool               `json:"auto_run,omitempty"`
+	State          MissionState       `json:"state"`
+	Plan           []Step             `json:"plan"`
+	Approvals      []Approval         `json:"approvals,omitempty"`
+	Artifacts      []ArtifactManifest `json:"artifacts,omitempty"`
+	LastError      string             `json:"last_error,omitempty"`
+	CreatedAt      time.Time          `json:"created_at"`
+	UpdatedAt      time.Time          `json:"updated_at"`
+	CompletedAt    *time.Time         `json:"completed_at,omitempty"`
 }
 
 type Step struct {
@@ -97,12 +99,13 @@ type Approval struct {
 }
 
 type Event struct {
-	ID        string    `json:"id"`
-	MissionID string    `json:"mission_id"`
-	Type      string    `json:"type"`
-	StepID    string    `json:"step_id,omitempty"`
-	Payload   any       `json:"payload,omitempty"`
-	CreatedAt time.Time `json:"created_at"`
+	ID             string    `json:"id"`
+	MissionID      string    `json:"mission_id"`
+	OrganizationID string    `json:"organization_id,omitempty"`
+	Type           string    `json:"type"`
+	StepID         string    `json:"step_id,omitempty"`
+	Payload        any       `json:"payload,omitempty"`
+	CreatedAt      time.Time `json:"created_at"`
 }
 
 type ArtifactManifest struct {

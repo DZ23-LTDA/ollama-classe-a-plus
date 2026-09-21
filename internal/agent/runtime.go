@@ -33,6 +33,7 @@ type Runtime struct {
 	research      *ResearchEngine
 	devices       *DeviceStore
 	ingestion     DocumentIngestor
+	push          *PushService
 	mu            sync.Mutex
 	running       map[string]bool
 }
@@ -53,6 +54,7 @@ type RuntimeConfig struct {
 	Builder       *BuilderService
 	Collaboration *CollaborationStore
 	Devices       *DeviceStore
+	Push          *PushService
 }
 
 func NewRuntime(config RuntimeConfig) (*Runtime, error) {
@@ -127,7 +129,7 @@ func NewRuntime(config RuntimeConfig) (*Runtime, error) {
 			return nil, err
 		}
 	}
-	runtime := &Runtime{store: store, planner: planner, tools: tools, workspaceRoot: root, context: contextStore, metrics: &RuntimeMetrics{}, connectors: config.Connectors, mcp: config.MCP, queue: queue, redisQueue: config.RedisQueue, traces: traces, telemetry: telemetry, media: config.Media, builder: builder, collaboration: collaboration, running: make(map[string]bool)}
+	runtime := &Runtime{store: store, planner: planner, tools: tools, workspaceRoot: root, context: contextStore, metrics: &RuntimeMetrics{}, connectors: config.Connectors, mcp: config.MCP, queue: queue, redisQueue: config.RedisQueue, traces: traces, telemetry: telemetry, media: config.Media, builder: builder, collaboration: collaboration, push: config.Push, running: make(map[string]bool)}
 	orchestrator, err := NewAgentOrchestrator(filepath.Join(root, ".agent-orchestrator"), runtime.SubagentRunner)
 	if err != nil {
 		return nil, err
@@ -144,6 +146,19 @@ func NewRuntime(config RuntimeConfig) (*Runtime, error) {
 	runtime.devices = devices
 	runtime.ingestion = DocumentIngestor{Context: contextStore, Research: runtime.research}
 	return runtime, nil
+}
+
+// WithOrganization returns a request-scoped runtime view. Shared in-memory stores
+// remain compatible, while PostgresStore receives a transaction-local RLS scope.
+func (r *Runtime) WithOrganization(organizationID string) *Runtime {
+	if r == nil {
+		return nil
+	}
+	view := *r
+	if postgres, ok := r.store.(*PostgresStore); ok {
+		view.store = postgres.WithOrganization(organizationID)
+	}
+	return &view
 }
 
 func (r *Runtime) Context() *ContextStore {
@@ -186,6 +201,8 @@ func (r *Runtime) Devices() *DeviceStore { return r.devices }
 
 func (r *Runtime) Ingestion() DocumentIngestor { return r.ingestion }
 
+func (r *Runtime) Push() *PushService { return r.push }
+
 func (r *Runtime) CreateMission(ctx context.Context, request CreateMissionRequest) (Mission, error) {
 	objective := strings.TrimSpace(request.Objective)
 	if objective == "" {
@@ -199,7 +216,7 @@ func (r *Runtime) CreateMission(ctx context.Context, request CreateMissionReques
 		return Mission{}, err
 	}
 	now := time.Now().UTC()
-	mission := Mission{ID: "mis_" + uuid.NewString(), Version: 1, Objective: objective, Model: strings.TrimSpace(request.Model), Workspace: workspace, ProjectID: strings.TrimSpace(request.ProjectID), AutoRun: request.AutoRun, State: MissionPlanning, CreatedAt: now, UpdatedAt: now}
+	mission := Mission{ID: "mis_" + uuid.NewString(), Version: 1, Objective: objective, Model: strings.TrimSpace(request.Model), Workspace: workspace, ProjectID: strings.TrimSpace(request.ProjectID), OrganizationID: strings.TrimSpace(request.OrganizationID), AutoRun: request.AutoRun, State: MissionPlanning, CreatedAt: now, UpdatedAt: now}
 	if err := r.store.PutMission(mission); err != nil {
 		return Mission{}, err
 	}
@@ -558,7 +575,18 @@ func (r *Runtime) failStep(mission Mission, step *Step, err error) error {
 }
 
 func (r *Runtime) event(mission Mission, eventType, stepID string, payload any) error {
-	return r.store.AppendEvent(Event{ID: "evt_" + uuid.NewString(), MissionID: mission.ID, Type: eventType, StepID: stepID, Payload: payload, CreatedAt: time.Now().UTC()})
+	err := r.store.AppendEvent(Event{ID: "evt_" + uuid.NewString(), MissionID: mission.ID, OrganizationID: mission.OrganizationID, Type: eventType, StepID: stepID, Payload: payload, CreatedAt: time.Now().UTC()})
+	if r.push != nil && mission.OrganizationID != "" && (eventType == "mission.completed" || eventType == "mission.failed" || eventType == "step.awaiting_approval") {
+		title := "DZ23 Agentic"
+		body := "A missão " + mission.ID + " mudou de estado"
+		if eventType == "mission.completed" {
+			body = "A missão " + mission.ID + " foi concluída"
+		}
+		go func() {
+			_ = r.push.NotifyOrganization(context.Background(), mission.OrganizationID, title, body, map[string]any{"mission_id": mission.ID, "event": eventType})
+		}()
+	}
+	return err
 }
 
 func riskRank(risk RiskClass) int {

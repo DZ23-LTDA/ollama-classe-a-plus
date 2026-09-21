@@ -4,9 +4,13 @@ import (
 	"context"
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/hmac"
 	"crypto/rand"
+	"crypto/sha1"
 	"crypto/sha256"
+	"encoding/base32"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -16,6 +20,7 @@ import (
 	"net/url"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -24,10 +29,17 @@ import (
 )
 
 type User struct {
-	ID        string    `json:"id"`
-	Email     string    `json:"email"`
-	Name      string    `json:"name"`
-	CreatedAt time.Time `json:"created_at"`
+	ID                  string    `json:"id"`
+	Email               string    `json:"email"`
+	Name                string    `json:"name"`
+	MFAEnabled          bool      `json:"mfa_enabled,omitempty"`
+	MFASecretCiphertext string    `json:"mfa_secret_ciphertext,omitempty"`
+	CreatedAt           time.Time `json:"created_at"`
+}
+
+func (u User) Public() User {
+	u.MFASecretCiphertext = ""
+	return u
 }
 
 type Organization struct {
@@ -206,6 +218,87 @@ func (s *AuthStore) Authenticate(raw string) (User, Organization, Membership, er
 		return User{}, Organization{}, Membership{}, errors.New("invalid or expired token")
 	}
 	return user, organization, membership, nil
+}
+
+func (s *AuthStore) EnableMFA(userID, secret string) (User, error) {
+	secret = strings.ToUpper(strings.TrimSpace(secret))
+	secret = strings.TrimRight(secret, "=")
+	if secret == "" {
+		return User{}, errors.New("mfa secret is required")
+	}
+	decoded, err := base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(secret)
+	if err != nil || len(decoded) < 10 {
+		return User{}, errors.New("mfa secret must be a valid base32 value")
+	}
+	ciphertext, err := encryptCredential(secret)
+	if err != nil {
+		return User{}, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	user, ok := s.users[userID]
+	if !ok {
+		return User{}, os.ErrNotExist
+	}
+	user.MFAEnabled = true
+	user.MFASecretCiphertext = ciphertext
+	s.users[userID] = user
+	return user, s.persistLocked()
+}
+
+func (s *AuthStore) DisableMFA(userID string) (User, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	user, ok := s.users[userID]
+	if !ok {
+		return User{}, os.ErrNotExist
+	}
+	user.MFAEnabled = false
+	user.MFASecretCiphertext = ""
+	s.users[userID] = user
+	return user, s.persistLocked()
+}
+
+func (s *AuthStore) VerifyMFA(userID, code string, now time.Time) error {
+	code = strings.TrimSpace(code)
+	if len(code) != 6 {
+		return errors.New("mfa code must have six digits")
+	}
+	if _, err := strconv.Atoi(code); err != nil {
+		return errors.New("mfa code must contain digits")
+	}
+	s.mu.RLock()
+	user, ok := s.users[userID]
+	s.mu.RUnlock()
+	if !ok {
+		return os.ErrNotExist
+	}
+	if !user.MFAEnabled {
+		return nil
+	}
+	secret, err := decryptCredential(user.MFASecretCiphertext)
+	if err != nil {
+		return err
+	}
+	counter := now.UTC().Unix() / 30
+	for offset := int64(-1); offset <= 1; offset++ {
+		if hmac.Equal([]byte(code), []byte(totpCode(secret, counter+offset))) {
+			return nil
+		}
+	}
+	return errors.New("invalid mfa code")
+}
+
+func totpCode(secret string, counter int64) string {
+	decoded, _ := base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(strings.TrimRight(strings.ToUpper(strings.TrimSpace(secret)), "="))
+	var message [8]byte
+	binary.BigEndian.PutUint64(message[:], uint64(counter))
+	digest := hmac.New(sha1.New, decoded)
+	_, _ = digest.Write(message[:])
+	sum := digest.Sum(nil)
+	offset := sum[len(sum)-1] & 0x0f
+	value := (uint32(sum[offset])&0x7f)<<24 | uint32(sum[offset+1])<<16 | uint32(sum[offset+2])<<8 | uint32(sum[offset+3])
+	return fmt.Sprintf("%06d", value%1000000)
 }
 
 func (s *AuthStore) RevokeToken(raw string) error {
@@ -391,6 +484,39 @@ func (s *AuthStore) FirstOrganization(userID string) (Organization, Membership, 
 	return Organization{}, Membership{}, os.ErrNotExist
 }
 
+func (s *AuthStore) ProvisionOAuthUser(payload map[string]any, provider string) (User, Organization, Membership, error) {
+	email := oauthClaim(payload, "email", "email_address", "preferred_username", "login")
+	if email == "" || !strings.Contains(email, "@") {
+		return User{}, Organization{}, Membership{}, errors.New("oauth userinfo did not provide a valid email")
+	}
+	name := oauthClaim(payload, "name", "preferred_username", "login")
+	if name == "" {
+		name = email
+	}
+	user, err := s.CreateUser(email, name)
+	if err != nil {
+		return User{}, Organization{}, Membership{}, err
+	}
+	organization, membership, err := s.FirstOrganization(user.ID)
+	if err == nil {
+		return user, organization, membership, nil
+	}
+	organization, membership, err = s.CreateOrganization(strings.TrimSpace(provider)+" — "+email, user)
+	return user, organization, membership, err
+}
+
+func oauthClaim(payload map[string]any, keys ...string) string {
+	for _, key := range keys {
+		if value, ok := payload[key].(string); ok && strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	if nested, ok := payload["userinfo"].(map[string]any); ok {
+		return oauthClaim(nested, keys...)
+	}
+	return ""
+}
+
 func (s *AuthStore) persistLocked() error {
 	if s.root == "" {
 		return nil
@@ -516,6 +642,7 @@ type OAuthProvider struct {
 	Name         string `json:"name"`
 	AuthorizeURL string `json:"authorize_url"`
 	TokenURL     string `json:"token_url"`
+	UserInfoURL  string `json:"userinfo_url,omitempty"`
 	ClientIDEnv  string `json:"client_id_env"`
 	SecretEnv    string `json:"secret_env"`
 }
@@ -527,10 +654,44 @@ func (p OAuthProvider) Validate() error {
 			return errors.New("oauth endpoints must use https")
 		}
 	}
+	if p.UserInfoURL != "" {
+		u, err := url.Parse(p.UserInfoURL)
+		if err != nil || u.Scheme != "https" || u.Host == "" {
+			return errors.New("oauth userinfo endpoint must use https")
+		}
+	}
 	if os.Getenv(p.ClientIDEnv) == "" || os.Getenv(p.SecretEnv) == "" {
 		return errors.New("oauth client credentials are not configured")
 	}
 	return nil
+}
+
+func (p OAuthProvider) FetchUserInfo(ctx context.Context, client *http.Client, accessToken string) (map[string]any, error) {
+	if strings.TrimSpace(p.UserInfoURL) == "" {
+		return nil, errors.New("oauth userinfo endpoint is not configured")
+	}
+	if client == nil {
+		client = http.DefaultClient
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, p.UserInfoURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	request.Header.Set("Authorization", "Bearer "+strings.TrimSpace(accessToken))
+	request.Header.Set("Accept", "application/json")
+	response, err := client.Do(request)
+	if err != nil {
+		return nil, err
+	}
+	defer response.Body.Close()
+	if response.StatusCode/100 != 2 {
+		return nil, fmt.Errorf("oauth userinfo failed with status %d", response.StatusCode)
+	}
+	var payload map[string]any
+	if err := json.NewDecoder(io.LimitReader(response.Body, 1<<20)).Decode(&payload); err != nil {
+		return nil, err
+	}
+	return payload, nil
 }
 
 func (p OAuthProvider) AuthorizationURL(state string, scopes []string) (string, error) {
