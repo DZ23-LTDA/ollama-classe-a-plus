@@ -37,6 +37,7 @@ import (
 	"github.com/ollama/ollama/envconfig"
 	"github.com/ollama/ollama/format"
 	"github.com/ollama/ollama/fs/gguf"
+	"github.com/ollama/ollama/internal/agent"
 	internalcloud "github.com/ollama/ollama/internal/cloud"
 	"github.com/ollama/ollama/internal/multillm"
 	"github.com/ollama/ollama/internal/proxy"
@@ -103,6 +104,7 @@ type Server struct {
 	modelCaches   *modelCaches
 	multiProvider *multillm.Gateway
 	multiRegistry *multillm.Registry
+	agentRuntime  *agent.Runtime
 }
 
 func init() {
@@ -1910,6 +1912,13 @@ func allowedHostsMiddleware(addr net.Addr) gin.HandlerFunc {
 }
 
 func (s *Server) GenerateRoutes() (http.Handler, error) {
+	if s.agentRuntime == nil {
+		runtime, err := newDefaultAgentRuntime()
+		if err != nil {
+			return nil, err
+		}
+		s.agentRuntime = runtime
+	}
 	codexDesktopProxy, err := newCodexDesktopProxy()
 	if err != nil {
 		return nil, err
@@ -1967,6 +1976,7 @@ func (s *Server) GenerateRoutes() (http.Handler, error) {
 	r.GET("/api/dz23/cli-catalog", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"tools": multillm.DetectCLIs()})
 	})
+	newAgentAPI(s.agentRuntime).register(r)
 	// Codex uses this existing Ollama listener for both native and Ollama
 	// models. The proxy selects the upstream per request.
 	r.Any(proxy.CodexDesktopPathPrefix+"/*path", gin.WrapH(codexDesktopProxy))
@@ -2098,6 +2108,7 @@ func Serve(ln net.Listener) error {
 	schedCtx, schedDone := context.WithCancel(ctx)
 	sched := InitScheduler(schedCtx)
 	s.sched = sched
+	s.agentRuntime.Start(ctx)
 	s.modelCaches.Start(ctx)
 
 	slog.Info(fmt.Sprintf("Listening on %s (version %s)", ln.Addr(), version.Version))

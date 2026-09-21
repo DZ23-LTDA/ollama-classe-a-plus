@@ -108,6 +108,16 @@ See the [API documentation](https://docs.ollama.com/api) for all endpoints.
 
 This fork can expose explicitly configured API and CLI providers beside local models through the same Ollama and OpenAI-compatible endpoints. The feature is disabled by default. See [Ollama DZ23 multi-provider mode](docs/dz23-multi-provider.md) for configuration, security boundaries, and the built-in CLI/agent catalog.
 
+### DZ23 agentic runtime
+
+The fork also includes the first vertical slice of an agentic runtime: persistent missions, validated plans, approval-gated tools, workspace isolation, artifact manifests, event history, and recovery-aware execution. Configure `OLLAMA_AGENT_ROOT`, optionally set `OLLAMA_AGENT_STORE` and `OLLAMA_AGENT_MODEL`, then use the API or the CLI:
+
+```shell
+ollama agent create --objective "inspecionar o workspace" --auto-run
+```
+
+Read [the agentic architecture](docs/agentic/ARCHITECTURE.md), [the executable roadmap](docs/agentic/ROADMAP.md), and [the API guide](docs/agentic/API.md). Browser control, computer use, external connectors, media generation, mobile surfaces, and dedicated code sandboxes remain subsequent adapters and are not represented as completed capabilities until they have real implementations and tests.
+
 ### Python
 
 ```
