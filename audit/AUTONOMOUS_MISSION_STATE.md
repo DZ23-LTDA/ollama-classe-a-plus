@@ -138,3 +138,28 @@ pending_production:
   - remote push notifications, mobile conflict resolution and physical device tests
 next_action: verify root build, diff, commit phase 5 and package ZIP; preserve unresolved external credential/hardware gates.
 ```
+
+
+## Fechamento da fase 5 — 2026-09-21
+
+```yaml
+state: CANDIDATE_COMPLETED
+commit: 7b0609d8e43414c006150bc4de9f5fbe9571b57a
+proofs:
+  - CGO_ENABLED=0 go test ./internal/agent -count=1: PASS
+  - CGO_ENABLED=1 go test ./server -count=1: PASS
+  - apps/mobile-agentic npm ci && npm run typecheck: PASS
+  - CGO_ENABLED=1 go build -o ollama-dz23-agentic-phase5 .: PASS
+  - zipinfo -t phase5 archive: PASS
+features:
+  - PostgreSQL store and Redis queue adapters with local fallback
+  - OTLP OpenTelemetry exporter with HTTPS-by-default and noop fallback
+  - TLS/mTLS policy and WebSocket companion handshake/heartbeat
+  - mobile cached mission and offline action queue
+  - CI quality workflow, CycloneDX SBOM and local infra compose stack
+external:
+  - push remains blocked by GitHub HTTP 403 for dz23trading-collab
+remaining:
+  - real PostgreSQL/Redis/OTLP integration tests, certificate rotation, RLS, remote push, physical devices, public deploy adapters, OCR/model providers and signed releases
+next_action: proceed to the production-adapter phase only after external credentials, certificates and test infrastructure are available.
+```
