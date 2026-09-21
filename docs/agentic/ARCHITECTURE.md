@@ -105,3 +105,10 @@ O ResearchEngine recebe URLs declaradas, limita fontes e bytes, bloqueia loopbac
 ## Pareamento de dispositivos
 
 DeviceStore mantém companions múltiplos por organização, pairing code one-time, capabilities, heartbeat, status online/offline e revogação. O token é entregue somente na conclusão do pairing e armazenado como hash no servidor. mTLS, assinatura de binários, auto-update e testes em hardware real continuam gates de produção.
+
+
+## Infraestrutura de produção
+
+O runtime seleciona PostgreSQL para missões/eventos e Redis para fila quando as URLs correspondentes estão configuradas; sem elas, conserva implementações locais para desenvolvimento. Essa seleção ocorre no bootstrap do servidor, não no planner, e falha explicitamente quando uma URL configurada não pode ser validada ou conectada.
+
+O TraceStore local e o provider OpenTelemetry coexistem: o primeiro serve auditoria/replay do produto e o segundo exporta spans para observabilidade distribuída. Companions usam WebSocket versionado com handshake de device, TLS/mTLS opcional obrigatório por policy e heartbeat; o canal de transporte não é uma autorização para chamar ferramentas.

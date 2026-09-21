@@ -23,7 +23,9 @@ type Runtime struct {
 	connectors    *ConnectorManager
 	mcp           *MCPManager
 	queue         *JobQueue
+	redisQueue    *RedisQueue
 	traces        *TraceStore
+	telemetry     *Telemetry
 	media         *MediaManager
 	builder       *BuilderService
 	collaboration *CollaborationStore
@@ -44,7 +46,9 @@ type RuntimeConfig struct {
 	Connectors    *ConnectorManager
 	MCP           *MCPManager
 	Queue         *JobQueue
+	RedisQueue    *RedisQueue
 	Traces        *TraceStore
+	Telemetry     *Telemetry
 	Media         *MediaManager
 	Builder       *BuilderService
 	Collaboration *CollaborationStore
@@ -116,7 +120,14 @@ func NewRuntime(config RuntimeConfig) (*Runtime, error) {
 			return nil, err
 		}
 	}
-	runtime := &Runtime{store: store, planner: planner, tools: tools, workspaceRoot: root, context: contextStore, metrics: &RuntimeMetrics{}, connectors: config.Connectors, mcp: config.MCP, queue: queue, traces: traces, media: config.Media, builder: builder, collaboration: collaboration, running: make(map[string]bool)}
+	telemetry := config.Telemetry
+	if telemetry == nil {
+		telemetry, err = NewTelemetry(context.Background(), "")
+		if err != nil {
+			return nil, err
+		}
+	}
+	runtime := &Runtime{store: store, planner: planner, tools: tools, workspaceRoot: root, context: contextStore, metrics: &RuntimeMetrics{}, connectors: config.Connectors, mcp: config.MCP, queue: queue, redisQueue: config.RedisQueue, traces: traces, telemetry: telemetry, media: config.Media, builder: builder, collaboration: collaboration, running: make(map[string]bool)}
 	orchestrator, err := NewAgentOrchestrator(filepath.Join(root, ".agent-orchestrator"), runtime.SubagentRunner)
 	if err != nil {
 		return nil, err
@@ -240,9 +251,14 @@ func (r *Runtime) GetMission(id string) (Mission, error) {
 }
 
 func (r *Runtime) Start(ctx context.Context) {
-	r.queue.Start(ctx, "agent-runtime", func(jobContext context.Context, job QueueJob) error {
+	worker := func(jobContext context.Context, job QueueJob) error {
 		return r.Run(jobContext, job.MissionID)
-	})
+	}
+	if r.redisQueue != nil {
+		r.redisQueue.Start(ctx, "agent-runtime", worker)
+	} else {
+		r.queue.Start(ctx, "agent-runtime", worker)
+	}
 	go func() {
 		r.resumePending(ctx)
 		ticker := time.NewTicker(2 * time.Second)
@@ -279,14 +295,23 @@ func (r *Runtime) EnqueueMission(missionID string) (QueueJob, error) {
 	if _, err := r.store.GetMission(strings.TrimSpace(missionID)); err != nil {
 		return QueueJob{}, err
 	}
+	if r.redisQueue != nil {
+		return r.redisQueue.Enqueue(missionID, 3)
+	}
 	return r.queue.Enqueue(missionID, 3)
 }
 
 func (r *Runtime) QueueJobs(status QueueStatus) []QueueJob {
+	if r.redisQueue != nil {
+		return r.redisQueue.List(status)
+	}
 	return r.queue.List(status)
 }
 
 func (r *Runtime) ReplayJob(jobID string) (QueueJob, error) {
+	if r.redisQueue != nil {
+		return r.redisQueue.Replay(jobID)
+	}
 	return r.queue.Replay(jobID)
 }
 
@@ -295,6 +320,8 @@ func (r *Runtime) ListTools() []ToolDescriptor {
 }
 
 func (r *Runtime) Run(ctx context.Context, id string) (runErr error) {
+	ctx, otelSpan := r.telemetry.Start(ctx, "agent.mission.run", map[string]string{"mission.id": id})
+	defer otelSpan.End()
 	id = strings.TrimSpace(id)
 	missionSpan := r.traces.Start("tr_"+id, "", "mission.run", map[string]any{"mission_id": id})
 	defer func() { missionSpan.End("ok", runErr) }()

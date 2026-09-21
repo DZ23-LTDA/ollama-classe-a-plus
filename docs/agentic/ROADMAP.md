@@ -48,3 +48,8 @@ A prioridade é segurança e recuperação, depois execução real, depois conec
 ## Incremento 2026-09-21 — Multiagente, pesquisa e dispositivos
 
 Foi implementado um AgentOrchestrator com sete papéis especializados, concorrência limitada, retries, orçamento, cancelamento, persistência e reducer com conflitos. O ResearchEngine agora executa pesquisa multi-fonte com cache, citações, hash, extração HTML, robots policy e SSRF guard. O DeviceStore adiciona pairing one-time, capability report, heartbeat, listagem e revogação. O próximo incremento deve conectar o reducer a um modelo de síntese validado, adicionar fontes PDF/OCR, WebSocket/mTLS e testes físicos dos companions.
+
+
+## Incremento 2026-09-21 — Infraestrutura distribuída e transporte seguro
+
+A fase adicionou adapters opcionais de PostgreSQL, Redis e OpenTelemetry, WebSocket de companion com TLS/mTLS policy, stack Docker Compose de desenvolvimento, workflow de qualidade/SBOM e fila offline no mobile. A próxima etapa de produção deve validar Redis/PostgreSQL reais em CI, configurar RLS/tenant isolation, rotação mTLS, push remoto, resolução de conflitos mobile, exporters persistentes e assinatura/rollback das releases.

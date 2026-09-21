@@ -47,9 +47,19 @@ func newDefaultAgentRuntime() (*agent.Runtime, error) {
 	if storeRoot == "" {
 		storeRoot = filepath.Join(filepath.Dir(workspaceRoot), ".ollama-agent-store")
 	}
-	store, err := agent.NewJSONStore(storeRoot)
-	if err != nil {
-		return nil, err
+	var store agent.Store
+	if databaseURL := strings.TrimSpace(os.Getenv("OLLAMA_AGENT_DATABASE_URL")); databaseURL != "" {
+		postgres, err := agent.OpenPostgresStore(context.Background(), databaseURL)
+		if err != nil {
+			return nil, fmt.Errorf("open agent PostgreSQL store: %w", err)
+		}
+		store = postgres
+	} else {
+		local, err := agent.NewJSONStore(storeRoot)
+		if err != nil {
+			return nil, err
+		}
+		store = local
 	}
 	contextStore, err := agent.NewContextStore(filepath.Join(storeRoot, "context"))
 	if err != nil {
@@ -70,6 +80,17 @@ func newDefaultAgentRuntime() (*agent.Runtime, error) {
 	if err != nil {
 		return nil, err
 	}
+	telemetry, err := agent.NewTelemetry(context.Background(), os.Getenv("OLLAMA_AGENT_OTLP_ENDPOINT"))
+	if err != nil {
+		return nil, fmt.Errorf("initialize agent OpenTelemetry: %w", err)
+	}
+	var redisQueue *agent.RedisQueue
+	if redisURL := strings.TrimSpace(os.Getenv("OLLAMA_AGENT_REDIS_URL")); redisURL != "" {
+		redisQueue, err = agent.OpenRedisQueue(context.Background(), redisURL, os.Getenv("OLLAMA_AGENT_REDIS_PREFIX"))
+		if err != nil {
+			return nil, fmt.Errorf("open agent Redis queue: %w", err)
+		}
+	}
 	var planner agent.Planner = agent.RulePlanner{}
 	if model := strings.TrimSpace(os.Getenv("OLLAMA_AGENT_MODEL")); model != "" {
 		planner = agent.OllamaPlanner{
@@ -78,7 +99,7 @@ func newDefaultAgentRuntime() (*agent.Runtime, error) {
 			Fallback: agent.RulePlanner{},
 		}
 	}
-	return agent.NewRuntime(agent.RuntimeConfig{Store: store, Context: contextStore, Planner: planner, WorkspaceRoot: workspaceRoot, Connectors: connectors, MCP: mcp, Media: media})
+	return agent.NewRuntime(agent.RuntimeConfig{Store: store, Context: contextStore, Planner: planner, WorkspaceRoot: workspaceRoot, Connectors: connectors, MCP: mcp, Media: media, RedisQueue: redisQueue, Telemetry: telemetry})
 }
 
 func loadAgentConnectors() (*agent.ConnectorManager, error) {
@@ -165,6 +186,7 @@ func (a *agentAPI) register(r *gin.Engine) {
 	group.POST("/devices/pair/complete", a.completeDevicePairing)
 	group.POST("/devices/:id/heartbeat", a.deviceHeartbeat)
 	group.POST("/devices/:id/revoke", a.revokeDevice)
+	group.GET("/devices/:id/connect", a.deviceConnect)
 	group.POST("/projects/:id/ingest", a.ingestProject)
 	group.GET("/builders", a.builders)
 	group.POST("/builders", a.createBuilder)
@@ -207,6 +229,10 @@ func (a *agentAPI) authMiddleware(c *gin.Context) {
 		return
 	}
 	if strings.HasSuffix(c.Request.URL.Path, "/auth/dev/token") && strings.EqualFold(strings.TrimSpace(os.Getenv("OLLAMA_AGENT_AUTH_DEV")), "true") {
+		c.Next()
+		return
+	}
+	if strings.HasSuffix(c.Request.URL.Path, "/connect") {
 		c.Next()
 		return
 	}

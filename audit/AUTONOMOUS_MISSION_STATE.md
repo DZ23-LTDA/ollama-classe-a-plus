@@ -114,3 +114,27 @@ blockers:
   - production mTLS/WebSocket companion transport, OCR/vision providers, distributed stores, public hosting deploy, signed desktop/mobile releases and physical device validation remain
 next_action: run final diff review, commit phase 4 and build verified ZIP; do not publish main.
 ```
+
+
+## Adendo — fase 5 infraestrutura distribuída, companion seguro e mobile offline — 2026-09-21
+
+```yaml
+state: TESTING
+implemented:
+  - postgres_store: idempotent migrations, mission upsert and append-only event persistence
+  - redis_queue: enqueue, claim, retry backoff, dead-letter, replay and worker integration
+  - opentelemetry: optional OTLP HTTP exporter with HTTPS-by-default and local noop fallback
+  - companion_transport: WebSocket handshake, device token, capabilities, heartbeat, TLS/mTLS policy and origin allowlist
+  - mobile_offline: cached mission, queued actions and synchronization retry
+  - ci_sbom: Go/web/mobile gates and CycloneDX artifact workflow
+  - local_stack: PostgreSQL, Redis and OTEL Collector compose files
+proofs:
+  - CGO_ENABLED=0 go test ./internal/agent: PASS
+  - CGO_ENABLED=1 go test ./server: PASS
+  - apps/mobile-agentic npm ci && npm run typecheck: PASS
+pending_production:
+  - integration tests against real PostgreSQL/Redis/OTLP endpoints
+  - certificate rotation, RLS and tenant isolation review
+  - remote push notifications, mobile conflict resolution and physical device tests
+next_action: verify root build, diff, commit phase 5 and package ZIP; preserve unresolved external credential/hardware gates.
+```
