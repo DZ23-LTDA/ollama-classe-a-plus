@@ -100,3 +100,106 @@ export OPENAI_API_KEY=ollama
 ```
 
 When accessing the gateway from another machine, replace `ollama` with the value of `OLLAMA_DZ23_GATEWAY_KEY` and bind Ollama only to a trusted network interface protected by firewall/TLS.
+
+## Claude and Codex Desktop integrations
+
+The same listener can serve Claude Code, Claude Desktop, Codex CLI, and the
+ChatGPT Desktop Codex mode. These clients must use a concrete namespaced model
+when selecting a configured provider, for example `openai/gpt-4.1-mini` or
+`anthropic/claude-sonnet-4-5`.
+
+### Claude Code
+
+Start Claude Code through the Ollama launcher so the Anthropic-compatible
+environment is applied without writing a real provider key into Claude's
+configuration:
+
+```sh
+ollama launch claude --model openai/gpt-4.1-mini
+```
+
+For a manual shell setup, use the local listener and the model name in the
+ordinary Claude command:
+
+```sh
+ANTHROPIC_AUTH_TOKEN=ollama \
+ANTHROPIC_API_KEY="" \
+ANTHROPIC_BASE_URL=http://localhost:11434 \
+claude --model openai/gpt-4.1-mini
+```
+
+When the selected model belongs to a provider with `type: "anthropic"`, DZ23
+forwards `/v1/messages` using the native Anthropic protocol. When it belongs
+to a provider with `type: "openai-compatible"`, the provider must explicitly
+list `/v1/messages` in `paths`; DZ23 then translates Anthropic Messages to
+`/v1/chat/completions` and translates normal and streaming responses back to
+Anthropic format. This is the path used by Claude Code and Claude Desktop.
+
+### Claude Desktop
+
+On supported desktop platforms, enable the Claude Desktop integration with:
+
+```sh
+ollama launch claude-desktop
+```
+
+The launcher keeps the Claude gateway on loopback, assigns Claude-compatible
+route IDs, and restores the original Claude Desktop configuration on
+`--restore`. Use the Ollama Desktop Apps/Settings screen to select the
+explicit provider model. Do not expose the Claude gateway port on a LAN.
+
+### Codex CLI
+
+Use the dedicated Ollama profile, which points Codex at the OpenAI-compatible
+Responses API and writes a separate model catalog:
+
+```sh
+ollama launch codex --model openai/gpt-4.1-mini
+```
+
+The generated profile uses `wire_api = "responses"` and
+`http://localhost:11434/v1/`. Models configured by DZ23 are advertised as
+remote models in `/api/tags` and `/v1/models`, so Codex does not mistake them
+for local weights. Restore only the managed Ollama profile with:
+
+```sh
+ollama launch codex --restore
+```
+
+### ChatGPT Desktop / Codex mode
+
+On macOS/Windows installations that expose the ChatGPT Desktop Codex app,
+connect the regular desktop profile with:
+
+```sh
+ollama launch chatgpt
+```
+
+The generated combined catalog keeps native ChatGPT models and adds the
+selected DZ23 models. Requests are routed per model through the loopback Codex
+proxy; native ChatGPT requests are not sent to a configured DZ23 provider.
+Restore the native profile with:
+
+```sh
+ollama launch chatgpt --restore
+```
+
+The Codex Desktop router uses `/v1/responses`, keeps a separate Ollama-only
+routing allow-list, strips the managed local credential before forwarding, and
+does not persist ChatGPT session content.
+
+### Provider checklist
+
+Before selecting a model in either client, verify:
+
+1. `OLLAMA_DZ23_CONFIG` points to the intended configuration;
+2. the model appears in `curl http://localhost:11434/v1/models`;
+3. the required credential environment variable is present;
+4. the provider explicitly supports the path the client will use;
+5. the model declares `tools` and `coding` when the client will edit files or
+   execute agent tools;
+6. the provider's context window is at least 64k for large coding sessions.
+
+The gateway never forwards a client `Authorization` header to a provider. If
+the listener is accessed off-host, configure `gateway_api_key_env`, use the
+gateway bearer token, and protect the connection with TLS/firewall rules.

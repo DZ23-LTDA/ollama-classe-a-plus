@@ -115,6 +115,16 @@ func (g *Gateway) Middleware() gin.HandlerFunc {
 			}
 			return
 		}
+		if c.Request.URL.Path == "/v1/messages" && provider.Type == ProviderTypeOpenAICompatible {
+			if err := g.forwardAnthropicToOpenAI(c, provider, model, envelope); err != nil {
+				slog.Warn("DZ23 Anthropic-to-OpenAI request failed", "provider", provider.Name, "error", err)
+				if !c.Writer.Written() {
+					c.AbortWithStatusJSON(http.StatusBadGateway, gin.H{"error": "provider request failed"})
+				}
+			}
+			c.Abort()
+			return
+		}
 		if provider.Type == ProviderTypeAnthropic {
 			if err := g.forwardAnthropic(c, provider, model, envelope); err != nil {
 				slog.Warn("DZ23 Anthropic request failed", "provider", provider.Name, "error", err)
