@@ -73,3 +73,44 @@ proofs:
   - server gate: BLOCKED by existing upstream MLX symbols/toolchain, not by internal/agent tests
 next_action: Resolve MLX build environment, then commit/review/push the verified phase.
 ```
+
+
+## Adendo — fase 4 multiagente, pesquisa, devices e ingestão — 2026-09-21
+
+```yaml
+state: TESTING
+implemented:
+  - multiagent_orchestrator: specialist_roles, concurrency_budget, retries, cancellation, persistence and synthesis conflict detection
+  - deep_research: multi-source HTTPS fetch, HTML extraction, cache, citations, hashes, robots policy and SSRF guard
+  - device_pairing: one-time pairing, capability report, heartbeat, online/offline state and revocation
+  - document_ingestion: txt/md/html/json/csv/pdf/docx/xlsx readers, chunking and provenance-backed memories
+proofs:
+  - CGO_ENABLED=0 go test ./internal/agent -count=1 after phase 4: PASS
+  - focused swarm/research/device tests: PASS
+remaining:
+  - resolve full server build with CGO/MLX toolchain and run server tests
+  - integrate production mTLS/WebSocket companion transport, OAuth provider adapters and distributed stores
+next_action: run full server gate after build-essential installation, then commit phase 4 and package artifacts.
+```
+
+
+## Fechamento da fase 4 — 2026-09-21
+
+```yaml
+state: CANDIDATE_COMPLETED
+proofs:
+  - CGO_ENABLED=0 go test ./internal/agent -count=1: PASS
+  - CGO_ENABLED=1 go test ./server -count=1: PASS
+  - CGO_ENABLED=1 go build -o ollama-dz23-agentic-server .: PASS
+  - frontend ./node_modules/.bin/tsc --noEmit: PASS
+  - git diff --check: PASS
+features:
+  - multiagent orchestration with seven roles, budgets, retries, cancellation and synthesis
+  - deep research with citations, hashes, cache, HTML extraction, robots and SSRF policy
+  - device pairing, capability report, heartbeat, offline state and revocation
+  - safe PDF/DOCX/XLSX/document ingestion with chunks and provenance
+  - Web Agentic Console controls for missions, orchestration and research
+blockers:
+  - production mTLS/WebSocket companion transport, OCR/vision providers, distributed stores, public hosting deploy, signed desktop/mobile releases and physical device validation remain
+next_action: run final diff review, commit phase 4 and build verified ZIP; do not publish main.
+```

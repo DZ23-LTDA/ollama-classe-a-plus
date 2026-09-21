@@ -43,3 +43,8 @@ Cada fase exige testes unitários, contratos, autorização negativa, integraç�
 ## Ordem de investimento
 
 A prioridade é segurança e recuperação, depois execução real, depois conectores e superfícies. A interface não será usada para mascarar lacunas de runtime. O próximo incremento executável é substituir os adapters locais por stores/filas distribuídos, configurar providers OAuth/media/deploy, executar smoke tests em Windows/macOS/Android/iOS e fechar o fluxo de publicação no GitHub.
+
+
+## Incremento 2026-09-21 — Multiagente, pesquisa e dispositivos
+
+Foi implementado um AgentOrchestrator com sete papéis especializados, concorrência limitada, retries, orçamento, cancelamento, persistência e reducer com conflitos. O ResearchEngine agora executa pesquisa multi-fonte com cache, citações, hash, extração HTML, robots policy e SSRF guard. O DeviceStore adiciona pairing one-time, capability report, heartbeat, listagem e revogação. O próximo incremento deve conectar o reducer a um modelo de síntese validado, adicionar fontes PDF/OCR, WebSocket/mTLS e testes físicos dos companions.

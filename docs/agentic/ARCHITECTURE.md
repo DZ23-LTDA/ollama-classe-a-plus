@@ -92,3 +92,16 @@ Cada missão emite eventos estruturados com correlação. Métricas mínimas inc
 ## Definição de pronto da primeira fatia
 
 A primeira fatia foi considerada pronta quando uma missão textual pôde ser criada por API, persistir plano e eventos, executar uma ferramenta de leitura limitada do workspace, produzir um artifact manifest, sobreviver a restart, bloquear um passo que exige aprovação e expor o estado por API. Browser, desktop, mídia, builders, conectores, OAuth e mobile agora possuem adapters/testes focados; a definição de produção ainda exige credenciais, deploy, assinatura nativa, testes em dispositivos reais e auditoria independente.
+
+
+## Orquestração multiagente
+
+O AgentOrchestrator decompõe um objetivo em papéis independentes, limita concorrência por job, aplica orçamento de tempo/saída/retries, cancela tarefas pelo contexto e persiste o estado de cada subagente. A síntese preserva as saídas por papel, evidencia citações e sinaliza conflitos; ela não transforma falha parcial em sucesso total.
+
+## Pesquisa profunda
+
+O ResearchEngine recebe URLs declaradas, limita fontes e bytes, bloqueia loopback/private/link-local, pode consultar robots.txt, mantém cache por URL e retorna texto extraído, hash, status, erros e citações. O browser continua sendo o adapter para login, CAPTCHA e fontes autenticadas; o pesquisador não contorna controle de acesso.
+
+## Pareamento de dispositivos
+
+DeviceStore mantém companions múltiplos por organização, pairing code one-time, capabilities, heartbeat, status online/offline e revogação. O token é entregue somente na conclusão do pairing e armazenado como hash no servidor. mTLS, assinatura de binários, auto-update e testes em hardware real continuam gates de produção.

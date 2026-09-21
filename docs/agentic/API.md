@@ -133,3 +133,56 @@ Com um provider HTTPS compatível, use `POST /media/image`, `/media/video`, `/me
 ## Mobile
 
 O cliente Expo em `apps/mobile-agentic` usa SecureStore para o Bearer token, polling compatível com Android/iOS e EAS profiles para development/preview/production. Assinatura, credenciais de loja, `ascAppId` e hosting da API continuam fora do código.
+
+
+## Orquestração multiagente
+
+`POST /api/agent/v1/orchestration/jobs` recebe `objective`, `roles` opcionais (`research`, `programming`, `testing`, `design`, `security`, `data`, `review`), `workspace`, `project_id` e `budget`. Se `auto_run` for verdadeiro, o job começa em background; caso contrário, a API devolve um job `PLANNED`.
+
+```bash
+curl -sS -X POST http://localhost:11434/api/agent/v1/orchestration/jobs \
+  -H 'Content-Type: application/json' \
+  -d '{"objective":"pesquisar e revisar a arquitetura","roles":["research","security","review"],"budget":{"max_agents":3,"max_seconds":600,"max_retries":1},"auto_run":true}'
+
+curl -sS http://localhost:11434/api/agent/v1/orchestration/jobs/ORCH_ID
+curl -sS -X POST http://localhost:11434/api/agent/v1/orchestration/jobs/ORCH_ID/run
+curl -sS -X POST http://localhost:11434/api/agent/v1/orchestration/jobs/ORCH_ID/cancel
+```
+
+O orquestrador limita concorrência, tempo, tamanho de saída e retries por job. A síntese é determinística e conserva a saída de cada papel, citações e conflitos de evidência; um modelo posterior pode substituir o reducer sem remover a validação do runtime.
+
+## Pesquisa profunda
+
+`POST /api/agent/v1/research` baixa URLs HTTPS públicas em paralelo, limita bytes por fonte, aplica bloqueio SSRF, respeita `robots.txt` quando solicitado, usa cache por URL e retorna fontes, SHA-256, texto extraído, citações e erros individuais.
+
+```bash
+curl -sS -X POST http://localhost:11434/api/agent/v1/research \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"arquitetura agentic","urls":["https://example.org"],"max_sources":8,"respect_robots":true}'
+```
+
+A pesquisa não acessa hosts privados, loopback ou link-local em produção. Login, CAPTCHA e fontes autenticadas continuam exigindo o fluxo Browser Operator com takeover humano; o ResearchEngine não tenta contornar autenticação.
+
+## Dispositivos e companions
+
+`POST /devices/pair/start` cria um código one-time com expiração curta. O companion envia esse código em `POST /devices/pair/complete` junto com plataforma, nome e capability report; o token retornado deve ser armazenado somente no dispositivo. `POST /devices/:id/heartbeat` aceita Bearer token ou `X-Device-Token` e atualiza capabilities. `GET /devices` lista somente metadados; `POST /devices/:id/revoke` revoga o token e impede novos heartbeats.
+
+```bash
+curl -sS -X POST http://localhost:11434/api/agent/v1/devices/pair/start
+curl -sS -X POST http://localhost:11434/api/agent/v1/devices/pair/complete \
+  -H 'Content-Type: application/json' \
+  -d '{"pairing_code":"CODE","name":"Meu Desktop","platform":"darwin","capabilities":[{"name":"screen","scopes":["desktop:screen"]}]}'
+```
+
+O pairing local não substitui mTLS, assinatura de binário ou store distribuído de produção. Esses gates permanecem obrigatórios antes de expor companions em rede pública.
+
+
+## Ingestão e memória documental
+
+`POST /projects/:id/ingest` importa arquivos do root autorizado ou URLs públicas para chunks de memória. O ingestor suporta texto, Markdown, HTML, JSON, CSV, PDF via `pdftotext`, DOCX via `document.xml` e XLSX via worksheets; cada chunk conserva o caminho/URL de origem. Embeddings são produzidos pelo embedder configurado no ContextStore. Imagens exigem um adapter de visão/OCR configurado e não são tratadas como texto automaticamente.
+
+```bash
+curl -sS -X POST http://localhost:11434/api/agent/v1/projects/PROJECT_ID/ingest \
+  -H 'Content-Type: application/json' \
+  -d '{"paths":["docs/spec.pdf","README.md"],"chunk_size":1800,"chunk_overlap":200}'
+```

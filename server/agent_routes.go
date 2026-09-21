@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/json"
@@ -154,6 +155,17 @@ func (a *agentAPI) register(r *gin.Engine) {
 	group.POST("/media/speech", a.mediaSpeech)
 	group.POST("/media/transcribe", a.mediaTranscribe)
 	group.POST("/media/tone", a.mediaTone)
+	group.POST("/orchestration/jobs", a.createOrchestration)
+	group.GET("/orchestration/jobs/:id", a.getOrchestration)
+	group.POST("/orchestration/jobs/:id/run", a.runOrchestration)
+	group.POST("/orchestration/jobs/:id/cancel", a.cancelOrchestration)
+	group.POST("/research", a.research)
+	group.GET("/devices", a.devices)
+	group.POST("/devices/pair/start", a.startDevicePairing)
+	group.POST("/devices/pair/complete", a.completeDevicePairing)
+	group.POST("/devices/:id/heartbeat", a.deviceHeartbeat)
+	group.POST("/devices/:id/revoke", a.revokeDevice)
+	group.POST("/projects/:id/ingest", a.ingestProject)
 	group.GET("/builders", a.builders)
 	group.POST("/builders", a.createBuilder)
 	group.POST("/builders/:id/preview", a.previewBuilder)
@@ -630,6 +642,167 @@ func (a *agentAPI) traces(c *gin.Context) {
 
 func (a *agentAPI) allTraces(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"spans": a.runtime.Traces(c.Query("trace_id"))})
+}
+
+func (a *agentAPI) createOrchestration(c *gin.Context) {
+	var request struct {
+		Objective string            `json:"objective"`
+		Workspace string            `json:"workspace,omitempty"`
+		ProjectID string            `json:"project_id,omitempty"`
+		Roles     []agent.AgentRole `json:"roles,omitempty"`
+		Budget    agent.AgentBudget `json:"budget,omitempty"`
+		AutoRun   bool              `json:"auto_run,omitempty"`
+	}
+	if err := decodeJSON(c, &request); err != nil {
+		writeAgentError(c, http.StatusBadRequest, err)
+		return
+	}
+	job, err := a.runtime.Orchestrator().Plan(request.Objective, request.Workspace, request.ProjectID, request.Roles, request.Budget)
+	if err != nil {
+		writeAgentError(c, http.StatusBadRequest, err)
+		return
+	}
+	if request.AutoRun {
+		go func(id string) { _, _ = a.runtime.Orchestrator().Run(context.Background(), id) }(job.ID)
+		c.JSON(http.StatusAccepted, job)
+		return
+	}
+	c.JSON(http.StatusCreated, job)
+}
+
+func (a *agentAPI) getOrchestration(c *gin.Context) {
+	job, err := a.runtime.Orchestrator().Get(c.Param("id"))
+	if err != nil {
+		writeAgentError(c, statusForAgentError(err), err)
+		return
+	}
+	c.JSON(http.StatusOK, job)
+}
+
+func (a *agentAPI) runOrchestration(c *gin.Context) {
+	job, err := a.runtime.Orchestrator().Get(c.Param("id"))
+	if err != nil {
+		writeAgentError(c, statusForAgentError(err), err)
+		return
+	}
+	go func(id string) { _, _ = a.runtime.Orchestrator().Run(context.Background(), id) }(job.ID)
+	c.JSON(http.StatusAccepted, gin.H{"id": job.ID, "state": agent.OrchestrationRunning})
+}
+
+func (a *agentAPI) cancelOrchestration(c *gin.Context) {
+	job, err := a.runtime.Orchestrator().Cancel(c.Param("id"))
+	if err != nil {
+		writeAgentError(c, statusForAgentError(err), err)
+		return
+	}
+	c.JSON(http.StatusOK, job)
+}
+
+func (a *agentAPI) research(c *gin.Context) {
+	var request agent.ResearchRequest
+	if err := decodeJSON(c, &request); err != nil {
+		writeAgentError(c, http.StatusBadRequest, err)
+		return
+	}
+	report, err := a.runtime.Research().Research(c.Request.Context(), request)
+	if err != nil {
+		writeAgentError(c, http.StatusBadGateway, err)
+		return
+	}
+	c.JSON(http.StatusOK, report)
+}
+
+func (a *agentAPI) actorIdentity(c *gin.Context) (string, string) {
+	if value, ok := c.Get("agent.user"); ok {
+		if user, ok := value.(agent.User); ok {
+			return user.ID, ""
+		}
+	}
+	return strings.TrimSpace(c.GetHeader("X-Ollama-User")), strings.TrimSpace(c.GetHeader("X-Ollama-Organization"))
+}
+
+func (a *agentAPI) devices(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{"devices": a.runtime.Devices().List()})
+}
+
+func (a *agentAPI) startDevicePairing(c *gin.Context) {
+	userID, organizationID := a.actorIdentity(c)
+	code, pairing, err := a.runtime.Devices().StartPairing(userID, organizationID, 5*time.Minute)
+	if err != nil {
+		writeAgentError(c, http.StatusInternalServerError, err)
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"pairing_code": code, "expires_at": pairing.ExpiresAt})
+}
+
+func (a *agentAPI) completeDevicePairing(c *gin.Context) {
+	var request struct {
+		Code         string                   `json:"pairing_code"`
+		Name         string                   `json:"name"`
+		Platform     string                   `json:"platform"`
+		Capabilities []agent.DeviceCapability `json:"capabilities"`
+	}
+	if err := decodeJSON(c, &request); err != nil {
+		writeAgentError(c, http.StatusBadRequest, err)
+		return
+	}
+	userID, organizationID := a.actorIdentity(c)
+	device, token, err := a.runtime.Devices().CompletePairing(request.Code, request.Name, request.Platform, userID, organizationID, request.Capabilities)
+	if err != nil {
+		writeAgentError(c, http.StatusBadRequest, err)
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"device": device, "device_token": token})
+}
+
+func (a *agentAPI) deviceHeartbeat(c *gin.Context) {
+	var request struct {
+		Capabilities []agent.DeviceCapability `json:"capabilities,omitempty"`
+	}
+	if err := decodeJSON(c, &request); err != nil {
+		writeAgentError(c, http.StatusBadRequest, err)
+		return
+	}
+	token := strings.TrimSpace(strings.TrimPrefix(c.GetHeader("Authorization"), "Bearer "))
+	if token == "" {
+		token = strings.TrimSpace(c.GetHeader("X-Device-Token"))
+	}
+	device, err := a.runtime.Devices().Heartbeat(c.Param("id"), token, request.Capabilities)
+	if err != nil {
+		writeAgentError(c, http.StatusUnauthorized, err)
+		return
+	}
+	c.JSON(http.StatusOK, device)
+}
+
+func (a *agentAPI) revokeDevice(c *gin.Context) {
+	device, err := a.runtime.Devices().Revoke(c.Param("id"))
+	if err != nil {
+		writeAgentError(c, statusForAgentError(err), err)
+		return
+	}
+	c.JSON(http.StatusOK, device)
+}
+
+func (a *agentAPI) ingestProject(c *gin.Context) {
+	var request agent.DocumentIngestRequest
+	if err := decodeJSON(c, &request); err != nil {
+		writeAgentError(c, http.StatusBadRequest, err)
+		return
+	}
+	request.ProjectID = c.Param("id")
+	project, err := a.runtime.Context().GetProject(request.ProjectID)
+	if err != nil {
+		writeAgentError(c, statusForAgentError(err), err)
+		return
+	}
+	request.Workspace = project.Root
+	memories, err := a.runtime.Ingestion().Ingest(c.Request.Context(), request)
+	if err != nil {
+		writeAgentError(c, http.StatusBadRequest, err)
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"project_id": request.ProjectID, "memories": memories, "count": len(memories)})
 }
 
 func (a *agentAPI) mediaWorkspace(c *gin.Context, missionID string) (agent.Mission, string, error) {

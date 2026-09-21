@@ -27,6 +27,10 @@ type Runtime struct {
 	media         *MediaManager
 	builder       *BuilderService
 	collaboration *CollaborationStore
+	orchestrator  *AgentOrchestrator
+	research      *ResearchEngine
+	devices       *DeviceStore
+	ingestion     DocumentIngestor
 	mu            sync.Mutex
 	running       map[string]bool
 }
@@ -44,6 +48,7 @@ type RuntimeConfig struct {
 	Media         *MediaManager
 	Builder       *BuilderService
 	Collaboration *CollaborationStore
+	Devices       *DeviceStore
 }
 
 func NewRuntime(config RuntimeConfig) (*Runtime, error) {
@@ -111,7 +116,23 @@ func NewRuntime(config RuntimeConfig) (*Runtime, error) {
 			return nil, err
 		}
 	}
-	return &Runtime{store: store, planner: planner, tools: tools, workspaceRoot: root, context: contextStore, metrics: &RuntimeMetrics{}, connectors: config.Connectors, mcp: config.MCP, queue: queue, traces: traces, media: config.Media, builder: builder, collaboration: collaboration, running: make(map[string]bool)}, nil
+	runtime := &Runtime{store: store, planner: planner, tools: tools, workspaceRoot: root, context: contextStore, metrics: &RuntimeMetrics{}, connectors: config.Connectors, mcp: config.MCP, queue: queue, traces: traces, media: config.Media, builder: builder, collaboration: collaboration, running: make(map[string]bool)}
+	orchestrator, err := NewAgentOrchestrator(filepath.Join(root, ".agent-orchestrator"), runtime.SubagentRunner)
+	if err != nil {
+		return nil, err
+	}
+	runtime.orchestrator = orchestrator
+	runtime.research = NewResearchEngine()
+	devices := config.Devices
+	if devices == nil {
+		devices, err = NewDeviceStore(filepath.Join(root, ".agent-devices"))
+		if err != nil {
+			return nil, err
+		}
+	}
+	runtime.devices = devices
+	runtime.ingestion = DocumentIngestor{Context: contextStore, Research: runtime.research}
+	return runtime, nil
 }
 
 func (r *Runtime) Context() *ContextStore {
@@ -145,6 +166,14 @@ func (r *Runtime) Media() *MediaManager { return r.media }
 func (r *Runtime) Builder() *BuilderService { return r.builder }
 
 func (r *Runtime) Collaboration() *CollaborationStore { return r.collaboration }
+
+func (r *Runtime) Orchestrator() *AgentOrchestrator { return r.orchestrator }
+
+func (r *Runtime) Research() *ResearchEngine { return r.research }
+
+func (r *Runtime) Devices() *DeviceStore { return r.devices }
+
+func (r *Runtime) Ingestion() DocumentIngestor { return r.ingestion }
 
 func (r *Runtime) CreateMission(ctx context.Context, request CreateMissionRequest) (Mission, error) {
 	objective := strings.TrimSpace(request.Objective)
