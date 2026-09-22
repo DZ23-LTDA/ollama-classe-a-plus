@@ -322,7 +322,7 @@ func GenerateTone(workspace string, frequency float64, duration time.Duration) (
 		return MediaResult{}, err
 	}
 	data := make([]byte, samples*2)
-	for i := 0; i < samples; i++ {
+	for i := range samples {
 		sample := int16(12000 * sin(2*3.141592653589793*frequency*float64(i)/sampleRate))
 		data[i*2] = byte(sample)
 		data[i*2+1] = byte(sample >> 8)

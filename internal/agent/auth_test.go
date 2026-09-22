@@ -126,7 +126,11 @@ func TestOAuthClientBlocksRedirectAndPrivateActualAddress(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := oauthClient(server.Client()).Do(request); err == nil || !strings.Contains(err.Error(), "redirect") {
+	response, err := oauthClient(server.Client()).Do(request)
+	if response != nil {
+		_ = response.Body.Close()
+	}
+	if err == nil || !strings.Contains(err.Error(), "redirect") {
 		t.Fatalf("expected OAuth redirect rejection, got %v", err)
 	}
 	listener, err := net.Listen("tcp", "127.0.0.1:0")

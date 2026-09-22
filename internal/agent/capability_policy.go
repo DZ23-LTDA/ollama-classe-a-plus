@@ -7,8 +7,10 @@ import (
 	"strings"
 )
 
-var ErrUnknownCapability = errors.New("unknown mission capability")
-var ErrToolCapabilityDeclaration = errors.New("tool must declare known capabilities")
+var (
+	ErrUnknownCapability         = errors.New("unknown mission capability")
+	ErrToolCapabilityDeclaration = errors.New("tool must declare known capabilities")
+)
 
 // CapabilityPolicy is the runtime boundary between a mission grant and a tool.
 // It is intentionally deny-by-default: a descriptor with no scopes, or a grant

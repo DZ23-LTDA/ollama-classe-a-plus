@@ -302,7 +302,7 @@ func cosineSimilarity(a, b []float32) float64 {
 		length = len(b)
 	}
 	var dot, normA, normB float64
-	for i := 0; i < length; i++ {
+	for i := range length {
 		x, y := float64(a[i]), float64(b[i])
 		dot += x * y
 		normA += x * x

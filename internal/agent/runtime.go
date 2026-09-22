@@ -584,7 +584,7 @@ func (r *Runtime) Run(ctx context.Context, id string) (runErr error) {
 	}
 	_ = r.event(mission, "mission.running", "", nil)
 
-	for index := range mission.Plan {
+	for index := 0; index < len(mission.Plan); index++ {
 		step := &mission.Plan[index]
 		if step.State == StepSucceeded {
 			continue

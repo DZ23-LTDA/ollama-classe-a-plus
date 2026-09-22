@@ -2081,7 +2081,7 @@ func (a *agentAPI) requireApprovalApprover(c *gin.Context) bool {
 	if !a.authRequired {
 		return true
 	}
-	value, ok := c.Get("agent.membership")
+	value, _ := c.Get("agent.membership")
 	membership, ok := value.(agent.Membership)
 	if !ok || (membership.Role != agent.RoleOwner && membership.Role != agent.RoleAdmin) {
 		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "approval requires organization owner or admin"})

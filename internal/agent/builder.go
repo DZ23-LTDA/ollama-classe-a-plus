@@ -422,6 +422,7 @@ func (b *BuilderService) ListForOrganization(organizationID string) []BuilderPro
 func (b *BuilderService) persistLocked() error {
 	return writeJSONAtomic(filepath.Join(b.root, "projects.json"), b.projects)
 }
+
 func validBuilderKind(kind BuilderKind) bool {
 	switch kind {
 	case BuilderWebsite, BuilderApp, BuilderGame, BuilderSlides, BuilderDashboard:
@@ -430,6 +431,7 @@ func validBuilderKind(kind BuilderKind) bool {
 		return false
 	}
 }
+
 func validateBuilderFile(path, contents string) error {
 	clean := filepath.ToSlash(filepath.Clean(path))
 	if clean == "." || strings.HasPrefix(clean, "../") || strings.HasPrefix(clean, "/") || strings.Contains(clean, "../") {
@@ -440,6 +442,7 @@ func validateBuilderFile(path, contents string) error {
 	}
 	return nil
 }
+
 func templateFiles(kind BuilderKind, name string) map[string]string {
 	title := htmlEscape(name)
 	switch kind {
@@ -453,6 +456,7 @@ func templateFiles(kind BuilderKind, name string) map[string]string {
 		return map[string]string{"index.html": "<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>" + title + "</title></head><body><main><h1>" + title + "</h1><p>Builder preview ready.</p></main></body></html>"}
 	}
 }
+
 func mustJSON(value any) string {
 	data, _ := json.MarshalIndent(value, "", "  ")
 	return string(data)

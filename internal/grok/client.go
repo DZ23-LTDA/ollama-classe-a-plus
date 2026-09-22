@@ -341,7 +341,7 @@ func (c *Client) withRetry(ctx context.Context, operation func() error) error {
 		attempts = 3
 	}
 	var last error
-	for attempt := 0; attempt < attempts; attempt++ {
+	for attempt := range attempts {
 		if err := c.checkCircuit(); err != nil {
 			return err
 		}
