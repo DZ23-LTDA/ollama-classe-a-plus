@@ -9,7 +9,7 @@ npm install
 npm run start
 ```
 
-No emulador ou dispositivo físico, informe em **Servidor** uma URL alcançável pelo celular, por exemplo `http://192.168.0.10:11434`. O cliente persiste a URL no AsyncStorage e o token Bearer no SecureStore nativo. O servidor continua sendo a autoridade de policy.
+No emulador ou dispositivo físico, informe em **Servidor** uma URL alcançável pelo celular, por exemplo `http://192.168.0.10:11434`. O cliente persiste a URL no AsyncStorage e o token Bearer no SecureStore nativo. Depois de carregar o token, consulta `/api/agent/v1/auth/session` e só habilita outbox/push autenticados após confirmar o `organization_id`. Cache de missão, fila offline e marca de push são namespaced por servidor e organização; uma sessão sem tenant confirmado não pode enfileirar uma mutação autenticada. O servidor continua sendo a autoridade de policy.
 
 ## Autenticação
 
@@ -30,4 +30,4 @@ npm run build:all
 
 O arquivo `eas.json` possui perfis `development`, `preview` e `production`. O envio para lojas exige preencher o `ascAppId` do App Store Connect e configurar credenciais reais na conta EAS; esta etapa não é simulada pelo código.
 
-O mobile não executa shell, browser, processos ou conectores diretamente. Ele solicita operações pela API, observa eventos e apresenta approvals. Polling periódico é usado como fallback compatível com Android/iOS; push notifications podem ser adicionadas com um provedor de notificações configurado por organização.
+O mobile não executa shell, browser, processos ou conectores diretamente. Ele solicita operações pela API, observa eventos e apresenta approvals. O outbox usa `Idempotency-Key`, `If-Match`, backoff, limite de tentativas e estado explícito de conflito; `401/403` não são tratados como simples retry e exigem nova autenticação/revisão. Polling periódico é usado como fallback compatível com Android/iOS; push notifications são registradas por organização quando o operador concede permissão. Builds físicos Android/iOS, entrega push remota, resolução de conflitos em rede real e publicação em lojas continuam dependentes de contas, dispositivos e credenciais do operador.

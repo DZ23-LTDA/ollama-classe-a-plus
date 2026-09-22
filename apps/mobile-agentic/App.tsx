@@ -9,14 +9,27 @@ Notifications.setNotificationHandler({ handleNotification: async () => ({ should
 
 type Mission = { id: string; version?: number; objective: string; state: string; approvals?: Array<{ id: string; step_id: string; status: string; nonce?: string }>; last_error?: string };
 type Event = { id: string; type: string; step_id?: string; created_at: string };
-type Session = { access_token: string; user: { email: string }; organization: { name: string } };
+type Session = { access_token: string; user: { email: string }; organization: { id: string; name: string } };
+type AuthSession = { authenticated: boolean; organization?: { id?: string; name?: string } };
 type QueuedAction = { id: string; path: string; method: string; body?: string; headers?: Record<string, string>; created_at: string; attempts: number; next_attempt_at: string; idempotency_key: string; conflict?: string };
 
-const queueKey = "dz23.agent.offline.queue";
 const missionKey = "dz23.agent.cached.mission";
 const pushKey = "dz23.agent.push.registered";
 
-function pushStorageKey(server: string) { return `${pushKey}.${encodeURIComponent(server)}`; }
+function pushStorageKey(server: string, organizationID: string | null) {
+  if (!organizationID) return null;
+  return `${pushKey}.${encodeURIComponent(server)}.${encodeURIComponent(organizationID)}`;
+}
+function queueStorageKey(server: string, organizationID: string | null, authenticated: boolean) {
+  if (authenticated && !organizationID) return null;
+  const namespace = authenticated ? organizationID as string : "local";
+  return `dz23.agent.offline.queue.${encodeURIComponent(server)}.${encodeURIComponent(namespace)}`;
+}
+function missionStorageKey(server: string, organizationID: string | null, authenticated: boolean) {
+  if (authenticated && !organizationID) return null;
+  const namespace = authenticated ? organizationID as string : "local";
+  return `${missionKey}.${encodeURIComponent(server)}.${encodeURIComponent(namespace)}`;
+}
 
 class ApiError extends Error {
   status: number;
@@ -34,10 +47,11 @@ async function request<T>(base: string, path: string, token?: string, init?: Req
 }
 
 export default function App() {
-  const [base, setBase] = useState("http://localhost:11434");
-  const [draftBase, setDraftBase] = useState(base);
-  const [token, setToken] = useState("");
-  const [draftToken, setDraftToken] = useState("");
+	const [base, setBase] = useState("http://localhost:11434");
+	const [draftBase, setDraftBase] = useState(base);
+	const [token, setToken] = useState("");
+	const [draftToken, setDraftToken] = useState("");
+	const [organizationID, setOrganizationID] = useState<string | null>(null);
   const [objective, setObjective] = useState("");
   const [mission, setMission] = useState<Mission | null>(null);
   const [events, setEvents] = useState<Event[]>([]);
@@ -52,11 +66,18 @@ export default function App() {
 		await SecureStore.deleteItemAsync("dz23.agent.token");
 		setToken("");
 		setDraftToken("");
+		setOrganizationID(null);
 		setPushRegistered(false);
 	};
 
-  const loadQueue = async () => {
-    const raw = await AsyncStorage.getItem(queueKey);
+	  const loadQueue = async () => {
+	    const queueKey = queueStorageKey(base, organizationID, Boolean(token));
+	    if (!queueKey) {
+	      setQueued(0);
+	      setConflicts(0);
+	      return [];
+	    }
+	    const raw = await AsyncStorage.getItem(queueKey);
     const parsed = raw ? JSON.parse(raw) : [];
     const items: QueuedAction[] = Array.isArray(parsed) ? parsed.map((item: Partial<QueuedAction> & { token?: string }) => {
       const { token: _discardedToken, ...safe } = item;
@@ -67,8 +88,14 @@ export default function App() {
     return items;
   };
 
-  const enqueue = async (path: string, method: string, body?: unknown, headers?: Record<string, string>) => {
-    const items = await loadQueue();
+	  const enqueue = async (path: string, method: string, body?: unknown, headers?: Record<string, string>) => {
+	    if (token && !organizationID) {
+	      setError("A ação offline não foi enfileirada porque a organização autenticada ainda não foi confirmada.");
+	      return false;
+	    }
+	    const queueKey = queueStorageKey(base, organizationID, Boolean(token));
+	    if (!queueKey) return false;
+	    const items = await loadQueue();
     const id = `offline_${Date.now()}_${Math.random().toString(36).slice(2)}`;
     const idempotencyKey = `mobile_${id}`;
     items.push({ id, path, method, body: body ? JSON.stringify(body) : undefined, headers: { ...headers, "Idempotency-Key": idempotencyKey }, created_at: new Date().toISOString(), attempts: 0, next_attempt_at: new Date().toISOString(), idempotency_key: idempotencyKey });
@@ -76,8 +103,11 @@ export default function App() {
     await loadQueue();
   };
 
-  const flushQueue = async () => {
-    if (!token) return;
+	  const flushQueue = async () => {
+	    if (!token) return;
+	    if (!organizationID) return;
+	    const queueKey = queueStorageKey(base, organizationID, true);
+	    if (!queueKey) return;
     const items = await loadQueue();
     const remaining: QueuedAction[] = [];
     for (const item of items) {
@@ -105,10 +135,32 @@ export default function App() {
     }
     await AsyncStorage.setItem(queueKey, JSON.stringify(remaining));
     await loadQueue();
-    if (remaining.length === 0) setOnline(true);
-  };
+	    if (remaining.length === 0) setOnline(true);
+	  };
 
-  const refresh = async (missionId = mission?.id) => {
+	  const hydrateAuthScope = async (server = base, bearer = token) => {
+	    if (!bearer) {
+	      setOrganizationID(null);
+	      return;
+	    }
+	    try {
+	      const session = await request<AuthSession>(server, "/api/agent/v1/auth/session", bearer);
+	      const nextOrganization = session.authenticated ? session.organization?.id?.trim() : "local";
+	      if (!nextOrganization) throw new Error("A sessão autenticada não informou organization_id.");
+	      setOrganizationID(nextOrganization);
+	      setOnline(true);
+	    } catch (cause) {
+	      if (cause instanceof ApiError && (cause.status === 401 || cause.status === 403)) {
+	        await expireSession();
+	        setOnline(false);
+	        setError("Sessão expirada ou sem organização confirmada.");
+	      } else {
+	        setOnline(false);
+	      }
+	    }
+	  };
+
+	  const refresh = async (missionId = mission?.id) => {
     if (!missionId) return;
     try {
       const [nextMission, nextEvents] = await Promise.all([
@@ -116,18 +168,20 @@ export default function App() {
         request<{ events: Event[] }>(base, `/api/agent/v1/missions/${encodeURIComponent(missionId)}/events`, token),
       ]);
       setMission(nextMission); setEvents(nextEvents.events); setOnline(true);
-      await AsyncStorage.setItem(missionKey, JSON.stringify({ mission: nextMission, events: nextEvents.events }));
+	      const cacheKey = missionStorageKey(base, organizationID, Boolean(token));
+	      if (cacheKey) await AsyncStorage.setItem(cacheKey, JSON.stringify({ mission: nextMission, events: nextEvents.events }));
       void flushQueue();
 		} catch (cause) {
 			if (cause instanceof ApiError && (cause.status === 401 || cause.status === 403)) { await expireSession(); setError("Sessão expirada ou sem permissão; autentique novamente."); setOnline(false); return; }
 			setOnline(false);
-      const cached = await AsyncStorage.getItem(missionKey);
+	      const cacheKey = missionStorageKey(base, organizationID, Boolean(token));
+	      const cached = cacheKey ? await AsyncStorage.getItem(cacheKey) : null;
       if (cached && !mission) { const value = JSON.parse(cached) as { mission: Mission; events: Event[] }; setMission(value.mission); setEvents(value.events); }
     }
   };
 
-  const registerPush = async (server = base, bearer = token) => {
-    if (!bearer || !server || pushRegistered) return;
+	  const registerPush = async (server = base, bearer = token) => {
+	    if (!bearer || !server || !organizationID || pushRegistered) return;
     try {
       const permission = await Notifications.getPermissionsAsync();
       const granted = permission.granted || (await Notifications.requestPermissionsAsync()).granted;
@@ -135,21 +189,27 @@ export default function App() {
       const pushToken = (await Notifications.getExpoPushTokenAsync()).data;
       const platform = Platform.OS === "ios" ? "ios" : "android";
       await request(server, "/api/agent/v1/notifications/register", bearer, { method: "POST", body: JSON.stringify({ token: pushToken, platform }) });
-      await AsyncStorage.setItem(pushStorageKey(server), "1");
+	      const pushKeyForScope = pushStorageKey(server, organizationID);
+	      if (pushKeyForScope) await AsyncStorage.setItem(pushKeyForScope, "1");
       setPushRegistered(true);
     } catch { /* Push is optional; offline mission use must continue. */ }
   };
 
-  useEffect(() => {
-    void AsyncStorage.getItem("dz23.agent.base").then((value) => { if (value) { setBase(value); setDraftBase(value); } });
-    void SecureStore.getItemAsync("dz23.agent.token").then((value) => { if (value) { setToken(value); setDraftToken(value); } });
-    void AsyncStorage.getItem(pushStorageKey(base)).then((value) => setPushRegistered(value === "1"));
-    void loadQueue();
-    void AsyncStorage.getItem(missionKey).then((raw) => { if (raw) { const value = JSON.parse(raw) as { mission: Mission; events: Event[] }; setMission(value.mission); setEvents(value.events); } });
-  }, []);
+	  useEffect(() => {
+	    void AsyncStorage.getItem("dz23.agent.base").then((value) => { if (value) { setBase(value); setDraftBase(value); } });
+	    void SecureStore.getItemAsync("dz23.agent.token").then((value) => { if (value) { setToken(value); setDraftToken(value); } });
+	  }, []);
+	  useEffect(() => {
+	    if (token) void hydrateAuthScope(base, token);
+	    const pushKeyForScope = pushStorageKey(base, organizationID);
+	    if (pushKeyForScope) void AsyncStorage.getItem(pushKeyForScope).then((value) => setPushRegistered(value === "1"));
+	    void loadQueue();
+	    const cacheKey = missionStorageKey(base, organizationID, Boolean(token));
+	    if (cacheKey) void AsyncStorage.getItem(cacheKey).then((raw) => { if (raw) { const value = JSON.parse(raw) as { mission: Mission; events: Event[] }; setMission(value.mission); setEvents(value.events); } });
+	  }, [base, organizationID, token]);
   const pollInFlight = useRef(false);
   useEffect(() => { const timer = setInterval(async () => { if (pollInFlight.current) return; pollInFlight.current = true; try { await refresh(); } finally { pollInFlight.current = false; } }, 3000); return () => clearInterval(timer); }, [mission?.id, base, token]);
-  useEffect(() => { void registerPush(); }, [base, token, pushRegistered]);
+	  useEffect(() => { void registerPush(); }, [base, token, organizationID, pushRegistered]);
 
   const approvals = useMemo(() => mission?.approvals?.filter((approval) => approval.status === "PENDING") ?? [], [mission]);
   const mutationHeaders = () => mission?.version ? { "If-Match": String(mission.version) } : undefined;
@@ -160,7 +220,7 @@ export default function App() {
 			const apiError = cause instanceof ApiError ? cause : undefined;
 			if (apiError?.status === 401 || apiError?.status === 403) { await expireSession(); setOnline(false); setError("Sessão expirada ou sem permissão; autentique novamente."); return false; }
 			if (apiError?.status === 409) { setError(`${fallback}: o servidor detectou conflito. Atualizando a missão para revisão.`); await refresh(); return false; }
-      await enqueue(path, method, body, headers); setOnline(false); setError(`${fallback}. A ação foi salva e será sincronizada quando houver conexão.`); return false;
+	      const queuedOffline = await enqueue(path, method, body, headers); setOnline(false); setError(queuedOffline ? `${fallback}. A ação foi salva e será sincronizada quando houver conexão.` : `${fallback}. Ação não salva: confirme a organização autenticada antes de operar offline.`); return false;
     }
   };
 
@@ -169,23 +229,24 @@ export default function App() {
     setBusy(true); setError("");
     const payload = { objective, auto_run: false };
     try { const created = await request<Mission>(base, "/api/agent/v1/missions", token, { method: "POST", body: JSON.stringify(payload) }); setMission(created); setOnline(true); await refresh(created.id); }
-		catch (cause) { if (cause instanceof ApiError && (cause.status === 401 || cause.status === 403)) { await expireSession(); setOnline(false); setError("Sessão expirada ou sem permissão; autentique novamente."); setBusy(false); return; } await enqueue("/api/agent/v1/missions", "POST", payload); setOnline(false); setError("Servidor indisponível. A missão foi salva e será sincronizada quando houver conexão."); }
+			catch (cause) { if (cause instanceof ApiError && (cause.status === 401 || cause.status === 403)) { await expireSession(); setOnline(false); setError("Sessão expirada ou sem permissão; autentique novamente."); setBusy(false); return; } const queuedOffline = await enqueue("/api/agent/v1/missions", "POST", payload); setOnline(false); setError(queuedOffline ? "Servidor indisponível. A missão foi salva e será sincronizada quando houver conexão." : "Servidor indisponível. A missão não foi salva porque a organização autenticada ainda não foi confirmada."); }
     setObjective(""); setBusy(false);
   };
 	const decide = async (approvalId: string, nonce: string | undefined, approved: boolean) => { if (!mission || busy) return; setBusy(true); setError(""); await perform(`/api/agent/v1/missions/${mission.id}/approvals/${approvalId}`, "POST", { approved, nonce, reason: "Mobile operator" }, "Falha ao decidir approval"); await refresh(); setBusy(false); };
   const run = async () => { if (!mission) return; setBusy(true); setError(""); await perform(`/api/agent/v1/missions/${mission.id}/run`, "POST", {}, "Falha ao executar"); await refresh(); setBusy(false); };
-  const saveSession = async () => { const nextBase = draftBase.trim(); if (!nextBase) return; await AsyncStorage.setItem("dz23.agent.base", nextBase); if (draftToken.trim()) await SecureStore.setItemAsync("dz23.agent.token", draftToken.trim()); setBase(nextBase); setToken(draftToken.trim()); setPushRegistered(false); await flushQueue(); };
+	  const saveSession = async () => { const nextBase = draftBase.trim(); const nextToken = draftToken.trim(); if (!nextBase) return; await AsyncStorage.setItem("dz23.agent.base", nextBase); if (nextToken) await SecureStore.setItemAsync("dz23.agent.token", nextToken); else await SecureStore.deleteItemAsync("dz23.agent.token"); setBase(nextBase); setToken(nextToken); setOrganizationID(null); setPushRegistered(false); };
 	const clearSession = async () => {
 		const pending = await loadQueue();
 		if (pending.length > 0 || mission || events.length > 0) {
 			const discard = await new Promise<boolean>((resolve) => Alert.alert("Apagar sessão local?", "Isso remove a missão em cache, eventos e ações offline pendentes.", [{ text: "Cancelar", style: "cancel", onPress: () => resolve(false) }, { text: "Sair e apagar", style: "destructive", onPress: () => resolve(true) }], { cancelable: true, onDismiss: () => resolve(false) }));
 			if (!discard) return;
 		}
-		await expireSession();
-		await AsyncStorage.multiRemove([queueKey, missionKey, pushStorageKey(base)]);
+			await expireSession();
+			const storageKeys = [queueStorageKey(base, organizationID, Boolean(token)), missionStorageKey(base, organizationID, Boolean(token)), pushStorageKey(base, organizationID)].filter((key): key is string => Boolean(key));
+			await AsyncStorage.multiRemove(storageKeys);
 		setMission(null); setEvents([]); setQueued(0); setConflicts(0);
 	};
-  const discardConflicts = async () => { const items = await loadQueue(); await AsyncStorage.setItem(queueKey, JSON.stringify(items.filter((item) => !item.conflict))); await loadQueue(); };
+  const discardConflicts = async () => { const items = await loadQueue(); const queueKey = queueStorageKey(base, organizationID, Boolean(token)); if (queueKey) await AsyncStorage.setItem(queueKey, JSON.stringify(items.filter((item) => !item.conflict))); await loadQueue(); };
 
   return <SafeAreaView style={styles.safe}><StatusBar style="auto" /><ScrollView contentContainerStyle={styles.container}>
     <Text style={styles.eyebrow}>DZ23 AGENTIC</Text><Text style={styles.title}>Mission mobile</Text><Text style={styles.subtitle}>Acompanhe, aprove e execute missões, com outbox offline, reconciliação de conflitos e notificações push.</Text>
