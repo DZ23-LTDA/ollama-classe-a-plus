@@ -1064,3 +1064,20 @@ classification: preview/local RC em hardening
 open_risks: external payload classification/credential injection, upload egress, distributed network tests, strong sandbox
 next_action: commit/push, then close a focused product/security contract or platform sandbox primitive
 ```
+
+
+## Publicação da slice P0 Connector egress parity — 2026-09-22
+
+```yaml
+state: FIXING
+iteration: 14
+commit: d6506a1a
+branch: feat/manus-parity-omniroute
+remote: https://github.com/DZ23-LTDA/ollama-classe-a-plus.git
+pull_request: https://github.com/DZ23-LTDA/ollama-classe-a-plus/pull/1
+working_tree: checkpoint pending commit
+published: true
+proofs: integrity, Go tests/vet/build, UI Vitest/build, mobile typecheck and Connector egress negative tests all PASS
+classification: preview/local RC em hardening
+next_slice: external payload policy or platform sandbox primitives; no main merge
+```
