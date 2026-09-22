@@ -2,6 +2,7 @@ package agent
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -9,19 +10,21 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 )
 
 type MCPServerConfig struct {
-	ID              string   `json:"id"`
-	Command         string   `json:"command"`
-	Args            []string `json:"args,omitempty"`
-	AllowedMethods  []string `json:"allowed_methods,omitempty"`
-	EnvironmentVars []string `json:"environment_vars,omitempty"`
-	TimeoutSeconds  int      `json:"timeout_seconds,omitempty"`
-	Disabled        bool     `json:"disabled,omitempty"`
+	ID               string   `json:"id"`
+	Command          string   `json:"command"`
+	Args             []string `json:"args,omitempty"`
+	WorkingDirectory string   `json:"working_directory,omitempty"`
+	AllowedMethods   []string `json:"allowed_methods,omitempty"`
+	EnvironmentVars  []string `json:"environment_vars,omitempty"`
+	TimeoutSeconds   int      `json:"timeout_seconds,omitempty"`
+	Disabled         bool     `json:"disabled,omitempty"`
 }
 
 type MCPManager struct {
@@ -40,14 +43,26 @@ func (m *MCPManager) Register(config MCPServerConfig) error {
 	if config.TimeoutSeconds <= 0 || config.TimeoutSeconds > 300 {
 		config.TimeoutSeconds = 30
 	}
-	command, err := exec.LookPath(config.Command)
-	if err != nil {
-		return fmt.Errorf("MCP command unavailable: %w", err)
+	config.Command = strings.TrimSpace(config.Command)
+	if !filepath.IsAbs(config.Command) {
+		return errors.New("MCP command must be an absolute executable path")
 	}
+	commandInfo, err := os.Lstat(config.Command)
+	if err != nil || commandInfo.Mode()&os.ModeSymlink != 0 || commandInfo.IsDir() || commandInfo.Mode()&0o111 == 0 {
+		return errors.New("MCP command must be an executable regular file")
+	}
+	if len(config.Args) > 64 {
+		return errors.New("MCP args limit exceeded")
+	}
+	for _, arg := range config.Args {
+		if strings.IndexByte(arg, 0) >= 0 || len(arg) > 4096 {
+			return errors.New("MCP argument is invalid or too long")
+		}
+	}
+	config.Args = append([]string(nil), config.Args...)
 	if len(config.AllowedMethods) == 0 {
 		return errors.New("MCP allowed_methods must contain at least one method")
 	}
-	config.Command = command
 	allowed := make(map[string]bool, len(config.AllowedMethods))
 	for _, method := range config.AllowedMethods {
 		method = strings.TrimSpace(method)
@@ -56,17 +71,26 @@ func (m *MCPManager) Register(config MCPServerConfig) error {
 		}
 		allowed[method] = true
 	}
+	normalizedEnvironmentVars := make([]string, 0, len(config.EnvironmentVars))
 	for _, name := range config.EnvironmentVars {
-		if !validEnvName(strings.TrimSpace(name)) {
+		name = strings.TrimSpace(name)
+		if !validEnvName(name) {
 			return fmt.Errorf("invalid MCP environment variable %q", name)
 		}
+		normalizedEnvironmentVars = append(normalizedEnvironmentVars, name)
 	}
+	config.EnvironmentVars = normalizedEnvironmentVars
+	workingDirectory, err := prepareMCPWorkingDirectory(config.ID, config.WorkingDirectory)
+	if err != nil {
+		return err
+	}
+	config.WorkingDirectory = workingDirectory.path
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if old := m.servers[config.ID]; old != nil {
 		_ = old.Stop()
 	}
-	m.servers[config.ID] = &MCPServer{config: config, allowedMethods: allowed}
+	m.servers[config.ID] = &MCPServer{config: config, allowedMethods: allowed, cleanupDirectory: workingDirectory.cleanup}
 	return nil
 }
 
@@ -134,14 +158,38 @@ func (m *MCPManager) Call(ctx context.Context, serverID, method string, params a
 }
 
 type MCPServer struct {
-	mu             sync.Mutex
-	config         MCPServerConfig
-	allowedMethods map[string]bool
-	cmd            *exec.Cmd
-	stdin          io.WriteCloser
-	stdout         *bufio.Reader
-	cancel         context.CancelFunc
-	nextID         int64
+	mu               sync.Mutex
+	config           MCPServerConfig
+	allowedMethods   map[string]bool
+	cmd              *exec.Cmd
+	stdin            io.WriteCloser
+	stdout           *bufio.Reader
+	stderr           *mcpStderrBuffer
+	cancel           context.CancelFunc
+	nextID           int64
+	cleanupDirectory bool
+}
+
+const (
+	mcpMaxMessageBytes = 4 << 20
+	mcpMaxStderrBytes  = 64 << 10
+)
+
+type mcpStderrBuffer struct {
+	bytes.Buffer
+	limit int
+}
+
+func (b *mcpStderrBuffer) Write(data []byte) (int, error) {
+	if b.limit > b.Len() {
+		remaining := b.limit - b.Len()
+		if len(data) > remaining {
+			_, _ = b.Buffer.Write(data[:remaining])
+		} else {
+			_, _ = b.Buffer.Write(data)
+		}
+	}
+	return len(data), nil
 }
 
 func (s *MCPServer) Start() error {
@@ -154,8 +202,15 @@ func (s *MCPServer) startLocked() error {
 	if s.cmd != nil {
 		return nil
 	}
+	if s.cleanupDirectory {
+		if err := os.MkdirAll(s.config.WorkingDirectory, 0o700); err != nil {
+			return fmt.Errorf("recreate MCP working directory: %w", err)
+		}
+	}
 	processContext, cancel := context.WithCancel(context.Background())
 	cmd := exec.CommandContext(processContext, s.config.Command, s.config.Args...)
+	cmd.Dir = s.config.WorkingDirectory
+	configureMCPProcess(cmd)
 	cmd.Env = []string{"PATH=/usr/bin:/bin", "HOME=/tmp"}
 	for _, name := range s.config.EnvironmentVars {
 		name = strings.TrimSpace(name)
@@ -178,7 +233,8 @@ func (s *MCPServer) startLocked() error {
 		cancel()
 		return err
 	}
-	cmd.Stderr = io.Discard
+	stderr := &mcpStderrBuffer{limit: mcpMaxStderrBytes}
+	cmd.Stderr = stderr
 	if err := cmd.Start(); err != nil {
 		_ = stdin.Close()
 		cancel()
@@ -186,7 +242,8 @@ func (s *MCPServer) startLocked() error {
 	}
 	s.cmd = cmd
 	s.stdin = stdin
-	s.stdout = bufio.NewReaderSize(stdout, 1<<20)
+	s.stdout = bufio.NewReaderSize(stdout, 64<<10)
+	s.stderr = stderr
 	s.cancel = cancel
 	return nil
 }
@@ -204,11 +261,22 @@ func (s *MCPServer) stopLocked() error {
 	if s.stdin != nil {
 		_ = s.stdin.Close()
 	}
+	stderr := ""
+	if s.stderr != nil {
+		stderr = strings.TrimSpace(RedactDLP(s.stderr.String()))
+	}
 	var err error
 	if s.cmd != nil {
+		_ = terminateMCPProcess(s.cmd)
 		err = s.cmd.Wait()
 	}
-	s.cmd, s.stdin, s.stdout, s.cancel = nil, nil, nil, nil
+	if s.cleanupDirectory && s.config.WorkingDirectory != "" {
+		_ = os.RemoveAll(s.config.WorkingDirectory)
+	}
+	s.cmd, s.stdin, s.stdout, s.stderr, s.cancel = nil, nil, nil, nil, nil
+	if err != nil && stderr != "" {
+		return fmt.Errorf("%w: %s", err, stderr)
+	}
 	return err
 }
 
@@ -222,14 +290,17 @@ func (s *MCPServer) Call(ctx context.Context, method string, params any) (json.R
 	if len(s.allowedMethods) == 0 || !s.allowedMethods[method] {
 		return nil, fmt.Errorf("MCP method %q is not allowlisted", method)
 	}
-	if err := s.startLocked(); err != nil {
-		return nil, err
-	}
 	s.nextID++
 	requestID := s.nextID
 	request := map[string]any{"jsonrpc": "2.0", "id": requestID, "method": method, "params": params}
 	data, err := json.Marshal(request)
 	if err != nil {
+		return nil, err
+	}
+	if len(data) > mcpMaxMessageBytes {
+		return nil, errors.New("MCP request payload limit exceeded")
+	}
+	if err := s.startLocked(); err != nil {
 		return nil, err
 	}
 	if _, err := s.stdin.Write(append(data, '\n')); err != nil {
@@ -238,7 +309,7 @@ func (s *MCPServer) Call(ctx context.Context, method string, params any) (json.R
 	}
 	resultChannel := make(chan mcpResponse, 1)
 	go func() {
-		line, err := s.stdout.ReadBytes('\n')
+		line, err := readMCPMessage(s.stdout)
 		if err != nil {
 			resultChannel <- mcpResponse{err: err}
 			return
@@ -274,6 +345,24 @@ func (s *MCPServer) Call(ctx context.Context, method string, params any) (json.R
 			return nil, fmt.Errorf("MCP error: %s", response.Error.Message)
 		}
 		return response.Result, nil
+	}
+}
+
+func readMCPMessage(reader *bufio.Reader) ([]byte, error) {
+	message := make([]byte, 0, 4096)
+	for {
+		fragment, err := reader.ReadSlice('\n')
+		if len(message)+len(fragment) > mcpMaxMessageBytes {
+			return nil, errors.New("MCP response payload limit exceeded")
+		}
+		message = append(message, fragment...)
+		if err == nil {
+			return bytes.TrimSpace(message), nil
+		}
+		if errors.Is(err, bufio.ErrBufferFull) {
+			continue
+		}
+		return nil, err
 	}
 }
 

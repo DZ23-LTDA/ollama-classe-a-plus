@@ -103,6 +103,9 @@ grep -q 'TestRuntimeRedactsStepResultsEventsTracesAndPersistence' internal/agent
 grep -q 'redactMissionForPersistence' internal/agent/store.go
 grep -q 'remote MCP destination connected to a private address' internal/agent/mcp_remote.go
 grep -q 'TestRemoteMCPDialRejectsPrivateActualAddress' internal/agent/mcp_remote_test.go
+grep -q 'MCP command must be an absolute executable path' internal/agent/mcp.go
+grep -q 'TestMCPPayloadLimitAndCancellationRestart' internal/agent/mcp_test.go
+grep -q 'configureMCPProcess' internal/agent/mcp_process_unix.go
 grep -q 'Capabilities' internal/agent/runtime.go
 grep -q 'Evaluation' internal/agent/evaluation.go
 for route in projects library scheduled skills plugins tasks company; do

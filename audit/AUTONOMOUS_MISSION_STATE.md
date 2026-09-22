@@ -947,3 +947,31 @@ proofs: integrity, Go tests/vet/build, UI Vitest/build, mobile typecheck and Rem
 classification: preview/local RC em hardening
 next_slice: Media/Connector egress parity or MCP stdio lifecycle; no main merge
 ```
+
+
+## Slice P0 MCP stdio lifecycle validada — aguardando publicação — 2026-09-22
+
+```yaml
+state: RELEASING
+iteration: 12
+base_commit: ed12f252
+working_tree: MCP stdio changes/tests/docs still uncommitted
+implemented:
+  - absolute non-symlink executable and bounded args
+  - explicit private cwd, temporary by default, cleanup and restart recreation
+  - minimal environment with explicit variable allowlist
+  - request/response/stderr limits and stderr DLP
+  - Unix process group termination with parent-safe fallback
+proofs:
+  - focused MCP tests: PASS
+  - integrity guard: PASS
+  - CGO_ENABLED=1 go test ./... -count=1: PASS
+  - CGO_ENABLED=1 go vet ./...: PASS
+  - CGO_ENABLED=1 go build: PASS
+  - UI Vitest 20/199: PASS
+  - UI build: PASS; known >500KB warning
+  - mobile typecheck: PASS
+classification: preview/local RC; MCP stdio containment best-effort, not strong sandbox
+open_risks: seccomp/cgroups/rlimits/PID-memory-CPU controls, physical platform tests, Media/Connector egress parity
+next_action: commit/push, then continue Media/Connector egress or platform sandbox primitives
+```

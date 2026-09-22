@@ -195,3 +195,8 @@ A primeira camada de DLP agora protege resultados de ferramentas, eventos, trace
 ## Incremento 2026-09-22 — Remote MCP egress
 
 Remote MCP agora tem proxy nil, redirect same-origin e validação do IP conectado para reduzir DNS rebinding. O próximo trabalho de egress deve alinhar Media e Connectors ao mesmo contrato, incluindo redirects, MIME/magic, tamanho máximo e testes de rede; sandbox/process isolation forte segue pendente.
+
+
+## Incremento 2026-09-22 — MCP stdio lifecycle
+
+A contenção de processo MCP stdio ganhou cwd privado, ambiente mínimo, allowlist de executável, limites de payload, stderr redigido e lifecycle de grupo/restart. O próximo nível requer implementação por plataforma de seccomp/cgroups/rlimits/PID/memória/CPU e testes em runners reais; até lá, a documentação deve tratar stdio como best-effort.

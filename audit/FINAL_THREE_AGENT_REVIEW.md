@@ -136,3 +136,8 @@ A redação recursiva agora é aplicada antes de persistir/emitir `Step.Result`,
 ## Slice P0 validada — Remote MCP egress — 2026-09-22
 
 O transporte Remote MCP desabilita proxy ambiental, limita redirects ao mesmo origin e confere o IP do socket efetivamente conectado após o dial. A regressão local confirma rejeição de endereço privado conectado e redirect same-origin permitido. Isso reduz DNS rebinding nessa superfície, mas não fecha Media/Connectors, TLS distribuído ou egress global.
+
+
+## Slice P0 validada — MCP stdio lifecycle — 2026-09-22
+
+MCP stdio agora aplica allowlist de executável absoluto não-symlink, cwd privado, ambiente mínimo, limites de payload e stderr, redaction e encerramento seguro de grupo com restart após cancelamento. Os testes negativos cobrem symlink, comando relativo, cleanup, timeout e payload excedente. A auditoria não considera isso sandbox forte: seccomp, cgroups, rlimits, PID/memória/CPU e validação em plataformas reais permanecem abertos.

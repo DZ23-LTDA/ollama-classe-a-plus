@@ -135,3 +135,12 @@ Testes negativos injectam tokens em resultado de tool, evento, trace e missão p
 O transporte Remote MCP agora desabilita proxy ambiental, mantém redirects somente no mesmo origin permitido e verifica o endereço IP efetivamente conectado pelo socket TCP. Um hostname que resolver ou rebinding para loopback, privado, link-local, multicast ou unspecified é rejeitado no dialer externo; loopback explícito continua disponível apenas para servidores locais. Testes cobrem redirect same-origin e conexão privada real, além dos allowlists existentes.
 
 Os gates completos passaram: integrity guard, Go tests/vet/build, Vitest 20/199, UI build e mobile typecheck. A prova é local; ainda são necessários testes de rede distribuída, TLS/certificados, DNS controlado e auditoria do egress de Media/Connectors para classificar a plataforma como production-ready.
+
+
+## Slice P0 de MCP stdio lifecycle — 2026-09-22
+
+MCP stdio agora exige caminho absoluto para um executável regular não-symlink, limita quantidade/tamanho de argumentos, usa ambiente mínimo com apenas variáveis explicitamente allowlisted e sempre inicia em diretório de trabalho explícito privado. Quando o diretório não é informado, um workspace temporário é criado e removido no stop; após timeout/cancelamento ele é recriado para permitir restart limpo. Requests e responses têm limite de 4 MiB, stderr fica limitado a 64 KiB e é redigido antes de aparecer em erros.
+
+Em Unix, o processo é iniciado em grupo próprio e o stop tenta encerrar apenas esse grupo, com fallback seguro ao processo individual; Windows usa o kill nativo. Testes cobrem comando relativo, symlink, workspace cleanup, payload limit, cancelamento e restart. Os gates completos passaram: integrity guard, Go tests/vet/build, Vitest 20/199, UI build e mobile typecheck.
+
+A classificação permanece **contenção best-effort**, não sandbox forte. Ainda faltam seccomp, cgroups, rlimits, limites de PID/memória/CPU e validação física multi-plataforma para afirmar isolamento forte.

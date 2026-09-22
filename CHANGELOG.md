@@ -176,3 +176,8 @@ Resultados de tools, erros, eventos, traces e serializações JSON/Postgres pass
 ## 2026-09-22 — Remote MCP egress hardening
 
 O cliente Remote MCP deixou de usar proxy ambiental, limita redirects ao mesmo origin e verifica o IP efetivamente conectado para rejeitar destinos privados e DNS rebinding. Foram adicionadas regressões para redirect same-origin e conexão TCP privada local.
+
+
+## 2026-09-22 — MCP stdio lifecycle hardening
+
+MCP stdio passou a usar executável absoluto não-symlink, cwd privado, ambiente mínimo, limites de argumentos/request/response/stderr, redaction de stderr, grupo de processo e restart/cleanup verificáveis. A implementação é explicitamente best-effort; seccomp/cgroups/rlimits e limites fortes de recursos continuam fora desta slice.
