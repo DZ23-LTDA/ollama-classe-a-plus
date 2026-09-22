@@ -190,3 +190,8 @@ A autorização de gasto deixou de ser um checkbox: a solicitação é criada se
 ## Incremento 2026-09-22 — DLP de resultado/observabilidade
 
 A primeira camada de DLP agora protege resultados de ferramentas, eventos, traces e persistência. O próximo slice de egress deve definir classificação de dados, injeção explícita de credenciais e redaction de payloads externos sem quebrar integrações autorizadas; SSRF/DNS rebinding, redirects e sandbox/MCP process isolation continuam pendentes.
+
+
+## Incremento 2026-09-22 — Remote MCP egress
+
+Remote MCP agora tem proxy nil, redirect same-origin e validação do IP conectado para reduzir DNS rebinding. O próximo trabalho de egress deve alinhar Media e Connectors ao mesmo contrato, incluindo redirects, MIME/magic, tamanho máximo e testes de rede; sandbox/process isolation forte segue pendente.

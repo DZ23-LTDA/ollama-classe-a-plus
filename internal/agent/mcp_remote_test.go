@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"encoding/json"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -89,5 +90,50 @@ func TestRemoteMCPRejectsInvalidHeaderEnvironment(t *testing.T) {
 	config.HeadersEnv = map[string]string{"Host": "VALID_NAME"}
 	if err := manager.Register(config); err == nil {
 		t.Fatal("expected restricted transport header rejection")
+	}
+}
+
+func TestRemoteMCPRedirectsStaySameOrigin(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/redirect" {
+			http.Redirect(w, r, "/final", http.StatusFound)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"jsonrpc":"2.0","id":1,"result":{"redirected":true}}`))
+	}))
+	defer server.Close()
+	manager := NewRemoteMCPManager()
+	if err := manager.Register(RemoteMCPServerConfig{ID: "redirect", URL: server.URL + "/redirect", AllowedMethods: []string{"ping"}}); err != nil {
+		t.Fatal(err)
+	}
+	result, err := manager.Call(context.Background(), "redirect", "ping", nil)
+	if err != nil || !strings.Contains(string(result), "redirected") {
+		t.Fatalf("redirect result=%s err=%v", result, err)
+	}
+}
+
+func TestRemoteMCPDialRejectsPrivateActualAddress(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	accepted := make(chan struct{})
+	go func() {
+		conn, acceptErr := listener.Accept()
+		if acceptErr == nil {
+			_ = conn.Close()
+		}
+		close(accepted)
+	}()
+	conn, err := remoteMCPDialContext(context.Background(), "tcp", listener.Addr().String())
+	if err == nil {
+		_ = conn.Close()
+		t.Fatal("expected private connected address rejection")
+	}
+	<-accepted
+	if !strings.Contains(err.Error(), "private") {
+		t.Fatalf("unexpected dial error: %v", err)
 	}
 }

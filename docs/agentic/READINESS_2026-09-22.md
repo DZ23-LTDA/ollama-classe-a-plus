@@ -128,3 +128,10 @@ Os gates completos após a correção de contrato TypeScript passaram: integrity
 `RedactValue` passou a redigir recursivamente strings, mapas e listas, além de valores sob chaves sensíveis como `token`, `secret`, `password`, `api_key` e `private_key`. Foram adicionados padrões para PEM, GitHub, OpenAI, OpenRouter, xAI, AWS, Slack, Bearer e assignments de credenciais. O runtime aplica a redação a `Step.Result`, erros de step/mission e payloads de eventos; TraceStore protege atributos, nomes e erros; JSONStore e PostgresStore protegem serializações persistidas.
 
 Testes negativos injectam tokens em resultado de tool, evento, trace e missão persistida e verificam que nenhum token cru reaparece. Os gates completos passaram: integrity guard, Go tests/vet/build, Vitest 20/199, UI build e mobile typecheck. Payloads de saída para connectors/MCP ainda exigem uma política separada para distinguir segredo operacional autorizado de dado sensível do usuário; essa lacuna não foi declarada resolvida.
+
+
+## Slice P0 de egress Remote MCP — 2026-09-22
+
+O transporte Remote MCP agora desabilita proxy ambiental, mantém redirects somente no mesmo origin permitido e verifica o endereço IP efetivamente conectado pelo socket TCP. Um hostname que resolver ou rebinding para loopback, privado, link-local, multicast ou unspecified é rejeitado no dialer externo; loopback explícito continua disponível apenas para servidores locais. Testes cobrem redirect same-origin e conexão privada real, além dos allowlists existentes.
+
+Os gates completos passaram: integrity guard, Go tests/vet/build, Vitest 20/199, UI build e mobile typecheck. A prova é local; ainda são necessários testes de rede distribuída, TLS/certificados, DNS controlado e auditoria do egress de Media/Connectors para classificar a plataforma como production-ready.

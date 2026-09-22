@@ -903,3 +903,30 @@ proofs: integrity, Go tests/vet/build, UI Vitest/build, mobile typecheck and DLP
 classification: preview/local RC em hardening
 next_slice: egress classification/SSRF or MCP stdio process isolation; no main merge
 ```
+
+
+## Slice P0 Remote MCP egress validada — aguardando publicação — 2026-09-22
+
+```yaml
+state: RELEASING
+iteration: 11
+base_commit: e663bd01
+working_tree: Remote MCP egress changes/tests/docs still uncommitted
+implemented:
+  - proxy disabled for Remote MCP transport
+  - same-origin allowed redirects only
+  - actual connected socket IP private-range rejection
+  - local regressions for redirect and private address
+proofs:
+  - focused Remote MCP tests: PASS
+  - integrity guard: PASS
+  - CGO_ENABLED=1 go test ./... -count=1: PASS
+  - CGO_ENABLED=1 go vet ./...: PASS
+  - CGO_ENABLED=1 go build: PASS
+  - UI Vitest 20/199: PASS
+  - UI build: PASS; known >500KB warning
+  - mobile typecheck: PASS
+open_risks: Media/Connector egress parity, TLS/DNS distributed tests, strong sandbox/MCP process isolation
+classification: preview/local RC em hardening
+next_action: commit/push, then unify Media/Connector egress or harden MCP stdio lifecycle
+```

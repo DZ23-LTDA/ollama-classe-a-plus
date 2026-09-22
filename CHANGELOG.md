@@ -171,3 +171,8 @@ A rota HTTP de gasto deixou de aceitar `approved` do cliente. Solicitações que
 ## 2026-09-22 — DLP de resultados e observabilidade
 
 Resultados de tools, erros, eventos, traces e serializações JSON/Postgres passaram a usar redação recursiva de credenciais. A cobertura inclui campos estruturados sensíveis e tokens GitHub/OpenAI/OpenRouter/xAI/AWS/Slack/Bearer/PEM, com regressões de token injection. Egress de connectors/MCP permanece uma superfície distinta, pois credenciais operacionais não podem ser redigidas cegamente.
+
+
+## 2026-09-22 — Remote MCP egress hardening
+
+O cliente Remote MCP deixou de usar proxy ambiental, limita redirects ao mesmo origin e verifica o IP efetivamente conectado para rejeitar destinos privados e DNS rebinding. Foram adicionadas regressões para redirect same-origin e conexão TCP privada local.

@@ -131,3 +131,8 @@ O método interno legado com booleano continua somente para compatibilidade de d
 ## Slice P0 validada — DLP de resultados e observabilidade — 2026-09-22
 
 A redação recursiva agora é aplicada antes de persistir/emitir `Step.Result`, erros, eventos e atributos de traces, incluindo JSONStore e PostgresStore. Testes de token injection confirmam que credenciais em mapas, listas, eventos, traces e missões reabertas não aparecem em claro. A política de payload egress de connectors/MCP permanece aberta para não confundir redaction de dados com remoção indevida de credenciais operacionais autorizadas.
+
+
+## Slice P0 validada — Remote MCP egress — 2026-09-22
+
+O transporte Remote MCP desabilita proxy ambiental, limita redirects ao mesmo origin e confere o IP do socket efetivamente conectado após o dial. A regressão local confirma rejeição de endereço privado conectado e redirect same-origin permitido. Isso reduz DNS rebinding nessa superfície, mas não fecha Media/Connectors, TLS distribuído ou egress global.

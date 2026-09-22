@@ -36,6 +36,7 @@ type RemoteMCPManager struct {
 
 func NewRemoteMCPManager() *RemoteMCPManager {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.Proxy = nil
 	transport.DialContext = remoteMCPDialContext
 	return &RemoteMCPManager{
 		client: &http.Client{
@@ -121,14 +122,19 @@ func remoteMCPDialContext(ctx context.Context, network, address string) (net.Con
 	if remoteMCPLoopbackContext(ctx) {
 		return conn, nil
 	}
-	host, _, err := net.SplitHostPort(address)
+	_, _, err = net.SplitHostPort(address)
 	if err != nil {
 		_ = conn.Close()
 		return nil, errors.New("remote MCP destination is invalid")
 	}
-	if ip := net.ParseIP(host); ip != nil && remoteMCPPrivateIP(ip) {
+	remote, _, splitErr := net.SplitHostPort(conn.RemoteAddr().String())
+	if splitErr != nil {
 		_ = conn.Close()
-		return nil, errors.New("remote MCP destination resolves to a private address")
+		return nil, errors.New("remote MCP connected address is invalid")
+	}
+	if ip := net.ParseIP(strings.Trim(remote, "[]")); ip != nil && remoteMCPPrivateIP(ip) {
+		_ = conn.Close()
+		return nil, errors.New("remote MCP destination connected to a private address")
 	}
 	return conn, nil
 }
