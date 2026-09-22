@@ -1557,3 +1557,20 @@ classification: preview/local RC em hardening
 open_risks: distributed artifact stores/export signing and other external proofs
 next_action: commit/push, then continue remaining P0/P1s; no main merge
 ```
+
+
+## Publicação da slice P0 artifact manifest path safety — 2026-09-22
+
+```yaml
+state: FIXING
+iteration: 26
+commit: 4bf40774
+branch: feat/manus-parity-omniroute
+remote: https://github.com/DZ23-LTDA/ollama-classe-a-plus.git
+pull_request: https://github.com/DZ23-LTDA/ollama-classe-a-plus/pull/1
+working_tree: checkpoint pending commit
+published: true
+proofs: focused/full Go, vet/build, integrity, UI and mobile gates PASS
+classification: preview/local RC em hardening
+next_slice: continue remaining P0/P1s and external evidence; no main merge
+```
