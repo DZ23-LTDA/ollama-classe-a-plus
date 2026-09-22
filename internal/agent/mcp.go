@@ -480,7 +480,7 @@ func (t mcpCallTool) Execute(ctx context.Context, _ ToolContext, input map[strin
 	}
 	var value any
 	if err := json.Unmarshal(result, &value); err != nil {
-		return ToolResult{Value: string(result)}, nil
+		return ToolResult{Value: string(result)}, nil //nolint:nilerr // raw MCP payloads may be valid string results.
 	}
 	return ToolResult{Value: value}, nil
 }

@@ -2,7 +2,6 @@ package server
 
 import (
 	"crypto/subtle"
-	"encoding/json"
 	"net/http"
 	"os"
 	"strings"
@@ -80,8 +79,4 @@ func (a *agentAPI) deviceConnect(c *gin.Context) {
 
 func companionSecureRequest(request *http.Request) bool {
 	return request.TLS != nil || strings.EqualFold(request.Header.Get("X-Forwarded-Proto"), "https")
-}
-func encodeCompanionFrame(frame agent.CompanionFrame) []byte {
-	data, _ := json.Marshal(frame)
-	return data
 }

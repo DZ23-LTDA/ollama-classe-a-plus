@@ -487,12 +487,14 @@ func (m *MediaManager) client() *http.Client {
 	}
 	return &client
 }
+
 func (m *MediaManager) headers(request *http.Request) {
 	if strings.TrimSpace(m.Provider.APIKey) != "" {
 		request.Header.Set("Authorization", "Bearer "+m.Provider.APIKey)
 	}
 	request.Header.Set("User-Agent", "ollama-dz23-agentic-media/1")
 }
+
 func firstData(payload map[string]any) (map[string]any, error) {
 	data, ok := payload["data"].([]any)
 	if !ok || len(data) == 0 {
@@ -504,6 +506,7 @@ func firstData(payload map[string]any) (map[string]any, error) {
 	}
 	return entry, nil
 }
+
 func decodeResponse(response *http.Response) (map[string]any, error) {
 	body, err := readLimitedMediaBody(response.Body, 8<<20)
 	if err != nil {
@@ -518,6 +521,7 @@ func decodeResponse(response *http.Response) (map[string]any, error) {
 	}
 	return payload, nil
 }
+
 func writeLimitedFile(path string, data []byte, limit int64) error {
 	if int64(len(data)) > limit {
 		return errors.New("media payload exceeds limit")
@@ -615,6 +619,7 @@ func sin(value float64) float64 {
 	}
 	return sum
 }
+
 func writeWAVHeader(w io.Writer, dataSize, sampleRate int) error {
 	header := make([]byte, 44)
 	copy(header[0:4], "RIFF")

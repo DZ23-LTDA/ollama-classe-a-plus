@@ -270,7 +270,7 @@ func (s *ContextStore) SearchMemoriesContext(ctx context.Context, projectID, que
 	}
 	scored := make([]scoredMemory, 0, len(memories))
 	for _, memory := range memories {
-		score := float64(0)
+		var score float64
 		if len(queryVector) > 0 && len(memory.Embedding) > 0 {
 			score = cosineSimilarity(queryVector, memory.Embedding)
 		} else if query == "" || strings.Contains(strings.ToLower(memory.Content), query) || strings.Contains(strings.ToLower(memory.Kind), query) {

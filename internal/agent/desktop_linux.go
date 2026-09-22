@@ -16,21 +16,27 @@ import (
 func desktopScreenshot(ctx context.Context, path string) error {
 	return runDesktop(ctx, "import", "-window", "root", path)
 }
+
 func desktopMouseClick(ctx context.Context, x, y int) error {
 	return runDesktop(ctx, "xdotool", "mousemove", "--sync", strconv.Itoa(x), strconv.Itoa(y), "click", "1")
 }
+
 func desktopKeyboardType(ctx context.Context, text string) error {
 	return runDesktop(ctx, "xdotool", "type", "--clearmodifiers", "--delay", "1", text)
 }
+
 func desktopClipboardGet(ctx context.Context) (string, error) {
 	return runDesktopOutput(ctx, "xclip", "-selection", "clipboard", "-o")
 }
+
 func desktopClipboardSet(ctx context.Context, text string) error {
 	return runDesktopWithInput(ctx, text, "xclip", "-selection", "clipboard")
 }
+
 func desktopProcessList(ctx context.Context) (string, error) {
 	return runDesktopOutput(ctx, "ps", "-eo", "pid=,comm=,args=")
 }
+
 func desktopProcessTerminate(ctx context.Context, pid int) error {
 	return runDesktop(ctx, "kill", "-TERM", strconv.Itoa(pid))
 }

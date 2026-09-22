@@ -49,6 +49,7 @@ func (t *Telemetry) Start(ctx context.Context, name string, attrs map[string]str
 	}
 	return t.tracer.Start(ctx, name, oteltrace.WithAttributes(pairs...))
 }
+
 func (t *Telemetry) Shutdown(ctx context.Context) error {
 	if t == nil || t.provider == nil {
 		return nil

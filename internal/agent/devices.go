@@ -74,6 +74,7 @@ func NewDeviceStore(root string) (*DeviceStore, error) {
 	}
 	return store, nil
 }
+
 func (s *DeviceStore) StartPairing(userID, organizationID string, ttl time.Duration) (string, PairingRequest, error) {
 	if ttl <= 0 || ttl > 15*time.Minute {
 		ttl = 5 * time.Minute
@@ -89,6 +90,7 @@ func (s *DeviceStore) StartPairing(userID, organizationID string, ttl time.Durat
 	s.mu.Unlock()
 	return raw, pairing, err
 }
+
 func (s *DeviceStore) CompletePairing(code, name, platform, userID, organizationID string, capabilities []DeviceCapability) (Device, string, error) {
 	code = strings.TrimSpace(code)
 	name = strings.TrimSpace(name)
@@ -124,6 +126,7 @@ func (s *DeviceStore) CompletePairing(code, name, platform, userID, organization
 	s.tokens[device.ID] = hashDeviceSecret(token)
 	return device, token, s.persistLocked()
 }
+
 func (s *DeviceStore) Heartbeat(deviceID, token string, capabilities []DeviceCapability) (Device, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -193,6 +196,7 @@ func (s *DeviceStore) ListForOrganization(organizationID string) []Device {
 	sort.Slice(result, func(i, j int) bool { return result[i].CreatedAt.Before(result[j].CreatedAt) })
 	return result
 }
+
 func (s *DeviceStore) Get(deviceID string) (Device, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -226,6 +230,7 @@ func (s *DeviceStore) persistLocked() error {
 	}
 	return writeJSONAtomic(filepath.Join(s.root, "pairings.json"), s.pairings)
 }
+
 func normalizeCapabilities(input []DeviceCapability) []DeviceCapability {
 	seen := map[string]bool{}
 	result := make([]DeviceCapability, 0, len(input))
@@ -242,6 +247,7 @@ func normalizeCapabilities(input []DeviceCapability) []DeviceCapability {
 	}
 	return result
 }
+
 func randomDeviceSecret(bytesCount int) (string, error) {
 	raw := make([]byte, bytesCount)
 	if _, err := rand.Read(raw); err != nil {
@@ -249,10 +255,12 @@ func randomDeviceSecret(bytesCount int) (string, error) {
 	}
 	return base64.RawURLEncoding.EncodeToString(raw), nil
 }
+
 func hashDeviceSecret(value string) string {
 	sum := sha256.Sum256([]byte(value))
 	return hex.EncodeToString(sum[:])
 }
+
 func secureCompare(a, b string) bool {
 	if len(a) != len(b) {
 		return false

@@ -100,14 +100,6 @@ var (
 	ErrCompanyInvalidExternalURL          = errors.New("external destination must use HTTPS")
 )
 
-func normalizeGrowthStatus(value, fallback string) string {
-	value = strings.ToLower(strings.TrimSpace(value))
-	if value == "" {
-		return fallback
-	}
-	return value
-}
-
 func validateGrowthURL(value string) error {
 	parsed, err := url.Parse(strings.TrimSpace(value))
 	if err != nil || parsed.Scheme != "https" || parsed.Host == "" {

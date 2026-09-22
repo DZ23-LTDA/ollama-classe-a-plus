@@ -48,6 +48,13 @@ def browser_executable():
     for candidate in candidates:
         if candidate and pathlib.Path(candidate).is_file():
             return candidate
+    try:
+        with sync_playwright() as playwright:
+            managed = pathlib.Path(playwright.chromium.executable_path)
+        if managed.is_file():
+            return str(managed)
+    except Exception:
+        pass
     fail("no Chromium executable is available; install Playwright Chromium or set OLLAMA_AGENT_BROWSER_EXECUTABLE")
 
 

@@ -1,7 +1,6 @@
 package agent
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -133,5 +132,3 @@ func (s *TraceStore) persistLocked() error {
 	}
 	return writeJSONAtomic(filepath.Join(s.root, "spans.json"), s.spans)
 }
-
-func traceAttribute(value any) string { return fmt.Sprint(value) }

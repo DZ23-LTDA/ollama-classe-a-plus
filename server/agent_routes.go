@@ -999,6 +999,7 @@ func (a *agentAPI) jobs(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"jobs": jobs})
 }
+
 func (a *agentAPI) replayJob(c *gin.Context) {
 	job, err := a.scopedRuntime(c).ReplayJobForOrganization(c.Param("id"), agentOrganizationID(c))
 	if err != nil {

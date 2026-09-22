@@ -123,6 +123,7 @@ func (q *RedisQueue) Ack(jobID string) error {
 	job.UpdatedAt = time.Now().UTC()
 	return q.put(job)
 }
+
 func (q *RedisQueue) Nack(jobID string, runErr error) (QueueJob, error) {
 	job, err := q.get(jobID)
 	if err != nil {
@@ -154,6 +155,7 @@ func (q *RedisQueue) Nack(jobID string, runErr error) (QueueJob, error) {
 	_, err = q.do(context.Background(), "ZADD", q.delayedKey(), strconv.FormatInt(job.AvailableAt.UnixMilli(), 10), job.ID)
 	return job, err
 }
+
 func (q *RedisQueue) Replay(jobID string) (QueueJob, error) {
 	job, err := q.get(jobID)
 	if err != nil {
@@ -175,6 +177,7 @@ func (q *RedisQueue) Replay(jobID string) (QueueJob, error) {
 	_, err = q.do(context.Background(), "LPUSH", q.pendingKey(), job.ID)
 	return job, err
 }
+
 func (q *RedisQueue) List(status QueueStatus) []QueueJob {
 	value, err := q.do(context.Background(), "KEYS", q.key("job:*"))
 	if err != nil {
@@ -197,6 +200,7 @@ func (q *RedisQueue) List(status QueueStatus) []QueueJob {
 	}
 	return jobs
 }
+
 func (q *RedisQueue) Start(ctx context.Context, workerID string, handler func(context.Context, QueueJob) error) {
 	go func() {
 		for {
@@ -237,11 +241,13 @@ func (q *RedisQueue) get(id string) (QueueJob, error) {
 	}
 	return job, nil
 }
+
 func (q *RedisQueue) put(job QueueJob) error {
 	data, _ := json.Marshal(job)
 	_, err := q.do(context.Background(), "SET", q.jobKey(job.ID), string(data), "EX", "604800")
 	return err
 }
+
 func (q *RedisQueue) moveDue(ctx context.Context, now time.Time) error {
 	value, err := q.do(ctx, "ZRANGEBYSCORE", q.delayedKey(), "-inf", strconv.FormatInt(now.UnixMilli(), 10))
 	if err != nil {
@@ -294,6 +300,7 @@ func (q *RedisQueue) do(ctx context.Context, args ...string) (any, error) {
 	}
 	return redisCommand(conn, reader, args...)
 }
+
 func redisCommand(w io.Writer, r *bufio.Reader, args ...string) (any, error) {
 	var builder strings.Builder
 	builder.WriteString("*" + strconv.Itoa(len(args)) + "\r\n")
@@ -305,6 +312,7 @@ func redisCommand(w io.Writer, r *bufio.Reader, args ...string) (any, error) {
 	}
 	return readRedis(r)
 }
+
 func readRedis(r *bufio.Reader) (any, error) {
 	kind, err := r.ReadByte()
 	if err != nil {
