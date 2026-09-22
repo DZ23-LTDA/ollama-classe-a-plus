@@ -1,7 +1,6 @@
 package multillm
 
 import (
-	"errors"
 	"os"
 	"strings"
 )
@@ -33,5 +32,3 @@ func credentialValue(envName string) string {
 	}
 	return strings.TrimSpace(value)
 }
-
-var errUnsupportedProtectedCredential = errors.New("protected credential format is unsupported on this platform")
