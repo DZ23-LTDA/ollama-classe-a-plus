@@ -88,6 +88,9 @@ grep -q 'ErrCompanyAgentBudgetExceeded' internal/agent/company_agents.go
 grep -q 'PlanForOrganization' internal/agent/swarm.go
 grep -q 'ListForOrganization' internal/agent/traces.go
 grep -q 'HeartbeatForOrganization' internal/agent/devices.go
+grep -q 'DecideApprovalForActorCAS' internal/agent/runtime.go
+grep -q 'requireApprovalApprover' server/agent_routes.go
+grep -q 'nonce' app/ui/app/src/components/AgenticConsole.tsx
 grep -q 'Capabilities' internal/agent/runtime.go
 grep -q 'Evaluation' internal/agent/evaluation.go
 for route in projects library scheduled skills plugins tasks company; do

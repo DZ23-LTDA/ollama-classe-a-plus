@@ -232,6 +232,31 @@ func TestApprovalBindsActorOrganizationAndReason(t *testing.T) {
 	}
 }
 
+func TestApprovalCASAndNonceAreSingleUse(t *testing.T) {
+	runtime, err := NewRuntime(RuntimeConfig{Store: NewMemoryStore(), WorkspaceRoot: t.TempDir(), Planner: fixedPlanner{steps: []Step{{ID: "step_1", Kind: "workspace.write", Title: "write", Risk: RiskWrite, RequiresApproval: true, Input: map[string]any{"path": "approval-cas.txt", "content": "ok"}}}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mission, err := runtime.CreateMission(context.Background(), CreateMissionRequest{Objective: "approval CAS", OrganizationID: "org_a"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	approval := mission.Approvals[0]
+	if _, err := runtime.DecideApprovalForActorCAS(mission.ID, approval.ID, true, "approved", "admin_a", "org_a", mission.Version, "wrong"); !errors.Is(err, ErrApprovalNonceMismatch) {
+		t.Fatalf("wrong nonce err=%v", err)
+	}
+	decided, err := runtime.DecideApprovalForActorCAS(mission.ID, approval.ID, true, "approved", "admin_a", "org_a", mission.Version, approval.Nonce)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if decided.Approvals[0].Status != ApprovalApproved {
+		t.Fatalf("decided=%+v", decided.Approvals[0])
+	}
+	if _, err := runtime.DecideApprovalForActorCAS(mission.ID, approval.ID, true, "replay", "admin_a", "org_a", decided.Version, approval.Nonce); err == nil {
+		t.Fatal("approval nonce was reusable")
+	}
+}
+
 func TestCapabilityPolicyDefaultsToLocalScopes(t *testing.T) {
 	if !capabilityAllowed(ToolDescriptor{Name: "workspace.read", Scopes: []string{"workspace:read"}}, []string{"workspace:read", "workspace:write"}) {
 		t.Fatal("local workspace read should be allowed by the default policy")

@@ -1,7 +1,11 @@
 package server
 
 import (
+	"net/http/httptest"
 	"testing"
+
+	"github.com/gin-gonic/gin"
+	"github.com/ollama/ollama/internal/agent"
 )
 
 func TestAgentAuthRequiredDefaultsToLoopbackOnly(t *testing.T) {
@@ -66,6 +70,29 @@ func TestDevTokenOnlyAllowsActualLoopback(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			if got := isLoopbackRemoteAddr(test.addr); got != test.want {
 				t.Fatalf("isLoopbackRemoteAddr(%q) = %v, want %v", test.addr, got, test.want)
+			}
+		})
+	}
+}
+
+func TestApprovalApproverRequiresOwnerOrAdminWhenAuthenticated(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	api := &agentAPI{authRequired: true}
+	for _, test := range []struct {
+		role agent.Role
+		want bool
+	}{
+		{role: agent.RoleViewer, want: false},
+		{role: agent.RoleOperator, want: false},
+		{role: agent.RoleAdmin, want: true},
+		{role: agent.RoleOwner, want: true},
+	} {
+		t.Run(string(test.role), func(t *testing.T) {
+			recorder := httptest.NewRecorder()
+			context, _ := gin.CreateTestContext(recorder)
+			context.Set("agent.membership", agent.Membership{Role: test.role})
+			if got := api.requireApprovalApprover(context); got != test.want {
+				t.Fatalf("role %s approval access=%v want=%v", test.role, got, test.want)
 			}
 		})
 	}

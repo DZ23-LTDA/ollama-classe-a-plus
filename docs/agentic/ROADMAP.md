@@ -166,3 +166,10 @@ O resultado permanece **preview/local RC em hardening**. A existência de teste 
 A segunda slice pós-auditoria adicionou ownership de organização a orchestration jobs, spans de missão/ferramenta e devices/pairing. Os handlers de plan/get/run/cancel/list/heartbeat/revoke aplicam o tenant da requisição, e testes negativos confirmam `403`/no-mutation entre duas organizações. O próximo foco é fechar plugins/MCP/skills/artifacts e a policy de approvals, sem tratar os testes em memória como prova de RLS ou operação distribuída.
 
 O resultado permanece **preview/local RC em hardening**; TLS/mTLS, companions físicos, Redis/PostgreSQL/OTLP reais e os P0 de sandbox/egress/DLP ainda dependem de ambientes apropriados.
+
+
+## Incremento 2026-09-22 — approvals de missão com CAS
+
+Approvals de missão agora têm policy owner/admin em auth mode, nonce de uso único, razão obrigatória e CAS da versão da missão. O próximo trabalho de approvals deve migrar Company/Growth/Social de booleans caller-controlled para decisões auditáveis com actor, policy, nonce, expiração, idempotência e proteção contra auto-approval, antes de qualquer efeito externo.
+
+A classificação permanece **preview/local RC em hardening**; esta mudança não prova autorização empresarial distribuída nem aprovação dos adapters externos.

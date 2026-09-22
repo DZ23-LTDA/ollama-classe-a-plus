@@ -105,3 +105,10 @@ A prova inclui `server/builder_scope_test.go`, que cria um projeto em `org-a` e 
 A segunda slice pós-auditoria adicionou `organization_id` aos orchestration jobs e aos spans de missão/ferramenta; os handlers de plan/get/run/cancel e traces globais passaram a filtrar pelo tenant. Devices e pairing aplicam ownership em listagem, heartbeat e revoke, e pairing codes não aceitam override de organização. O teste HTTP `server/p0_scope_test.go` cobre duas organizações e verifica `403` sem mutação para orchestration, traces e devices; testes de domínio cobrem pairing cross-tenant.
 
 Os gates completos desta slice passaram. Isso não encerra os P0 da auditoria ampliada: plugins/MCP/skills/artifacts, approvals fortes, sandbox/process isolation, egress/DLP, Company Growth pausado, renderer session e release supply chain continuam abertos.
+
+
+## Slice P0 validada — mission approvals — 2026-09-22
+
+Approvals de missão agora separam a ação de aprovar do executor: em auth mode, owner/admin é obrigatório; a decisão valida organização, razão, nonce de uso único e versão corrente da missão. O Agentic Console envia o nonce retornado pela API. Testes cobrem role policy, nonce errado, replay e CAS; os gates completos passaram.
+
+A correção não cobre ainda os booleans `approved` de Company/Growth/Social, que continuam uma lacuna explícita para decisão auditável, actor/policy/nonce/expiração e proteção contra auto-approval. Sandbox forte, egress/DLP e outros P0 também permanecem abertos.

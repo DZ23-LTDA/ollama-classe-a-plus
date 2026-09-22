@@ -98,3 +98,12 @@ A segunda slice pós-auditoria adicionou `organization_id` aos orchestration job
 A evidência inclui `server/p0_scope_test.go`, testes de Orchestrator, TraceStore e DeviceStore, além dos gates completos: integrity guard, `CGO_ENABLED=1 go test ./... -count=1`, `go vet`, build Go, Vitest 20/199, build UI e typecheck mobile. O handshake WebSocket continua autenticado pelo device token; mTLS/TLS, pairing físico e testes em companions reais permanecem dependências externas.
 
 Esta slice não encerra a auditoria. Continuam P0 em plugins/MCP/skills/artifacts, approvals com separação forte de aprovador, sandbox/process isolation, SSRF/DNS rebinding e DLP, lifecycle pausado de todas as mutações Growth/Social, sessão segura no renderer e release supply chain. A classificação permanece **preview/local RC em hardening**.
+
+
+## Slice P0 de approvals de missão — 2026-09-22
+
+A terceira slice pós-auditoria endureceu approvals de missão. Quando autenticação está ativa, somente `owner` ou `admin` da organização pode decidir; a decisão passa por `DecideApprovalForActorCAS`, exige a versão corrente da missão e consome o nonce emitido para aquela aprovação. Replays, nonce incorreto, organização errada, razão vazia e decisão já consumida são rejeitados. O Agentic Console passou a enviar o nonce retornado pela API.
+
+A evidência inclui teste de CAS/nonce no Runtime, teste de role policy no servidor e os gates completos: integrity guard, `CGO_ENABLED=1 go test ./... -count=1`, `go vet`, build Go, Vitest 20/199, build UI e typecheck mobile. O modo local sem autenticação continua disponível para instalação loopback e não deve ser confundido com autorização multiusuário.
+
+Esta slice cobre approvals de missão, não todas as decisões do Company/Growth/Social OS. Endpoints que ainda aceitam campos booleanos de aprovação para campanhas, pedidos, drafts ou gasto permanecem pendência P0/P1 e não devem ser tratados como autoridade auditável para efeitos externos.

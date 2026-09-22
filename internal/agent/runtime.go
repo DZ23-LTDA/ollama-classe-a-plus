@@ -64,6 +64,11 @@ type RuntimeConfig struct {
 	Deployments   *DeploymentManager
 }
 
+var (
+	ErrApprovalVersionConflict = errors.New("approval mission version conflict")
+	ErrApprovalNonceMismatch   = errors.New("approval nonce mismatch")
+)
+
 func NewRuntime(config RuntimeConfig) (*Runtime, error) {
 	store := config.Store
 	if store == nil {
@@ -618,9 +623,20 @@ func (r *Runtime) DecideApproval(missionID, approvalID string, approved bool, re
 }
 
 func (r *Runtime) DecideApprovalForActor(missionID, approvalID string, approved bool, reason, actorID, organizationID string) (Mission, error) {
+	return r.decideApprovalForActor(missionID, approvalID, approved, reason, actorID, organizationID, 0, "", false)
+}
+
+func (r *Runtime) DecideApprovalForActorCAS(missionID, approvalID string, approved bool, reason, actorID, organizationID string, expectedVersion int64, nonce string) (Mission, error) {
+	return r.decideApprovalForActor(missionID, approvalID, approved, reason, actorID, organizationID, expectedVersion, nonce, true)
+}
+
+func (r *Runtime) decideApprovalForActor(missionID, approvalID string, approved bool, reason, actorID, organizationID string, expectedVersion int64, nonce string, requireNonce bool) (Mission, error) {
 	mission, err := r.store.GetMission(strings.TrimSpace(missionID))
 	if err != nil {
 		return Mission{}, err
+	}
+	if expectedVersion > 0 && mission.Version != expectedVersion {
+		return Mission{}, ErrApprovalVersionConflict
 	}
 	for index := range mission.Approvals {
 		if mission.Approvals[index].ID != approvalID {
@@ -640,6 +656,9 @@ func (r *Runtime) DecideApprovalForActor(missionID, approvalID string, approved 
 		}
 		if strings.TrimSpace(reason) == "" {
 			return Mission{}, errors.New("approval reason is required")
+		}
+		if requireNonce && (strings.TrimSpace(nonce) == "" || nonce != mission.Approvals[index].Nonce) {
+			return Mission{}, ErrApprovalNonceMismatch
 		}
 		mission.Approvals[index].ActorID = strings.TrimSpace(actorID)
 		mission.Approvals[index].OrganizationID = mission.OrganizationID

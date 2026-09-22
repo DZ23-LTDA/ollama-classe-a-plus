@@ -148,3 +148,11 @@ A classificação permanece release candidate local-first. Integrações externa
 - Spans de missão e ferramenta carregam organização e a API de traces filtra por tenant.
 - Devices e pairing passaram a aplicar ownership em listagem, heartbeat, revoke e consumo de código de pairing, com regressões HTTP cross-tenant `403` e sem mutação.
 - Gates completos da slice passaram; companion físico, mTLS e os demais P0 continuam sem prova de produção.
+
+
+## 2026-09-22 — mission approvals com policy, nonce e CAS
+
+- Decisão de approval autenticada exige membership owner/admin; operator/viewer não podem aprovar.
+- O endpoint usa nonce de uso único e versão corrente da missão, rejeitando replay e conflito de concorrência.
+- Agentic Console e tipos de API foram atualizados para transportar nonce/policy.
+- Company/Growth/Social approvals booleanas continuam explicitamente fora desta garantia até migrarem para decisões auditáveis.

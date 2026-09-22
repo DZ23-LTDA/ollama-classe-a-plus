@@ -722,3 +722,33 @@ proofs: integrity, Go tests/vet/build, UI Vitest/build, mobile typecheck and HTT
 classification: preview/local RC em hardening
 next_slice: plugins/MCP/skills/artifacts ownership or approval policy; do not merge main or claim final readiness
 ```
+
+
+## Slice P0 mission approvals validada — aguardando publicação — 2026-09-22
+
+```yaml
+state: RELEASING
+iteration: 7
+base_commit: 066b8334
+working_tree: alterações de approval ainda não commitadas
+implemented:
+  - owner/admin policy para decisão autenticada
+  - DecideApprovalForActorCAS com expected mission version
+  - nonce obrigatório e single-use no endpoint
+  - UI/tipos transportam nonce e policy
+  - negative tests para viewer/operator, wrong nonce, replay e CAS
+proofs:
+  - focused approval tests: PASS
+  - integrity guard: PASS
+  - CGO_ENABLED=1 go test ./... -count=1: PASS
+  - CGO_ENABLED=1 go vet ./...: PASS
+  - CGO_ENABLED=1 go build: PASS
+  - UI Vitest 20/199: PASS
+  - UI build: PASS; known >500KB warning
+  - mobile typecheck: PASS
+open_p0:
+  - Company/Growth/Social booleans still are not audit-grade approval authorities
+  - plugin/MCP/skills/artifacts ownership and sandbox/egress/DLP remain
+classification: preview/local RC em hardening
+next_action: commit/push, then migrate Company/Growth/Social approvals or harden MCP process isolation
+```

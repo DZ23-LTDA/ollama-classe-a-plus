@@ -2025,9 +2025,13 @@ func (a *agentAPI) decideApproval(c *gin.Context) {
 	var request struct {
 		Approved bool   `json:"approved"`
 		Reason   string `json:"reason,omitempty"`
+		Nonce    string `json:"nonce"`
 	}
 	if err := decodeJSON(c, &request); err != nil {
 		writeAgentError(c, http.StatusBadRequest, err)
+		return
+	}
+	if !a.requireApprovalApprover(c) {
 		return
 	}
 	mission, err := a.missionForRequest(c)
@@ -2038,12 +2042,25 @@ func (a *agentAPI) decideApproval(c *gin.Context) {
 	if !missionVersionMatches(c, mission) {
 		return
 	}
-	mission, err = a.scopedRuntime(c).DecideApprovalForActor(c.Param("id"), c.Param("approval_id"), request.Approved, request.Reason, agentActorID(c), agentOrganizationID(c))
+	mission, err = a.scopedRuntime(c).DecideApprovalForActorCAS(c.Param("id"), c.Param("approval_id"), request.Approved, request.Reason, agentActorID(c), agentOrganizationID(c), mission.Version, request.Nonce)
 	if err != nil {
 		writeAgentError(c, statusForAgentError(err), err)
 		return
 	}
 	c.JSON(http.StatusOK, mission)
+}
+
+func (a *agentAPI) requireApprovalApprover(c *gin.Context) bool {
+	if !a.authRequired {
+		return true
+	}
+	value, ok := c.Get("agent.membership")
+	membership, ok := value.(agent.Membership)
+	if !ok || (membership.Role != agent.RoleOwner && membership.Role != agent.RoleAdmin) {
+		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "approval requires organization owner or admin"})
+		return false
+	}
+	return true
 }
 
 func decodeJSON(c *gin.Context, value any) error {
@@ -2065,6 +2082,9 @@ func statusForAgentError(err error) int {
 	}
 	if errors.Is(err, errAgentForbidden) || errors.Is(err, agent.ErrBuilderForbidden) || errors.Is(err, agent.ErrOrchestrationForbidden) || errors.Is(err, agent.ErrDeviceForbidden) {
 		return http.StatusForbidden
+	}
+	if errors.Is(err, agent.ErrApprovalVersionConflict) {
+		return http.StatusConflict
 	}
 	if errors.Is(err, os.ErrNotExist) {
 		return http.StatusNotFound
