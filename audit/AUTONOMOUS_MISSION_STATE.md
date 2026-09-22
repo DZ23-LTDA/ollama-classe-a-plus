@@ -1438,3 +1438,20 @@ classification: preview/local RC em hardening
 open_risks: external provider adapters, credentials, OAuth refresh, streaming
 next_action: commit/push, then continue remaining P0/P1s; no main merge
 ```
+
+
+## Publicação da slice P1 provider selection contract — 2026-09-22
+
+```yaml
+state: FIXING
+iteration: 23
+commit: dcd3a19f
+branch: feat/manus-parity-omniroute
+remote: https://github.com/DZ23-LTDA/ollama-classe-a-plus.git
+pull_request: https://github.com/DZ23-LTDA/ollama-classe-a-plus/pull/1
+working_tree: checkpoint pending commit
+published: true
+proofs: provider negative test, integrity, Go focused, UI Vitest/build PASS
+classification: preview/local RC em hardening
+next_slice: continue remaining P0/P1s, especially external adapters and release evidence; no main merge
+```
