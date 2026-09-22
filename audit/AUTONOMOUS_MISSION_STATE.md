@@ -1296,3 +1296,25 @@ proofs: integrity, Go tests/vet/build, UI Vitest/build, mobile typecheck and cro
 classification: preview/local RC em hardening
 next_slice: server-owned tenant registration or release/CI hardening; no main merge
 ```
+
+
+## Slice P0 CI/release quality gates validada — aguardando publicação — 2026-09-22
+
+```yaml
+state: RELEASING
+iteration: 20
+base_commit: 4e531827
+working_tree: CI/release YAML and docs still uncommitted
+implemented:
+  - valid Browser Operator YAML indentation and fallback check
+  - Go full test/vet/build gates in agentic quality workflow
+  - UI Vitest/build and mobile install/typecheck in CI
+  - release quality job required by build and publish jobs
+proofs:
+  - YAML parser: PASS
+  - integrity guard: PASS
+  - git diff --check: PASS
+external_not_proven: GitHub Actions, Docker distributed integration, physical runners, signing, SBOM/provenance attestation
+classification: preview/local RC em hardening
+next_action: commit/push, then continue remaining P0s; no main merge
+```

@@ -216,3 +216,8 @@ Terminal e sandbox tools passaram a usar grupo de processos encerrável, limites
 ## 2026-09-22 — plugin/MCP/skill ownership
 
 Connectors, MCP stdio, Remote MCP e skills passaram a carregar ownership opcional por organização; lifecycle autenticado usa métodos scoped e nega cross-tenant/global mutation, enquanto catálogo global permanece read-only.
+
+
+## 2026-09-22 — CI/release quality gates
+
+O workflow agentic passou a verificar suíte Go completa, vet, build, UI tests/build e mobile typecheck. O release workflow ganhou quality gate obrigatório antes dos builds e da publicação; signing, SBOM e provenance continuam condicionais ao ambiente GitHub/credenciais reais.

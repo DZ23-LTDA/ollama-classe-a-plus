@@ -193,3 +193,10 @@ Testes cobrem redaction de stderr, status explícito, cancelamento rápido e enc
 Connector, MCP stdio, Remote MCP e Skill manifests agora possuem `organization_id` quando são tenant-owned. Catálogos autenticados mostram recursos tenant-owned da organização ativa e preservam recursos sem owner como configuração global read-only; operações enable/disable/remove autenticadas exigem ownership exato e retornam `403` para outro tenant ou para recurso global, sem mutação. O modo local sem autenticação continua usando lifecycle compatível no bind loopback.
 
 Regressões criam recursos em `org-a` e `org-b`, confirmam filtragem de lista e rejeitam mutation cross-tenant para Connector, MCP, Remote MCP e Skill. Os gates completos passaram: integrity guard, Go tests/vet/build, UI Vitest/build e mobile typecheck. Ainda faltam endpoints server-owned para registrar novos recursos por organização, assinatura/attestation de skills, isolamento de execução MCP por tenant e prova distribuída com Postgres/RLS.
+
+
+## Slice P0 de CI/release quality gates — 2026-09-22
+
+O workflow `dz23-agentic-quality` foi corrigido para YAML válido, removeu `npm ci` sem lockfile do mobile, e passou a executar typecheck, Vitest e build de produção da UI além de typecheck mobile, integrity, suíte Go completa, vet e build. O Browser Operator mantém instalação e fallback explícito do Chromium. O workflow de release ganhou um job `quality` independente com esses gates e todos os builds/publicação dependem dele; isso bloqueia publicação de tag quando a qualidade falha.
+
+A validação local confirmou parser YAML, integrity guard e `git diff --check`. Esta sandbox não executa GitHub Actions, Docker distribuído, builds físicos macOS/Windows nem signing. SBOM/provenance/attestation continuam dependentes do runner e das credenciais/configurações de release; não foram declarados como concluídos localmente.

@@ -26,10 +26,34 @@ jobs:
           echo VERSION="${GITHUB_REF_NAME#v}" | tee -a $GITHUB_OUTPUT
           echo vendorsha=$(cat LLAMA_CPP_VERSION)-$(cat MLX_VERSION)-$(cat MLX_C_VERSION) | tee -a $GITHUB_OUTPUT
 
+  quality:
+    name: Agentic release quality gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: go mod verify
+      - run: ./scripts/check-class-a-plus-integrity.sh
+      - run: CGO_ENABLED=1 go test ./... -count=1
+      - run: CGO_ENABLED=1 go vet ./...
+      - run: CGO_ENABLED=1 go build -o /tmp/ollama-agentic-release .
+      - name: Mobile typecheck
+        working-directory: apps/mobile-agentic
+        run: npm install --no-audit --no-fund && npm run typecheck
+      - name: Web tests and production build
+        working-directory: app/ui/app
+        run: npm install --no-audit --no-fund && npm test -- --run && npm run build
+
   darwin-build:
     runs-on: macos-26-xlarge
     environment: release
-    needs: setup-environment
+    needs: [setup-environment, quality]
     env:
       GOFLAGS: ${{ needs.setup-environment.outputs.GOFLAGS }}
       VERSION: ${{ needs.setup-environment.outputs.VERSION }}
@@ -93,7 +117,7 @@ jobs:
             dist/*.dmg
 
   windows-depends:
-    needs: setup-environment
+    needs: [setup-environment, quality]
     strategy:
       fail-fast: false
       matrix:
@@ -335,7 +359,7 @@ jobs:
   windows-build:
     runs-on: windows
     environment: release
-    needs: [setup-environment]
+    needs: [setup-environment, quality]
     env:
       GOFLAGS: ${{ needs.setup-environment.outputs.GOFLAGS }}
       VERSION: ${{ needs.setup-environment.outputs.VERSION }}
@@ -505,7 +529,7 @@ jobs:
             target: jetpack-6
     runs-on: ${{ matrix.arch == 'arm64' && 'linux-arm64' || 'linux' }}
     environment: release
-    needs: setup-environment
+    needs: [setup-environment, quality]
     env:
       GOFLAGS: ${{ needs.setup-environment.outputs.GOFLAGS }}
     steps:
@@ -619,7 +643,7 @@ jobs:
               type=registry,ref=${{ vars.DOCKER_REPO }}:latest
     runs-on: ${{ matrix.arch == 'arm64' && format('{0}-{1}', matrix.os, matrix.arch) || matrix.os }}
     environment: release
-    needs: [setup-environment, linux-depends]
+    needs: [setup-environment, linux-depends, quality]
     env:
       GOFLAGS: ${{ needs.setup-environment.outputs.GOFLAGS }}
     steps:
@@ -748,7 +772,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     environment: release
-    needs: [darwin-build, windows-app, docker-build-push]
+    needs: [darwin-build, windows-app, docker-build-push, quality]
     concurrency:
       group: release-publish
       queue: max

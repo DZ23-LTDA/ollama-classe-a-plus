@@ -235,3 +235,8 @@ Tools agora têm lifecycle de grupo, redaction e limites best-effort reportados.
 ## Incremento 2026-09-22 — plugin/MCP/skill ownership
 
 Lifecycle autenticado agora é tenant-aware para Connector, MCP stdio, Remote MCP e Skill. Recursos globais são read-only nesse caminho; a próxima etapa é implementar registro server-owned por organização, attestation de skills e isolamento de execução MCP por tenant.
+
+
+## Incremento 2026-09-22 — CI/release quality gates
+
+CI agora cobre Go/UI/mobile de forma explícita e o release depende desse quality job. A próxima validação deve ocorrer no GitHub Actions com Docker/RLS/Redis/OTLP, runners físicos e credenciais de assinatura; o sandbox local não substitui essas provas.

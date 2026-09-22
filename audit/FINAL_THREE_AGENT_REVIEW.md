@@ -176,3 +176,8 @@ Terminal/sandbox tools ganharam grupo de processo encerrável, timeout, output b
 ## Slice P0 validada — plugin/MCP/skill ownership — 2026-09-22
 
 Lifecycle autenticado de Connector, MCP stdio, Remote MCP e Skill agora exige ownership exato; catálogos preservam recursos sem owner como globais read-only. Testes negativos cobrem duas organizações e ausência de mutação cross-tenant. Registro tenant-owned server-side, attestation e isolamento forte de processos ainda permanecem abertos.
+
+
+## Slice P0 validada — CI/release quality gates — 2026-09-22
+
+Quality CI corrigiu indentação do Browser Operator e adicionou Go full/vet/build, UI Vitest/build e mobile typecheck. Release ganhou job de quality obrigatório para builds e publicação. Ações GitHub, Docker distribuído, runners físicos, signing e attestation ainda precisam de execução real; a alteração não os finge concluídos.

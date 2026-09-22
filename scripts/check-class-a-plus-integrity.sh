@@ -130,6 +130,10 @@ grep -q 'ListForOrganization' internal/agent/mcp.go
 grep -q 'SkillsForOrganization' internal/agent/context.go
 grep -q 'TestPluginManagersEnforceOrganizationOwnership' internal/agent/plugin_scope_test.go
 grep -q 'pluginCatalog' server/plugin_routes.go
+grep -q 'npm test -- --run' .github/workflows/dz23-agentic-quality.yaml
+grep -q 'npm run build' .github/workflows/dz23-agentic-quality.yaml
+grep -q 'CGO_ENABLED=1 go vet ./...' .github/workflows/dz23-agentic-quality.yaml
+grep -q 'needs: \[darwin-build, windows-app, docker-build-push, quality\]' .github/workflows/release.yaml
 grep -q 'Capabilities' internal/agent/runtime.go
 grep -q 'Evaluation' internal/agent/evaluation.go
 for route in projects library scheduled skills plugins tasks company; do

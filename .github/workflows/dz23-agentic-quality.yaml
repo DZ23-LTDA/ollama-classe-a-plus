@@ -31,20 +31,22 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-	      - name: Install Browser Operator dependencies
-	        run: |
-	          python3 -m pip install --user --break-system-packages playwright
-	          python3 -m playwright install --with-deps chromium
-	          browser_path="$(python3 -c 'from playwright.sync_api import sync_playwright; p=sync_playwright().start(); print(p.chromium.executable_path); p.stop()')"
-	          if [ ! -x "$browser_path" ] && [ -x /usr/bin/chromium ]; then browser_path=/usr/bin/chromium; fi
-	          test -x "$browser_path"
-	          echo "OLLAMA_AGENT_BROWSER_EXECUTABLE=$browser_path" >> "$GITHUB_ENV"
+      - name: Install Browser Operator dependencies
+        run: |
+          python3 -m pip install --user --break-system-packages playwright
+          python3 -m playwright install --with-deps chromium
+          browser_path="$(python3 -c 'from playwright.sync_api import sync_playwright; p=sync_playwright().start(); print(p.chromium.executable_path); p.stop()')"
+          if [ ! -x "$browser_path" ] && [ -x /usr/bin/chromium ]; then browser_path=/usr/bin/chromium; fi
+          test -x "$browser_path"
+          echo "OLLAMA_AGENT_BROWSER_EXECUTABLE=$browser_path" >> "$GITHUB_ENV"
       - run: go mod verify
       - run: gofmt -l internal/agent server/companion_ws.go server/agent_routes.go | tee /tmp/gofmt.txt && test ! -s /tmp/gofmt.txt
       - run: ./scripts/check-class-a-plus-integrity.sh
       - run: bash -n scripts/smoke-company-os.sh && python3 -m json.tool examples/dz23-desktop-commander-mcp.json >/dev/null && python3 -m json.tool examples/dz23-desktop-commander-remote.json >/dev/null
       - run: CGO_ENABLED=0 go test ./internal/agent -count=1
       - run: CGO_ENABLED=1 go test ./server -count=1
+      - run: CGO_ENABLED=1 go test ./... -count=1
+      - run: CGO_ENABLED=1 go vet ./...
       - run: CGO_ENABLED=1 go build -o dist/ollama-agentic .
       - uses: actions/upload-artifact@v4
         with:
@@ -77,24 +79,28 @@ jobs:
         run: docker compose -f deploy/docker-compose.agentic.yml down -v
 
   web-and-mobile:
-    name: Web and mobile typechecks
+    name: Web and mobile quality
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: apps/mobile-agentic/package-lock.json
       - name: Mobile typecheck
         working-directory: apps/mobile-agentic
-        run: npm ci --no-audit --no-fund && npm run typecheck
+        run: npm install --no-audit --no-fund && npm run typecheck
       - name: Web dependency install
         working-directory: app/ui/app
         run: npm install --no-audit --no-fund
       - name: Web typecheck
         working-directory: app/ui/app
         run: ./node_modules/.bin/tsc --noEmit
+      - name: Web tests
+        working-directory: app/ui/app
+        run: npm test -- --run
+      - name: Web production build
+        working-directory: app/ui/app
+        run: npm run build
 
   sbom:
     name: Generate SBOM
