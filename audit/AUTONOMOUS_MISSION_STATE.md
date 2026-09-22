@@ -1279,3 +1279,20 @@ classification: preview/local RC em hardening
 open_risks: server-owned tenant registration, skill attestation, strong MCP isolation, distributed/RLS proof
 next_action: commit/push, then continue release/CI or plugin registration; no main merge
 ```
+
+
+## Publicação da slice P0 plugin/MCP/skill ownership — 2026-09-22
+
+```yaml
+state: FIXING
+iteration: 19
+commit: 30b1ecb8
+branch: feat/manus-parity-omniroute
+remote: https://github.com/DZ23-LTDA/ollama-classe-a-plus.git
+pull_request: https://github.com/DZ23-LTDA/ollama-classe-a-plus/pull/1
+working_tree: checkpoint pending commit
+published: true
+proofs: integrity, Go tests/vet/build, UI Vitest/build, mobile typecheck and cross-tenant plugin tests all PASS
+classification: preview/local RC em hardening
+next_slice: server-owned tenant registration or release/CI hardening; no main merge
+```
