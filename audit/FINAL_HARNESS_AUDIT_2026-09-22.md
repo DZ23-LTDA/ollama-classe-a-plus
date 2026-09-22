@@ -389,3 +389,23 @@ A consolidação foi baseada nos resultados fornecidos e nos seguintes grupos de
 [3]: file:///home/ubuntu/work/ollama-dz23-work/docs/agentic/ARCHITECTURE.md "Arquitetura agentic documentada no checkout"
 [4]: file:///home/ubuntu/work/ollama-dz23-work/.github/workflows/release.yaml "Workflow de release do checkout"
 [5]: file:///home/ubuntu/work/ollama-dz23-work/SECURITY.md "Política de segurança do checkout"
+
+
+## Addendum de remediação incremental — após a auditoria ampliada — 2026-09-22
+
+Este documento preserva os achados originais como histórico. As slices publicadas posteriormente mitigaram partes relevantes sem transformar o produto em produção-ready.
+
+| Achado original | Estado após as slices publicadas | Limite que permanece |
+|---|---|---|
+| C-01 autenticação não fail-closed | **Mitigado parcialmente**: bind não-loopback força auth e há regressões de dev-token remoto | TLS/reverse proxy, OIDC/SAML real e operação distribuída ainda dependem do ambiente |
+| C-02 workspace/artifacts por symlink/TOCTOU | **Mitigado parcialmente**: tools, Builder preview/export e `BuildArtifactManifest` rejeitam symlink/realpath externo | TOCTOU e prova multi-plataforma/distribuída ainda não estão encerrados |
+| C-03 sandbox forte | **Parcial**: process group, cancellation, cwd privado, stderr DLP e limites best-effort | seccomp/AppArmor/cgroups/quotas e isolamento forte permanecem abertos; não chamar de sandbox forte |
+| C-04/C-06 Remote MCP/SSRF | **Mitigado parcialmente**: proxy nil, redirect same-origin e IP efetivo são validados | OAuth/session/revocation, Streamable HTTP completo e todos os egresses ainda precisam de prova |
+| C-08 skills/plugins | **Mitigado parcialmente**: lifecycle autenticado tem ownership por organização | capability enforcement, assinatura/trust e registro server-owned ainda são pendentes |
+| C-09 Company/Growth tenant state | **Mitigado em slices**: Company create, Builder, orchestration/traces/devices, plugins e jobs têm negativos cross-tenant | todas as mutações e prova Postgres RLS/Redis real ainda não foram exercitadas |
+| C-10 approvals | **Mitigado em missão e Company OS**: owner/admin, nonce, CAS e ledger de gasto | políticas ABAC/segregação por ação e efeitos externos reais ainda não estão concluídos |
+| C-12 baseline Go | **Verde localmente**: `CGO_ENABLED=1 go test ./...`, vet e build passaram nas slices | runner GitHub e Docker distribuído continuam evidência externa |
+| C-13/C-14 release supply chain | **Mitigado parcialmente**: quality gate, artefato não vazio, checksum e attestation condicional | signing, SBOM final, provenance executada e publicação real não foram comprovados |
+| C-15 UI/mobile | **Verde em gates locais**: Vitest/build/typecheck mobile | dispositivos físicos, distribuição e jornadas reais continuam `NOT_RUN` |
+
+**Classificação vigente:** preview/local RC em hardening. Este addendum não revoga os blockers externos nem autoriza alegações de credenciais, contas, devices, deploys, marketplace, app review, signing ou release concluídos.
