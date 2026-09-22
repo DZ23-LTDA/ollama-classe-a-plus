@@ -241,3 +241,10 @@ O gate distribuído está fechado para esta slice. Isso não elimina os demais a
 A policy de capabilities foi centralizada no Runtime. Tools precisam declarar scopes conhecidos; grants desconhecidos ou descritores sem scopes falham; a verificação ocorre na inicialização, durante o planejamento e imediatamente antes da execução. O approval registra scopes e risco, enquanto o default de missão é somente leitura e a UI torna escrita um opt-in explícito.
 
 A regressão foi coberta por testes de grant desconhecido, descriptor sem scopes, grant parcial, policy determinística, policy de approval e execução completa do runtime. Esta correção reduz overgrant, mas não converte o sandbox best-effort em isolamento forte e não fecha os blockers externos ou os demais P0/P1.
+
+
+## Remediação verificada — upstream Go race — 2026-09-22
+
+A falha upstream no head anterior foi reproduzida localmente. O `go test -race ./...` apontou o contador não atômico de `TestResearchEngineFetchesSourcesWithCitationsAndCache` e o uso concorrente do `bytes.Buffer` promovido por `mcpStderrBuffer.ReadFrom`. O contador foi tornado atômico e o buffer MCP recebeu sincronização explícita e `ReadFrom` próprio.
+
+Após a correção, os gates locais de teste normal, race, vet, build e integrity passaram. A confirmação remota do workflow upstream continua necessária; portanto o PR não é tratado como globalmente verde até o novo run terminar.

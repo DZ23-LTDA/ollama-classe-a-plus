@@ -281,3 +281,8 @@ Missões agora validam grants contra uma policy central e scopes declarados por 
 ## 2026-09-22 — matriz de referências e capacidades
 
 Foi adicionada `audit/HARNESS_CAPABILITY_MATRIX.md`, com decisões rastreáveis para as referências nomeadas e os 13 repositórios fornecidos. A matriz separa produto, coordenação, inferência, execução especializada e evidências; preserva Ollama como motor padrão; e mantém providers, harnesses e serviços externos substituíveis e opt-in.
+
+
+## 2026-09-22 — correção de races em pesquisa e MCP
+
+O fixture concorrente de pesquisa passou a usar contador atômico. O buffer stderr de MCP passou a proteger `Write`, `String` e `ReadFrom`, evitando que `io.Copy` contorne o limite/mutex durante cancelamento e `Stop`. `go test -race ./...` agora passa localmente.

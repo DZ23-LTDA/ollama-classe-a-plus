@@ -297,3 +297,8 @@ A policy de capabilities agora é central e deny-by-default no Runtime, com gran
 O complemento recebido foi incorporado como `audit/HARNESS_CAPABILITY_MATRIX.md`. Ele cataloga as 44 referências de produto e os 13 repositórios fornecidos, agrupando capacidades em engenharia, edição/contexto, builders, pesquisa, Company OS, memória/automação, providers, colaboração/dispositivos e execução. A decisão é preservar Ollama e o Runtime como núcleo, usar implementação nativa quando suficiente e adotar integrações substituíveis somente quando houver contrato, licença, isolamento e teste de aceite.
 
 A matriz não converte triagem documental em integração operacional. Os gates externos permanecem abertos para sessões reais de harness, contas OAuth, hardware, deploy, lojas, sandbox forte, colaboradores/dispositivos e homologação distribuída.
+
+
+## Remediação 2026-09-22 — upstream Go race
+
+O workflow upstream revelou duas corridas que não apareciam nos gates agentic específicos: contador do fixture HTTP de pesquisa e `ReadFrom` promovido no buffer stderr do MCP. Ambas foram corrigidas sem relaxar o teste ou ocultar o race detector. O próximo gate é a execução remota do workflow `test` no novo SHA.

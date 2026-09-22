@@ -1744,3 +1744,26 @@ validation: integrity PASS; document/link existence PASS; no third-party reposit
 classification: preview/local RC em hardening; NÃO final; NÃO production-ready
 next_action: concluir diagnóstico dos gates upstream Go/race e continuar P0/P1 internal hardening; sem merge automático em main
 ```
+
+
+## Correção dos upstream Go races — aguardando publicação — 2026-09-22
+
+```yaml
+state: RELEASING
+iteration: 32
+root_cause:
+  - research test shared request counter
+  - MCP stderr bytes.Buffer promoted ReadFrom bypassed synchronization
+files:
+  - internal/agent/research_test.go
+  - internal/agent/mcp.go
+local_evidence:
+  focused_race: PASS
+  go_test_all: PASS
+  go_race_all: PASS
+  go_vet: PASS
+  go_build: PASS
+  integrity: PASS
+classification: preview/local RC em hardening; NÃO final; NÃO production-ready
+next_action: commit/push race fix and verify upstream workflow test on new SHA
+```

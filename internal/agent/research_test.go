@@ -5,13 +5,14 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 )
 
 func TestResearchEngineFetchesSourcesWithCitationsAndCache(t *testing.T) {
-	calls := 0
+	var calls atomic.Int64
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		calls++
+		calls.Add(1)
 		if r.URL.Path == "/robots.txt" {
 			_, _ = w.Write([]byte("User-agent: *\nDisallow: /blocked\n"))
 			return
@@ -33,8 +34,8 @@ func TestResearchEngineFetchesSourcesWithCitationsAndCache(t *testing.T) {
 	if _, err := engine.Research(context.Background(), ResearchRequest{Query: "project", URLs: []string{server.URL + "/one"}, RespectRobots: false}); err != nil {
 		t.Fatal(err)
 	}
-	if calls < 3 || calls > 4 {
-		t.Fatalf("expected cached source fetches, got %d requests", calls)
+	if calls.Load() < 3 || calls.Load() > 4 {
+		t.Fatalf("expected cached source fetches, got %d requests", calls.Load())
 	}
 }
 

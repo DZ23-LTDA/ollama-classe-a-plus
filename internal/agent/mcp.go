@@ -227,11 +227,14 @@ const (
 )
 
 type mcpStderrBuffer struct {
+	mu sync.Mutex
 	bytes.Buffer
 	limit int
 }
 
 func (b *mcpStderrBuffer) Write(data []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
 	if b.limit > b.Len() {
 		remaining := b.limit - b.Len()
 		if len(data) > remaining {
@@ -241,6 +244,30 @@ func (b *mcpStderrBuffer) Write(data []byte) (int, error) {
 		}
 	}
 	return len(data), nil
+}
+
+func (b *mcpStderrBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.Buffer.String()
+}
+
+func (b *mcpStderrBuffer) ReadFrom(reader io.Reader) (int64, error) {
+	buffer := make([]byte, 32<<10)
+	var total int64
+	for {
+		read, err := reader.Read(buffer)
+		if read > 0 {
+			_, _ = b.Write(buffer[:read])
+			total += int64(read)
+		}
+		if err == io.EOF {
+			return total, nil
+		}
+		if err != nil {
+			return total, err
+		}
+	}
 }
 
 func (s *MCPServer) Start() error {

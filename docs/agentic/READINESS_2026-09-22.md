@@ -292,3 +292,12 @@ A execução de missões passou a usar uma `CapabilityPolicy` central, deny-by-d
 Evidências locais: `scripts/check-class-a-plus-integrity.sh`, `CGO_ENABLED=1 go test ./... -count=1`, `CGO_ENABLED=1 go vet ./...`, build Go, Vitest completo, build Vite e typecheck mobile — todos PASS. Isso reduz capability overgrant no runtime, mas não substitui sandbox forte, autorização externa por endpoint nem testes físicos/distribuídos.
 
 A classificação permanece **preview/local RC em hardening**; a slice não fecha os P0/P1 restantes nem valida credenciais ou adapters externos.
+
+
+## Remediação dos gates upstream Go/race — 2026-09-22
+
+A reprodução local confirmou que o `go test` normal passava e que o `go test -race` encontrava duas corridas reais: o contador compartilhado do fixture de pesquisa e o buffer stderr do MCP, cujo `ReadFrom` promovido por `bytes.Buffer` contornava a proteção existente. O teste de pesquisa agora usa `atomic.Int64`; o buffer MCP tem mutex, `String` protegido e `ReadFrom` próprio limitado.
+
+Evidências após a correção: `go test ./... -count=1`, `go test -race ./... -count=1`, `go vet ./...`, build Go e integrity guard — PASS. A nova execução upstream no head publicado ainda é necessária; o CI agentic anterior havia passado, mas o teste upstream falhou antes desta correção.
+
+A classificação permanece **preview/local RC em hardening**. Esta slice corrige races de teste/lifecycle, mas não fecha sandbox forte, integração externa, device testing ou os demais P0/P1.
