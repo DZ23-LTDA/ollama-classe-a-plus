@@ -45,10 +45,10 @@ jobs:
       - run: CGO_ENABLED=1 go build -o /tmp/ollama-agentic-release .
       - name: Mobile typecheck
         working-directory: apps/mobile-agentic
-        run: npm install --no-audit --no-fund && npm run typecheck
+        run: npm ci --no-audit --no-fund && npm run typecheck
       - name: Web tests and production build
         working-directory: app/ui/app
-        run: npm install --no-audit --no-fund && npm test -- --run && npm run build
+        run: npm ci --no-audit --no-fund && npm test -- --run && npm run build
 
   darwin-build:
     runs-on: macos-26-xlarge

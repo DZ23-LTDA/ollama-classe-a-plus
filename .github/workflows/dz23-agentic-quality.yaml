@@ -117,10 +117,10 @@ jobs:
           node-version: 22
       - name: Mobile typecheck
         working-directory: apps/mobile-agentic
-        run: npm install --no-audit --no-fund && npm run typecheck
+        run: npm ci --no-audit --no-fund && npm run typecheck
       - name: Web dependency install
         working-directory: app/ui/app
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
       - name: Web typecheck
         working-directory: app/ui/app
         run: ./node_modules/.bin/tsc --noEmit
