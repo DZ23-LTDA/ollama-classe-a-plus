@@ -441,7 +441,7 @@ jobs:
             "$python_bin" -m pip install --user --break-system-packages 'playwright==1.63.0'
             "$python_bin" -m playwright install --with-deps chromium
           else
-            "$python_bin" -m pip install --user 'playwright==1.63.0'
+            "$python_bin" -m pip install --user --break-system-packages 'playwright==1.63.0'
             "$python_bin" -m playwright install chromium
           fi
       - name: Cache MLX Darwin release payload
@@ -457,6 +457,9 @@ jobs:
       - name: Install UI dependencies
         working-directory: ./app/ui/app
         run: npm ci
+      - name: Build UI
+        working-directory: ./app/ui/app
+        run: npm run build
       - name: Install tscriptify
         run: |
           go install github.com/tkrajina/typescriptify-golang-structs/tscriptify@latest
@@ -535,7 +538,7 @@ jobs:
             "$python_bin" -m pip install --user --break-system-packages 'playwright==1.63.0'
             "$python_bin" -m playwright install --with-deps chromium
           else
-            "$python_bin" -m pip install --user 'playwright==1.63.0'
+            "$python_bin" -m pip install --user --break-system-packages 'playwright==1.63.0'
             "$python_bin" -m playwright install chromium
           fi
       # app/ui embeds app/dist, so the UI has to be built before app/... will
