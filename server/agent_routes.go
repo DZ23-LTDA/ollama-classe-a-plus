@@ -313,6 +313,7 @@ func (a *agentAPI) register(r *gin.Engine) {
 	group.POST("/grok/responses", a.grokResponses)
 	group.GET("/config/safe", a.safeConfig)
 	group.GET("/auth/session", a.authSession)
+	group.POST("/auth/logout", a.authLogout)
 	group.POST("/auth/dev/token", a.devToken)
 	group.POST("/auth/mfa/enable", a.enableMFA)
 	group.POST("/auth/mfa/disable", a.disableMFA)
@@ -631,6 +632,19 @@ func (a *agentAPI) authSession(c *gin.Context) {
 	organization, _ := c.Get("agent.organization")
 	membership, _ := c.Get("agent.membership")
 	c.JSON(http.StatusOK, gin.H{"authenticated": true, "user": user, "organization": organization, "membership": membership})
+}
+
+func (a *agentAPI) authLogout(c *gin.Context) {
+	header := strings.TrimSpace(c.GetHeader("Authorization"))
+	if !strings.HasPrefix(strings.ToLower(header), "bearer ") {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "bearer token is required"})
+		return
+	}
+	if err := a.auth.RevokeToken(strings.TrimSpace(header[len("Bearer "):])); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired token"})
+		return
+	}
+	c.AbortWithStatus(http.StatusNoContent)
 }
 
 func (a *agentAPI) enableMFA(c *gin.Context) {

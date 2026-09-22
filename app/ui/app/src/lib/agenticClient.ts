@@ -82,6 +82,14 @@ export function hasAgentSession(): boolean {
   return agentSession !== null;
 }
 
+export async function logoutAgentSession(): Promise<void> {
+  try {
+    await agentFetch("/api/agent/v1/auth/logout", { method: "POST", body: "{}" });
+  } finally {
+    clearAgentSession();
+  }
+}
+
 function agentHeaders(): Record<string, string> {
   if (!agentSession) return {};
   return { Authorization: `Bearer ${agentSession.token}`, ...(agentSession.organization ? { "X-Ollama-Organization": agentSession.organization } : {}) };

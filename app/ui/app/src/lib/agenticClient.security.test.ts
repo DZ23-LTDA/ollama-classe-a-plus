@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { agentFetch, clearAgentSession, hasAgentSession, setAgentSession } from "./agenticClient";
+import { agentFetch, clearAgentSession, hasAgentSession, logoutAgentSession, setAgentSession } from "./agenticClient";
 
 describe("agent session security", () => {
   afterEach(() => {
@@ -44,6 +44,19 @@ describe("agent session security", () => {
 
     expect(hasAgentSession()).toBe(true);
     expect(dispatchEvent).not.toHaveBeenCalled();
+  });
+
+  it("revokes the server session before clearing local state", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 204 })));
+    setAgentSession("session-token", "org-a");
+
+    await logoutAgentSession();
+
+    const request = vi.mocked(fetch).mock.calls[0]?.[1] as RequestInit;
+    expect(vi.mocked(fetch).mock.calls[0]?.[0]).toContain("/api/agent/v1/auth/logout");
+    expect(request.method).toBe("POST");
+    expect((request.headers as Record<string, string>).Authorization).toBe("Bearer session-token");
+    expect(hasAgentSession()).toBe(false);
   });
 
   it("rejects empty session tokens", () => {
