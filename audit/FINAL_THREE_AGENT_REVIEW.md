@@ -253,3 +253,8 @@ Após a correção, os gates locais de teste normal, race, vet, build e integrit
 ## Quality workflow remoto confirmado — 2026-09-22
 
 O run `35749351291` no SHA `428a99bd` passou Go/server, PostgreSQL RLS + Redis DLQ + OTLP, Web/Mobile e SBOM. O resultado é válido para o workflow agentic do fork. A matriz upstream `test` ainda deve ser observada no head corrente antes de classificar o PR como totalmente validado.
+
+
+## Bootstrap MCP/Remote MCP testado — 2026-09-22
+
+Os loaders de configuração do servidor agora possuem testes positivos e negativos no caminho real de bootstrap. O resultado fecha a lacuna de cobertura do loader, mas não eleva a integração a `connected` ou `upstream-ready`; endpoint, credencial, sessão OAuth, revogação e transporte externo continuam dependências do ambiente.

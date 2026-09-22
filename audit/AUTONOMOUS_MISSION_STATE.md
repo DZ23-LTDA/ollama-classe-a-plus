@@ -1816,3 +1816,18 @@ upstream_observation: test.yaml has pull_request-only trigger; GitHub PR API rem
 classification: preview/local RC em hardening; NÃO final; NÃO production-ready
 next_action: continue next internal P0 slice; re-check upstream trigger later without treating historical queued runs as evidence
 ```
+
+
+## Slice P0 bootstrap MCP/Remote MCP — aguardando publicação — 2026-09-22
+
+```yaml
+state: RELEASING
+iteration: 34
+files:
+  - server/agent_mcp_bootstrap_test.go
+  - scripts/check-class-a-plus-integrity.sh
+scope: real server bootstrap tests for OLLAMA_AGENT_MCP and OLLAMA_AGENT_REMOTE_MCP
+local_evidence: focused normal/race PASS; integrity PASS
+classification: preview/local RC em hardening; NÃO final; NÃO production-ready
+next_action: run full Go/server gates, commit/push, then verify quality workflow
+```

@@ -307,3 +307,8 @@ O workflow upstream revelou duas corridas que não apareciam nos gates agentic e
 ## Validação remota 2026-09-22 — agentic quality verde
 
 O SHA `428a99bd` passou o workflow agentic completo no run `35749351291`. A próxima prova específica é o workflow upstream `test` no head corrente do PR, incluindo a matriz de plataformas aplicável.
+
+
+## Incremento 2026-09-22 — bootstrap MCP verificável
+
+O loader de manifestos MCP passou a ter regressões de servidor que exercitam o caminho de configuração real. O próximo trabalho de transporte continua sendo correlação/multiplexação JSON-RPC, sessão/revogação Remote MCP, auditoria por chamada e sandbox forte.

@@ -306,3 +306,10 @@ A classificação permanece **preview/local RC em hardening**. Esta slice corrig
 ## Quality workflow remoto verde — 2026-09-22
 
 O workflow `dz23-agentic-quality` passou no SHA `428a99bd` no run `35749351291`. Os jobs de Go/server, PostgreSQL RLS + Redis DLQ + OTLP, Web/Mobile e SBOM passaram. Esta evidência cobre o workflow agentic do fork; o workflow upstream `test` ainda precisa concluir no head corrente do PR.
+
+
+## Slice P0 de bootstrap MCP/Remote MCP — 2026-09-22
+
+Os loaders `OLLAMA_AGENT_MCP` e `OLLAMA_AGENT_REMOTE_MCP` agora têm prova de bootstrap real no pacote `server`. Os testes cobrem registro de manifestos válidos, JSON com campo desconhecido, trailing JSON e allowlist remota vazia. A configuração continua opt-in por arquivo e nenhuma conexão externa é declarada.
+
+Evidências: testes focused normal e race, integrity guard e gates Go anteriores — PASS. A matriz upstream `test.yaml` permanece pendente por não ter sido acionada no head atual do PR.

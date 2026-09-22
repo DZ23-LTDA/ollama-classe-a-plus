@@ -291,3 +291,8 @@ O fixture concorrente de pesquisa passou a usar contador atômico. O buffer stde
 ## 2026-09-22 — quality workflow agentic verde no SHA 428a99bd
 
 O run GitHub Actions `35749351291` passou os quatro jobs do workflow agentic: Go/server, PostgreSQL RLS + Redis DLQ + OTLP, Web/Mobile e SBOM. O teste upstream de matriz permanece separado e será confirmado no head corrente.
+
+
+## 2026-09-22 — bootstrap MCP estrito
+
+Foi adicionada cobertura de servidor para carregar manifestos MCP stdio e Remote MCP com JSON estrito, rejeição de campos desconhecidos, trailing data e allowlists vazias. O teste comprova registro local; não comprova endpoint, credencial ou sessão externa.
