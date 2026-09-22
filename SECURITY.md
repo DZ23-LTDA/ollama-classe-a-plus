@@ -23,3 +23,9 @@ While the maintainer team does its best to secure Ollama, users are encouraged t
 ## Contact
 
 For any other questions or concerns related to security, please contact us at hello@ollama.com
+
+## Ollama Classe A+
+
+O runtime agentic pode executar ferramentas, acessar conectores, controlar companions, manipular arquivos e publicar builders. Em instalações públicas, mantenha `OLLAMA_AGENT_AUTH_REQUIRED=true`, use TLS/mTLS quando houver dispositivo remoto, configure PostgreSQL RLS por organização, mantenha tokens em um secrets manager e não habilite modos `DEV` ou `ALLOW_INSECURE` fora de loopback.
+
+Vulnerabilidades envolvendo SSRF, path traversal, bypass de approval, fuga entre organizações, exposição de tokens, execução fora da sandbox ou publicação não autorizada devem ser tratadas como alta prioridade. Não coloque credenciais reais em issues, PRs, screenshots, fixtures ou logs. Para o código específico desta distribuição, encaminhe também a referência do commit e o arquivo afetado ao mantenedor do repositório público.
