@@ -1,7 +1,11 @@
 package agent
 
 import (
+	"context"
 	"encoding/base32"
+	"net"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
@@ -106,6 +110,42 @@ func TestOAuthStateRejectsInsecureRedirect(t *testing.T) {
 	}
 	if _, _, err := store.CreateOAuthState("test", "http://127.0.0.1/callback", strings.Repeat("a", 43), "", time.Minute); err == nil {
 		t.Fatal("insecure OAuth state redirect accepted")
+	}
+}
+
+func TestOAuthClientBlocksRedirectAndPrivateActualAddress(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/start" {
+			http.Redirect(w, r, "/final", http.StatusFound)
+			return
+		}
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	}))
+	defer server.Close()
+	request, err := oauthRequest(context.Background(), http.MethodGet, server.URL+"/start", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := oauthClient(server.Client()).Do(request); err == nil || !strings.Contains(err.Error(), "redirect") {
+		t.Fatalf("expected OAuth redirect rejection, got %v", err)
+	}
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	accepted := make(chan struct{})
+	go func() {
+		conn, acceptErr := listener.Accept()
+		if acceptErr == nil {
+			_ = conn.Close()
+		}
+		close(accepted)
+	}()
+	_, err = oauthDialContext(context.Background(), "tcp", listener.Addr().String())
+	<-accepted
+	if err == nil || !strings.Contains(err.Error(), "private") {
+		t.Fatalf("expected private OAuth dial rejection, got %v", err)
 	}
 }
 

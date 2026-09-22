@@ -201,3 +201,8 @@ OAuth start/callback agora exigem allowlist exata por provider, canonicalizaçã
 ## 2026-09-22 — session handling web/mobile
 
 O cliente web agentic removeu bearer persistido em localStorage e passou a usar sessão em memória com limpeza 401/403. O mobile limpa SecureStore ao expirar, envia nonce de approval, impede dupla ação e exige confirmação antes de apagar cache/outbox no logout.
+
+
+## 2026-09-22 — OAuth endpoint egress hardening
+
+OIDC discovery, JWKS, userinfo e token exchange passaram a bloquear proxy/redirects, validar HTTPS e rejeitar IP privado efetivamente conectado. Discovery também valida os endpoints retornados pelo IdP antes de usá-los.

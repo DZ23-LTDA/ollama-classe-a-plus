@@ -172,3 +172,10 @@ Testes cobrem host não allowlisted, HTTP externo, fragmento, userinfo, loopback
 O cliente web agentic deixou de ler bearer e organização de `localStorage`: a sessão é mantida somente em memória por `setAgentSession`, pode ser removida por `clearAgentSession` e limpa automaticamente em respostas 401/403, emitindo evento local para a UI reagir. Testes verificam que o header é formado sem acessar localStorage, que token vazio é rejeitado e que sessão expirada é apagada.
 
 No mobile, 401/403 removem o token do Expo SecureStore sem enfileirar mutações não autorizadas; approvals enviam nonce, ficam desabilitados enquanto uma decisão está em andamento e receberam labels de acessibilidade. Logout exige confirmação quando há missão/cache/outbox e, após confirmação, remove sessão, missão, eventos, push marker e ações offline. A validação de armazenamento seguro nativo depende de build/dispositivo real; a UI web ainda requer uma jornada de login que chame `setAgentSession` em vez de persistir credenciais.
+
+
+## Slice P0 de OAuth endpoint egress — 2026-09-22
+
+Discovery OIDC, JWKS, userinfo e token exchange passaram a usar um client seguro que remove proxy ambiental, bloqueia redirects e verifica o IP efetivamente conectado, aceitando loopback apenas quando o endpoint configurado é explicitamente loopback. URLs de endpoints rejeitam credentials/fragments e exigem HTTPS; discovery valida issuer e também os endpoints de autorização, token, JWKS e userinfo retornados antes de usá-los.
+
+Regressões cobrem redirect OAuth e socket privado real, além de validação de endpoint existente. Os gates completos passaram: integrity guard, Go tests/vet/build, Vitest 20/199, UI build e mobile typecheck. Um IdP real/staging ainda é necessário para validar discovery, assinatura, audience, nonce, rotação e refresh ponta a ponta.

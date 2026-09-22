@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"math/big"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -813,30 +814,92 @@ func (p OAuthProvider) Validate() error {
 		if strings.TrimSpace(raw) == "" {
 			continue
 		}
-		u, err := url.Parse(raw)
-		if err != nil || u.Scheme != "https" || u.Host == "" {
-			return errors.New("oauth endpoints must use https")
+		if err := validateOAuthEndpointURL(raw); err != nil {
+			return err
 		}
 	}
 	if strings.TrimSpace(p.IssuerURL) != "" {
-		u, err := url.Parse(p.IssuerURL)
-		if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil {
-			return errors.New("oauth issuer endpoint must use https")
+		if err := validateOAuthEndpointURL(p.IssuerURL); err != nil {
+			return err
 		}
 	}
 	if strings.TrimSpace(p.IssuerURL) == "" && (strings.TrimSpace(p.AuthorizeURL) == "" || strings.TrimSpace(p.TokenURL) == "") {
 		return errors.New("oauth authorize and token endpoints or an issuer are required")
 	}
 	if p.UserInfoURL != "" {
-		u, err := url.Parse(p.UserInfoURL)
-		if err != nil || u.Scheme != "https" || u.Host == "" {
-			return errors.New("oauth userinfo endpoint must use https")
+		if err := validateOAuthEndpointURL(p.UserInfoURL); err != nil {
+			return err
 		}
 	}
 	if os.Getenv(p.ClientIDEnv) == "" || os.Getenv(p.SecretEnv) == "" {
 		return errors.New("oauth client credentials are not configured")
 	}
 	return nil
+}
+
+func validateOAuthEndpointURL(raw string) error {
+	u, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || u.Fragment != "" || u.Opaque != "" {
+		return errors.New("oauth endpoints must use HTTPS without credentials or fragment")
+	}
+	return nil
+}
+
+type oauthLoopbackContextKey struct{}
+
+func oauthClient(base *http.Client) *http.Client {
+	if base == nil {
+		base = http.DefaultClient
+	}
+	client := *base
+	client.CheckRedirect = func(_ *http.Request, _ []*http.Request) error { return errors.New("oauth redirects are disabled") }
+	switch transport := base.Transport.(type) {
+	case nil:
+		safe := http.DefaultTransport.(*http.Transport).Clone()
+		safe.Proxy = nil
+		safe.DialContext = oauthDialContext
+		client.Transport = safe
+	case *http.Transport:
+		safe := transport.Clone()
+		safe.Proxy = nil
+		safe.DialContext = oauthDialContext
+		client.Transport = safe
+	default:
+		safe := http.DefaultTransport.(*http.Transport).Clone()
+		safe.Proxy = nil
+		safe.DialContext = oauthDialContext
+		client.Transport = safe
+	}
+	return &client
+}
+
+func oauthRequest(ctx context.Context, method, rawURL string, body io.Reader) (*http.Request, error) {
+	parsed, err := url.Parse(rawURL)
+	if err != nil || parsed.Host == "" || parsed.User != nil || parsed.Fragment != "" {
+		return nil, errors.New("oauth endpoint URL is invalid")
+	}
+	requestContext := context.WithValue(ctx, oauthLoopbackContextKey{}, isLoopbackHost(parsed.Hostname()))
+	return http.NewRequestWithContext(requestContext, method, parsed.String(), body)
+}
+
+func oauthDialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	conn, err := (&net.Dialer{Timeout: 15 * time.Second}).DialContext(ctx, network, address)
+	if err != nil {
+		return nil, err
+	}
+	if loopback, _ := ctx.Value(oauthLoopbackContextKey{}).(bool); loopback {
+		return conn, nil
+	}
+	remote, _, splitErr := net.SplitHostPort(conn.RemoteAddr().String())
+	if splitErr != nil {
+		_ = conn.Close()
+		return nil, errors.New("oauth connected address is invalid")
+	}
+	if ip := net.ParseIP(strings.Trim(remote, "[]")); ip != nil && (ip.IsPrivate() || ip.IsLoopback() || ip.IsUnspecified() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsMulticast()) {
+		_ = conn.Close()
+		return nil, errors.New("oauth destination connected to a private address")
+	}
+	return conn, nil
 }
 
 type OIDCDiscovery struct {
@@ -852,10 +915,8 @@ func (p OAuthProvider) Discover(ctx context.Context, client *http.Client) (OIDCD
 	if issuer == "" {
 		return OIDCDiscovery{}, errors.New("oidc issuer is not configured")
 	}
-	if client == nil {
-		client = http.DefaultClient
-	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, issuer+"/.well-known/openid-configuration", nil)
+	client = oauthClient(client)
+	request, err := oauthRequest(ctx, http.MethodGet, issuer+"/.well-known/openid-configuration", nil)
 	if err != nil {
 		return OIDCDiscovery{}, err
 	}
@@ -874,10 +935,21 @@ func (p OAuthProvider) Discover(ctx context.Context, client *http.Client) (OIDCD
 	if strings.TrimRight(discovery.Issuer, "/") != issuer || discovery.AuthorizationEndpoint == "" || discovery.TokenEndpoint == "" || discovery.JWKSURI == "" {
 		return OIDCDiscovery{}, errors.New("oidc discovery issuer or required endpoints are invalid")
 	}
+	for _, endpoint := range []string{discovery.AuthorizationEndpoint, discovery.TokenEndpoint, discovery.JWKSURI} {
+		if err := validateOAuthEndpointURL(endpoint); err != nil {
+			return OIDCDiscovery{}, err
+		}
+	}
+	if discovery.UserInfoEndpoint != "" {
+		if err := validateOAuthEndpointURL(discovery.UserInfoEndpoint); err != nil {
+			return OIDCDiscovery{}, err
+		}
+	}
 	return discovery, nil
 }
 
 func (p OAuthProvider) ValidateIDToken(ctx context.Context, client *http.Client, rawToken, expectedNonce string) (map[string]any, error) {
+	client = oauthClient(client)
 	parts := strings.Split(strings.TrimSpace(rawToken), ".")
 	if len(parts) != 3 {
 		return nil, errors.New("id_token must be a compact JWT")
@@ -904,10 +976,7 @@ func (p OAuthProvider) ValidateIDToken(ctx context.Context, client *http.Client,
 	if err != nil {
 		return nil, err
 	}
-	if client == nil {
-		client = http.DefaultClient
-	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, discovery.JWKSURI, nil)
+	request, err := oauthRequest(ctx, http.MethodGet, discovery.JWKSURI, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -1008,10 +1077,8 @@ func (p OAuthProvider) FetchUserInfo(ctx context.Context, client *http.Client, a
 	if endpoint == "" {
 		return nil, errors.New("oauth userinfo endpoint is not configured")
 	}
-	if client == nil {
-		client = http.DefaultClient
-	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	client = oauthClient(client)
+	request, err := oauthRequest(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -1060,11 +1127,9 @@ func (p OAuthProvider) ExchangeCode(ctx context.Context, client *http.Client, co
 	if err := p.Validate(); err != nil {
 		return nil, err
 	}
-	if client == nil {
-		client = http.DefaultClient
-	}
+	client = oauthClient(client)
 	form := url.Values{"grant_type": {"authorization_code"}, "code": {code}, "redirect_uri": {redirectURI}, "client_id": {os.Getenv(p.ClientIDEnv)}, "client_secret": {os.Getenv(p.SecretEnv)}, "code_verifier": {codeVerifier}}
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, p.TokenURL, strings.NewReader(form.Encode()))
+	request, err := oauthRequest(ctx, http.MethodPost, p.TokenURL, strings.NewReader(form.Encode()))
 	if err != nil {
 		return nil, err
 	}

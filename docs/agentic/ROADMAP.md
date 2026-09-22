@@ -220,3 +220,8 @@ OAuth redirect agora depende de allowlist provider-scoped e canonicalização se
 ## Incremento 2026-09-22 — session handling web/mobile
 
 Bearer web deixou de ser persistido no localStorage e sessões inválidas são limpas; o mobile protege SecureStore, approvals e descarte de outbox. A próxima etapa é ligar a jornada de login web ao setter in-memory e validar secure storage/biometria em builds reais de Android/iOS/desktop, sem afirmar isso no sandbox.
+
+
+## Incremento 2026-09-22 — OAuth endpoint egress
+
+Os endpoints OAuth/OIDC agora compartilham política de egress sem proxy/redirect e com IP efetivo seguro. Continua necessário executar um IdP de staging para provar discovery, JWKS, assinatura, audience, nonce, refresh e revogação sem simular credenciais ou declarar SSO de produção.

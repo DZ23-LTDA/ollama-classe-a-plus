@@ -1166,3 +1166,30 @@ proofs: integrity, Go tests/vet/build, UI security Vitest/build, mobile typechec
 classification: preview/local RC em hardening
 next_slice: wire web login to memory session, OAuth endpoint egress, or platform sandbox; no main merge
 ```
+
+
+## Slice P0 OAuth endpoint egress validada — aguardando publicação — 2026-09-22
+
+```yaml
+state: RELEASING
+iteration: 17
+base_commit: f1d93445
+working_tree: OAuth endpoint egress changes/tests/docs still uncommitted
+implemented:
+  - safe client for discovery/JWKS/userinfo/token exchange
+  - proxy disabled and redirects blocked
+  - connected private IP rejection
+  - discovery endpoint HTTPS/issuer validation
+proofs:
+  - focused OAuth tests: PASS
+  - integrity guard: PASS
+  - CGO_ENABLED=1 go test ./... -count=1: PASS
+  - CGO_ENABLED=1 go vet ./...: PASS
+  - CGO_ENABLED=1 go build: PASS
+  - UI Vitest 20/199: PASS
+  - UI build: PASS; known >500KB warning
+  - mobile typecheck: PASS
+classification: preview/local RC em hardening
+open_risks: real IdP/staging and refresh/revocation, web login wiring, strong sandbox
+next_action: commit/push, then continue secure session/CSRF contract or sandbox resource controls
+```

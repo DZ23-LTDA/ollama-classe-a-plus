@@ -161,3 +161,8 @@ OAuth start/callback não aceitam mais redirect arbitrário: cada provider preci
 ## Slice P0 validada — session handling web/mobile — 2026-09-22
 
 O bearer web não é mais lido de localStorage: a sessão fica em memória e é limpa em 401/403. O mobile limpa SecureStore em sessão expirada, aplica nonce/busy/accessibility em approvals e pede confirmação antes de remover cache/outbox no logout. A jornada de login web e a validação física de secure storage nativo ainda não estão fechadas.
+
+
+## Slice P0 validada — OAuth endpoint egress — 2026-09-22
+
+OIDC discovery/JWKS/userinfo/token exchange agora usam egress sem proxy, redirects bloqueados e verificação de IP conectado; endpoints retornados por discovery são validados antes do uso. A prova contra IdP real, refresh/revogação e operação SSO de produção permanecem externas ao sandbox.
