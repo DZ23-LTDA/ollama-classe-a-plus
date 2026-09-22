@@ -1624,3 +1624,29 @@ classification: preview/local RC em hardening; NÃO final; NÃO production-ready
 next_action: revisar diff/segredos, commitar e fazer push; então verificar o novo run do PR sem repetir valores sensíveis
 rollback: reverter o commit desta slice na branch feature; não force-push e não alterar main
 ```
+
+
+## Follow-up do CI distribuído — nova correção aguardando publicação — 2026-09-22
+
+```yaml
+state: RELEASING
+iteration: 29
+base_commit: 9f1afeb3dc147632816ce8eeab583b7cf40fb08e
+remote_run: 35737050056
+remote_result:
+  - Go agentic/server: PASS
+  - SBOM: PASS
+  - web/mobile: PASS
+  - distributed: FAIL antes do teste RLS
+root_causes:
+  - sintaxe psql `:'app_password'` inválida dentro de `DO $$`
+  - cleanup em step separado não herda variáveis shell locais
+implemented:
+  - criação/alteração de role via psql -c com password hexagonal efêmera
+  - grants em chamada psql separada
+  - cleanup usa placeholders neutros apenas para interpolação do Compose
+proof_pending:
+  - nova execução GitHub Actions do job PostgreSQL/RLS/Redis/OTLP
+classification: preview/local RC em hardening; NÃO final; NÃO production-ready
+next_action: executar gates locais, commit/push e acompanhar novo run; não repetir valores sensíveis do CI
+```

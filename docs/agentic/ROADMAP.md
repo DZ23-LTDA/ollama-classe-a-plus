@@ -275,3 +275,8 @@ A geração de manifests reutiliza a contenção de symlink do workspace. Export
 ## Incremento 2026-09-22 — distributed CI smoke remediation
 
 A primeira execução pública do workflow ampliado revelou um defeito útil no próprio gate: o teste PostgreSQL RLS conectava com a role bootstrap superusuária, e o armazenamento tenant-scoped recusava corretamente essa configuração. O workflow foi ajustado para criar uma role de teste não-superusuária e manter passwords efêmeras apenas no passo local, sem `GITHUB_ENV`. A prova local está verde; o próximo passo é confirmar o novo run remoto com Docker e serviços distribuídos. A classificação do produto continua preview/local RC em hardening.
+
+
+## Follow-up 2026-09-22 — bootstrap do smoke distribuído
+
+O segundo run público encontrou uma falha de sintaxe no bootstrap condicional da role PostgreSQL e confirmou que steps separados não compartilham variáveis shell. A correção usa `psql -c` com password efêmera hexagonal no passo de start e placeholders neutros na limpeza. O gate remoto ainda precisa ser repetido; nenhuma classificação de produção foi alterada.

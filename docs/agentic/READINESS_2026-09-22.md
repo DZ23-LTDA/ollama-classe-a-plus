@@ -267,3 +267,12 @@ O job PostgreSQL RLS deixou de conectar o teste tenant-scoped com a role bootstr
 Evidências locais desta correção: `scripts/check-class-a-plus-integrity.sh`, parser dos workflows, `git diff --check`, suíte Go completa com CGO, `go vet`, build Go, 20 arquivos/199 testes Vitest, build Vite e `npm run typecheck` mobile — todos PASS. Docker e a nova execução remota permanecem necessários para fechar o gate distribuído.
 
 A classificação não muda: **preview/local RC em hardening**, sem merge automático em `main` e sem declarar produção-ready.
+
+
+## Follow-up do CI distribuído — 2026-09-22
+
+A execução `35737050056` confirmou que o job Go, SBOM e Web/Mobile passaram, mas o job distribuído falhou antes do teste RLS: o bloco `DO $$` misturava sintaxe de variável do `psql` com PL/pgSQL e produziu erro de sintaxe. A limpeza também não tinha acesso às variáveis locais do passo de start, porque cada passo do GitHub Actions possui ambiente separado.
+
+O workflow foi corrigido novamente para consultar a existência da role com `psql -c`, executar `CREATE ROLE` ou `ALTER ROLE` com password hexagonal efêmera e aplicar os grants em uma chamada separada. A limpeza agora injeta somente placeholders não secretos, suficientes para o Compose interpolar a configuração e executar `down -v`, sem recuperar nem persistir os secrets do passo anterior.
+
+Esta segunda correção ainda aguarda nova execução remota. A validação local deve cobrir YAML, integrity, diff, Go, UI e mobile; Docker/PostgreSQL/Redis/OTLP permanecem impossíveis de executar nesta sandbox.

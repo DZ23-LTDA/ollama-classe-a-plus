@@ -261,3 +261,8 @@ As dez telas públicas do shell (`class-a-plus-*.png`) foram recapturadas com Ch
 ## 2026-09-22 — correção do smoke distribuído do CI
 
 O job de integração do `dz23-agentic-quality` foi corrigido após a execução no commit `2933f6e2` revelar que o teste PostgreSQL RLS estava usando a role bootstrap superusuária. O workflow agora cria uma role não-superusuária dedicada ao teste tenant-scoped, mantém as passwords efêmeras em variáveis locais do passo e não as grava em `GITHUB_ENV`. O integrity guard verifica os dois contratos. Os gates locais completos passaram; a nova execução do GitHub Actions ainda é necessária para validar Docker/PostgreSQL/Redis/OTLP no runner.
+
+
+## 2026-09-22 — follow-up do bootstrap PostgreSQL no CI
+
+O run remoto `35737050056` revelou que a primeira correção do smoke ainda usava sintaxe inválida ao combinar variável `psql` com `DO $$`, e que a etapa de cleanup não herdava variáveis locais de outro passo. O workflow agora usa comandos condicionais `CREATE ROLE`/`ALTER ROLE` com password efêmera hexagonal e placeholders não secretos somente para o `docker compose down`. A nova confirmação distribuída permanece pendente.

@@ -220,3 +220,10 @@ O primeiro run do workflow `dz23-agentic-quality` no commit `2933f6e2` forneceu 
 A correção agora cria/ajusta uma role `ollama_agent_test` dedicada, roda o teste com essa role e conserva as passwords somente em variáveis locais no mesmo passo. O integrity guard bloqueia o retorno de `GITHUB_ENV` no job distribuído. Os gates locais completos passaram, incluindo integrity, YAML, Go test/vet/build, Vitest/build e typecheck mobile. A confirmação de Docker/PostgreSQL/Redis/OTLP depende da nova execução remota.
 
 Este achado não fecha os P0 restantes: sandbox forte, capability enforcement, egress/DLP completo, storage/IdP distribuído, adapters externos, dispositivos e supply chain continuam abertos. A decisão permanece **FIXING / preview-local em hardening**.
+
+
+## Follow-up do workflow distribuído — 2026-09-22
+
+O run `35737050056` manteve Go, SBOM e Web/Mobile verdes, mas falhou no bootstrap PostgreSQL. A causa foi objetiva: `:'app_password'` foi colocado dentro de `DO $$`, onde o servidor recebeu sintaxe inválida; adicionalmente, a etapa `down -v` não herda variáveis shell do passo anterior. O workflow foi corrigido para usar `psql -c` condicional com password gerada em hexadecimal e para executar cleanup com placeholders neutros, sem depender de secrets entre steps.
+
+A nova execução remota é obrigatória antes de marcar o gate distribuído como verde. O produto continua em **FIXING / preview-local em hardening**.

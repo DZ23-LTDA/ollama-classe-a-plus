@@ -143,6 +143,8 @@ grep -q 'OLLAMA_AGENT_POSTGRES_PASSWORD' deploy/docker-compose.agentic.yml
 grep -q 'OLLAMA_AGENT_REDIS_PASSWORD' deploy/docker-compose.agentic.yml
 grep -q 'ollama_agent_test' .github/workflows/dz23-agentic-quality.yaml
 grep -q 'tenant_password' .github/workflows/dz23-agentic-quality.yaml
+grep -q 'SELECT 1 FROM pg_roles' .github/workflows/dz23-agentic-quality.yaml
+grep -q 'cleanup-placeholder' .github/workflows/dz23-agentic-quality.yaml
 if sed -n '56,110p' .github/workflows/dz23-agentic-quality.yaml | grep -q 'GITHUB_ENV'; then
   echo 'distributed integration secrets must remain step-local' >&2
   exit 1
