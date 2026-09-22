@@ -185,3 +185,8 @@ A classificação continua **preview/local RC em hardening**. O workflow de afil
 ## Incremento 2026-09-22 — spend approval e budget atômico
 
 A autorização de gasto deixou de ser um checkbox: a solicitação é criada sem débito, fica pendente na fila de approvals e só altera o budget após decisão auditável com nonce/CAS. A próxima prioridade de segurança é aplicar a mesma separação a integrações externas, MCP/egress, DLP de resultados e ownership de plugins; esses itens não são considerados concluídos por esta slice.
+
+
+## Incremento 2026-09-22 — DLP de resultado/observabilidade
+
+A primeira camada de DLP agora protege resultados de ferramentas, eventos, traces e persistência. O próximo slice de egress deve definir classificação de dados, injeção explícita de credenciais e redaction de payloads externos sem quebrar integrações autorizadas; SSRF/DNS rebinding, redirects e sandbox/MCP process isolation continuam pendentes.

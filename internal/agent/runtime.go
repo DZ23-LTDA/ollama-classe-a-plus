@@ -564,7 +564,7 @@ func (r *Runtime) Run(ctx context.Context, id string) (runErr error) {
 				mission.Version++
 				mission.UpdatedAt = time.Now().UTC()
 				_ = r.store.PutMission(mission)
-				_ = r.event(mission, "step.retry_scheduled", step.ID, map[string]any{"error": executeErr.Error()})
+				_ = r.event(mission, "step.retry_scheduled", step.ID, map[string]any{"error": RedactDLP(executeErr.Error())})
 				index--
 				continue
 			}
@@ -572,7 +572,7 @@ func (r *Runtime) Run(ctx context.Context, id string) (runErr error) {
 		}
 		step.State = StepSucceeded
 		r.metrics.stepsSucceeded.Add(1)
-		step.Result = result.Value
+		step.Result = RedactValue(result.Value)
 		step.Error = ""
 		mission.Artifacts = append(mission.Artifacts, result.Artifacts...)
 		mission.State = MissionRunning
@@ -730,7 +730,7 @@ func (r *Runtime) stepApproved(mission Mission, stepID string) bool {
 func (r *Runtime) failMission(mission Mission, err error) (Mission, error) {
 	mission.State = MissionFailed
 	r.metrics.missionsFailed.Add(1)
-	mission.LastError = err.Error()
+	mission.LastError = RedactDLP(err.Error())
 	mission.Version++
 	mission.UpdatedAt = time.Now().UTC()
 	if saveErr := r.store.PutMission(mission); saveErr != nil {
@@ -743,20 +743,20 @@ func (r *Runtime) failMission(mission Mission, err error) (Mission, error) {
 func (r *Runtime) failStep(mission Mission, step *Step, err error) error {
 	step.State = StepFailed
 	r.metrics.stepsFailed.Add(1)
-	step.Error = err.Error()
+	step.Error = RedactDLP(err.Error())
 	mission.State = MissionFailed
-	mission.LastError = err.Error()
+	mission.LastError = RedactDLP(err.Error())
 	mission.Version++
 	mission.UpdatedAt = time.Now().UTC()
 	if saveErr := r.store.PutMission(mission); saveErr != nil {
 		return saveErr
 	}
-	_ = r.event(mission, "step.failed", step.ID, map[string]any{"error": err.Error(), "attempts": step.Attempts})
+	_ = r.event(mission, "step.failed", step.ID, map[string]any{"error": RedactDLP(err.Error()), "attempts": step.Attempts})
 	return err
 }
 
 func (r *Runtime) event(mission Mission, eventType, stepID string, payload any) error {
-	err := r.store.AppendEvent(Event{ID: "evt_" + uuid.NewString(), MissionID: mission.ID, OrganizationID: mission.OrganizationID, Type: eventType, StepID: stepID, Payload: payload, CreatedAt: time.Now().UTC()})
+	err := r.store.AppendEvent(Event{ID: "evt_" + uuid.NewString(), MissionID: mission.ID, OrganizationID: mission.OrganizationID, Type: eventType, StepID: stepID, Payload: RedactValue(payload), CreatedAt: time.Now().UTC()})
 	if r.push != nil && mission.OrganizationID != "" && (eventType == "mission.completed" || eventType == "mission.failed" || eventType == "step.awaiting_approval") {
 		title := "DZ23 Agentic"
 		body := "A missão " + mission.ID + " mudou de estado"

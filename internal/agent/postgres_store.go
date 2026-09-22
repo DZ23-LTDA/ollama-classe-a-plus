@@ -205,6 +205,7 @@ func (s *PostgresStore) PutMission(mission Mission) error {
 	if !s.systemAccess && strings.TrimSpace(mission.OrganizationID) != s.organizationID {
 		return os.ErrPermission
 	}
+	mission = redactMissionForPersistence(mission)
 	plan, _ := json.Marshal(mission.Plan)
 	approvals, _ := json.Marshal(mission.Approvals)
 	artifacts, _ := json.Marshal(mission.Artifacts)
@@ -227,6 +228,7 @@ func (s *PostgresStore) AppendEvent(event Event) error {
 	if !s.systemAccess && strings.TrimSpace(event.OrganizationID) != s.organizationID {
 		return os.ErrPermission
 	}
+	event.Payload = RedactValue(event.Payload)
 	payload, _ := json.Marshal(event.Payload)
 	tx, err := s.begin(context.Background())
 	if err != nil {

@@ -860,3 +860,29 @@ proofs: integrity, Go tests/vet/build, UI Vitest/build, mobile typecheck and spe
 classification: preview/local RC em hardening
 next_slice: sandbox/MCP process isolation or egress/DLP; no main merge
 ```
+
+
+## Slice P0 DLP validada — aguardando publicação — 2026-09-22
+
+```yaml
+state: RELEASING
+iteration: 10
+base_commit: 018e08dc
+working_tree: DLP changes and tests still uncommitted
+implemented:
+  - recursive RedactValue with structured sensitive-key handling
+  - credential patterns for PEM, GitHub, OpenAI, OpenRouter, xAI, AWS, Slack and Bearer
+  - Step.Result, error, event, trace and JSON/Postgres persistence redaction
+proofs:
+  - focused DLP/runtime tests: PASS
+  - integrity guard: PASS
+  - CGO_ENABLED=1 go test ./... -count=1: PASS
+  - CGO_ENABLED=1 go vet ./...: PASS
+  - CGO_ENABLED=1 go build: PASS
+  - UI Vitest 20/199: PASS
+  - UI build: PASS; known >500KB warning
+  - mobile typecheck: PASS
+open_risks: connector/MCP outbound payload classification, SSRF/DNS rebinding, redirects, strong sandbox/process isolation
+classification: preview/local RC em hardening
+next_action: commit/push, then address egress classification or MCP stdio isolation
+```

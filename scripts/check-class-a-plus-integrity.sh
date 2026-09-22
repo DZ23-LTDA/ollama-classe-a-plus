@@ -98,6 +98,9 @@ grep -q 'CompanyCampaignApprovalHTTPUsesNonceAndOrganization' server/company_app
 grep -q 'RecordSpendRequest' internal/agent/company.go
 grep -q 'decideCompanyApprovalByID' server/company_approval_routes.go
 grep -q 'CompanyApprovalQueue' app/ui/app/src/components/CompanyApprovalQueue.tsx
+grep -q 'func RedactValue' internal/agent/secrets.go
+grep -q 'TestRuntimeRedactsStepResultsEventsTracesAndPersistence' internal/agent/runtime_test.go
+grep -q 'redactMissionForPersistence' internal/agent/store.go
 grep -q 'Capabilities' internal/agent/runtime.go
 grep -q 'Evaluation' internal/agent/evaluation.go
 for route in projects library scheduled skills plugins tasks company; do

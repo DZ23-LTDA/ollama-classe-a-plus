@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
 	"regexp"
@@ -114,10 +115,15 @@ var dlpPatterns = []struct {
 	kind    string
 	pattern *regexp.Regexp
 }{
-	{"private_key", regexp.MustCompile(`-----BEGIN [A-Z ]+PRIVATE KEY-----`)},
+	{"private_key", regexp.MustCompile(`(?s)-----BEGIN [A-Z ]+PRIVATE KEY-----.*?-----END [A-Z ]+PRIVATE KEY-----`)},
 	{"github_token", regexp.MustCompile(`(?i)\b(?:ghp|github_pat)_[A-Za-z0-9_]{20,}\b`)},
+	{"openrouter_token", regexp.MustCompile(`\bsk-or-v1-[A-Za-z0-9_-]{20,}\b`)},
 	{"openai_token", regexp.MustCompile(`\bsk-[A-Za-z0-9_-]{20,}\b`)},
+	{"xai_token", regexp.MustCompile(`\bxai-[A-Za-z0-9_-]{20,}\b`)},
+	{"aws_access_key", regexp.MustCompile(`\bAKIA[A-Z0-9]{16}\b`)},
+	{"slack_token", regexp.MustCompile(`\bxox[baprs]-[A-Za-z0-9-]{16,}\b`)},
 	{"bearer_token", regexp.MustCompile(`(?i)\bBearer\s+[A-Za-z0-9._~+/=-]{16,}`)},
+	{"credential_assignment", regexp.MustCompile(`(?i)(?:password|passwd|secret|api[_-]?key|access[_-]?token|refresh[_-]?token)\s*[:=]\s*["']?[A-Za-z0-9._~+/=-]{8,}["']?`)},
 }
 
 func ScanDLP(text string) []DLPFinding {
@@ -135,4 +141,52 @@ func RedactDLP(text string) string {
 		text = item.pattern.ReplaceAllString(text, "[REDACTED]")
 	}
 	return text
+}
+
+// RedactValue recursively removes credential-shaped strings from values that
+// are about to be persisted, emitted as events, or serialized externally.
+// JSON-compatible values are normalized to JSON-compatible maps/slices so
+// nested tool responses cannot bypass the string redaction path.
+func RedactValue(value any) any {
+	switch typed := value.(type) {
+	case nil:
+		return nil
+	case string:
+		return RedactDLP(typed)
+	case []byte:
+		return RedactDLP(string(typed))
+	case map[string]any:
+		result := make(map[string]any, len(typed))
+		for key, item := range typed {
+			if sensitiveDLPKey(key) {
+				result[key] = "[REDACTED]"
+				continue
+			}
+			result[key] = RedactValue(item)
+		}
+		return result
+	case []any:
+		result := make([]any, len(typed))
+		for index, item := range typed {
+			result[index] = RedactValue(item)
+		}
+		return result
+	case bool, int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64, json.Number:
+		return value
+	default:
+		encoded, err := json.Marshal(value)
+		if err != nil {
+			return value
+		}
+		var normalized any
+		if err := json.Unmarshal(encoded, &normalized); err != nil {
+			return value
+		}
+		return RedactValue(normalized)
+	}
+}
+
+func sensitiveDLPKey(key string) bool {
+	key = strings.ToLower(strings.TrimSpace(key))
+	return strings.Contains(key, "token") || strings.Contains(key, "secret") || strings.Contains(key, "password") || strings.Contains(key, "passwd") || strings.Contains(key, "api_key") || strings.Contains(key, "access_key") || strings.Contains(key, "private_key")
 }

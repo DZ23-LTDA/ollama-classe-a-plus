@@ -74,7 +74,8 @@ func (s *TraceStore) StartForOrganization(organizationID, traceID, parentID, nam
 	if traceID == "" {
 		traceID = "tr_" + uuid.NewString()
 	}
-	span := TraceSpan{TraceID: traceID, OrganizationID: normalizedOrganizationID(organizationID), SpanID: "sp_" + uuid.NewString(), ParentID: parentID, Name: name, Status: "running", StartAt: time.Now().UTC(), Attributes: attributes}
+	redactedAttributes, _ := RedactValue(attributes).(map[string]any)
+	span := TraceSpan{TraceID: traceID, OrganizationID: normalizedOrganizationID(organizationID), SpanID: "sp_" + uuid.NewString(), ParentID: parentID, Name: RedactDLP(name), Status: "running", StartAt: time.Now().UTC(), Attributes: redactedAttributes}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.spans = append(s.spans, span)
@@ -97,7 +98,7 @@ func (h *SpanHandle) End(status string, runErr error) {
 	span.Duration = now.Sub(span.StartAt)
 	if runErr != nil {
 		span.Status = "error"
-		span.Error = limitError(runErr.Error(), 2000)
+		span.Error = RedactDLP(limitError(runErr.Error(), 2000))
 	}
 	h.ended = true
 	_ = h.store.persistLocked()

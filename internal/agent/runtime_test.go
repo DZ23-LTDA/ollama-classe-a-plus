@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -144,6 +145,82 @@ type fixedPlanner struct {
 
 func (p fixedPlanner) Plan(_ context.Context, _ Mission) ([]Step, error) {
 	return append([]Step(nil), p.steps...), nil
+}
+
+type dlpResultTool struct{}
+
+func (dlpResultTool) Descriptor() ToolDescriptor {
+	return ToolDescriptor{Name: "workspace.read", Version: "test", Description: "test tool", Risk: RiskRead}
+}
+
+func (dlpResultTool) Execute(context.Context, ToolContext, map[string]any) (ToolResult, error) {
+	return ToolResult{Value: map[string]any{
+		"safe":       "visible",
+		"nested":     map[string]any{"token": "xai-abcdefghijklmnopqrstuvwxyz123456"},
+		"credential": "api_key=super-secret-token-value",
+	}}, nil
+}
+
+func TestRuntimeRedactsStepResultsEventsTracesAndPersistence(t *testing.T) {
+	root := t.TempDir()
+	store, err := NewJSONStore(filepath.Join(root, ".store"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	registry := NewRegistry()
+	registry.Register(dlpResultTool{})
+	traces, err := NewTraceStore("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	runtime, err := NewRuntime(RuntimeConfig{Store: store, Tools: registry, Traces: traces, Planner: fixedPlanner{steps: []Step{{ID: "step_secret", Kind: "workspace.read", Title: "secret result", Risk: RiskRead, State: StepPending}}}, WorkspaceRoot: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mission, err := runtime.CreateMission(context.Background(), CreateMissionRequest{Objective: "redaction test", OrganizationID: "org_a"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := runtime.Run(context.Background(), mission.ID); err != nil {
+		t.Fatal(err)
+	}
+	completed, err := runtime.GetMission(mission.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	encodedResult, _ := json.Marshal(completed.Plan[0].Result)
+	if strings.Contains(string(encodedResult), "xai-") || strings.Contains(string(encodedResult), "super-secret-token-value") {
+		t.Fatalf("step result leaked credential: %s", encodedResult)
+	}
+	if err := runtime.event(completed, "test.secret", completed.Plan[0].ID, map[string]any{"token": "Bearer abcdefghijklmnop1234"}); err != nil {
+		t.Fatal(err)
+	}
+	events, err := runtime.Events(mission.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	encodedEvents, _ := json.Marshal(events)
+	if strings.Contains(string(encodedEvents), "abcdefghijklmnop1234") {
+		t.Fatalf("event leaked bearer token: %s", encodedEvents)
+	}
+	span := traces.StartForOrganization("org_a", "trace_secret", "", "test", map[string]any{"api_key": "super-secret-token-value"})
+	span.End("error", errors.New("provider failed with xai-abcdefghijklmnopqrstuvwxyz123456"))
+	encodedTraces, _ := json.Marshal(traces.ListForOrganization("org_a", "trace_secret", 10))
+	if strings.Contains(string(encodedTraces), "super-secret-token-value") || strings.Contains(string(encodedTraces), "xai-") {
+		t.Fatalf("trace leaked credential: %s", encodedTraces)
+	}
+	reloaded, err := NewJSONStore(filepath.Join(root, ".store"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	persisted, err := reloaded.GetMission(mission.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	persistedResult, _ := json.Marshal(persisted.Plan[0].Result)
+	if strings.Contains(string(persistedResult), "super-secret-token-value") || strings.Contains(string(persistedResult), "xai-") {
+		t.Fatalf("persisted result leaked credential: %s", persistedResult)
+	}
 }
 
 func TestContextStorePersistsProjectAndMemory(t *testing.T) {

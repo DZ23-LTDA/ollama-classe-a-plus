@@ -121,3 +121,10 @@ Os gates completos passaram: integrity guard, `CGO_ENABLED=1 go test ./... -coun
 A rota de gasto foi migrada para `RecordSpendRequest`: quando a política exige aprovação, a solicitação cria um approval `spend` pendente e retorna `202 Accepted` sem debitar o budget. A fila `CompanyApprovalQueue` permite owner/admin decidir com nonce e CAS por endpoint genérico; somente após decisão aprovada o valor é contabilizado. Rejeição, replay, organização incorreta, versão conflitante e excesso de budget não produzem débito parcial.
 
 Os gates completos após a correção de contrato TypeScript passaram: integrity guard, `CGO_ENABLED=1 go test ./... -count=1`, `go vet`, build Go, Vitest 20/199, build UI e typecheck mobile. O método interno legado `RecordSpend(..., approved bool)` permanece apenas para compatibilidade de domínio/testes; a rota HTTP e a UI não o utilizam mais nem aceitam essa autoridade do cliente.
+
+
+## Slice P0 de DLP em resultados e observabilidade — 2026-09-22
+
+`RedactValue` passou a redigir recursivamente strings, mapas e listas, além de valores sob chaves sensíveis como `token`, `secret`, `password`, `api_key` e `private_key`. Foram adicionados padrões para PEM, GitHub, OpenAI, OpenRouter, xAI, AWS, Slack, Bearer e assignments de credenciais. O runtime aplica a redação a `Step.Result`, erros de step/mission e payloads de eventos; TraceStore protege atributos, nomes e erros; JSONStore e PostgresStore protegem serializações persistidas.
+
+Testes negativos injectam tokens em resultado de tool, evento, trace e missão persistida e verificam que nenhum token cru reaparece. Os gates completos passaram: integrity guard, Go tests/vet/build, Vitest 20/199, UI build e mobile typecheck. Payloads de saída para connectors/MCP ainda exigem uma política separada para distinguir segredo operacional autorizado de dado sensível do usuário; essa lacuna não foi declarada resolvida.

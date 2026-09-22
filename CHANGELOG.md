@@ -166,3 +166,8 @@ Campanhas, afiliados, pedidos e drafts sociais passaram a emitir `CompanyApprova
 ## 2026-09-22 — spend approvals e budget atômico
 
 A rota HTTP de gasto deixou de aceitar `approved` do cliente. Solicitações que atravessam a política de budget viram approvals pendentes com nonce, expiração, actor, organização e CAS; a nova fila do Company OS decide e só então contabiliza o valor. O limite mensal continua pausando a Company sem débito parcial.
+
+
+## 2026-09-22 — DLP de resultados e observabilidade
+
+Resultados de tools, erros, eventos, traces e serializações JSON/Postgres passaram a usar redação recursiva de credenciais. A cobertura inclui campos estruturados sensíveis e tokens GitHub/OpenAI/OpenRouter/xAI/AWS/Slack/Bearer/PEM, com regressões de token injection. Egress de connectors/MCP permanece uma superfície distinta, pois credenciais operacionais não podem ser redigidas cegamente.

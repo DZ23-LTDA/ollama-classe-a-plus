@@ -126,3 +126,8 @@ A rota de gasto ainda possui `approved` booleano e não foi incluída nesta slic
 A rota HTTP de gasto não aceita mais `approved` como autoridade. Solicitações sujeitas à política criam uma decisão `spend` pendente e retornam `202` sem mutar `SpentCents`; a fila Company OS usa o endpoint genérico de decisão com owner/admin, nonce e CAS. A aprovação aplicada verifica pausa e limite antes do débito, e o teste HTTP/domínio cobre ausência de mutação antes da decisão e débito único depois dela.
 
 O método interno legado com booleano continua somente para compatibilidade de domínio/testes e não é utilizado pela rota pública. A auditoria maior continua aberta para sandbox/MCP, egress/DLP, plugins e demais superfícies.
+
+
+## Slice P0 validada — DLP de resultados e observabilidade — 2026-09-22
+
+A redação recursiva agora é aplicada antes de persistir/emitir `Step.Result`, erros, eventos e atributos de traces, incluindo JSONStore e PostgresStore. Testes de token injection confirmam que credenciais em mapas, listas, eventos, traces e missões reabertas não aparecem em claro. A política de payload egress de connectors/MCP permanece aberta para não confundir redaction de dados com remoção indevida de credenciais operacionais autorizadas.

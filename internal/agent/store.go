@@ -92,13 +92,14 @@ func (s *JSONStore) PutMission(mission Mission) error {
 		return nil
 	}
 	path := filepath.Join(s.root, "missions", mission.ID+".json")
-	return writeJSONAtomic(path, mission)
+	return writeJSONAtomic(path, redactMissionForPersistence(mission))
 }
 
 func (s *JSONStore) AppendEvent(event Event) error {
 	if strings.TrimSpace(event.MissionID) == "" || strings.TrimSpace(event.ID) == "" {
 		return errors.New("event id and mission id are required")
 	}
+	event.Payload = RedactValue(event.Payload)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.events[event.MissionID] = append(s.events[event.MissionID], event)
@@ -107,6 +108,20 @@ func (s *JSONStore) AppendEvent(event Event) error {
 	}
 	path := filepath.Join(s.root, "events", event.MissionID+".json")
 	return writeJSONAtomic(path, s.events[event.MissionID])
+}
+
+func redactMissionForPersistence(mission Mission) Mission {
+	safe := cloneMission(mission)
+	safe.Objective = RedactDLP(safe.Objective)
+	safe.LastError = RedactDLP(safe.LastError)
+	for index := range safe.Plan {
+		if safe.Plan[index].Input != nil {
+			safe.Plan[index].Input, _ = RedactValue(safe.Plan[index].Input).(map[string]any)
+		}
+		safe.Plan[index].Result = RedactValue(safe.Plan[index].Result)
+		safe.Plan[index].Error = RedactDLP(safe.Plan[index].Error)
+	}
+	return safe
 }
 
 func (s *JSONStore) ListEvents(missionID string) ([]Event, error) {
