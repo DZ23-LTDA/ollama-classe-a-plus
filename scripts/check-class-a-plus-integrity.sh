@@ -37,6 +37,10 @@ required_files=(
 	  "internal/agent/mcp_remote.go"
 	  "internal/agent/mcp_remote_test.go"
 	  "internal/agent/mcp.go"
+	  "internal/agent/sandbox_linux.go"
+	  "internal/agent/sandbox_other.go"
+	  "internal/agent/sandbox_seccomp_linux.go"
+	  "internal/agent/sandbox_seccomp_other.go"
 	  "internal/agent/plugin_lifecycle_test.go"
 	  "internal/grok/client.go"
 	  "internal/grok/live.go"
@@ -50,7 +54,10 @@ required_files=(
 	  "server/builder_scope_test.go"
 	  "server/p0_scope_test.go"
 	  "server/company_routes.go"
-  "server/company_growth_routes.go"
+	  "server/company_growth_routes.go"
+	  "apps/mobile-agentic/App.tsx"
+	  "apps/mobile-agentic/package.json"
+	  ".github/workflows/release.yaml"
   "app/ui/app/src/components/AppSidebar.tsx"
   "app/ui/app/src/components/AgenticControlCenter.tsx"
   "app/ui/app/src/routes/agentic.tsx"
@@ -167,9 +174,23 @@ grep -q 'Provider       string' internal/agent/types.go
 grep -q 'provider != "ollama-local"' internal/agent/runtime.go
 grep -q 'Claude / Anthropic (não conectado)' app/ui/app/src/components/AgenticConsole.tsx
 grep -q 'TestRuntimeRejectsUnconfiguredMissionProvider' internal/agent/runtime_test.go
-grep -q 'Empty release artifact' .github/workflows/release.yaml
-grep -q 'actions/attest-build-provenance@v2' .github/workflows/release.yaml
-grep -q 'OLLAMA_ENABLE_ATTESTATIONS' .github/workflows/release.yaml
+	grep -q 'Empty release artifact' .github/workflows/release.yaml
+	grep -q 'actions/attest-build-provenance@v2' .github/workflows/release.yaml
+	grep -q 'OLLAMA_ENABLE_ATTESTATIONS' .github/workflows/release.yaml
+	grep -q 'ollama-classe-a-plus-sbom.cdx.json' .github/workflows/release.yaml
+	grep -q 'sha256sum -c sha256sum.txt' .github/workflows/release.yaml
+	grep -q 'release-metadata.json' .github/workflows/release.yaml
+	grep -q 'strictSandboxLauncher' internal/agent/sandbox_seccomp_linux.go
+	grep -q 'OLLAMA_AGENT_SANDBOX_CGROUP_ROOT' internal/agent/sandbox_linux.go
+	grep -q 'killSandboxControl' internal/agent/tools.go
+	grep -q 'agentOriginAllowed' server/agent_routes.go
+	grep -q 'sandbox_strict_cgroup_configured' server/agent_routes.go
+	grep -q 'queueStorageKey' apps/mobile-agentic/App.tsx
+	grep -q 'auth/session' apps/mobile-agentic/App.tsx
+	grep -q '"overrides"' apps/mobile-agentic/package.json
+	grep -q '"image-size": "2.0.4"' apps/mobile-agentic/package.json
+	grep -q '"postcss": "8.5.28"' apps/mobile-agentic/package.json
+	grep -q '"uuid": "11.1.1"' apps/mobile-agentic/package.json
 grep -q 'QueueJobsForOrganization' internal/agent/runtime.go
 grep -q 'ReplayJobForOrganization' internal/agent/runtime.go
 grep -q 'TestRuntimeQueueJobsOrganizationScope' internal/agent/runtime_test.go
