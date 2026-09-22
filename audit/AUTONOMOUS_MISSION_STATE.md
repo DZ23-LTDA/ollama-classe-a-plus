@@ -1108,3 +1108,20 @@ classification: preview/local RC em hardening
 open_risks: OAuth endpoint egress parity, real IdP/staging, session storage/UI, strong sandbox
 next_action: commit/push, then address OAuth endpoint egress or secure browser token storage
 ```
+
+
+## Publicação da slice P0 OAuth redirect URI allowlist — 2026-09-22
+
+```yaml
+state: FIXING
+iteration: 15
+commit: 150273ee
+branch: feat/manus-parity-omniroute
+remote: https://github.com/DZ23-LTDA/ollama-classe-a-plus.git
+pull_request: https://github.com/DZ23-LTDA/ollama-classe-a-plus/pull/1
+working_tree: checkpoint pending commit
+published: true
+proofs: integrity, Go tests/vet/build, UI Vitest/build, mobile typecheck and OAuth redirect negative tests all PASS
+classification: preview/local RC em hardening
+next_slice: OAuth endpoint egress parity or secure browser token storage; no main merge
+```
