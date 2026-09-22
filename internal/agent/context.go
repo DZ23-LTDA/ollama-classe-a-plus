@@ -339,6 +339,7 @@ func (s *ContextStore) LoadSkills(dir string, _ bool) error {
 		// verifies its source, digest and owner. Never accept trust from JSON or
 		// from a caller-controlled boolean.
 		manifest.Trusted = false
+		manifest.Enabled = true
 		loaded[manifest.ID] = manifest
 	}
 	s.mu.Lock()
@@ -358,6 +359,30 @@ func (s *ContextStore) Skills() []SkillManifest {
 	}
 	sort.Slice(result, func(i, j int) bool { return result[i].ID < result[j].ID })
 	return result
+}
+
+func (s *ContextStore) SetSkillEnabled(id string, enabled bool) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	id = strings.TrimSpace(id)
+	skill, ok := s.skills[id]
+	if !ok {
+		return fmt.Errorf("skill %q is not registered", id)
+	}
+	skill.Enabled = enabled
+	s.skills[id] = skill
+	return nil
+}
+
+func (s *ContextStore) RemoveSkill(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	id = strings.TrimSpace(id)
+	if _, ok := s.skills[id]; !ok {
+		return fmt.Errorf("skill %q is not registered", id)
+	}
+	delete(s.skills, id)
+	return nil
 }
 
 func (s *ContextStore) CreateSchedule(schedule Schedule) (Schedule, error) {

@@ -21,6 +21,7 @@ import (
 	"github.com/ollama/ollama/api"
 	"github.com/ollama/ollama/envconfig"
 	"github.com/ollama/ollama/internal/agent"
+	"github.com/ollama/ollama/internal/grok"
 )
 
 type agentAPI struct {
@@ -29,6 +30,7 @@ type agentAPI struct {
 	auth         *agent.AuthStore
 	authRequired bool
 	push         *agent.PushService
+	grok         *grok.Client
 	samlMu       sync.Mutex
 	samlServices map[string]*agent.SAMLService
 }
@@ -46,7 +48,23 @@ func newAgentAPI(runtime *agent.Runtime) (*agentAPI, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &agentAPI{runtime: runtime, context: runtime.Context(), auth: auth, authRequired: required, push: runtime.Push(), samlServices: map[string]*agent.SAMLService{}}, nil
+	grokClient, err := newAgentGrokClient()
+	if err != nil {
+		return nil, err
+	}
+	return &agentAPI{runtime: runtime, context: runtime.Context(), auth: auth, authRequired: required, push: runtime.Push(), grok: grokClient, samlServices: map[string]*agent.SAMLService{}}, nil
+}
+
+func newAgentGrokClient() (*grok.Client, error) {
+	baseURL := strings.TrimSpace(os.Getenv("OLLAMA_AGENT_GROK_BASE_URL"))
+	if baseURL == "" {
+		baseURL = "https://api.x.ai/v1"
+	}
+	model := strings.TrimSpace(os.Getenv("OLLAMA_AGENT_GROK_MODEL"))
+	if model == "" {
+		model = "grok-4"
+	}
+	return grok.NewClient(baseURL, os.Getenv("XAI_API_KEY"), model)
 }
 
 func agentAuthRequired() (bool, error) {
@@ -281,6 +299,8 @@ func (a *agentAPI) register(r *gin.Engine) {
 	group := r.Group("/api/agent/v1")
 	group.Use(a.authMiddleware)
 	group.GET("/health", a.health)
+	group.GET("/grok/status", a.grokStatus)
+	group.POST("/grok/responses", a.grokResponses)
 	group.GET("/config/safe", a.safeConfig)
 	group.GET("/auth/session", a.authSession)
 	group.POST("/auth/dev/token", a.devToken)
@@ -329,16 +349,30 @@ func (a *agentAPI) register(r *gin.Engine) {
 	group.GET("/metrics/prometheus", a.prometheus)
 	group.GET("/tools", a.tools)
 	group.GET("/connectors", a.connectors)
+	group.POST("/connectors/:id/enable", a.enableConnector)
+	group.POST("/connectors/:id/disable", a.disableConnector)
+	group.DELETE("/connectors/:id", a.removeConnector)
 	group.GET("/mcp", a.mcp)
+	group.POST("/mcp/:id/enable", a.enableMCP)
+	group.POST("/mcp/:id/disable", a.disableMCP)
+	group.DELETE("/mcp/:id", a.removeMCP)
+	group.POST("/remote-mcp/:id/enable", a.enableRemoteMCP)
+	group.POST("/remote-mcp/:id/disable", a.disableRemoteMCP)
+	group.DELETE("/remote-mcp/:id", a.removeRemoteMCP)
 	group.GET("/jobs", a.jobs)
 	group.POST("/jobs/:id/replay", a.replayJob)
 	group.GET("/skills", a.skills)
+	group.POST("/skills/:id/enable", a.enableSkill)
+	group.POST("/skills/:id/disable", a.disableSkill)
+	group.DELETE("/skills/:id", a.removeSkill)
 	group.GET("/companies", a.companies)
 	group.POST("/companies", a.createCompany)
 	group.GET("/companies/:id", a.getCompany)
 	group.PATCH("/companies/:id", a.updateCompany)
 	group.GET("/companies/:id/report", a.companyReport)
+	group.GET("/companies/:id/agents", a.companyAgents)
 	group.GET("/companies/:id/growth/report", a.companyGrowthReport)
+	group.GET("/companies/:id/social/report", a.companySocialReport)
 	group.POST("/companies/:id/roadmap", a.addCompanyRoadmap)
 	group.POST("/companies/:id/goals", a.addCompanyGoal)
 	group.POST("/companies/:id/backlog", a.addCompanyBacklog)
@@ -355,10 +389,18 @@ func (a *agentAPI) register(r *gin.Engine) {
 	group.POST("/companies/:id/orders", a.createCompanyOrder)
 	group.POST("/companies/:id/orders/:order_id/approve", a.approveCompanyOrder)
 	group.POST("/companies/:id/orders/:order_id/fulfill", a.fulfillCompanyOrder)
+	group.POST("/companies/:id/social/accounts", a.addCompanySocialAccount)
+	group.POST("/companies/:id/social/drafts", a.createCompanySocialDraft)
+	group.POST("/companies/:id/social/drafts/:draft_id/approve", a.approveCompanySocialDraft)
+	group.POST("/companies/:id/social/drafts/:draft_id/publish", a.publishCompanySocialDraft)
+	group.POST("/companies/:id/social/metrics", a.recordCompanySocialMetric)
 	group.POST("/companies/:id/pause", a.pauseCompany)
 	group.POST("/companies/:id/resume", a.resumeCompany)
 	group.POST("/companies/:id/anomalies", a.recordCompanyAnomaly)
 	group.POST("/companies/:id/spend", a.recordCompanySpend)
+	group.POST("/companies/:id/agents/:agent_id/pause", a.pauseCompanyAgent)
+	group.POST("/companies/:id/agents/:agent_id/resume", a.resumeCompanyAgent)
+	group.POST("/companies/:id/agents/:agent_id/spend", a.recordCompanyAgentSpend)
 	group.GET("/schedules", a.schedules)
 	group.POST("/schedules", a.createSchedule)
 	group.PATCH("/schedules/:id", a.updateSchedule)
@@ -1787,11 +1829,6 @@ func (a *agentAPI) deployments(c *gin.Context) {
 }
 
 func (a *agentAPI) deployBuilder(c *gin.Context) {
-	manager := a.runtime.Deployments()
-	if manager == nil {
-		writeAgentError(c, http.StatusNotImplemented, errors.New("no deployment providers are configured"))
-		return
-	}
 	var request struct {
 		Target   string `json:"target,omitempty"`
 		Approved bool   `json:"approved"`
@@ -1802,6 +1839,11 @@ func (a *agentAPI) deployBuilder(c *gin.Context) {
 	}
 	if !request.Approved {
 		writeAgentError(c, http.StatusPreconditionRequired, errors.New("external deployment requires explicit approval"))
+		return
+	}
+	manager := a.runtime.Deployments()
+	if manager == nil {
+		writeAgentError(c, http.StatusNotImplemented, errors.New("no deployment providers are configured"))
 		return
 	}
 	project, err := a.runtime.Builder().Get(c.Param("id"))

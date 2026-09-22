@@ -455,3 +455,39 @@ proofs:
   - final Chromium capture: PASS
 next_action: stage, commit and push verified branch; preserve external blockers in release notes
 ```
+
+
+## Incremento operacional e lifecycle — 2026-09-22
+
+```yaml
+mission_id: class-a-plus-final-hardening-2026-09-22
+state: CANDIDATE_COMPLETED
+iteration: 3
+objective: transformar adapters restantes em jornadas locais verificáveis e publicar a evolução com estado honesto
+completed:
+  - grok_live_responses_streaming_retry_circuit_and_sanitized_status
+  - evaluation_os_deterministic_cases_and_evidence_based_provider_router
+  - company_department_agents_with_budget_sla_pause_resume_and_supervisor
+  - social_os_sandbox_with_oauth_pending_drafts_approval_and_metrics
+  - server_side_lifecycle_for_connectors_mcp_remote_mcp_and_skills
+  - builder_deploy_approval_checked_before_provider_configuration
+  - public_docs_readme_roadmap_api_matrix_changelog_and_company_os_updated
+proofs:
+  - backend focused tests internal/agent internal/grok internal/multillm server: PASS
+  - class-a-plus-integrity guard: PASS
+  - UI npm run build: PASS
+  - UI Vitest: 20 files / 199 tests: PASS
+  - shell Chromium E2E: PASS
+  - Growth OS live smoke: PASS
+  - Builder live smoke including approval gate: PASS
+  - JSON/provider presets and diff check: PASS
+external_blockers:
+  - xAI key/quota and live tools/web search/Voice/Imagine validation
+  - Composio connected accounts and OAuth per tenant
+  - Desktop Commander account, PKCE, pairing and physical agent
+  - TikTok Shop/Meta/Instagram/YouTube/WhatsApp/Shopify apps, scopes, sandboxes and webhooks
+  - PostgreSQL/RLS, Redis, OTLP and IdP staging
+  - GPU/local media models and physical desktop/mobile runners
+  - signed installers, app stores and operator deployment accounts
+next_action: run complete release gates, capture final screens, commit and push feature branch; do not merge main automatically
+```

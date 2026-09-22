@@ -114,3 +114,10 @@ A base atual tem Growth OS sandbox, conectores HTTP allowlisted, OAuth tenant-aw
 A documentação oficial consultada informa que as Affiliate APIs do TikTok Shop não estão disponíveis no Reino Unido e União Europeia e que o onboarding de creators não pode ser totalmente moderado por parceiros via API. Logo, a jornada “como TikTok Shop” é viável **arquiteturalmente** e pode ser implementada com autorização de seller/creator/partner, mas não pode ser marcada como operação real universal antes da aprovação do app, da região, dos escopos e da sandbox correspondente.
 
 Nenhum connector deve publicar posts, iniciar anúncios, enviar mensagens, criar produtos, alterar preço/estoque, aprovar pedidos, solicitar fulfillment, cobrar ou movimentar dinheiro sem approval explícito, idempotency key, trilha de auditoria, limites de orçamento e política de pausa automática.
+
+
+## Lifecycle operacional de plugins
+
+Connectors, MCP stdio, Remote MCP e skills possuem lifecycle explícito no runtime. A UI pode solicitar habilitar, desabilitar ou remover um recurso, mas a decisão é server-side e revalida tenant, allowlist, estado e capabilities antes de alterar o registro. Desabilitar bloqueia a execução sem apagar credenciais; remover exige uma ação explícita e não remove secrets externos.
+
+O Composio, xAI/Grok, Desktop Commander e canais de Social Commerce permanecem adapters opt-in. O Classe A+ fornece contratos, presets sem segredos, headers server-side, approvals e testes locais. Connected accounts, OAuth, quotas, app review, webhooks, device pairing e publicação real só podem ser promovidos após smoke autorizado e reversível.

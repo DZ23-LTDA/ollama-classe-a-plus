@@ -21,6 +21,8 @@ type PostgresStore struct {
 	systemAccess   bool
 }
 
+var ErrPostgresTenantRequiresNonSuperuser = errors.New("tenant-scoped postgres store requires a non-superuser role")
+
 func OpenPostgresStore(ctx context.Context, dsn string) (*PostgresStore, error) {
 	if strings.TrimSpace(dsn) == "" {
 		return nil, errors.New("postgres DSN is required")
@@ -88,6 +90,17 @@ func (s *PostgresStore) begin(ctx context.Context) (*sql.Tx, error) {
 	if err != nil {
 		return nil, err
 	}
+	if !s.systemAccess {
+		var isSuperuser bool
+		if err := tx.QueryRowContext(ctx, `SELECT usesuper FROM pg_user WHERE usename = current_user`).Scan(&isSuperuser); err != nil {
+			_ = tx.Rollback()
+			return nil, err
+		}
+		if isSuperuser {
+			_ = tx.Rollback()
+			return nil, ErrPostgresTenantRequiresNonSuperuser
+		}
+	}
 	org := s.organizationID
 	if _, err := tx.ExecContext(ctx, `SELECT set_config('app.current_organization_id', $1, true), set_config('app.system_access', $2, true)`, org, boolString(s.systemAccess)); err != nil {
 		_ = tx.Rollback()
@@ -119,6 +132,9 @@ func (s *PostgresStore) GetMission(id string) (Mission, error) {
 	mission, err := s.getMissionTx(tx, id)
 	if err != nil {
 		return Mission{}, err
+	}
+	if !s.systemAccess && mission.OrganizationID != s.organizationID {
+		return Mission{}, os.ErrNotExist
 	}
 	return mission, tx.Commit()
 }
@@ -155,7 +171,7 @@ func (s *PostgresStore) ListMissions() ([]Mission, error) {
 		return nil, err
 	}
 	defer tx.Rollback()
-	rows, err := tx.Query(`SELECT id FROM agent_missions ORDER BY updated_at ASC,id ASC`)
+	rows, err := tx.Query(`SELECT id FROM agent_missions WHERE ($1 = '' OR organization_id = $1) ORDER BY updated_at ASC,id ASC`, s.organizationID)
 	if err != nil {
 		return nil, err
 	}
@@ -186,6 +202,9 @@ func (s *PostgresStore) PutMission(mission Mission) error {
 	if strings.TrimSpace(mission.ID) == "" {
 		return errors.New("mission id is required")
 	}
+	if !s.systemAccess && strings.TrimSpace(mission.OrganizationID) != s.organizationID {
+		return os.ErrPermission
+	}
 	plan, _ := json.Marshal(mission.Plan)
 	approvals, _ := json.Marshal(mission.Approvals)
 	artifacts, _ := json.Marshal(mission.Artifacts)
@@ -204,6 +223,9 @@ func (s *PostgresStore) PutMission(mission Mission) error {
 func (s *PostgresStore) AppendEvent(event Event) error {
 	if event.ID == "" || event.MissionID == "" {
 		return errors.New("event id and mission id are required")
+	}
+	if !s.systemAccess && strings.TrimSpace(event.OrganizationID) != s.organizationID {
+		return os.ErrPermission
 	}
 	payload, _ := json.Marshal(event.Payload)
 	tx, err := s.begin(context.Background())
@@ -224,7 +246,7 @@ func (s *PostgresStore) ListEvents(missionID string) ([]Event, error) {
 		return nil, err
 	}
 	defer tx.Rollback()
-	rows, err := tx.Query(`SELECT id,mission_id,organization_id,type,step_id,payload,created_at FROM agent_events WHERE mission_id=$1 ORDER BY created_at ASC,id ASC`, strings.TrimSpace(missionID))
+	rows, err := tx.Query(`SELECT id,mission_id,organization_id,type,step_id,payload,created_at FROM agent_events WHERE mission_id=$1 AND ($2 = '' OR organization_id=$2) ORDER BY created_at ASC,id ASC`, strings.TrimSpace(missionID), s.organizationID)
 	if err != nil {
 		return nil, err
 	}

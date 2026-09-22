@@ -21,6 +21,7 @@ type MCPServerConfig struct {
 	AllowedMethods  []string `json:"allowed_methods,omitempty"`
 	EnvironmentVars []string `json:"environment_vars,omitempty"`
 	TimeoutSeconds  int      `json:"timeout_seconds,omitempty"`
+	Disabled        bool     `json:"disabled,omitempty"`
 }
 
 type MCPManager struct {
@@ -84,12 +85,45 @@ func (m *MCPManager) List() []MCPServerConfig {
 	return result
 }
 
+func (m *MCPManager) SetEnabled(id string, enabled bool) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	server, ok := m.servers[strings.TrimSpace(id)]
+	if !ok {
+		return fmt.Errorf("MCP server %q is not registered", id)
+	}
+	server.config.Disabled = !enabled
+	if !enabled {
+		_ = server.Stop()
+	}
+	return nil
+}
+
+func (m *MCPManager) Remove(id string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	id = strings.TrimSpace(id)
+	server, ok := m.servers[id]
+	if !ok {
+		return fmt.Errorf("MCP server %q is not registered", id)
+	}
+	_ = server.Stop()
+	delete(m.servers, id)
+	return nil
+}
+
 func (m *MCPManager) Call(ctx context.Context, serverID, method string, params any) (json.RawMessage, error) {
 	m.mu.RLock()
 	server := m.servers[serverID]
 	m.mu.RUnlock()
 	if server == nil {
 		return nil, fmt.Errorf("MCP server %q is not registered", serverID)
+	}
+	server.mu.Lock()
+	disabled := server.config.Disabled
+	server.mu.Unlock()
+	if disabled {
+		return nil, errors.New("MCP server is disabled")
 	}
 	return server.Call(ctx, method, params)
 }

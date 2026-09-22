@@ -50,20 +50,26 @@ const (
 )
 
 type ModelConfig struct {
-	ID           string   `json:"id"`
-	HarnessID    string   `json:"harness_id,omitempty"`
-	Capabilities []string `json:"capabilities,omitempty"`
-	Priority     int      `json:"priority,omitempty"`
+	ID                   string   `json:"id"`
+	HarnessID            string   `json:"harness_id,omitempty"`
+	Capabilities         []string `json:"capabilities,omitempty"`
+	Priority             int      `json:"priority,omitempty"`
+	CostPer1KInputCents  int64    `json:"cost_per_1k_input_cents,omitempty"`
+	CostPer1KOutputCents int64    `json:"cost_per_1k_output_cents,omitempty"`
+	QualityScore         int      `json:"quality_score,omitempty"`
 }
 
 type Model struct {
-	ID           string   `json:"id"`
-	UpstreamID   string   `json:"upstream_id"`
-	HarnessID    string   `json:"harness_id,omitempty"`
-	Provider     string   `json:"provider"`
-	Capabilities []string `json:"capabilities,omitempty"`
-	Available    bool     `json:"available"`
-	Priority     int      `json:"priority,omitempty"`
+	ID                   string   `json:"id"`
+	UpstreamID           string   `json:"upstream_id"`
+	HarnessID            string   `json:"harness_id,omitempty"`
+	Provider             string   `json:"provider"`
+	Capabilities         []string `json:"capabilities,omitempty"`
+	Available            bool     `json:"available"`
+	Priority             int      `json:"priority,omitempty"`
+	CostPer1KInputCents  int64    `json:"cost_per_1k_input_cents,omitempty"`
+	CostPer1KOutputCents int64    `json:"cost_per_1k_output_cents,omitempty"`
+	QualityScore         int      `json:"quality_score,omitempty"`
 }
 
 type Policy struct {
@@ -108,7 +114,7 @@ func Load(path string) (*Registry, error) {
 			if _, exists := r.models[id]; exists {
 				return nil, fmt.Errorf("duplicate model %q", id)
 			}
-			r.models[id] = Model{ID: id, UpstreamID: item.ID, HarnessID: strings.TrimSpace(item.HarnessID), Provider: p.Name, Capabilities: append([]string(nil), item.Capabilities...), Available: available, Priority: p.Priority + item.Priority}
+			r.models[id] = Model{ID: id, UpstreamID: item.ID, HarnessID: strings.TrimSpace(item.HarnessID), Provider: p.Name, Capabilities: append([]string(nil), item.Capabilities...), Available: available, Priority: p.Priority + item.Priority, CostPer1KInputCents: item.CostPer1KInputCents, CostPer1KOutputCents: item.CostPer1KOutputCents, QualityScore: item.QualityScore}
 		}
 	}
 	return r, nil

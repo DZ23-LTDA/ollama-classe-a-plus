@@ -98,3 +98,15 @@ O hardening não transforma adapters externos em contas conectadas. Composio, xA
 ### Incremento final de policy — 2026-09-22
 
 Missões agora persistem `capabilities` e recebem somente `workspace:read`/`workspace:write` por default. Tools com scopes de browser, desktop, terminal, sandbox, MCP, connectors ou deploy são negadas até que o escopo seja concedido explicitamente; approvals e allowlists continuam independentes. O bypass de autenticação foi limitado ao FullPath exato do handshake `/devices/:id/connect`, em vez de liberar qualquer caminho terminado em `/connect`.
+
+
+## Unreleased — capacidades operacionais e lifecycle — 2026-09-22
+
+- Grok Live local-first em `internal/grok`: Responses API, streaming SSE, retries limitados, circuito de falha, status sanitizado e distinção entre fontes ao vivo e memória.
+- Evaluation OS determinístico para coding, browser, tools, segurança, memória, planejamento e recuperação; provider router por capacidades, saúde, latência, custo, privacidade e qualidade histórica.
+- Company Operations com agentes departamentais persistentes, supervisor, orçamento, SLA, memória, pausa/retomada e Social OS sandbox para contas OAuth pendentes, drafts, approvals, publicação simulada e métricas.
+- Lifecycle server-side para connectors, MCP stdio, Remote MCP e skills: habilitar, desabilitar e remover com bloqueio de execução e catálogo sanitizado.
+- Correção do deploy Builder: `approved:false` retorna `428 Precondition Required` antes de consultar providers ou configuração de deploy ausente.
+- Smoke real aprovado para Growth OS, Builder e shell Chromium; build UI, Vitest, testes backend, integrity guard e contratos locais permanecem verdes.
+
+A rodada continua sem conectar contas externas nem publicar posts, anúncios, produtos, pedidos ou deploys públicos. xAI, Composio, Desktop Commander, social commerce, marketplaces, PostgreSQL/RLS, Redis, OTLP, IdP, GPU, dispositivos físicos, assinatura e lojas exigem ambientes e credenciais autorizados.

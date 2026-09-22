@@ -258,3 +258,22 @@ curl -sS -X POST http://localhost:11434/api/agent/v1/projects/PROJECT_ID/ingest 
   -H 'Content-Type: application/json' \
   -d '{"paths":["docs/spec.pdf","README.md"],"chunk_size":1800,"chunk_overlap":200}'
 ```
+
+
+## Grok Live, Evaluation OS e routing
+
+`GET /api/agent/v1/grok/status` retorna o estado sanitizado do provider xAI/Grok. `POST /api/agent/v1/grok/responses` encaminha uma requisição Responses com `input`, `model`, `tools` e `stream` usando a chave configurada somente no servidor. Sem credencial, o endpoint não tenta uma chamada externa.
+
+O Evaluation OS executa casos determinísticos de coding, browser, tools, segurança, memória, planejamento e recuperação. O provider router pode restringir uma decisão a modelos locais, exigir capacidades, impor orçamento e ordenar candidatos por saúde, latência, custo e qualidade histórica. Essas métricas não provam qualidade geral nem substituem avaliação com dados autorizados.
+
+## Lifecycle de plugins
+
+Os endpoints seguintes alteram somente recursos já registrados no servidor e são protegidos pelo mesmo middleware agentic:
+
+- `POST /api/agent/v1/connectors/:id/enable` e `POST /api/agent/v1/connectors/:id/disable`;
+- `POST /api/agent/v1/mcp/:id/enable` e `POST /api/agent/v1/mcp/:id/disable`;
+- `POST /api/agent/v1/remote-mcp/:id/enable` e `POST /api/agent/v1/remote-mcp/:id/disable`;
+- `POST /api/agent/v1/skills/:id/enable` e `POST /api/agent/v1/skills/:id/disable`;
+- `DELETE` nos recursos correspondentes para remoção explícita.
+
+A UI não concede scopes por conta própria. O servidor valida o identificador, o estado e as allowlists antes de alterar o lifecycle. Tokens continuam fora das respostas e manifests sem atestado permanecem sem confiança executável.

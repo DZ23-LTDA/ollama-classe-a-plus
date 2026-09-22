@@ -12,15 +12,25 @@ required_files=(
 	  "docs/agentic/DESKTOP_COMMANDER_REMOTE.md"
 	  "docs/agentic/COMPOSIO.md"
 	  "docs/agentic/XAI_GROK.md"
+	  "docs/agentic/EVALUATION.md"
 	  "examples/dz23-composio-connect.json"
 	  "examples/dz23-xai.json"
   "internal/agent/runtime.go"
   "internal/agent/company.go"
-  "internal/agent/company_growth.go"
-  "internal/agent/mcp_remote.go"
-  "internal/multillm/registry.go"
-  "server/agent_routes.go"
-  "server/company_routes.go"
+	  "internal/agent/company_growth.go"
+	  "internal/agent/company_social.go"
+	  "internal/agent/company_agents.go"
+	  "internal/agent/evaluation.go"
+	  "internal/agent/mcp_remote.go"
+	  "internal/agent/plugin_lifecycle_test.go"
+	  "internal/grok/client.go"
+	  "internal/grok/live.go"
+	  "internal/multillm/router.go"
+	  "internal/multillm/registry.go"
+	  "server/agent_routes.go"
+	  "server/grok_routes.go"
+	  "server/plugin_routes.go"
+	  "server/company_routes.go"
   "server/company_growth_routes.go"
   "app/ui/app/src/components/AppSidebar.tsx"
   "app/ui/app/src/components/AgenticControlCenter.tsx"
@@ -32,7 +42,8 @@ required_files=(
   "app/ui/app/src/routes/plugins.tsx"
   "app/ui/app/src/routes/tasks.tsx"
   "app/ui/app/src/routes/company.tsx"
-  "app/ui/app/src/components/CompanyGrowthPanel.tsx"
+	  "app/ui/app/src/components/CompanyGrowthPanel.tsx"
+	  "app/ui/app/src/components/CompanyOperationsPanel.tsx"
   "scripts/smoke-company-growth.sh"
   "scripts/smoke-builder.sh"
 )
@@ -52,6 +63,10 @@ grep -q 'HeadersEnv' internal/agent/mcp_remote.go
 grep -q 'api.x.ai/v1' examples/dz23-xai.json
 grep -q 'Growth OS' app/ui/app/src/components/CompanyGrowthPanel.tsx
 grep -q 'addCompanyCampaign' server/company_growth_routes.go
+grep -q 'grokResponses' server/grok_routes.go
+grep -q 'SetConnectorEnabled' internal/agent/runtime.go
+grep -q 'Capabilities' internal/agent/runtime.go
+grep -q 'Evaluation' internal/agent/evaluation.go
 for route in projects library scheduled skills plugins tasks company; do
   grep -q "routes/${route}" app/ui/app/src/routeTree.gen.ts || {
     echo "route tree is missing /${route}" >&2

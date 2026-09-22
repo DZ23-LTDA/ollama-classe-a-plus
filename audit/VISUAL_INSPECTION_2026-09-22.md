@@ -36,3 +36,8 @@ Depois do registro de `GET /api/agent/v1/metrics`, `class-a-plus-agentic.png` ca
 `class-a-plus-company.png` foi capturada com Chromium contra Vite e o servidor Ollama local em `127.0.0.1:3001`. A tela mostra o menu persistente, a empresa criada pelo smoke, status ativa, backlog aberto, KPI, ciclo ativo, budget, identidade, departamentos virtuais, ciclo e guardrails de segurança. A tela não afirma que CRM, anúncios, redes sociais, afiliados, dropshipping ou OAuth estejam conectados.
 
 O smoke `scripts/smoke-company-os.sh` passou por criação, leitura, edição, roadmap, meta, backlog, ciclo ligado ao schedule, report, rejeição de gasto sem approval, gasto aprovado e pause/resume. O smoke Chromium `app/ui/app/scripts/smoke-shell.mjs` também passou por home, Projetos, Agendado, Plugins com catálogo MCP local/remoto, Skills, Empresa e Agentic Console.
+
+
+## Sétima inspeção — capacidades operacionais e lifecycle
+
+As capturas finais `class-a-plus-company.png` e `class-a-plus-plugins.png` foram produzidas em 2026-09-22 com Chromium contra Vite e o servidor Ollama local endurecido. A tela Company mostra Growth OS sandbox com métricas, campanha, programa de afiliados, produto e pedido persistidos; os textos informam que publicação, anúncio, parceiro e fulfillment exigem approval e connector autorizado. A tela Plugins mostra catálogo real vazio no ambiente sem manifests, política ativa de approvals, secrets fora da interface e cross-tenant rejeitado no servidor. A ausência de connectors e MCP nesta captura é o estado correto do ambiente de teste, não uma simulação de recursos conectados.

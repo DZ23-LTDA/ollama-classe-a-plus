@@ -123,6 +123,7 @@ type Company struct {
 	Currency          string                    `json:"currency"`
 	Status            CompanyStatus             `json:"status"`
 	Departments       []CompanyDepartment       `json:"departments"`
+	Agents            []CompanyAgent            `json:"agents,omitempty"`
 	Channels          []CompanyChannel          `json:"channels,omitempty"`
 	Roadmap           []CompanyRoadmapItem      `json:"roadmap,omitempty"`
 	Goals             []CompanyGoal             `json:"goals,omitempty"`
@@ -133,6 +134,9 @@ type Company struct {
 	AffiliateLinks    []CompanyAffiliateLink    `json:"affiliate_links,omitempty"`
 	Products          []CompanyProduct          `json:"products,omitempty"`
 	Orders            []CompanyOrder            `json:"orders,omitempty"`
+	SocialAccounts    []CompanySocialAccount    `json:"social_accounts,omitempty"`
+	SocialDrafts      []CompanySocialDraft      `json:"social_drafts,omitempty"`
+	SocialMetrics     []CompanySocialMetric     `json:"social_metrics,omitempty"`
 	Budget            CompanyBudget             `json:"budget"`
 	Risk              CompanyRisk               `json:"risk"`
 	CreatedAt         time.Time                 `json:"created_at"`
@@ -252,6 +256,9 @@ func (s *CompanyStore) Create(company Company) (Company, error) {
 	}
 	if len(company.Departments) == 0 {
 		company.Departments = defaultCompanyDepartments()
+	}
+	if len(company.Agents) == 0 {
+		company.Agents = defaultCompanyAgents()
 	}
 	now := time.Now().UTC()
 	company.CreatedAt = now

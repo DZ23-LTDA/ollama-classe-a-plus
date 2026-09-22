@@ -180,6 +180,7 @@ type SkillManifest struct {
 	Scopes      []string `json:"scopes,omitempty"`
 	Tools       []string `json:"tools,omitempty"`
 	Trusted     bool     `json:"trusted"`
+	Enabled     bool     `json:"enabled"`
 }
 
 type Schedule struct {

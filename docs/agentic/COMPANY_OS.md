@@ -67,3 +67,10 @@ O Company OS desta rodada é uma fundação funcional de planejamento e operaç�
 ## Referências
 
 [1]: https://polsia.com/ "Polsia — AI That Runs Your Company While You Sleep"
+
+
+## Agentes departamentais e Social OS
+
+Cada departamento pode manter um agente persistente com supervisor, escopo de capabilities, orçamento, SLA, memória, estado de pausa e registro de última execução. O supervisor pode pausar ou retomar o agente e o limite de orçamento bloqueia novas ações quando atingido. Esse mecanismo organiza a execução contínua, mas não transforma um agente em pessoa jurídica nem autoriza decisões financeiras sem approval.
+
+O Social OS sandbox mantém contas em estado `oauth_pending` até que o operador complete autorização. Ele suporta drafts, aprovação, publicação simulada e métricas locais. Nenhum token, post, anúncio, pedido ou mensagem externa é criado sem connector configurado, escopo mínimo, approval e teste do canal. Integrações com TikTok Shop, Meta/Instagram, YouTube, WhatsApp, Shopify e marketplaces permanecem adapters dependentes de contas, revisão de app, região, webhooks e compliance.

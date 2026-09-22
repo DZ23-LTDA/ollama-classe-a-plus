@@ -123,3 +123,16 @@ Permanecem bloqueadores externos honestos: credenciais e sandbox de Composio, xA
 ### Policy de capabilities e handshake — 2026-09-22
 
 O Runtime passou a persistir escopos por missão, com default limitado ao workspace local. Tools sensíveis exigem capability explícita e continuam sujeitas a approval. O middleware também restringe o bypass de bearer ao FullPath único do handshake de companion; qualquer rota arbitrária terminada em `connect` permanece protegida.
+
+
+## Incremento 2026-09-22 — capacidades operacionais e lifecycle
+
+Esta rodada transformou mais adapters em jornadas verificáveis. O runtime ganhou Grok Live local-first com Responses API, streaming, retries limitados, circuito de falha e status sanitizado. A distinção entre fontes ao vivo e memória ficou explícita. O Evaluation OS agora oferece casos determinísticos para coding, browser, tools, segurança, memória, planejamento e recuperação. O provider router considera capacidades, saúde, latência, custo, privacidade e qualidade histórica.
+
+O Company OS passou a expor agentes departamentais persistentes com supervisor, orçamento, SLA, memória, pausa e retomada. O Social OS ganhou contratos sandbox para contas, drafts, approvals, publicação controlada e métricas. A UI Company Operations conecta esses estados ao backend sem declarar contas externas como conectadas.
+
+Plugins, MCP e skills agora possuem lifecycle explícito de habilitar, desabilitar e remover. O servidor mantém a decisão e o bloqueio de execução; a UI apenas solicita a mutação. O catálogo continua sanitizado e manifests sem atestado não recebem confiança executável.
+
+O fluxo de deploy do Builder foi corrigido para verificar approval antes de consultar provider ou retornar ausência de configuração. Os smokes finais passaram para Growth OS, Builder e shell E2E, incluindo criação real de projetos, schedules e missões.
+
+A promoção para produção continua condicionada a credenciais e ambientes externos. Permanecem pendentes os smokes autorizados de xAI/Composio/Desktop Commander, Social Commerce/TikTok Shop/Meta/Shopify, PostgreSQL/RLS/Redis/OTLP, IdP, GPU, runners físicos, assinatura de instaladores, lojas e deploy externo.

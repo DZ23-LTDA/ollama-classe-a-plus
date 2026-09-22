@@ -30,3 +30,10 @@ Para aproximar a jornada do Grok Bot com o runtime Classe A+, a composição rec
 Não se deve afirmar que essa composição é o Grok Bot, nem que possui o computador cloud, sessões ou políticas internas do serviço xAI.
 
 Fontes oficiais: [xAI API overview](https://docs.x.ai/overview), [Grok Bot overview](https://docs.x.ai/grok-bot/overview), [xAI tools](https://docs.x.ai/developers/tools/overview).
+
+
+## Grok Live no runtime
+
+Além do preset multi-provider, o runtime expõe `GET /api/agent/v1/grok/status` e `POST /api/agent/v1/grok/responses`. O primeiro nunca retorna a chave e informa somente estado sanitizado. O segundo usa `XAI_API_KEY` no processo do servidor, aceita `input`, `tools` e streaming conforme o adapter, e falha fechado quando o modelo ou a credencial não está configurado.
+
+O cliente local implementa retries limitados, circuito de falha e registro de latência. Isso fornece a superfície operacional para usar a API xAI em missões, mas não incorpora o Grok Bot hospedado nem prova disponibilidade de web search, Voice, Imagine ou quota sem um smoke autorizado.

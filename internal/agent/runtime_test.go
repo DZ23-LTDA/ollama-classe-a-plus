@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -172,6 +173,13 @@ func TestContextStorePersistsProjectAndMemory(t *testing.T) {
 }
 
 func TestSandboxExecRunsIsolatedPython(t *testing.T) {
+	if _, err := exec.LookPath("unshare"); err != nil {
+		t.Skip("sandbox test requires unshare")
+	}
+	probe := exec.Command("unshare", "--user", "--map-root-user", "--mount", "--pid", "--fork", "--mount-proc", "--net", "/bin/true")
+	if output, err := probe.CombinedOutput(); err != nil {
+		t.Skipf("user namespace sandbox unavailable: %v (%s)", err, strings.TrimSpace(string(output)))
+	}
 	root := t.TempDir()
 	runtime, err := NewRuntime(RuntimeConfig{Store: NewMemoryStore(), WorkspaceRoot: root, Planner: fixedPlanner{steps: []Step{{ID: "step_1", Kind: "sandbox.exec", Title: "run", Risk: RiskWrite, RequiresApproval: true, State: StepPending, Input: map[string]any{"language": "python", "code": "print(2 + 2)"}}}}})
 	if err != nil {
@@ -192,7 +200,9 @@ func TestSandboxExecRunsIsolatedPython(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if completed.State != MissionCompleted || !strings.Contains(completed.Plan[0].Result.(map[string]any)["stdout"].(string), "4") {
+	result, ok := completed.Plan[0].Result.(map[string]any)
+	stdout, stdoutOK := result["stdout"].(string)
+	if completed.State != MissionCompleted || !ok || !stdoutOK || !strings.Contains(stdout, "4") {
 		t.Fatalf("completed = %+v", completed)
 	}
 }

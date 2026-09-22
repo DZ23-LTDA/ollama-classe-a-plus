@@ -69,3 +69,12 @@ O **Growth OS** continua sendo um sandbox local reversível. Ele não é um agen
 Depois da revisão inicial, foi adicionada uma policy de capabilities por missão. O default concede apenas escopos de workspace, enquanto browser, desktop, terminal, sandbox, MCP, connectors e deploy exigem escopos explícitos. Também foi removido o bypass genérico por sufixo `/connect`; somente o FullPath exato do handshake de dispositivo recebe tratamento especial, e o próprio handshake ainda exige transporte seguro, token de dispositivo e validações de sessão.
 
 Os gates completos foram repetidos após esse incremento: suíte Go com CGO, `go vet`, build, Vitest, build UI, smokes funcionais e captura Chromium permaneceram verdes.
+
+
+## Incremento operacional posterior — 2026-09-22
+
+A rodada seguinte transformou adapters em superfícies operacionais locais. Grok Live ganhou cliente Responses com streaming, retry e circuito; Evaluation OS e provider router ganharam testes determinísticos; Company OS ganhou agentes departamentais e Social OS sandbox; plugins, MCP e skills ganharam lifecycle server-side; e o deploy Builder passou a checar approval antes de provider ausente.
+
+As evidências adicionais foram `scripts/smoke-company-growth.sh`, `scripts/smoke-builder.sh`, `app/ui/app/scripts/smoke-shell.mjs`, captura Chromium das dez rotas do shell, `CGO_ENABLED=1 go test ./... -count=1`, `CGO_ENABLED=1 go vet ./...`, build Go, build UI, 20 arquivos/199 testes Vitest, typecheck mobile e integrity guard. O gate distribuído PostgreSQL/Redis/OTLP ficou `N/A` neste sandbox porque Docker não está instalado; não foi convertido em sucesso.
+
+A classificação permanece `CANDIDATE_COMPLETED` para o release preview local. Os blockers externos continuam: contas e quotas xAI/Composio/Desktop Commander, OAuth e app review de redes sociais/marketplaces, staging distribuído, IdP, GPU, dispositivos físicos, assinatura, lojas e deploy do operador.

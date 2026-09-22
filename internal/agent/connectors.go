@@ -25,6 +25,7 @@ type ConnectorConfig struct {
 	AllowedOrigins []string             `json:"allowed_origins,omitempty"`
 	Operations     []ConnectorOperation `json:"operations"`
 	TimeoutSeconds int                  `json:"timeout_seconds,omitempty"`
+	Disabled       bool                 `json:"disabled,omitempty"`
 }
 
 type ConnectorOperation struct {
@@ -39,6 +40,8 @@ type ConnectorManager struct {
 	client     *http.Client
 	auth       *AuthStore
 }
+
+var ErrConnectorDisabled = errors.New("connector is disabled")
 
 func NewConnectorManager() *ConnectorManager {
 	return &ConnectorManager{connectors: make(map[string]ConnectorConfig), client: &http.Client{CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return errors.New("connector redirects are disabled") }}}
@@ -102,6 +105,30 @@ func (m *ConnectorManager) List() []ConnectorConfig {
 	return result
 }
 
+func (m *ConnectorManager) SetEnabled(id string, enabled bool) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	id = strings.TrimSpace(id)
+	connector, ok := m.connectors[id]
+	if !ok {
+		return fmt.Errorf("connector %q is not registered", id)
+	}
+	connector.Disabled = !enabled
+	m.connectors[id] = connector
+	return nil
+}
+
+func (m *ConnectorManager) Remove(id string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	id = strings.TrimSpace(id)
+	if _, ok := m.connectors[id]; !ok {
+		return fmt.Errorf("connector %q is not registered", id)
+	}
+	delete(m.connectors, id)
+	return nil
+}
+
 func (m *ConnectorManager) Call(ctx context.Context, connectorID, operationName, method, requestPath string, body []byte) (int, string, error) {
 	return m.call(ctx, connectorID, operationName, method, requestPath, body, "")
 }
@@ -131,6 +158,9 @@ func (m *ConnectorManager) call(ctx context.Context, connectorID, operationName,
 	m.mu.RUnlock()
 	if !ok {
 		return 0, "", fmt.Errorf("connector %q is not registered", connectorID)
+	}
+	if config.Disabled {
+		return 0, "", ErrConnectorDisabled
 	}
 	operation, allowed := findConnectorOperation(config.Operations, operationName, method, requestPath)
 	if !allowed {

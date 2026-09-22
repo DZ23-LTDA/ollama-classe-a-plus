@@ -630,3 +630,24 @@ A cada rodada, atualizar esta árvore, a matriz de paridade, o roadmap, o change
 [2]: https://github.com/ollama/ollama "Ollama — repositório upstream"
 
 [3]: https://manus.im/ "Manus — página pública do produto"
+
+
+## Atualização técnica desta rodada
+
+```text
+Classe A+ Runtime
+├── Provider Intelligence
+│   ├── Provider Router: capabilities, health, latency, cost, privacy, quality
+│   ├── Grok Live: Responses, streaming, retry, circuit, sources vs memory
+│   └── Evaluation OS: coding, browser, tools, security, memory, planning, recovery
+├── Company Operations
+│   ├── Department Agents: supervisor, budget, SLA, memory, pause/resume
+│   └── Social OS sandbox: accounts, drafts, approval, simulated publish, metrics
+└── Plugin Lifecycle
+    ├── Connector enable/disable/remove
+    ├── MCP stdio enable/disable/remove
+    ├── Remote MCP enable/disable/remove
+    └── Skill enable/disable/remove with trust fail-closed
+```
+
+Esses nós possuem contratos, implementação e testes locais. A árvore não implica que providers externos, contas sociais, marketplaces ou dispositivos físicos estejam conectados.

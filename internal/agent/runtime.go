@@ -203,6 +203,62 @@ func (r *Runtime) SetAuthStore(store *AuthStore) {
 	}
 }
 
+func (r *Runtime) SetConnectorEnabled(id string, enabled bool) error {
+	if r.connectors == nil {
+		return errors.New("connector manager is unavailable")
+	}
+	return r.connectors.SetEnabled(id, enabled)
+}
+
+func (r *Runtime) RemoveConnector(id string) error {
+	if r.connectors == nil {
+		return errors.New("connector manager is unavailable")
+	}
+	return r.connectors.Remove(id)
+}
+
+func (r *Runtime) SetMCPEnabled(id string, enabled bool) error {
+	if r.mcp == nil {
+		return errors.New("MCP manager is unavailable")
+	}
+	return r.mcp.SetEnabled(id, enabled)
+}
+
+func (r *Runtime) RemoveMCP(id string) error {
+	if r.mcp == nil {
+		return errors.New("MCP manager is unavailable")
+	}
+	return r.mcp.Remove(id)
+}
+
+func (r *Runtime) SetRemoteMCPEnabled(id string, enabled bool) error {
+	if r.remoteMCP == nil {
+		return errors.New("remote MCP manager is unavailable")
+	}
+	return r.remoteMCP.SetEnabled(id, enabled)
+}
+
+func (r *Runtime) RemoveRemoteMCP(id string) error {
+	if r.remoteMCP == nil {
+		return errors.New("remote MCP manager is unavailable")
+	}
+	return r.remoteMCP.Remove(id)
+}
+
+func (r *Runtime) SetSkillEnabled(id string, enabled bool) error {
+	if r.context == nil {
+		return errors.New("context store is unavailable")
+	}
+	return r.context.SetSkillEnabled(id, enabled)
+}
+
+func (r *Runtime) RemoveSkill(id string) error {
+	if r.context == nil {
+		return errors.New("context store is unavailable")
+	}
+	return r.context.RemoveSkill(id)
+}
+
 func (r *Runtime) MCPServers() []MCPServerConfig {
 	if r.mcp == nil {
 		return nil

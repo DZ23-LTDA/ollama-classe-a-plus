@@ -271,9 +271,17 @@ func companyErrorStatus(err error) int {
 		return http.StatusConflict
 	case errors.Is(err, agent.ErrCompanyCampaignNotFound), errors.Is(err, agent.ErrCompanyAffiliateNotFound), errors.Is(err, agent.ErrCompanyProductNotFound), errors.Is(err, agent.ErrCompanyOrderNotFound):
 		return http.StatusNotFound
+	case errors.Is(err, agent.ErrCompanySocialNotFound):
+		return http.StatusNotFound
+	case errors.Is(err, agent.ErrCompanyAgentNotFound):
+		return http.StatusNotFound
 	case errors.Is(err, agent.ErrCompanyApprovalRequiredForExternal):
 		return http.StatusConflict
+	case errors.Is(err, agent.ErrCompanySocialOAuthRequired), errors.Is(err, agent.ErrCompanySocialExternalUnavailable):
+		return http.StatusConflict
 	case errors.Is(err, agent.ErrCompanyInvalidExternalURL):
+		return http.StatusBadRequest
+	case errors.Is(err, agent.ErrCompanySocialProviderUnsupported):
 		return http.StatusBadRequest
 	case errors.Is(err, agent.ErrCompanyPaused):
 		return http.StatusLocked

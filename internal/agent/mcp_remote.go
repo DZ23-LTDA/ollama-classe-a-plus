@@ -24,6 +24,7 @@ type RemoteMCPServerConfig struct {
 	HeadersEnv     map[string]string `json:"headers_env,omitempty"`
 	AllowedMethods []string          `json:"allowed_methods,omitempty"`
 	TimeoutSeconds int               `json:"timeout_seconds,omitempty"`
+	Disabled       bool              `json:"disabled,omitempty"`
 }
 
 type RemoteMCPManager struct {
@@ -169,6 +170,30 @@ func (m *RemoteMCPManager) List() []RemoteMCPServerConfig {
 	return result
 }
 
+func (m *RemoteMCPManager) SetEnabled(id string, enabled bool) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	id = strings.TrimSpace(id)
+	config, ok := m.servers[id]
+	if !ok {
+		return fmt.Errorf("remote MCP server %q is not registered", id)
+	}
+	config.Disabled = !enabled
+	m.servers[id] = config
+	return nil
+}
+
+func (m *RemoteMCPManager) Remove(id string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	id = strings.TrimSpace(id)
+	if _, ok := m.servers[id]; !ok {
+		return fmt.Errorf("remote MCP server %q is not registered", id)
+	}
+	delete(m.servers, id)
+	return nil
+}
+
 func (m *RemoteMCPManager) Call(ctx context.Context, serverID, method string, params any) (json.RawMessage, error) {
 	m.mu.RLock()
 	config, ok := m.servers[strings.TrimSpace(serverID)]
@@ -176,6 +201,9 @@ func (m *RemoteMCPManager) Call(ctx context.Context, serverID, method string, pa
 	m.mu.RUnlock()
 	if !ok {
 		return nil, fmt.Errorf("remote MCP server %q is not registered", serverID)
+	}
+	if config.Disabled {
+		return nil, errors.New("remote MCP server is disabled")
 	}
 	method = strings.TrimSpace(method)
 	if method == "" {

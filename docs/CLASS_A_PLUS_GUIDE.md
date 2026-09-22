@@ -32,11 +32,13 @@ A arquitetura é local-first. Um operador pode começar apenas com o binário e 
 | SSO | Implementado em adapters | OAuth/OIDC e SAML exigem IdP, certificados e testes de produção. |
 | Mobile | Base Expo implementada | Push, conflitos avançados, assinatura e lojas ainda dependem de ambiente real. |
 | Modelos locais de mídia | Adapter configurável | Não confundir adapter multimodal com modelos locais completos já distribuídos. |
-| Shell desktop Classe A+ | Parcialmente implementado | Home com composer e recomendações, menu persistente, CRUD real de Projetos e Agendado, catálogos reais de Tasks/Skills/Plugins/Biblioteca e Control Center sanitizado; builder rico, mutações de skills/plugins e todas as superfícies de produção ainda evoluem. |
+| Shell desktop Classe A+ | Parcialmente implementado | Home com composer e recomendações, menu persistente, CRUD real de Projetos e Agendado, catálogos reais de Tasks/Skills/Plugins/Biblioteca, lifecycle de plugins e Control Center sanitizado; builder rico e superfícies de produção ainda evoluem. |
 | HarnessRouter | Adapter implementado | Provider OpenAI Responses-compatible com `harness_id` server-side para Codex/Claude Code; exige instância, chave e harness instalados para validação ponta a ponta. |
 | Company OS | Implementado localmente nesta rodada | Empresa/tenant, identidade, 7 departamentos, roadmap, KPIs, backlog, ciclos, relatório, budget, approvals, pausa por limite/anomalia e Growth OS sandbox para campanhas, afiliados, catálogo e pedidos; CRM, social, marketplaces, fulfillment e ads reais ainda dependem de connectors e ambientes externos. |
 | Desktop Commander Remote MCP | Adapter implementado | Stdio local e Streamable HTTP remoto com allowlist, HTTPS, bearer opcional e approval; OAuth PKCE, conta, device pairing e testes físicos dependem do operador. |
 | Hardening e release preview | Verificado localmente | Auth fail-closed fora de loopback, contenção de symlink/StepID, MCP estrito, approvals auditáveis, tenant checks, idempotência, `go test ./...`, `go vet ./...`, build UI e typecheck mobile aprovados. |
+| Grok Live e Evaluation OS | Verificado localmente | Responses/streaming/status sanitizado, router por capacidades/saúde/custo e casos determinísticos de avaliação; xAI real e datasets externos continuam dependentes de credenciais e quota. |
+| Agentes departamentais e Social OS | Verificado localmente em sandbox | Agentes com supervisor, orçamento, SLA, pausa/retomada, drafts sociais, approval e métricas; contas, publicação e commerce externo permanecem bloqueados até autorização. |
 
 ## Instalação rápida
 
