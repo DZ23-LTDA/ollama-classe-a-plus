@@ -752,3 +752,20 @@ open_p0:
 classification: preview/local RC em hardening
 next_action: commit/push, then migrate Company/Growth/Social approvals or harden MCP process isolation
 ```
+
+
+## Publicação da slice P0 mission approvals — 2026-09-22
+
+```yaml
+state: FIXING
+iteration: 7
+commit: 45cd4f42
+branch: feat/manus-parity-omniroute
+remote: https://github.com/DZ23-LTDA/ollama-classe-a-plus.git
+pull_request: https://github.com/DZ23-LTDA/ollama-classe-a-plus/pull/1
+working_tree: checkpoint pending commit
+published: true
+proofs: integrity, Go tests/vet/build, UI Vitest/build, mobile typecheck and approval negative tests all PASS
+classification: preview/local RC em hardening
+next_slice: Company/Growth/Social audit-grade approvals or MCP process isolation; no main merge
+```
