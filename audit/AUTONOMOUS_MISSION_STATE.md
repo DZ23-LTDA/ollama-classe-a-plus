@@ -1477,3 +1477,20 @@ classification: preview/local RC em hardening
 open_risks: real GitHub release, SBOM final artifact binding, signing credentials
 next_action: commit/push, then continue remaining P0/P1s; no main merge
 ```
+
+
+## Publicação da slice P1 release artifact integrity — 2026-09-22
+
+```yaml
+state: FIXING
+iteration: 24
+commit: 6d35ad20
+branch: feat/manus-parity-omniroute
+remote: https://github.com/DZ23-LTDA/ollama-classe-a-plus.git
+pull_request: https://github.com/DZ23-LTDA/ollama-classe-a-plus/pull/1
+working_tree: checkpoint pending commit
+published: true
+proofs: integrity/YAML/diff checks PASS; release execution/signing NOT_RUN in sandbox
+classification: preview/local RC em hardening
+next_slice: continue remaining P0/P1s and external evidence; no main merge
+```
