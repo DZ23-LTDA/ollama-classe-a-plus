@@ -10,17 +10,17 @@
 
 Este repositório público reúne a base Ollama DZ23 e a evolução agentic do projeto. O manual completo, os contratos, a configuração e a política de atualização estão em [`docs/CLASS_A_PLUS_GUIDE.md`](docs/CLASS_A_PLUS_GUIDE.md).
 
-### Visão rápida
+### Visão rápida — capturas reais atualizadas em 2026-09-22
 
-![Home do shell Classe A+](docs/images/screens/class-a-plus-home.png)
+![Home atual do shell Classe A+](docs/images/screens/class-a-plus-home.png)
 
-![Agentic Console live](docs/images/screens/class-a-plus-agentic.png)
+![Agentic Console atual](docs/images/screens/class-a-plus-agentic.png)
 
-![Settings e Agentic Control Center](docs/images/screens/class-a-plus-settings.png)
+![Settings e Agentic Control Center atuais](docs/images/screens/class-a-plus-settings.png)
 
-![Company OS](docs/images/screens/class-a-plus-company.png)
+![Company OS atual](docs/images/screens/class-a-plus-company.png)
 
-As imagens acima são capturas reais das rotas `/`, `/agentic`, `/settings` e `/company`, produzidas contra um servidor Ollama local sem provider externo. A Settings mostra o Control Center sanitizado e o Company OS mostra dados gerados pelo smoke test local. Para conhecer a árvore completa, as telas planejadas de builder/mobile e os limites de cada integração, veja a [árvore de produto](docs/agentic/PRODUCT_TREE.md), a [matriz de paridade](docs/agentic/PARITY_MATRIX.md), a [integração HarnessRouter](docs/agentic/HARNESSROUTER.md), a [documentação Company OS](docs/agentic/COMPANY_OS.md) e a [galeria visual](docs/CLASS_A_PLUS_GUIDE.md#telas-e-estado-visual). Mockups conceituais são identificados como conceito dentro da própria imagem; eles não são apresentados como funcionalidades concluídas. A rodada mais recente também reforçou autenticação fail-closed, allowlists MCP, lifecycle de plugins/skills, Grok Live sem segredo no browser, Evaluation OS, contenção de symlink, approvals auditáveis, idempotência e outbox mobile sem bearer persistido.
+As imagens acima foram recapturadas com Chromium contra o Vite dev e o servidor Ollama local em `127.0.0.1:3001`, sem provider externo. A captura mostra a implementação e dados sandbox locais; não comprova credenciais, contas, dispositivos, deploys ou integrações externas conectadas. A [galeria complementar](docs/CLASS_A_PLUS_GUIDE.md#telas-e-estado-visual) inclui Projetos, Biblioteca, Agendado, Skills, Plugins e Tarefas. Para conhecer a árvore completa, as telas planejadas de builder/mobile e os limites de cada integração, veja a [árvore de produto](docs/agentic/PRODUCT_TREE.md), a [matriz de paridade](docs/agentic/PARITY_MATRIX.md), a [integração HarnessRouter](docs/agentic/HARNESSROUTER.md) e a [documentação Company OS](docs/agentic/COMPANY_OS.md). Mockups conceituais são identificados como conceito dentro da própria imagem; eles não são apresentados como funcionalidades concluídas. A rodada mais recente também reforçou autenticação fail-closed, allowlists MCP, lifecycle de plugins/skills, contenção de symlink, approvals auditáveis e DLP.
 
 | Recurso | Documento |
 |---|---|

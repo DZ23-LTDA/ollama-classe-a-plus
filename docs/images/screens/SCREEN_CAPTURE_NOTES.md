@@ -1,16 +1,17 @@
 # Notas das capturas
 
-`agentic-console.png` é uma captura real da rota `/agentic` da UI React atual, renderizada com Chromium e dados demonstrativos interceptados localmente. Ela mostra o Mission Console, criação de missão, métricas, orquestração multiagente, pesquisa profunda, timeline e approval pendente.
+## Captura atual — 2026-09-22
 
-`settings.png` é a captura histórica da rota `/settings` anterior. Ela aparece praticamente vazia além do cabeçalho Settings e não deve ser apresentada como uma tela de configurações completa.
+Os arquivos `class-a-plus-home.png`, `class-a-plus-projects.png`, `class-a-plus-library.png`, `class-a-plus-scheduled.png`, `class-a-plus-skills.png`, `class-a-plus-plugins.png`, `class-a-plus-tasks.png`, `class-a-plus-agentic.png`, `class-a-plus-settings.png` e `class-a-plus-company.png` foram recapturados nesta rodada com Chromium em viewport de 1440×900.
 
-`class-a-plus-home.png`, `class-a-plus-agentic.png` e `class-a-plus-settings.png` são capturas reais do shell, Agentic Console e Settings. A captura live do Agentic Console mostra seleção de motor/projeto, missão, métricas, orquestração e pesquisa; a Settings mostra o **Agentic Control Center**, catálogo de providers quando disponível e estado sanitizado de approvals/workspace/auth. Elas não provam que credenciais, providers externos, modelos ou deploys estejam configurados.
+A captura foi feita com `app/ui/app/scripts/capture-parity-screens.mjs`, usando o Vite dev em `127.0.0.1:4173` e o servidor Ollama local em `127.0.0.1:3001`. O uso do Vite dev é intencional: o cliente agentic usa a URL de desenvolvimento para consultar a API local; o preview estático sem proxy pode mostrar uma tela de erro e não deve ser usado como fonte dessas imagens.
 
-`class-a-plus-projects.png`, `class-a-plus-library.png`, `class-a-plus-scheduled.png`, `class-a-plus-skills.png`, `class-a-plus-plugins.png`, `class-a-plus-tasks.png` e `class-a-plus-company.png` são capturas reais das rotas do shell, com o menu lateral Classe A+ aberto por padrão. Contra o servidor local, Projetos e Agendado foram criados/listados/excluídos por CRUD real; Plugins e MCP exibem catálogo vazio sem crash quando o backend retorna `null`; Skills, Tasks e Biblioteca consultam contratos reais; Company OS mostra uma empresa criada pelo smoke, sete departamentos, um KPI, backlog, ciclo, budget e o painel Growth OS com campanha, programa, produto e pedido sandbox. Os scripts `app/ui/app/scripts/smoke-shell.mjs`, `scripts/smoke-company-os.sh` e `scripts/smoke-company-growth.sh` cobrem essas jornadas por API.
+As telas mostram navegação, Agentic Console, projetos, biblioteca, schedules, skills, plugins, tarefas, Settings e Company OS com estado local/sandbox. Alguns dados demonstrativos foram criados no runtime local; aprovações permanecem visíveis como pendentes quando aplicável. Nenhuma captura representa provider externo conectado, credencial válida, login enterprise, dispositivo físico, deploy, marketplace, loja ou harness remoto.
 
-As capturas desta rodada foram produzidas contra Vite e um servidor Ollama local em `127.0.0.1:3001`, sem provider externo e sem modelo instalado. Elas demonstram a implementação e os estados locais, não uma execução de produção, deployment, login enterprise, dispositivo físico ou harness remoto.
+## Arquivos históricos
 
+`agentic-console.png` e `settings.png` são capturas históricas de rodadas anteriores. O README e o guia usam a série `class-a-plus-*.png` atualizada acima; os arquivos históricos não devem ser interpretados como o estado atual do produto.
 
-## Captura final de hardening — 2026-09-22
+## Regra de proveniência
 
-As telas `class-a-plus-home.png`, `class-a-plus-settings.png`, `class-a-plus-company.png`, `class-a-plus-agentic.png` e `class-a-plus-plugins.png` foram recapturadas com Chromium contra o servidor local final após o hardening de autenticação, MCP, capabilities e Growth OS. A captura confirma navegação, títulos, catálogo e estados de interface; não comprova providers externos, credenciais, dispositivos físicos ou publicação em produção.
+Screenshots reais demonstram a implementação e o estado observado no ambiente em que foram capturados. Eles não substituem testes de integração, smoke com contas externas, staging distribuído, validação em dispositivos ou evidência de release. Mockups conceituais continuam documentados separadamente em `docs/images/mockups/MOCKUP_NOTES.md`.

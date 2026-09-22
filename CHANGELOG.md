@@ -251,3 +251,8 @@ Fila de jobs agora filtra listagem e replay pela organização da missão, negan
 ## 2026-09-22 — artifact manifest path safety
 
 Manifests de artefatos agora rejeitam symlinks e resoluções fora do workspace antes de ler e hashear arquivos.
+
+
+## 2026-09-22 — screenshots do estado atual
+
+As dez telas públicas do shell (`class-a-plus-*.png`) foram recapturadas com Chromium contra o Vite dev e o servidor Ollama local em loopback. README, guia e notas de proveniência agora apontam para as imagens atuais de Home, Agentic Console, Settings, Company OS, Projetos, Biblioteca, Agendado, Skills, Plugins e Tarefas. As capturas mostram apenas estado local/sandbox e não afirmam providers, credenciais, deploys ou dispositivos externos configurados.

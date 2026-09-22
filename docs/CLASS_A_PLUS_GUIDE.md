@@ -191,18 +191,22 @@ O runtime valida o workspace, rejeita symlinks, limita tamanho e quantidade de a
 
 ## Telas e estado visual
 
-A captura abaixo é real da rota `/agentic`, renderizada com Chromium usando fixtures locais demonstrativas para exibir a tela sem executar ações externas:
-
-![Mission Console atual](images/screens/agentic-console.png)
-
-A tela de Settings atual contém um Agentic Control Center sanitizado, com catálogo de modelos, estado do runtime, capabilities, connectors, MCP, skills e CLIs sem retornar secrets. O repositório também contém mockups conceituais das áreas ainda incompletas, todos marcados como **CONCEITO** dentro da própria imagem:
+As capturas abaixo foram atualizadas em **2026-09-22** com Chromium, Vite dev e o servidor Ollama local em `127.0.0.1:3001`. Elas usam somente estado local/sandbox e não executam ações externas:
 
 | Tela | Imagem | Estado |
 |---|---|---|
-| Configurações e integrações | [class-a-plus-settings.png](images/screens/class-a-plus-settings.png) | Screenshot real do Control Center; o mockup [configuration-mockup.png](images/mockups/configuration-mockup.png) continua sendo conceito para áreas futuras. |
-| Builder visual | [builder-mockup.png](images/mockups/builder-mockup.png) | Canvas e histórico têm base; editor rico ainda evolui. |
-| Companion mobile | [mobile-mockup.png](images/mockups/mobile-mockup.png) | Base Expo existe; push, conflitos avançados e lojas pendentes. |
-| Agentic Console real | [class-a-plus-agentic.png](images/screens/class-a-plus-agentic.png) | Rota implementada; a captura usa backend local e não executa ação externa. |
+| Home do shell | [class-a-plus-home.png](images/screens/class-a-plus-home.png) | Composer, recomendações e navegação local-first. |
+| Agentic Console | [class-a-plus-agentic.png](images/screens/class-a-plus-agentic.png) | Nova tarefa, seleção de motor local, projeto, orquestração e pesquisa. |
+| Configurações e integrações | [class-a-plus-settings.png](images/screens/class-a-plus-settings.png) | Agentic Control Center sanitizado; valores de secrets não são exibidos. |
+| Company OS | [class-a-plus-company.png](images/screens/class-a-plus-company.png) | Growth OS sandbox com campanha, afiliados e produto local. |
+| Projetos | [class-a-plus-projects.png](images/screens/class-a-plus-projects.png) | CRUD local de projetos e política de approvals. |
+| Biblioteca | [class-a-plus-library.png](images/screens/class-a-plus-library.png) | Biblioteca consultando contratos locais de artifacts/memória. |
+| Agendado | [class-a-plus-scheduled.png](images/screens/class-a-plus-scheduled.png) | Schedules persistentes locais e estado de execução. |
+| Skills | [class-a-plus-skills.png](images/screens/class-a-plus-skills.png) | Catálogo de manifests e estado de confiança. |
+| Plugins | [class-a-plus-plugins.png](images/screens/class-a-plus-plugins.png) | Catalogs de connectors/MCP e política de approval. |
+| Tarefas | [class-a-plus-tasks.png](images/screens/class-a-plus-tasks.png) | Inbox de missões, estados e provider persistido. |
+| Builder visual | [builder-mockup.png](images/mockups/builder-mockup.png) | **CONCEITO** para o editor rico; preview/export local têm screenshots de API, não esta imagem. |
+| Companion mobile | [mobile-mockup.png](images/mockups/mobile-mockup.png) | **CONCEITO**; push, conflitos avançados, builds e lojas continuam pendentes. |
 
 As notas de proveniência estão em `docs/images/screens/SCREEN_CAPTURE_NOTES.md` e `docs/images/mockups/MOCKUP_NOTES.md`. Isso evita apresentar uma tela conceitual como funcionalidade concluída.
 
