@@ -312,3 +312,8 @@ O SHA `428a99bd` passou o workflow agentic completo no run `35749351291`. A pró
 ## Incremento 2026-09-22 — bootstrap MCP verificável
 
 O loader de manifestos MCP passou a ter regressões de servidor que exercitam o caminho de configuração real. O próximo trabalho de transporte continua sendo correlação/multiplexação JSON-RPC, sessão/revogação Remote MCP, auditoria por chamada e sandbox forte.
+
+
+## Incremento 2026-09-22 — MCP JSON-RPC correlation
+
+O transporte stdio agora separa notificações sem `id` da resposta correlacionada. Permanecem como trabalho de hardening: reader dedicado com multiplexação segura, cancelamento de requests individuais, framing/streaming completo, auditoria por chamada e sessão/reconexão Remote MCP.

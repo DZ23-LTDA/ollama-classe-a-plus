@@ -31,6 +31,19 @@ func TestMCPManagerCallsAllowlistedMethod(t *testing.T) {
 	}
 }
 
+func TestMCPNotificationsDoNotBreakResponseCorrelation(t *testing.T) {
+	t.Setenv("GO_WANT_MCP_HELPER_PROCESS", "1")
+	manager := NewMCPManager()
+	if err := manager.Register(MCPServerConfig{ID: "notify", Command: os.Args[0], Args: []string{"-test.run=TestMCPHelperProcess"}, AllowedMethods: []string{"notify"}, EnvironmentVars: []string{"GO_WANT_MCP_HELPER_PROCESS"}, TimeoutSeconds: 5}); err != nil {
+		t.Fatal(err)
+	}
+	defer manager.StopAll()
+	result, err := manager.Call(context.Background(), "notify", "notify", map[string]any{"value": "after-notification"})
+	if err != nil || !strings.Contains(string(result), "after-notification") {
+		t.Fatalf("notification result=%s err=%v", result, err)
+	}
+}
+
 func TestMCPHelperProcess(t *testing.T) {
 	if os.Getenv("GO_WANT_MCP_HELPER_PROCESS") != "1" {
 		return
@@ -49,6 +62,9 @@ func TestMCPHelperProcess(t *testing.T) {
 		if request.Method == "sleep" {
 			time.Sleep(10 * time.Second)
 			continue
+		}
+		if request.Method == "notify" {
+			fmt.Printf("{\"jsonrpc\":\"2.0\",\"method\":\"progress\",\"params\":{\"status\":\"working\"}}\n")
 		}
 		value := request.Params["value"]
 		fmt.Printf("{\"jsonrpc\":\"2.0\",\"id\":%d,\"result\":{\"value\":%q}}\n", request.ID, value)

@@ -109,6 +109,7 @@ grep -q 'remote MCP destination connected to a private address' internal/agent/m
 grep -q 'TestRemoteMCPDialRejectsPrivateActualAddress' internal/agent/mcp_remote_test.go
 grep -q 'MCP command must be an absolute executable path' internal/agent/mcp.go
 	grep -q 'TestMCPPayloadLimitAndCancellationRestart' internal/agent/mcp_test.go
+	grep -q 'TestMCPNotificationsDoNotBreakResponseCorrelation' internal/agent/mcp_test.go
 	grep -q 'TestLoadAgentMCPBootstrapsStrictManifest' server/agent_mcp_bootstrap_test.go
 	grep -q 'TestLoadAgentRemoteMCPRejectsEmptyAllowlist' server/agent_mcp_bootstrap_test.go
 	grep -q 'configureMCPProcess' internal/agent/mcp_process_unix.go

@@ -1861,3 +1861,20 @@ remote_runs:
 classification: preview/local RC em hardening; NÃO final; NÃO production-ready
 next_action: continue MCP transport audit/correlation and remaining P0/P1s; no automatic merge
 ```
+
+
+## Slice P1 MCP correlation — aguardando publicação — 2026-09-22
+
+```yaml
+state: RELEASING
+iteration: 35
+files:
+  - internal/agent/mcp.go
+  - internal/agent/mcp_test.go
+  - scripts/check-class-a-plus-integrity.sh
+scope: ignore JSON-RPC notifications and enforce correlated response id
+local_evidence: focused normal/race PASS
+remote_evidence: pending
+classification: preview/local RC em hardening; NÃO final; NÃO production-ready
+next_action: full gates, commit/push, remote verification, then continue MCP audit trail/session work
+```

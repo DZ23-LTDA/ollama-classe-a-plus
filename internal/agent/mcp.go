@@ -387,17 +387,25 @@ func (s *MCPServer) Call(ctx context.Context, method string, params any) (json.R
 	}
 	resultChannel := make(chan mcpResponse, 1)
 	go func() {
-		line, err := readMCPMessage(s.stdout)
-		if err != nil {
-			resultChannel <- mcpResponse{err: err}
+		for {
+			line, err := readMCPMessage(s.stdout)
+			if err != nil {
+				resultChannel <- mcpResponse{err: err}
+				return
+			}
+			var response mcpResponse
+			if err := json.Unmarshal(line, &response); err != nil {
+				resultChannel <- mcpResponse{err: err}
+				return
+			}
+			if response.ID == nil {
+				// JSON-RPC notifications do not carry an id and are not the
+				// response to the request currently being served.
+				continue
+			}
+			resultChannel <- response
 			return
 		}
-		var response mcpResponse
-		if err := json.Unmarshal(line, &response); err != nil {
-			resultChannel <- mcpResponse{err: err}
-			return
-		}
-		resultChannel <- response
 	}()
 	timeout := time.Duration(s.config.TimeoutSeconds) * time.Second
 	if deadline, ok := ctx.Deadline(); ok && time.Until(deadline) < timeout {
@@ -415,7 +423,7 @@ func (s *MCPServer) Call(ctx context.Context, method string, params any) (json.R
 			_ = s.stopLocked()
 			return nil, response.err
 		}
-		if response.ID != requestID {
+		if response.ID == nil || *response.ID != requestID {
 			_ = s.stopLocked()
 			return nil, errors.New("MCP response id does not match request")
 		}
@@ -445,7 +453,7 @@ func readMCPMessage(reader *bufio.Reader) ([]byte, error) {
 }
 
 type mcpResponse struct {
-	ID     int64           `json:"id"`
+	ID     *int64          `json:"id,omitempty"`
 	Result json.RawMessage `json:"result"`
 	Error  *mcpError       `json:"error,omitempty"`
 	err    error

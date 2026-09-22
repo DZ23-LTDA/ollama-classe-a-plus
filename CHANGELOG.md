@@ -296,3 +296,8 @@ O run GitHub Actions `35749351291` passou os quatro jobs do workflow agentic: Go
 ## 2026-09-22 — bootstrap MCP estrito
 
 Foi adicionada cobertura de servidor para carregar manifestos MCP stdio e Remote MCP com JSON estrito, rejeição de campos desconhecidos, trailing data e allowlists vazias. O teste comprova registro local; não comprova endpoint, credencial ou sessão externa.
+
+
+## 2026-09-22 — correlação JSON-RPC MCP
+
+MCP stdio passou a ignorar notificações JSON-RPC sem identificador e aguardar o response com o `id` do request. A regressão inclui execução normal e race; multiplexação e transporte externo continuam fora da prova local.

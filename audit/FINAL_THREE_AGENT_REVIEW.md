@@ -258,3 +258,8 @@ O run `35749351291` no SHA `428a99bd` passou Go/server, PostgreSQL RLS + Redis D
 ## Bootstrap MCP/Remote MCP testado — 2026-09-22
 
 Os loaders de configuração do servidor agora possuem testes positivos e negativos no caminho real de bootstrap. O resultado fecha a lacuna de cobertura do loader, mas não eleva a integração a `connected` ou `upstream-ready`; endpoint, credencial, sessão OAuth, revogação e transporte externo continuam dependências do ambiente.
+
+
+## Correlação MCP com notificações — 2026-09-22
+
+A regressão do transporte stdio demonstra que uma notificação JSON-RPC sem `id` não é confundida com a resposta do request. O sistema continua falhando fechado para ID divergente. A correção não encerra os achados de multiplexação, auditoria, sessão Remote MCP ou sandbox forte.

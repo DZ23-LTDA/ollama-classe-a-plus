@@ -313,3 +313,10 @@ O workflow `dz23-agentic-quality` passou no SHA `428a99bd` no run `35749351291`.
 Os loaders `OLLAMA_AGENT_MCP` e `OLLAMA_AGENT_REMOTE_MCP` agora têm prova de bootstrap real no pacote `server`. Os testes cobrem registro de manifestos válidos, JSON com campo desconhecido, trailing JSON e allowlist remota vazia. A configuração continua opt-in por arquivo e nenhuma conexão externa é declarada.
 
 Evidências: testes focused normal e race, integrity guard e gates Go anteriores — PASS. A matriz upstream `test.yaml` permanece pendente por não ter sido acionada no head atual do PR.
+
+
+## Slice P1 de correlação/notificações MCP — 2026-09-22
+
+O transporte MCP stdio agora descarta notificações JSON-RPC sem `id` enquanto aguarda a resposta correlacionada ao request. Respostas com `id` ausente, nulo ou diferente continuam sendo tratadas como falha de correlação, evitando aceitar uma resposta de outra operação. A regressão normal e race passou com fixture local.
+
+Isso não implementa multiplexação concorrente, framing completo, sessão Remote MCP ou auditoria persistida por chamada.
