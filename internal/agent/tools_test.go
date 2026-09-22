@@ -62,3 +62,22 @@ func TestTerminalArgumentPolicyRejectsEscapeAndUnsupportedFlags(t *testing.T) {
 		t.Fatal("expected git argument rejection")
 	}
 }
+
+func TestSandboxStrictModeFailsClosedWithoutDelegatedCgroup(t *testing.T) {
+	t.Setenv("OLLAMA_AGENT_SANDBOX_CGROUP_ROOT", t.TempDir())
+	_, err := newSandboxControl("step_strict_test")
+	if err == nil {
+		t.Fatalf("strict sandbox error = %v", err)
+	}
+}
+
+func TestSandboxRejectsUnknownMode(t *testing.T) {
+	t.Setenv("OLLAMA_AGENT_SANDBOX_MODE", "unsafe")
+	_, err := (sandboxExecTool{}).Execute(context.Background(), ToolContext{Workspace: t.TempDir(), StepID: "step_mode_test"}, map[string]any{
+		"language": "python",
+		"code":     "print('must not run')",
+	})
+	if err == nil || !strings.Contains(err.Error(), "must be best-effort or strict") {
+		t.Fatalf("unknown sandbox mode error = %v", err)
+	}
+}

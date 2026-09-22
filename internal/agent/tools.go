@@ -373,7 +373,7 @@ func minInt(a, b int) int {
 type sandboxExecTool struct{}
 
 func (sandboxExecTool) Descriptor() ToolDescriptor {
-	return ToolDescriptor{Name: "sandbox.exec", Version: "1", Description: "Executar Python ou Node em user namespace isolado e sem rede", Risk: RiskWrite, RequiresApproval: true, Scopes: []string{"sandbox:execute"}}
+	return ToolDescriptor{Name: "sandbox.exec", Version: "2", Description: "Executar Python ou Node sem rede; modo strict exige namespaces, seccomp e cgroup v2 delegado", Risk: RiskWrite, RequiresApproval: true, Scopes: []string{"sandbox:execute"}}
 }
 
 func (sandboxExecTool) Execute(ctx context.Context, toolContext ToolContext, input map[string]any) (ToolResult, error) {
@@ -385,6 +385,13 @@ func (sandboxExecTool) Execute(ctx context.Context, toolContext ToolContext, inp
 	if interpreter == "" {
 		return ToolResult{}, errors.New("sandbox language must be python or node")
 	}
+	mode := strings.ToLower(strings.TrimSpace(os.Getenv("OLLAMA_AGENT_SANDBOX_MODE")))
+	if mode == "" {
+		mode = "best-effort"
+	}
+	if mode != "best-effort" && mode != "strict" {
+		return ToolResult{}, errors.New("OLLAMA_AGENT_SANDBOX_MODE must be best-effort or strict")
+	}
 	code := stringInput(input, "code", "")
 	if strings.TrimSpace(code) == "" {
 		return ToolResult{}, errors.New("sandbox code is required")
@@ -394,6 +401,16 @@ func (sandboxExecTool) Execute(ctx context.Context, toolContext ToolContext, inp
 	}
 	if _, err := os.Stat(interpreter); err != nil {
 		return ToolResult{}, fmt.Errorf("sandbox interpreter unavailable: %w", err)
+	}
+	strict := mode == "strict"
+	var control *sandboxControl
+	if strict {
+		var err error
+		control, err = newSandboxControl(toolContext.StepID)
+		if err != nil {
+			return ToolResult{}, fmt.Errorf("strict sandbox unavailable: %w", err)
+		}
+		defer closeSandboxControl(control)
 	}
 	sandboxDir := filepath.Join(toolContext.Workspace, ".agent-sandbox")
 	if err := rejectSymlinkComponents(toolContext.Workspace, sandboxDir); err != nil {
@@ -411,6 +428,14 @@ func (sandboxExecTool) Execute(ctx context.Context, toolContext ToolContext, inp
 		return ToolResult{}, err
 	}
 	defer os.Remove(codePath)
+	launcherPath := ""
+	if strict {
+		launcherPath = filepath.Join(sandboxDir, toolContext.StepID+"-strict-launcher.py")
+		if err := os.WriteFile(launcherPath, []byte(strictSandboxLauncher), 0o600); err != nil {
+			return ToolResult{}, err
+		}
+		defer os.Remove(launcherPath)
+	}
 	deadline, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 	mountScript := `set -eu
@@ -425,18 +450,37 @@ mkdir -p /home/workspace /tmp
 mount --bind "$1" /home/workspace
 mount -t tmpfs tmpfs /tmp
 cd /home/workspace
-exec "$2" "$3"`
-	command := exec.Command("unshare", "--user", "--map-root-user", "--mount", "--pid", "--fork", "--mount-proc", "--net", "/bin/sh", "-c", mountScript, "sandbox", toolContext.Workspace, interpreter, "/home/workspace/.agent-sandbox/"+filepath.Base(codePath))
+	if [ "$4" = "strict" ]; then
+		exec /usr/bin/setpriv --no-new-privs /usr/bin/python3 /home/workspace/.agent-sandbox/` + filepath.Base(launcherPath) + ` "$2" "$3"
+	fi
+	exec "$2" "$3"`
+	args := []string{"--user", "--map-root-user", "--mount", "--pid", "--fork", "--mount-proc", "--net", "--kill-child", "--propagation", "private", "/bin/sh", "-c", mountScript, "sandbox", toolContext.Workspace, interpreter, "/home/workspace/.agent-sandbox/" + filepath.Base(codePath), mode}
+	command := exec.Command("unshare", args...)
 	command.Dir = toolContext.Workspace
 	command.Env = []string{"PATH=/usr/bin:/bin", "HOME=/home/workspace", "PWD=/home/workspace"}
 	configureToolProcess(command)
+	if err := configureSandboxCommand(command, control); err != nil {
+		return ToolResult{}, fmt.Errorf("configure strict sandbox: %w", err)
+	}
 	var stdout, stderr bytes.Buffer
 	command.Stdout = &limitedBuffer{Buffer: &stdout, Limit: 128 << 10}
 	command.Stderr = &limitedBuffer{Buffer: &stderr, Limit: 128 << 10}
 	if err := runToolCommand(deadline, command); err != nil {
-		return ToolResult{Value: map[string]any{"stdout": RedactDLP(stdout.String()), "stderr": RedactDLP(stderr.String()), "execution_isolation": "best-effort-unshare", "resource_limits": "ulimit-context-timeout-output-bounded"}}, err
+		isolation := "best-effort-unshare"
+		limits := "ulimit-context-timeout-output-bounded"
+		if strict {
+			isolation = "strict-linux-user-mount-pid-net-seccomp-cgroupv2"
+			limits = "cgroup-v2-cpu-memory-pids-swap-timeout-output-bounded"
+		}
+		return ToolResult{Value: map[string]any{"stdout": RedactDLP(stdout.String()), "stderr": RedactDLP(stderr.String()), "execution_isolation": isolation, "resource_limits": limits}}, err
 	}
-	return ToolResult{Value: map[string]any{"stdout": RedactDLP(stdout.String()), "stderr": RedactDLP(stderr.String()), "exit_code": 0, "execution_isolation": "best-effort-unshare", "resource_limits": "ulimit-context-timeout-output-bounded"}}, nil
+	isolation := "best-effort-unshare"
+	limits := "ulimit-context-timeout-output-bounded"
+	if strict {
+		isolation = "strict-linux-user-mount-pid-net-seccomp-cgroupv2"
+		limits = "cgroup-v2-cpu-memory-pids-swap-timeout-output-bounded"
+	}
+	return ToolResult{Value: map[string]any{"stdout": RedactDLP(stdout.String()), "stderr": RedactDLP(stderr.String()), "exit_code": 0, "execution_isolation": isolation, "resource_limits": limits}}, nil
 }
 
 func runToolCommand(ctx context.Context, command *exec.Cmd) error {

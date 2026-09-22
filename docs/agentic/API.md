@@ -14,10 +14,20 @@ export OLLAMA_AGENT_EMBED_MODEL=nomic-embed-text
 export OLLAMA_AGENT_CONNECTORS=/etc/ollama-dz23/agent-connectors.json
 export OLLAMA_AGENT_MCP=/etc/ollama-dz23/agent-mcp.json
 export OLLAMA_AGENT_REMOTE_MCP=/etc/ollama-dz23/agent-remote-mcp.json
+export OLLAMA_AGENT_SANDBOX_MODE=best-effort
+# Em Linux multiusuário, aponte para um subtree cgroup v2 delegado ao processo:
+# export OLLAMA_AGENT_SANDBOX_MODE=strict
+# export OLLAMA_AGENT_SANDBOX_CGROUP_ROOT=/sys/fs/cgroup/ollama-agent
 ollama serve
 ```
 
 O modelo não recebe permissão implícita. Ele somente sugere passos; o runtime valida cada passo contra o registry e a policy.
+
+### Sandbox de execução
+
+`sandbox.exec` usa `best-effort` por padrão para preservar compatibilidade local, com user/mount/PID/network namespaces quando o host permite, `ulimit`, timeout, grupo de processo e saída limitada. Esse modo **não** é uma fronteira forte de segurança.
+
+Em Linux, `OLLAMA_AGENT_SANDBOX_MODE=strict` só executa quando `OLLAMA_AGENT_SANDBOX_CGROUP_ROOT` é um subtree cgroup v2 real e delegado com `cpu`, `memory` e `pids`. O runtime cria um cgroup efêmero por passo, aplica CPU, memória, PIDs e swap, coloca o processo nele por `CgroupFD`, usa namespaces sem rede, `setpriv --no-new-privs` e instala um filtro seccomp antes do interpreter. Se qualquer pré-requisito faltar — inclusive em macOS/Windows — a execução é recusada; nunca há downgrade silencioso para best-effort. O operador deve provisionar o subtree, validar a política do host e manter AppArmor/SELinux ou um executor/container dedicado quando a ameaça exigir uma fronteira mais forte.
 
 ## Criar missão
 
