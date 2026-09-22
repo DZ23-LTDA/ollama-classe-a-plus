@@ -211,3 +211,12 @@ Queue list/replay usa ownership da missão e o teste HTTP confirma `403` sem mut
 ## Slice P0 validada — artifact manifest path safety — 2026-09-22
 
 `BuildArtifactManifest` rejeita symlink e resolução externa antes da leitura. A correção foi coberta por regressões de arquivo regular e symlink.
+
+
+## Remediação verificada do workflow distribuído — 2026-09-22
+
+O primeiro run do workflow `dz23-agentic-quality` no commit `2933f6e2` forneceu uma evidência nova: o teste PostgreSQL RLS falhou porque a URL do teste usava a role bootstrap superusuária do Compose, enquanto o adapter tenant-scoped exige uma role não-superusuária. Redis DLQ, OTLP e o job web/mobile passaram nesse run. Também foi identificado que passwords efêmeras escritas em `GITHUB_ENV` apareciam no bloco de ambiente do log do passo; não eram credenciais de terceiros, mas a prática foi removida.
+
+A correção agora cria/ajusta uma role `ollama_agent_test` dedicada, roda o teste com essa role e conserva as passwords somente em variáveis locais no mesmo passo. O integrity guard bloqueia o retorno de `GITHUB_ENV` no job distribuído. Os gates locais completos passaram, incluindo integrity, YAML, Go test/vet/build, Vitest/build e typecheck mobile. A confirmação de Docker/PostgreSQL/Redis/OTLP depende da nova execução remota.
+
+Este achado não fecha os P0 restantes: sandbox forte, capability enforcement, egress/DLP completo, storage/IdP distribuído, adapters externos, dispositivos e supply chain continuam abertos. A decisão permanece **FIXING / preview-local em hardening**.

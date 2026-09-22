@@ -240,3 +240,30 @@ Gates completos Go/integrity/build/UI/mobile passaram. O isolamento ainda depend
 `BuildArtifactManifest` agora rejeita componentes symlink e resoluções fora do workspace antes de calcular hash, tamanho ou MIME. Foram adicionados testes para symlink externo e arquivo regular.
 
 Gates completos Go/integrity/build/UI/mobile passaram. Isso protege a geração do manifest; a prova de publicação/exportação em todos os runtimes e adapters distribuídos continua separada.
+
+
+## Remediação do workflow distribuído — 2026-09-22
+
+O workflow `dz23-agentic-quality` executado no commit `2933f6e2` encontrou uma falha real no teste `TestDistributedPostgresRLSAndEvents`: a URL do smoke usava a role `ollama_agent` criada pelo Compose, que é a role bootstrap/superusuária, e o adapter tenant-scoped recusou corretamente operar com ela. O mesmo passo havia colocado passwords efêmeras no `GITHUB_ENV`, fazendo com que os valores aparecessem no bloco de ambiente do log do passo; esses valores eram efêmeros do CI, não credenciais de terceiros, e não foram adicionados ao repositório.
+
+A correção publicada nesta iteração mantém as passwords somente em variáveis locais de um único passo, cria/ajusta uma role separada `ollama_agent_test` sem privilégio de superusuário e executa o smoke RLS usando essa role. O integrity guard também impede o retorno de `GITHUB_ENV` no job distribuído. A prova local desta correção é estática (parser YAML e integrity) e os gates completos locais passaram; a confirmação autoritativa depende de uma nova execução do GitHub Actions, porque Docker não está disponível nesta sandbox.
+
+A classificação permanece **preview/local RC em hardening**. O CI distribuído continua sendo uma dependência de validação remota, não uma prova inventada localmente.
+
+
+## Slice de workflow distribuído corrigida — 2026-09-22
+
+- Falha observada no run `35735628693`: somente o teste PostgreSQL RLS falhou por uso de superusuário; Redis DLQ, OTLP e qualidade web/mobile passaram naquele run.
+- Correção: role não-superusuária dedicada para o teste tenant-scoped e passwords confinadas ao passo de execução.
+- Provas locais: integrity guard, YAML parser, `CGO_ENABLED=1 go test ./... -count=1`, `CGO_ENABLED=1 go vet ./...`, build Go, Vitest/build UI e typecheck mobile: PASS.
+- Prova ainda pendente: novo run do GitHub Actions no commit desta correção.
+- Não foram repetidas nem publicadas credenciais de terceiros; qualquer chave fornecida anteriormente continua considerada exposta e deve ser rotacionada pelo operador.
+
+
+## Slice de workflow distribuído corrigida — 2026-09-22
+
+O job PostgreSQL RLS deixou de conectar o teste tenant-scoped com a role bootstrap superusuária do Compose. O passo agora cria uma role de teste separada, executa toda a validação com ela e mantém passwords efêmeras em escopo local, sem `GITHUB_ENV`. O guard estático bloqueia regressão dessa prática.
+
+Evidências locais desta correção: `scripts/check-class-a-plus-integrity.sh`, parser dos workflows, `git diff --check`, suíte Go completa com CGO, `go vet`, build Go, 20 arquivos/199 testes Vitest, build Vite e `npm run typecheck` mobile — todos PASS. Docker e a nova execução remota permanecem necessários para fechar o gate distribuído.
+
+A classificação não muda: **preview/local RC em hardening**, sem merge automático em `main` e sem declarar produção-ready.

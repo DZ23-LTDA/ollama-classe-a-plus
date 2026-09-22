@@ -270,3 +270,8 @@ Queue list/replay agora consultam a organização da missão antes de expor ou m
 ## Incremento 2026-09-22 — artifact manifest path safety
 
 A geração de manifests reutiliza a contenção de symlink do workspace. Exportação assinada, armazenamento distribuído e validações físicas de artefatos continuam pendentes.
+
+
+## Incremento 2026-09-22 — distributed CI smoke remediation
+
+A primeira execução pública do workflow ampliado revelou um defeito útil no próprio gate: o teste PostgreSQL RLS conectava com a role bootstrap superusuária, e o armazenamento tenant-scoped recusava corretamente essa configuração. O workflow foi ajustado para criar uma role de teste não-superusuária e manter passwords efêmeras apenas no passo local, sem `GITHUB_ENV`. A prova local está verde; o próximo passo é confirmar o novo run remoto com Docker e serviços distribuídos. A classificação do produto continua preview/local RC em hardening.

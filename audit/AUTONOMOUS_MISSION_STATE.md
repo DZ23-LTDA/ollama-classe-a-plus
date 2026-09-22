@@ -1591,3 +1591,36 @@ classification: preview/local RC em hardening
 note: FINAL_HARNESS_AUDIT now distinguishes historical findings from published partial remediations; it does not claim production readiness
 next_action: continue remaining P0/P1s and external evidence; no main merge
 ```
+
+
+## Remediação do CI distribuído — aguardando publicação — 2026-09-22
+
+```yaml
+mission_id: class-a-plus-final-hardening-2026-09-22
+state: RELEASING
+iteration: 28
+base_commit: 2933f6e2a758aafaf47c9c96dcb3e1741d3e8f69
+branch: feat/manus-parity-omniroute
+working_tree: correção de workflow/guard e documentação ainda não commitada
+trigger:
+  - GitHub run 35735628693 falhou em TestDistributedPostgresRLSAndEvents porque o DSN usava a role Compose superusuária
+  - passwords efêmeras no GITHUB_ENV apareceram no bloco de ambiente do log do passo
+implemented:
+  - workflow cria role não-superusuária ollama_agent_test para o smoke RLS
+  - passwords ficam somente em variáveis locais do passo; GITHUB_ENV removido do job distribuído
+  - integrity guard bloqueia regressão de GITHUB_ENV e exige o contrato tenant_password
+proofs_local:
+  - integrity guard: PASS
+  - workflow YAML parser: PASS
+  - git diff --check: PASS
+  - CGO_ENABLED=1 go test ./... -count=1: PASS
+  - CGO_ENABLED=1 go vet ./...: PASS
+  - CGO_ENABLED=1 go build: PASS
+  - UI Vitest/build: PASS
+  - mobile typecheck: PASS
+external_validation_pending:
+  - nova execução GitHub Actions com Docker/PostgreSQL/Redis/OTLP
+classification: preview/local RC em hardening; NÃO final; NÃO production-ready
+next_action: revisar diff/segredos, commitar e fazer push; então verificar o novo run do PR sem repetir valores sensíveis
+rollback: reverter o commit desta slice na branch feature; não force-push e não alterar main
+```

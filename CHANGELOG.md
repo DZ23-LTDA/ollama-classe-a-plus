@@ -256,3 +256,8 @@ Manifests de artefatos agora rejeitam symlinks e resoluções fora do workspace 
 ## 2026-09-22 — screenshots do estado atual
 
 As dez telas públicas do shell (`class-a-plus-*.png`) foram recapturadas com Chromium contra o Vite dev e o servidor Ollama local em loopback. README, guia e notas de proveniência agora apontam para as imagens atuais de Home, Agentic Console, Settings, Company OS, Projetos, Biblioteca, Agendado, Skills, Plugins e Tarefas. As capturas mostram apenas estado local/sandbox e não afirmam providers, credenciais, deploys ou dispositivos externos configurados.
+
+
+## 2026-09-22 — correção do smoke distribuído do CI
+
+O job de integração do `dz23-agentic-quality` foi corrigido após a execução no commit `2933f6e2` revelar que o teste PostgreSQL RLS estava usando a role bootstrap superusuária. O workflow agora cria uma role não-superusuária dedicada ao teste tenant-scoped, mantém as passwords efêmeras em variáveis locais do passo e não as grava em `GITHUB_ENV`. O integrity guard verifica os dois contratos. Os gates locais completos passaram; a nova execução do GitHub Actions ainda é necessária para validar Docker/PostgreSQL/Redis/OTLP no runner.

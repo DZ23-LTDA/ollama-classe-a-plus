@@ -62,16 +62,36 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - name: Generate ephemeral integration secrets
+      - name: Start dependencies and run integration tests
         run: |
-          echo "OLLAMA_AGENT_POSTGRES_PASSWORD=$(openssl rand -hex 24)" >> "$GITHUB_ENV"
-          echo "OLLAMA_AGENT_REDIS_PASSWORD=$(openssl rand -hex 24)" >> "$GITHUB_ENV"
-      - name: Start distributed dependencies
-        run: docker compose -f deploy/docker-compose.agentic.yml up -d --wait
-      - name: Run integration tests
-        run: |
-          export OLLAMA_AGENT_TEST_POSTGRES_URL="postgres://ollama_agent:${OLLAMA_AGENT_POSTGRES_PASSWORD}@127.0.0.1:5432/ollama_agent?sslmode=disable"
-          export OLLAMA_AGENT_TEST_REDIS_URL="redis://:${OLLAMA_AGENT_REDIS_PASSWORD}@127.0.0.1:6379/0"
+          set -euo pipefail
+          postgres_password="$(openssl rand -hex 24)"
+          redis_password="$(openssl rand -hex 24)"
+          tenant_password="$(openssl rand -hex 24)"
+          export OLLAMA_AGENT_POSTGRES_PASSWORD="$postgres_password"
+          export OLLAMA_AGENT_REDIS_PASSWORD="$redis_password"
+          docker compose -f deploy/docker-compose.agentic.yml up -d --wait
+
+          # The Compose bootstrap role owns the database and is a superuser by
+          # design. Use a separate role for tenant-scoped RLS operations.
+          docker compose -f deploy/docker-compose.agentic.yml exec -T postgres \
+            psql -v ON_ERROR_STOP=1 -U ollama_agent -d ollama_agent \
+            --set=app_password="$tenant_password" <<'SQL'
+          DO $$
+          BEGIN
+            IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'ollama_agent_test') THEN
+              EXECUTE format('CREATE ROLE ollama_agent_test LOGIN PASSWORD %L', :'app_password');
+            ELSE
+              EXECUTE format('ALTER ROLE ollama_agent_test WITH LOGIN PASSWORD %L', :'app_password');
+            END IF;
+          END
+          $$;
+          GRANT CONNECT ON DATABASE ollama_agent TO ollama_agent_test;
+          GRANT USAGE, CREATE ON SCHEMA public TO ollama_agent_test;
+          SQL
+
+          export OLLAMA_AGENT_TEST_POSTGRES_URL="postgres://ollama_agent_test:${tenant_password}@127.0.0.1:5432/ollama_agent?sslmode=disable"
+          export OLLAMA_AGENT_TEST_REDIS_URL="redis://:${redis_password}@127.0.0.1:6379/0"
           export OLLAMA_AGENT_TEST_OTLP_ENDPOINT="http://127.0.0.1:4318/v1/traces"
           export OLLAMA_AGENT_OTLP_ALLOW_INSECURE=1
           CGO_ENABLED=0 go test -tags integration ./internal/agent -run TestDistributed -count=1 -v
