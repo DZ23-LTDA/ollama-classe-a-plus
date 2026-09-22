@@ -817,8 +817,26 @@ jobs:
               exit 1
             fi
           done < <(find dist -type f -print0)
+      - name: Generate release SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          path: .
+          format: cyclonedx-json
+          output-file: dist/ollama-classe-a-plus-sbom.cdx.json
+      - name: Write release metadata
+        run: |
+          jq -n \
+            --arg repository "$GITHUB_REPOSITORY" \
+            --arg ref "$GITHUB_REF_NAME" \
+            --arg commit "$GITHUB_SHA" \
+            --arg version "${GITHUB_REF_NAME#v}" \
+            '{repository: $repository, ref: $ref, commit: $commit, version: $version, checksum_manifest: "sha256sum.txt", sbom: "ollama-classe-a-plus-sbom.cdx.json", provenance: "GitHub Actions build provenance is emitted only when OLLAMA_ENABLE_ATTESTATIONS=true"}' \
+            > dist/release-metadata.json
       - name: Generate checksum file
-        run: find . -type f -not -name 'sha256sum.txt' | xargs sha256sum | tee sha256sum.txt
+        run: find . -type f -not -name 'sha256sum.txt' -print0 | sort -z | xargs -0 sha256sum | tee sha256sum.txt
+        working-directory: dist
+      - name: Verify checksum file
+        run: sha256sum -c sha256sum.txt
         working-directory: dist
       - name: Attest checksum manifest when enabled
         if: ${{ vars.OLLAMA_ENABLE_ATTESTATIONS == 'true' }}
@@ -873,7 +891,7 @@ jobs:
 
           shopt -s nullglob
           pids=()
-          for payload in dist/*.txt dist/*.zip dist/*.tgz dist/*.tar.zst dist/*.exe dist/*.dmg dist/*.ps1 dist/*.sh ; do
+          for payload in dist/*.txt dist/*.json dist/*.zip dist/*.tgz dist/*.tar.zst dist/*.exe dist/*.dmg dist/*.ps1 dist/*.sh ; do
             # Publish the checksum manifest only after every payload has succeeded.
             [ "$payload" = dist/sha256sum.txt ] && continue
             echo "Uploading $payload"
