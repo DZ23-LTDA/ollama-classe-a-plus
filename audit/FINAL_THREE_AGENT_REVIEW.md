@@ -196,3 +196,8 @@ Compose agora usa loopback-only, passwords de ambiente e Redis autenticado; CI i
 ## Slice P1 validada — provider selection contract — 2026-09-22
 
 A UI transporta provider e o runtime rejeita seleções sem adapter implementado. Claude/Codex/OmniRoute não são apresentados como conectados; execução externa, credenciais por tenant e streaming ainda permanecem pendentes.
+
+
+## Slice P1 validada — release artifact integrity — 2026-09-22
+
+O release bloqueia artefatos vazios/ausentes e só ativa provenance attestation com flag e permissões explícitas. Signing, SBOM final e publicação real permanecem não comprovados nesta sandbox.

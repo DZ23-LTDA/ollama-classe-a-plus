@@ -1455,3 +1455,25 @@ proofs: provider negative test, integrity, Go focused, UI Vitest/build PASS
 classification: preview/local RC em hardening
 next_slice: continue remaining P0/P1s, especially external adapters and release evidence; no main merge
 ```
+
+
+## Slice P1 release artifact integrity validada — aguardando publicação — 2026-09-22
+
+```yaml
+state: RELEASING
+iteration: 24
+base_commit: f315d339
+working_tree: release/docs changes still uncommitted
+implemented:
+  - reject missing/empty release payloads
+  - optional provenance attestation gated by OLLAMA_ENABLE_ATTESTATIONS=true
+  - explicit permissions for OIDC/attestations
+proofs:
+  - integrity guard: PASS
+  - YAML parser: PASS
+  - git diff --check: PASS
+  - release execution/signing: NOT_RUN in sandbox
+classification: preview/local RC em hardening
+open_risks: real GitHub release, SBOM final artifact binding, signing credentials
+next_action: commit/push, then continue remaining P0/P1s; no main merge
+```

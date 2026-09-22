@@ -236,3 +236,8 @@ PostgreSQL/Redis/OTLP foram limitados a loopback por padrão; PostgreSQL/Redis e
 ## 2026-09-22 — provider selection contract
 
 A Nova tarefa envia e persiste `provider`; apenas `ollama-local` é aceito até adapters Claude/Codex/OmniRoute reais existirem. A UI marca os demais como não conectados.
+
+
+## 2026-09-22 — release artifact integrity
+
+Release agora falha para artefatos ausentes/vazios e pode gerar attestation de provenance somente com configuração explícita `OLLAMA_ENABLE_ATTESTATIONS=true` no ambiente GitHub.

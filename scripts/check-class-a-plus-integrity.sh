@@ -146,6 +146,9 @@ grep -q 'Provider       string' internal/agent/types.go
 grep -q 'provider != "ollama-local"' internal/agent/runtime.go
 grep -q 'Claude / Anthropic (não conectado)' app/ui/app/src/components/AgenticConsole.tsx
 grep -q 'TestRuntimeRejectsUnconfiguredMissionProvider' internal/agent/runtime_test.go
+grep -q 'Empty release artifact' .github/workflows/release.yaml
+grep -q 'actions/attest-build-provenance@v2' .github/workflows/release.yaml
+grep -q 'OLLAMA_ENABLE_ATTESTATIONS' .github/workflows/release.yaml
 grep -q 'Capabilities' internal/agent/runtime.go
 grep -q 'Evaluation' internal/agent/evaluation.go
 for route in projects library scheduled skills plugins tasks company; do

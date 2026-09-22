@@ -255,3 +255,8 @@ A stack local agora exige secrets e loopback binding. Falta executar e inspecion
 ## Incremento 2026-09-22 — provider selection contract
 
 A seleção de provider deixou de ser apenas cosmética: o runtime valida e persiste o provider real. A próxima etapa é implementar adapters externos isolados, com credenciais por organização, health/allowlist, streaming e testes; até lá a UI mantém esses motores desativados.
+
+
+## Incremento 2026-09-22 — release artifact integrity
+
+O release valida presença/tamanho dos artefatos e oferece attestation condicional. A assinatura de instaladores/binários, SBOM ligado aos artefatos finais e execução real do release ainda dependem de credenciais, policies e runners do operador.

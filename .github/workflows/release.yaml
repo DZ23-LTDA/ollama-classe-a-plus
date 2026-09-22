@@ -779,6 +779,8 @@ jobs:
       cancel-in-progress: false
     permissions:
       contents: write
+      id-token: write
+      attestations: write
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
@@ -804,14 +806,25 @@ jobs:
             dist/ollama-windows-arm64.zip
           )
           for payload in "${required[@]}"; do
-            if [ ! -f "$payload" ]; then
+            if [ ! -s "$payload" ]; then
               echo "::error::Missing expected release artifact: $payload"
               exit 1
             fi
           done
+          while IFS= read -r -d '' payload; do
+            if [ ! -s "$payload" ]; then
+              echo "::error::Empty release artifact: $payload"
+              exit 1
+            fi
+          done < <(find dist -type f -print0)
       - name: Generate checksum file
         run: find . -type f -not -name 'sha256sum.txt' | xargs sha256sum | tee sha256sum.txt
         working-directory: dist
+      - name: Attest checksum manifest when enabled
+        if: ${{ vars.OLLAMA_ENABLE_ATTESTATIONS == 'true' }}
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dist/sha256sum.txt
       - name: Publish release artifacts
         shell: bash
         run: |

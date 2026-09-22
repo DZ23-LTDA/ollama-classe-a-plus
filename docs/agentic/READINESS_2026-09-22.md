@@ -221,3 +221,8 @@ O integrity guard e `git diff --check` passaram. Docker/Compose não está insta
 A seleção de motor na Nova tarefa agora envia `provider` explicitamente e o runtime persiste essa escolha. Como somente o planner Ollama local está implementado nesta árvore, providers Claude/Codex/OmniRoute/automático aparecem como não conectados na UI e são rejeitados pelo servidor com erro de configuração, em vez de serem enviados silenciosamente ao Ollama como se fossem adapters reais.
 
 O teste negativo server-side e os gates completos Go/integrity/UI passaram. A implementação de adapters externos, renovação OAuth e execução real dos CLIs continuam pendentes e não são declaradas conectadas.
+
+
+## Slice P1 de release artifact integrity — 2026-09-22
+
+O job final de release passou a rejeitar artefatos ausentes ou vazios antes de gerar checksums. A attestation de provenance pode ser executada somente quando a variável de ambiente GitHub `OLLAMA_ENABLE_ATTESTATIONS=true` estiver configurada, usando a permissão OIDC/attestations; caso contrário, permanece explicitamente não executada. A sandbox não publicou release, assinou binários ou executou Actions, portanto essas provas seguem externas.
