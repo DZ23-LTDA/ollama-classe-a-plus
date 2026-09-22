@@ -19,6 +19,8 @@ type Runtime struct {
 	tools         *Registry
 	workspaceRoot string
 	context       *ContextStore
+	company       *CompanyStore
+	remoteMCP     *RemoteMCPManager
 	metrics       *RuntimeMetrics
 	connectors    *ConnectorManager
 	mcp           *MCPManager
@@ -45,6 +47,8 @@ type RuntimeConfig struct {
 	Tools         *Registry
 	WorkspaceRoot string
 	Context       *ContextStore
+	Company       *CompanyStore
+	RemoteMCP     *RemoteMCPManager
 	Connectors    *ConnectorManager
 	MCP           *MCPManager
 	Queue         *JobQueue
@@ -78,6 +82,9 @@ func NewRuntime(config RuntimeConfig) (*Runtime, error) {
 	if config.MCP != nil {
 		tools.Register(mcpCallTool{manager: config.MCP})
 	}
+	if config.RemoteMCP != nil {
+		tools.Register(remoteMCPCallTool{manager: config.RemoteMCP})
+	}
 	root := config.WorkspaceRoot
 	if strings.TrimSpace(root) == "" {
 		root, _ = os.Getwd()
@@ -92,6 +99,13 @@ func NewRuntime(config RuntimeConfig) (*Runtime, error) {
 	contextStore := config.Context
 	if contextStore == nil {
 		contextStore, err = NewContextStore(filepath.Join(root, ".agent-context"))
+		if err != nil {
+			return nil, err
+		}
+	}
+	companyStore := config.Company
+	if companyStore == nil {
+		companyStore, err = NewCompanyStore(filepath.Join(root, ".agent-companies"))
 		if err != nil {
 			return nil, err
 		}
@@ -131,7 +145,7 @@ func NewRuntime(config RuntimeConfig) (*Runtime, error) {
 			return nil, err
 		}
 	}
-	runtime := &Runtime{store: store, planner: planner, tools: tools, workspaceRoot: root, context: contextStore, metrics: &RuntimeMetrics{}, connectors: config.Connectors, mcp: config.MCP, queue: queue, redisQueue: config.RedisQueue, traces: traces, telemetry: telemetry, media: config.Media, builder: builder, collaboration: collaboration, push: config.Push, deployments: config.Deployments, running: make(map[string]bool)}
+	runtime := &Runtime{store: store, planner: planner, tools: tools, workspaceRoot: root, context: contextStore, company: companyStore, remoteMCP: config.RemoteMCP, metrics: &RuntimeMetrics{}, connectors: config.Connectors, mcp: config.MCP, queue: queue, redisQueue: config.RedisQueue, traces: traces, telemetry: telemetry, media: config.Media, builder: builder, collaboration: collaboration, push: config.Push, deployments: config.Deployments, running: make(map[string]bool)}
 	orchestrator, err := NewAgentOrchestrator(filepath.Join(root, ".agent-orchestrator"), runtime.SubagentRunner)
 	if err != nil {
 		return nil, err
@@ -167,6 +181,10 @@ func (r *Runtime) Context() *ContextStore {
 	return r.context
 }
 
+func (r *Runtime) CompanyStore() *CompanyStore {
+	return r.company
+}
+
 func (r *Runtime) Metrics() MetricsSnapshot {
 	return r.metrics.Snapshot()
 }
@@ -189,6 +207,13 @@ func (r *Runtime) MCPServers() []MCPServerConfig {
 		return nil
 	}
 	return r.mcp.List()
+}
+
+func (r *Runtime) RemoteMCPServers() []RemoteMCPServerConfig {
+	if r.remoteMCP == nil {
+		return nil
+	}
+	return r.remoteMCP.List()
 }
 
 func (r *Runtime) Traces(traceID string) []TraceSpan {
@@ -307,6 +332,12 @@ func (r *Runtime) Start(ctx context.Context) {
 
 func (r *Runtime) resumePending(ctx context.Context) {
 	for _, schedule := range r.context.ClaimDueSchedules(time.Now().UTC()) {
+		if companyID := companyIDFromWorkspace(schedule.Workspace); companyID != "" && r.company != nil {
+			company, err := r.company.Get(companyID)
+			if err == nil && (company.Status == CompanyPaused || company.Risk.Paused) {
+				continue
+			}
+		}
 		_, _ = r.CreateMission(ctx, CreateMissionRequest{Objective: schedule.Objective, Model: schedule.Model, Workspace: schedule.Workspace, ProjectID: schedule.ProjectID, OrganizationID: schedule.OrganizationID, AutoRun: true})
 	}
 	missions, err := r.store.ListMissions()
@@ -320,6 +351,14 @@ func (r *Runtime) resumePending(ctx context.Context) {
 		}
 		_, _ = r.EnqueueMission(mission.ID)
 	}
+}
+
+func companyIDFromWorkspace(workspace string) string {
+	workspace = strings.TrimSpace(workspace)
+	if !strings.HasPrefix(workspace, "company://") {
+		return ""
+	}
+	return strings.TrimSpace(strings.TrimPrefix(workspace, "company://"))
 }
 
 func (r *Runtime) EnqueueMission(missionID string) (QueueJob, error) {

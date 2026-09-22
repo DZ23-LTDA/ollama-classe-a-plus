@@ -8,7 +8,7 @@ await mkdir(outputDir, { recursive: true });
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
 
-for (const route of ["/", "/projects", "/library", "/scheduled", "/skills", "/plugins", "/tasks", "/agentic", "/settings"]) {
+for (const route of ["/", "/projects", "/library", "/scheduled", "/skills", "/plugins", "/tasks", "/agentic", "/settings", "/company"]) {
   const name = route.slice(1) || "home";
   await page.goto(`${baseURL}${route}`, { waitUntil: "domcontentloaded", timeout: 30000 });
   await page.waitForTimeout(1200);

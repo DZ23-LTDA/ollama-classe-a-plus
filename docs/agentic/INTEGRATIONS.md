@@ -42,6 +42,14 @@ O processo é iniciado apenas quando uma chamada é feita. O manager usa JSON-RP
 
 O isolamento de filesystem e rede do servidor MCP ainda deve ser reforçado com um executor sandbox dedicado em instalações multiusuário. Nunca registre um MCP com `environment_vars` que incluam credenciais sem uma policy de tenant e auditoria equivalente.
 
+## Desktop Commander local e Remote MCP
+
+O [Desktop Commander](https://desktopcommander.app/) pode ser usado localmente como servidor MCP stdio com o preset [`examples/dz23-desktop-commander-mcp.json`](../../examples/dz23-desktop-commander-mcp.json). Ele requer Node.js 18+ e inicia o pacote `@wonderwhy-er/desktop-commander` com os métodos allowlisted. Filesystem, terminal, processos e edição continuam sujeitos ao registry de tools, approval e permissões do usuário do processo.
+
+O Remote Desktop Commander oficial documenta o endpoint `https://mcp.desktopcommander.app/mcp`, Streamable HTTP, OAuth 2.0 com PKCE e pareamento por device flow. O preset [`examples/dz23-desktop-commander-remote.json`](../../examples/dz23-desktop-commander-remote.json) é carregado por `OLLAMA_AGENT_REMOTE_MCP`; o adapter usa HTTPS, allowlist de métodos, timeout e um bearer opcional em `DESKTOP_COMMANDER_ACCESS_TOKEN`. O runtime não tenta obter credenciais, abrir sessão OAuth, parear máquinas nem revogar dispositivos. A conta, o agente `npx ... remote`, a aprovação do código e a revogação devem ser feitos pelo operador no dashboard oficial.
+
+O catálogo `GET /api/agent/v1/mcp` retorna servidores stdio e remotos sem o valor do token. Chamadas remotas passam pela tool `mcp.remote.call`, que exige approval. O serviço remoto está documentado como beta e executa com as permissões do usuário da máquina; não conecte uma conta de produção sem revisar escopos, dispositivo, logs e política de desligamento.
+
 ## HarnessRouter e harnesses de coding
 
 O [HarnessRouter Community Edition](https://github.com/HarnessRouter/harnessrouter) pode ser configurado como provider `openai-compatible` em [`examples/dz23-harnessrouter.json`](../../examples/dz23-harnessrouter.json). Cada `ModelConfig` pode declarar `harness_id`; o proxy Classe A+ preserva metadata existente e sobrescreve `metadata.harness_id` no servidor, permitindo selecionar `harnessrouter/codex` ou `harnessrouter/claude-code` sem aceitar esse controle do browser.

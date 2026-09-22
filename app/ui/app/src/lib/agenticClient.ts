@@ -22,154 +22,74 @@ export type AgentSchedule = {
   last_run_at?: string;
 };
 
-export type AgentArtifact = {
-  id: string;
-  name: string;
-  sha256: string;
-  size: number;
-  media_type?: string;
-};
-
+export type AgentArtifact = { id: string; name: string; sha256: string; size: number; media_type?: string };
 export type AgentMission = {
-  id: string;
-  version: number;
-  objective: string;
-  model?: string;
-  workspace?: string;
-  project_id?: string;
-  organization_id?: string;
-  state: string;
-  plan?: Array<{
-    id: string;
-    title: string;
-    kind: string;
-    state: string;
-    requires_approval: boolean;
-  }>;
+  id: string; version: number; objective: string; model?: string; workspace?: string; project_id?: string; organization_id?: string;
+  state: string; plan?: Array<{ id: string; title: string; kind: string; state: string; requires_approval: boolean }>;
   approvals?: Array<{ id: string; step_id: string; status: string; reason?: string }>;
-  artifacts?: AgentArtifact[];
-  last_error?: string;
-  created_at: string;
-  updated_at: string;
+  artifacts?: AgentArtifact[]; last_error?: string; created_at: string; updated_at: string;
 };
+export type AgentEvent = { id: string; type: string; step_id?: string; created_at: string; payload?: unknown };
+export type AgentConnector = { id: string; provider: string; base_url: string; token_env?: string; oauth_provider?: string; allowed_origins?: string[]; operations?: Array<{ name: string; methods: string[]; path_prefixes: string[] }> };
+export type AgentMCPServer = { id: string; command?: string; url?: string; token_env?: string; transport?: string; args?: string[]; allowed_methods?: string[]; environment_vars?: string[]; timeout_seconds?: number };
+export type AgentSkill = { id: string; version: string; description: string; scopes?: string[]; tools?: string[]; trusted: boolean };
+export type AgentCLIStatus = { id: string; name: string; section: string; visibility: string; mode: string; executables?: string[]; installed: boolean; executable?: string };
 
-export type AgentEvent = {
-  id: string;
-  type: string;
-  step_id?: string;
-  created_at: string;
-  payload?: unknown;
+export type CompanyDepartment = { id: string; name: string; mandate: string; autonomy: string; approval_required?: string[] };
+export type CompanyRoadmapItem = { id: string; title: string; description?: string; owner_department?: string; priority: number; status: string; due_at?: string };
+export type CompanyGoal = { id: string; title: string; metric: string; target: number; current: number; unit?: string; period: string; owner_department?: string; status: string };
+export type CompanyBacklogItem = { id: string; title: string; description?: string; owner_department?: string; priority: number; status: string; source?: string; estimated_hours?: number };
+export type CompanyCycle = { id: string; name: string; objective: string; frequency: string; interval_seconds: number; schedule_id?: string; enabled: boolean; next_run_at: string; paused_reason?: string };
+export type AgentCompany = {
+  id: string; organization_id: string; name: string; mission?: string; positioning?: string; business_model?: string;
+  target_audience?: string; offer?: string; website?: string; currency: string; status: string;
+  departments: CompanyDepartment[]; roadmap?: CompanyRoadmapItem[]; goals?: CompanyGoal[]; backlog?: CompanyBacklogItem[]; cycles?: CompanyCycle[];
+  budget: { currency: string; monthly_limit_cents: number; spent_cents: number; approval_threshold_cents: number; require_approval_for_ads: boolean; require_approval_for_sales: boolean };
+  risk: { paused: boolean; pause_reason?: string; anomaly_count: number; last_anomaly?: string };
+  created_at: string; updated_at: string;
 };
-
-export type AgentConnector = {
-  id: string;
-  provider: string;
-  base_url: string;
-  token_env?: string;
-  oauth_provider?: string;
-  allowed_origins?: string[];
-  operations?: Array<{ name: string; methods: string[]; path_prefixes: string[] }>;
-};
-
-export type AgentMCPServer = {
-  id: string;
-  command: string;
-  args?: string[];
-  allowed_methods?: string[];
-  environment_vars?: string[];
-  timeout_seconds?: number;
-};
-
-export type AgentSkill = {
-  id: string;
-  version: string;
-  description: string;
-  scopes?: string[];
-  tools?: string[];
-  trusted: boolean;
-};
-
-export type AgentCLIStatus = {
-  id: string;
-  name: string;
-  section: string;
-  visibility: string;
-  mode: string;
-  executables?: string[];
-  installed: boolean;
-  executable?: string;
-};
+export type AgentCompanyReport = { company: AgentCompany; open_backlog: number; completed_backlog: number; goals_on_track: number; goals_at_risk: number; enabled_cycles: number; budget_utilization_pct: number };
 
 function agentHeaders(): Record<string, string> {
   if (typeof window === "undefined") return {};
   const token = window.localStorage.getItem("ollama-agent-token");
   const organization = window.localStorage.getItem("ollama-agent-organization");
-  return {
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    ...(organization ? { "X-Ollama-Organization": organization } : {}),
-  };
+  return { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(organization ? { "X-Ollama-Organization": organization } : {}) };
 }
-
 export async function agentFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...agentHeaders(),
-      ...(init.headers ?? {}),
-    },
-  });
+  const response = await fetch(`${API_BASE}${path}`, { ...init, headers: { "Content-Type": "application/json", ...agentHeaders(), ...(init.headers ?? {}) } });
   const body = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const message = typeof body?.error === "string" ? body.error : response.statusText || "Agent API request failed";
-    throw new Error(message);
-  }
+  if (!response.ok) throw new Error(typeof body?.error === "string" ? body.error : response.statusText || "Agent API request failed");
   return body as T;
 }
-
 export const listProjects = () => agentFetch<{ projects: AgentProject[] }>("/api/agent/v1/projects");
-export const createProject = (name: string, root = "") =>
-  agentFetch<AgentProject>("/api/agent/v1/projects", { method: "POST", body: JSON.stringify({ name, root }) });
-export const updateProject = (id: string, name: string, root = "") =>
-  agentFetch<AgentProject>(`/api/agent/v1/projects/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ name, root }) });
-export const deleteProject = (id: string) =>
-  agentFetch<void>(`/api/agent/v1/projects/${encodeURIComponent(id)}`, { method: "DELETE" });
-
+export const createProject = (name: string, root = "") => agentFetch<AgentProject>("/api/agent/v1/projects", { method: "POST", body: JSON.stringify({ name, root }) });
+export const updateProject = (id: string, name: string, root = "") => agentFetch<AgentProject>(`/api/agent/v1/projects/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ name, root }) });
+export const deleteProject = (id: string) => agentFetch<void>(`/api/agent/v1/projects/${encodeURIComponent(id)}`, { method: "DELETE" });
 export const listMissions = () => agentFetch<{ missions: AgentMission[] }>("/api/agent/v1/missions");
 export const getMission = (id: string) => agentFetch<AgentMission>(`/api/agent/v1/missions/${encodeURIComponent(id)}`);
-export const listMissionEvents = (id: string) =>
-  agentFetch<{ events: AgentEvent[] }>(`/api/agent/v1/missions/${encodeURIComponent(id)}/events`);
-export const createMission = (payload: { objective: string; model?: string; project_id?: string; workspace?: string; auto_run?: boolean }) =>
-  agentFetch<AgentMission>("/api/agent/v1/missions", { method: "POST", body: JSON.stringify(payload) });
-export const runMission = (id: string) =>
-  agentFetch<AgentMission>(`/api/agent/v1/missions/${encodeURIComponent(id)}/run`, { method: "POST", body: "{}" });
-export const decideMissionApproval = (missionID: string, approvalID: string, approved: boolean) =>
-  agentFetch<AgentMission>(`/api/agent/v1/missions/${encodeURIComponent(missionID)}/approvals/${encodeURIComponent(approvalID)}`, {
-    method: "POST",
-    body: JSON.stringify({ approved, reason: approved ? "Aprovado no Agentic Console" : "Rejeitado no Agentic Console" }),
-  });
-
+export const listMissionEvents = (id: string) => agentFetch<{ events: AgentEvent[] }>(`/api/agent/v1/missions/${encodeURIComponent(id)}/events`);
+export const createMission = (payload: { objective: string; model?: string; project_id?: string; workspace?: string; auto_run?: boolean }) => agentFetch<AgentMission>("/api/agent/v1/missions", { method: "POST", body: JSON.stringify(payload) });
+export const runMission = (id: string) => agentFetch<AgentMission>(`/api/agent/v1/missions/${encodeURIComponent(id)}/run`, { method: "POST", body: "{}" });
+export const decideMissionApproval = (missionID: string, approvalID: string, approved: boolean) => agentFetch<AgentMission>(`/api/agent/v1/missions/${encodeURIComponent(missionID)}/approvals/${encodeURIComponent(approvalID)}`, { method: "POST", body: JSON.stringify({ approved, reason: approved ? "Aprovado no Agentic Console" : "Rejeitado no Agentic Console" }) });
 export const listSchedules = () => agentFetch<{ schedules: AgentSchedule[] }>("/api/agent/v1/schedules");
-export const createSchedule = (payload: Partial<AgentSchedule>) =>
-  agentFetch<AgentSchedule>("/api/agent/v1/schedules", { method: "POST", body: JSON.stringify(payload) });
-export const updateSchedule = (id: string, payload: Partial<AgentSchedule>) =>
-  agentFetch<AgentSchedule>(`/api/agent/v1/schedules/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(payload) });
-export const deleteSchedule = (id: string) =>
-  agentFetch<void>(`/api/agent/v1/schedules/${encodeURIComponent(id)}`, { method: "DELETE" });
+export const createSchedule = (payload: Partial<AgentSchedule>) => agentFetch<AgentSchedule>("/api/agent/v1/schedules", { method: "POST", body: JSON.stringify(payload) });
+export const updateSchedule = (id: string, payload: Partial<AgentSchedule>) => agentFetch<AgentSchedule>(`/api/agent/v1/schedules/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(payload) });
+export const deleteSchedule = (id: string) => agentFetch<void>(`/api/agent/v1/schedules/${encodeURIComponent(id)}`, { method: "DELETE" });
+export const listSkills = async () => { const result = await agentFetch<{ skills?: AgentSkill[] | null }>("/api/agent/v1/skills"); return { skills: Array.isArray(result.skills) ? result.skills : [] }; };
+export const listConnectors = async () => { const result = await agentFetch<{ connectors?: AgentConnector[] | null }>("/api/agent/v1/connectors"); return { connectors: Array.isArray(result.connectors) ? result.connectors : [] }; };
+export const listMCPServers = async () => { const result = await agentFetch<{ servers?: AgentMCPServer[] | null; remote_servers?: AgentMCPServer[] | null }>("/api/agent/v1/mcp"); return { servers: [...(Array.isArray(result.servers) ? result.servers : []), ...(Array.isArray(result.remote_servers) ? result.remote_servers.map((server) => ({ ...server, transport: "streamable-http" })) : [])] }; };
+export const listCLIStatus = async () => { const result = await agentFetch<{ tools?: AgentCLIStatus[] | null }>("/api/dz23/cli-catalog"); return { tools: Array.isArray(result.tools) ? result.tools : [] }; };
 
-export const listSkills = async () => {
-  const result = await agentFetch<{ skills?: AgentSkill[] | null }>("/api/agent/v1/skills");
-  return { skills: Array.isArray(result.skills) ? result.skills : [] };
-};
-export const listConnectors = async () => {
-  const result = await agentFetch<{ connectors?: AgentConnector[] | null }>("/api/agent/v1/connectors");
-  return { connectors: Array.isArray(result.connectors) ? result.connectors : [] };
-};
-export const listMCPServers = async () => {
-  const result = await agentFetch<{ servers?: AgentMCPServer[] | null }>("/api/agent/v1/mcp");
-  return { servers: Array.isArray(result.servers) ? result.servers : [] };
-};
-export const listCLIStatus = async () => {
-  const result = await agentFetch<{ tools?: AgentCLIStatus[] | null }>("/api/dz23/cli-catalog");
-  return { tools: Array.isArray(result.tools) ? result.tools : [] };
-};
+export const listCompanies = () => agentFetch<{ companies: AgentCompany[] }>("/api/agent/v1/companies");
+export const createCompany = (payload: Record<string, unknown>) => agentFetch<AgentCompany>("/api/agent/v1/companies", { method: "POST", body: JSON.stringify(payload) });
+export const updateCompany = (id: string, payload: Record<string, unknown>) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(payload) });
+export const getCompanyReport = (id: string) => agentFetch<AgentCompanyReport>(`/api/agent/v1/companies/${encodeURIComponent(id)}/report`);
+export const addCompanyRoadmap = (id: string, payload: Record<string, unknown>) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/roadmap`, { method: "POST", body: JSON.stringify(payload) });
+export const addCompanyGoal = (id: string, payload: Record<string, unknown>) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/goals`, { method: "POST", body: JSON.stringify(payload) });
+export const addCompanyBacklog = (id: string, payload: Record<string, unknown>) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/backlog`, { method: "POST", body: JSON.stringify(payload) });
+export const addCompanyCycle = (id: string, payload: Record<string, unknown>) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/cycles`, { method: "POST", body: JSON.stringify(payload) });
+export const pauseCompany = (id: string, reason: string) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/pause`, { method: "POST", body: JSON.stringify({ reason }) });
+export const resumeCompany = (id: string) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/resume`, { method: "POST", body: "{}" });
+export const recordCompanyAnomaly = (id: string, severity: string, reason: string) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/anomalies`, { method: "POST", body: JSON.stringify({ severity, reason }) });
+export const recordCompanySpend = (id: string, category: string, amount_cents: number, approved: boolean) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/spend`, { method: "POST", body: JSON.stringify({ category, amount_cents, approved }) });

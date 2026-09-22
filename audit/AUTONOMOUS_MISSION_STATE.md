@@ -262,3 +262,53 @@ remaining_external:
   - distributed PostgreSQL/Redis/OTLP, IdP, real deploy accounts and physical desktop/mobile tests
 next_action: run focused multillm/server gates, review diff, commit and publish the feature branch without changing main.
 ```
+
+
+## Checkpoint atual — Company OS e Desktop Commander Remote MCP — 2026-09-22
+
+```yaml
+state: CANDIDATE_COMPLETED
+branch: feat/manus-parity-omniroute
+completed:
+  - company_os_store: tenant-aware identity, departments, roadmap, goals, backlog, cycles, budget and risk pause
+  - company_os_api: CRUD identity, report, roadmap, goals, backlog, cycles, pause/resume, anomaly and spend endpoints
+  - company_os_ui: /company functional workspace with creation, KPI/backlog/cycle forms and guardrails
+  - company_scheduler_guard: company:// workspaces skip mission creation while paused
+  - remote_mcp_adapter: Streamable HTTP, HTTPS policy, timeout, allowlist, optional server-side bearer and approval tool
+  - desktop_commander_presets: local stdio and official remote endpoint examples without secrets
+  - public_docs: Company OS, Remote MCP, API, integrations, parity matrix, roadmap and changelog
+proofs:
+  - go test ./internal/agent ./server ./internal/multillm -count=1: PASS
+  - remote MCP httptest JSON/SSE, bearer and URL policy tests: PASS
+  - CompanyStore lifecycle, persistence, budget pause and anomaly tests: PASS
+  - JSON preset validation: PASS
+  - UI npm run build: PASS
+remaining_external:
+  - Desktop Commander OAuth PKCE, account, device pairing, physical agent and revocation flow
+  - real Remote MCP call against an authorized paired test device
+  - CRM, social, affiliate, ecommerce, advertising, logistics and analytics connectors
+  - distributed Company OS storage/RLS, IdP, deploy accounts and physical desktop/mobile tests
+next_action: review diff, run integrity and full gates, update screenshots if needed, commit and publish the feature branch without changing main
+```
+
+
+## Verificação final da rodada — 2026-09-22
+
+```yaml
+state: CANDIDATE_COMPLETED
+proofs:
+  - Class A+ integrity guard: PASS
+  - CGO_ENABLED=0 go test ./internal/agent -count=1: PASS
+  - CGO_ENABLED=1 go test ./server ./cmd/launch ./internal/multillm -count=1: PASS
+  - CGO_ENABLED=1 go build: PASS
+  - UI npm run build: PASS
+  - Company OS live API smoke: PASS
+  - Chromium shell smoke including /company and MCP catalog: PASS
+  - Company OS screenshot capture and visual inspection: PASS
+  - git diff --check: PASS
+external_blockers_unchanged:
+  - OAuth PKCE, device pairing and physical Desktop Commander agent
+  - real social, CRM, affiliate, ecommerce, ads, logistics and analytics providers
+  - distributed Company OS RLS, IdP, deployment accounts and signed devices
+next_action: commit and push the verified feature branch, then update the public PR; do not merge into main automatically
+```

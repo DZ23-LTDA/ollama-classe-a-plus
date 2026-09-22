@@ -33,6 +33,8 @@ jobs:
           cache: true
       - run: go mod verify
       - run: gofmt -l internal/agent server/companion_ws.go server/agent_routes.go | tee /tmp/gofmt.txt && test ! -s /tmp/gofmt.txt
+      - run: ./scripts/check-class-a-plus-integrity.sh
+      - run: bash -n scripts/smoke-company-os.sh && python3 -m json.tool examples/dz23-desktop-commander-mcp.json >/dev/null && python3 -m json.tool examples/dz23-desktop-commander-remote.json >/dev/null
       - run: CGO_ENABLED=0 go test ./internal/agent -count=1
       - run: CGO_ENABLED=1 go test ./server -count=1
       - run: CGO_ENABLED=1 go build -o dist/ollama-agentic .

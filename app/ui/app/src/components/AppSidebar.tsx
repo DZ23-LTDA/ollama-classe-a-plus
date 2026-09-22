@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import {
   ArrowPathIcon,
   BookOpenIcon,
+  BuildingOffice2Icon,
   BoltIcon,
   ClockIcon,
   Cog6ToothIcon,
@@ -25,7 +26,8 @@ export type AppSection =
   | "scheduled"
   | "skills"
   | "plugins"
-  | "tasks";
+  | "tasks"
+  | "company";
 
 type Icon = React.ComponentType<{ className?: string }>;
 
@@ -116,6 +118,7 @@ export function AppNavigation({ current }: { current: AppSection }) {
       </Link>
       <TargetLink href="/tasks" label="Tarefas" current={current} section="tasks" icon={ArrowPathIcon} />
       <TargetLink href="/scheduled" label="Agendado" current={current} section="scheduled" icon={ClockIcon} />
+      <TargetLink href="/company" label="Empresa" current={current} section="company" icon={BuildingOffice2Icon} badge="Novo" />
 
       <NavLabel>Construir</NavLabel>
       <TargetLink href="/skills" label="Habilidades" current={current} section="skills" icon={BoltIcon} badge="Novo" />

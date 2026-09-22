@@ -1,0 +1,10 @@
+[
+  {
+    "id": "desktop-commander-local",
+    "command": "npx",
+    "args": ["--yes", "@wonderwhy-er/desktop-commander@latest"],
+    "allowed_methods": ["initialize", "notifications/initialized", "tools/list", "tools/call", "resources/list", "resources/read"],
+    "environment_vars": ["HOME", "PATH"],
+    "timeout_seconds": 60
+  }
+]

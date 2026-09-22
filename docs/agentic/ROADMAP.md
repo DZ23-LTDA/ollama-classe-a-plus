@@ -82,3 +82,12 @@ A rodada substituiu estados estáticos do shell por contratos reais: Projetos e 
 O proxy multi-provider ganhou `harness_id` declarativo por modelo e injeção server-side de `metadata.harness_id`, permitindo o preset opcional [`examples/dz23-harnessrouter.json`](../../examples/dz23-harnessrouter.json) para Codex e Claude Code no [HarnessRouter](https://github.com/HarnessRouter/harnessrouter). Isso é adapter implementado; não é validação de uma instância ou credencial externa.
 
 Provas desta rodada: `go test ./internal/agent ./server`, build Vite, smoke CRUD real contra servidor local, smoke de missão/eventos, captura Chromium das nove rotas e `node app/ui/app/scripts/smoke-shell.mjs` com home, Projects, Scheduled, Plugins, Skills e seleção Claude. O próximo gate é HarnessRouter real com streaming/follow-up/cancelamento/artifacts, seguido de editor drag-and-drop/CRDT e testes distribuídos/IdP/dispositivos.
+
+
+## Incremento 2026-09-22 — Company OS e Desktop Commander Remote MCP
+
+A base passou a incluir um Company OS persistente. Uma empresa é criada no tenant ativo e recebe identidade, posicionamento, modelo de negócio, departamentos virtuais, roadmap, metas, backlog, ciclos, budget, relatório e risco. Ciclos são ligados a schedules persistentes e o runtime interrompe a criação de novas missões quando a empresa está pausada por ação do operador, orçamento excedido ou anomalia grave.
+
+Também foi implementado um adapter Remote MCP Streamable HTTP e o preset oficial do Desktop Commander. O runtime valida HTTPS fora de loopback, mantém allowlist de métodos, usa bearer apenas por variável server-side e expõe `mcp.remote.call` com approval. O transporte não é confundido com autenticação: OAuth PKCE, conta, device pairing, agente `npx ... remote`, revogação e testes físicos permanecem dependentes do operador e do serviço oficial.
+
+Os próximos gates do Company OS são connectors reais com CRM, e-mail, redes sociais, anúncios, afiliados, ecommerce, logística e analytics, sempre com sandbox, scopes mínimos, DLP, approval e testes de compliance. Os próximos gates do Remote MCP são completar um fluxo OAuth autorizado, parear um dispositivo de teste, executar apenas jornadas reversíveis e validar revogação, logs e desligamento. Nenhum desses gates é simulado pela presente revisão.

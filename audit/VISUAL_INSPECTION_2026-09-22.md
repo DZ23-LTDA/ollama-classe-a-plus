@@ -29,3 +29,10 @@ O Agentic Console ainda mostrava `Not Found` porque o frontend consulta `/api/ag
 Depois do registro de `GET /api/agent/v1/metrics`, `class-a-plus-agentic.png` carrega sem `Not Found`; mostra Nova tarefa com selects de motor e projeto, métricas, orquestração multiagente e pesquisa profunda. A missão smoke anterior elevou o contador de criadas para 2, confirmando consulta ao runtime local.
 
 `class-a-plus-settings.png` mostra o Agentic Control Center online, provider Ollama no catálogo, approvals server-side, workspace isolado, catálogo de connectors/MCP/skills vazio e GitHub Copilot detectado como CLI. A mensagem de configuração nativa é informativa e não bloqueia o painel agentic.
+
+
+## Sexta inspeção — Company OS e Remote MCP
+
+`class-a-plus-company.png` foi capturada com Chromium contra Vite e o servidor Ollama local em `127.0.0.1:3001`. A tela mostra o menu persistente, a empresa criada pelo smoke, status ativa, backlog aberto, KPI, ciclo ativo, budget, identidade, departamentos virtuais, ciclo e guardrails de segurança. A tela não afirma que CRM, anúncios, redes sociais, afiliados, dropshipping ou OAuth estejam conectados.
+
+O smoke `scripts/smoke-company-os.sh` passou por criação, leitura, edição, roadmap, meta, backlog, ciclo ligado ao schedule, report, rejeição de gasto sem approval, gasto aprovado e pause/resume. O smoke Chromium `app/ui/app/scripts/smoke-shell.mjs` também passou por home, Projetos, Agendado, Plugins com catálogo MCP local/remoto, Skills, Empresa e Agentic Console.

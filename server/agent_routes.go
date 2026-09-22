@@ -72,6 +72,10 @@ func newDefaultAgentRuntime() (*agent.Runtime, error) {
 	if err != nil {
 		return nil, err
 	}
+	companyStore, err := agent.NewCompanyStore(filepath.Join(storeRoot, "companies"))
+	if err != nil {
+		return nil, err
+	}
 	if embedModel := strings.TrimSpace(os.Getenv("OLLAMA_AGENT_EMBED_MODEL")); embedModel != "" {
 		contextStore.SetEmbedder(agent.OllamaEmbedder{Client: api.NewClient(envconfig.ConnectableHost(), http.DefaultClient), Model: embedModel})
 	}
@@ -80,6 +84,10 @@ func newDefaultAgentRuntime() (*agent.Runtime, error) {
 		return nil, err
 	}
 	mcp, err := loadAgentMCP()
+	if err != nil {
+		return nil, err
+	}
+	remoteMCP, err := loadAgentRemoteMCP()
 	if err != nil {
 		return nil, err
 	}
@@ -114,7 +122,7 @@ func newDefaultAgentRuntime() (*agent.Runtime, error) {
 			Fallback: agent.RulePlanner{},
 		}
 	}
-	return agent.NewRuntime(agent.RuntimeConfig{Store: store, Context: contextStore, Planner: planner, WorkspaceRoot: workspaceRoot, Connectors: connectors, MCP: mcp, Media: media, RedisQueue: redisQueue, Telemetry: telemetry, Push: push, Deployments: deployments})
+	return agent.NewRuntime(agent.RuntimeConfig{Store: store, Context: contextStore, Company: companyStore, Planner: planner, WorkspaceRoot: workspaceRoot, Connectors: connectors, MCP: mcp, RemoteMCP: remoteMCP, Media: media, RedisQueue: redisQueue, Telemetry: telemetry, Push: push, Deployments: deployments})
 }
 
 func loadAgentConnectors() (*agent.ConnectorManager, error) {
@@ -202,6 +210,28 @@ func loadAgentMCP() (*agent.MCPManager, error) {
 	return manager, nil
 }
 
+func loadAgentRemoteMCP() (*agent.RemoteMCPManager, error) {
+	configPath := strings.TrimSpace(os.Getenv("OLLAMA_AGENT_REMOTE_MCP"))
+	if configPath == "" {
+		return nil, nil
+	}
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return nil, err
+	}
+	var configs []agent.RemoteMCPServerConfig
+	if err := json.Unmarshal(data, &configs); err != nil {
+		return nil, err
+	}
+	manager := agent.NewRemoteMCPManager()
+	for _, config := range configs {
+		if err := manager.Register(config); err != nil {
+			return nil, err
+		}
+	}
+	return manager, nil
+}
+
 func (a *agentAPI) register(r *gin.Engine) {
 	group := r.Group("/api/agent/v1")
 	group.Use(a.authMiddleware)
@@ -258,6 +288,19 @@ func (a *agentAPI) register(r *gin.Engine) {
 	group.GET("/jobs", a.jobs)
 	group.POST("/jobs/:id/replay", a.replayJob)
 	group.GET("/skills", a.skills)
+	group.GET("/companies", a.companies)
+	group.POST("/companies", a.createCompany)
+	group.GET("/companies/:id", a.getCompany)
+	group.PATCH("/companies/:id", a.updateCompany)
+	group.GET("/companies/:id/report", a.companyReport)
+	group.POST("/companies/:id/roadmap", a.addCompanyRoadmap)
+	group.POST("/companies/:id/goals", a.addCompanyGoal)
+	group.POST("/companies/:id/backlog", a.addCompanyBacklog)
+	group.POST("/companies/:id/cycles", a.addCompanyCycle)
+	group.POST("/companies/:id/pause", a.pauseCompany)
+	group.POST("/companies/:id/resume", a.resumeCompany)
+	group.POST("/companies/:id/anomalies", a.recordCompanyAnomaly)
+	group.POST("/companies/:id/spend", a.recordCompanySpend)
 	group.GET("/schedules", a.schedules)
 	group.POST("/schedules", a.createSchedule)
 	group.PATCH("/schedules/:id", a.updateSchedule)
@@ -789,7 +832,7 @@ func (a *agentAPI) connectors(c *gin.Context) {
 }
 
 func (a *agentAPI) mcp(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"servers": a.runtime.MCPServers()})
+	c.JSON(http.StatusOK, gin.H{"servers": a.runtime.MCPServers(), "remote_servers": a.runtime.RemoteMCPServers()})
 }
 
 func (a *agentAPI) jobs(c *gin.Context) {
@@ -1834,6 +1877,9 @@ func writeAgentError(c *gin.Context, status int, err error) {
 }
 
 func statusForAgentError(err error) int {
+	if status := companyErrorStatus(err); status != 0 {
+		return status
+	}
 	if errors.Is(err, errAgentForbidden) {
 		return http.StatusForbidden
 	}

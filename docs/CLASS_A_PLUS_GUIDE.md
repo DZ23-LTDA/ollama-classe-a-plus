@@ -32,6 +32,8 @@ A arquitetura é local-first. Um operador pode começar apenas com o binário e 
 | Modelos locais de mídia | Adapter configurável | Não confundir adapter multimodal com modelos locais completos já distribuídos. |
 | Shell desktop Classe A+ | Parcialmente implementado | Home com composer e recomendações, menu persistente, CRUD real de Projetos e Agendado, catálogos reais de Tasks/Skills/Plugins/Biblioteca e Control Center sanitizado; builder rico, mutações de skills/plugins e todas as superfícies de produção ainda evoluem. |
 | HarnessRouter | Adapter implementado | Provider OpenAI Responses-compatible com `harness_id` server-side para Codex/Claude Code; exige instância, chave e harness instalados para validação ponta a ponta. |
+| Company OS | Implementado localmente nesta rodada | Empresa/tenant, identidade, 7 departamentos, roadmap, KPIs, backlog, ciclos, relatório, budget, approvals e pausa por limite/anomalia; CRM, social, afiliados, dropshipping e ads reais ainda dependem de connectors e ambientes externos. |
+| Desktop Commander Remote MCP | Adapter implementado | Stdio local e Streamable HTTP remoto com allowlist, HTTPS, bearer opcional e approval; OAuth PKCE, conta, device pairing e testes físicos dependem do operador. |
 
 ## Instalação rápida
 
@@ -111,7 +113,8 @@ export OLLAMA_AGENT_AUTH_STORE="$HOME/.local/share/ollama-classe-a-plus/auth"
 | `OLLAMA_AGENT_OTLP_ENDPOINT` | Endpoint OTLP HTTP para traces distribuídos. |
 | `OLLAMA_AGENT_OTLP_ALLOW_INSECURE` | Permite OTLP HTTP sem TLS apenas em desenvolvimento controlado. |
 | `OLLAMA_AGENT_CONNECTORS` | Arquivo JSON de connectors HTTP allowlisted. |
-| `OLLAMA_AGENT_MCP` | Arquivo JSON de servidores MCP declarativos. |
+| `OLLAMA_AGENT_MCP` | Arquivo JSON de servidores MCP stdio declarativos. |
+| `OLLAMA_AGENT_REMOTE_MCP` | Arquivo JSON de servidores Remote MCP Streamable HTTP. |
 | `OLLAMA_AGENT_DEPLOYMENTS` | Arquivo JSON de providers Vercel, Netlify e generic. |
 | `OLLAMA_AGENT_MEDIA_BASE_URL` | Endpoint compatível para operações multimodais. |
 | `OLLAMA_AGENT_MEDIA_LOCAL` | Usa o endpoint local de mídia quando habilitado explicitamente. |

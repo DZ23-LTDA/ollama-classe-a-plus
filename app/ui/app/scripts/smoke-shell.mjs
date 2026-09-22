@@ -33,7 +33,10 @@ await assert.doesNotReject(() => page.getByText(scheduleObjective, { exact: true
 
 await open("/plugins");
 assert.equal(await page.getByText("Connectors allowlisted").count(), 1, "plugins: connector catalog missing");
-assert.equal(await page.getByText("MCP stdio").count(), 1, "plugins: MCP catalog missing");
+assert.equal(await page.getByText(/MCP local e remoto/).count(), 1, "plugins: MCP catalog missing");
+
+await open("/company");
+assert.equal(await page.getByText("Company OS").count() > 0, true, "company: title missing");
 
 await open("/skills");
 assert.equal(await page.getByText(/Skills|habilidade|manifesto/i).count() > 0, true, "skills: catalog content missing");

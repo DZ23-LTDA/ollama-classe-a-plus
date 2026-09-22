@@ -37,7 +37,8 @@ Manus Desktop
 │   ├── Agendado
 │   ├── Biblioteca
 │   ├── Projetos
-│   └── Tarefas
+│   ├── Tarefas
+│   └── Empresa / Company OS
 ├── Nova tarefa
 │   ├── Composer de linguagem natural
 │   │   ├── Texto e instruções
@@ -88,7 +89,8 @@ Manus Desktop
 │   ├── Slack e Discord
 │   ├── WhatsApp
 │   ├── Jira, Notion e Microsoft 365
-│   └── MCP/A2A
+│   ├── MCP/A2A
+│   └── Desktop Commander local/Remote MCP
 ├── Agendado
 │   ├── Tarefa única
 │   ├── Recorrência
@@ -165,7 +167,8 @@ Ollama Classe A+
 │   ├── AgentOrchestrator e swarm de papéis
 │   ├── ResearchEngine com citações e SSRF guard
 │   ├── Memory, projects e ingestion
-│   ├── Skills e MCP stdio
+│   ├── Skills e MCP stdio/Remote HTTP
+│   ├── Desktop Commander local/Remote MCP [ADAPTER]
 │   ├── Scheduler, webhooks e jobs
 │   ├── Browser Operator Playwright [ADAPTER]
 │   ├── Desktop companion Linux/macOS/Windows [ADAPTER]
@@ -175,6 +178,7 @@ Ollama Classe A+
 │   ├── Media, OCR e vision [ADAPTER]
 │   ├── Builder/canvas/undo/redo/exporters [ADAPTER]
 │   ├── Deploy Vercel/Netlify/generic [ADAPTER]
+│   ├── Company OS: identidade, departamentos, roadmap, KPIs, backlog, ciclos e budget [ATUAL/PARCIAL]
 │   └── Device pairing, push e colaboração [PARCIAL]
 ├── Multi-provider em internal/multillm [ATUAL/ADAPTER]
 │   ├── Provider OpenAI-compatible
@@ -263,6 +267,7 @@ Ollama Classe A+ — Unified Agentic Desktop
 │   ├── Biblioteca
 │   ├── Projetos
 │   ├── Tarefas
+│   ├── Empresa / Company OS
 │   ├── Configurações
 │   ├── Busca global
 │   ├── Command palette
@@ -369,6 +374,7 @@ Ollama Classe A+ — Unified Agentic Desktop
 │   ├── Enable/disable por projeto
 │   ├── Scopes, allowlists e capability grants
 │   ├── MCP stdio/HTTP
+│   ├── Desktop Commander Remote MCP
 │   ├── Lifecycle, health e logs
 │   ├── A2A agent cards e tasks
 │   ├── Sandboxing de plugins
@@ -389,6 +395,19 @@ Ollama Classe A+ — Unified Agentic Desktop
 │   ├── OAuth, refresh e revogação
 │   ├── Tenant isolation
 │   └── Connector health, quotas e audit
+├── 8.5 Company OS e operação empresarial
+│   ├── Empresa como organização/tenant
+│   ├── Identidade, posicionamento, oferta e modelo de negócio
+│   ├── Departamentos CEO, produto, engenharia, marketing, vendas, suporte e operações
+│   ├── Roadmap estratégico, metas e KPIs
+│   ├── Backlog priorizado e ciclos diários/semanais
+│   ├── CRM, leads e pipeline
+│   ├── Pesquisa, prospecção e campanhas de marketing
+│   ├── Redes sociais, afiliados, ecommerce e dropshipping por connectors allowlisted
+│   ├── E-mail, anúncios, domínio, deploy, analytics e conversões
+│   ├── Budget, approval para gasto/anúncio/contrato/mensagem e auditoria
+│   ├── Relatórios financeiros/operacionais e avaliação contínua de agentes
+│   └── Pausa automática por erro, gasto excessivo, fraude ou anomalia
 ├── 9. OmniRoute e roteamento de modelos
 │   ├── Gateway OpenAI-compatible
 │   ├── Endpoint local configurável
@@ -527,7 +546,8 @@ ollama-classe-a-plus/
 │   │   ├── browser.go, desktop*.go       # browser/computer adapters
 │   │   ├── research.go, ingestion.go     # pesquisa e conhecimento
 │   │   ├── memory/context.go             # memória e contexto
-│   │   ├── mcp.go, connectors.go         # skills, MCP e integrações
+│   │   ├── mcp.go, mcp_remote.go         # MCP stdio e Remote MCP
+│   │   ├── connectors.go, company.go     # integrações e Company OS
 │   │   ├── queue.go, redis_queue.go      # workers, retries, DLQ e replay
 │   │   ├── auth.go, saml.go, secrets.go   # identidade e segredos
 │   │   ├── builder.go, exporters.go      # builders e artifacts
@@ -553,7 +573,8 @@ ollama-classe-a-plus/
 │   │   ├── projects.tsx                  # alvo: Projetos
 │   │   ├── scheduled.tsx                 # alvo: Agendado
 │   │   ├── skills.tsx                    # alvo: Habilidades
-│   │   └── plugins.tsx                   # alvo: Plugins/conectores
+│   │   ├── plugins.tsx                   # alvo: Plugins/conectores
+│   │   ├── company.tsx                   # atual: Company OS
 │   ├── components/
 │   │   ├── AppSidebar.tsx                # atual/base: shell
 │   │   ├── AgenticConsole.tsx            # atual: missão e métricas

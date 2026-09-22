@@ -8,9 +8,14 @@ required_files=(
   "UPSTREAM_BASE_COMMIT"
   "docs/agentic/PRODUCT_TREE.md"
   "docs/agentic/PARITY_MATRIX.md"
+  "docs/agentic/COMPANY_OS.md"
+  "docs/agentic/DESKTOP_COMMANDER_REMOTE.md"
   "internal/agent/runtime.go"
+  "internal/agent/company.go"
+  "internal/agent/mcp_remote.go"
   "internal/multillm/registry.go"
   "server/agent_routes.go"
+  "server/company_routes.go"
   "app/ui/app/src/components/AppSidebar.tsx"
   "app/ui/app/src/components/AgenticControlCenter.tsx"
   "app/ui/app/src/routes/agentic.tsx"
@@ -20,6 +25,7 @@ required_files=(
   "app/ui/app/src/routes/skills.tsx"
   "app/ui/app/src/routes/plugins.tsx"
   "app/ui/app/src/routes/tasks.tsx"
+  "app/ui/app/src/routes/company.tsx"
 )
 
 for file in "${required_files[@]}"; do
@@ -31,7 +37,9 @@ grep -q 'allow_insecure_loopback' internal/multillm/registry.go
 grep -q 'safeConfig' server/agent_routes.go
 grep -q 'Nova tarefa' app/ui/app/src/components/AppSidebar.tsx
 grep -q 'Agentic Control Center' app/ui/app/src/components/AgenticControlCenter.tsx
-for route in projects library scheduled skills plugins tasks; do
+grep -q 'RemoteMCP' internal/agent/runtime.go
+grep -q 'mcp.remote.call' internal/agent/mcp_remote.go
+for route in projects library scheduled skills plugins tasks company; do
   grep -q "routes/${route}" app/ui/app/src/routeTree.gen.ts || {
     echo "route tree is missing /${route}" >&2
     exit 1

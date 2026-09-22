@@ -47,3 +47,13 @@ Os gates comprovados desta revisão incluem testes focados do runtime/server, bu
 - Endpoint JSON `GET /api/agent/v1/metrics` registrado para o Console e smoke E2E live cobrindo home, CRUD, Plugins, Skills e criação de missão.
 - Adapter HarnessRouter por OpenAI Responses-compatible com `harness_id` server-side, teste de preservação de metadata e preset [`examples/dz23-harnessrouter.json`](examples/dz23-harnessrouter.json); a execução real continua dependente de instância, chave e harness instalados.
 - Manual, matriz de paridade, roadmap, checkpoint de missão e screenshots atualizados.
+
+## Unreleased — Company OS e Desktop Commander Remote MCP — 2026-09-22
+
+- Company OS persistente tenant-aware em `internal/agent/company.go`, com identidade, posicionamento, modelo de negócio, departamentos virtuais, roadmap, metas/KPIs, backlog priorizado, ciclos diários/semanais, relatório operacional, budget, approvals, anomalias e pausa automática.
+- API `/api/agent/v1/companies` e rota `/company` com criação, seleção, atualização, roadmap, metas, backlog, ciclos ligados ao scheduler, pausa/retomada e registro de gasto.
+- Worker de schedules passou a respeitar `company://<id>` e não cria novas missões para uma empresa pausada.
+- Adapter `RemoteMCPManager` para Streamable HTTP com HTTPS fora de loopback, timeout, allowlist, bearer opcional por variável server-side e tool `mcp.remote.call` com approval.
+- Presets sem segredos para Desktop Commander local stdio e Remote MCP oficial em `examples/dz23-desktop-commander-mcp.json` e `examples/dz23-desktop-commander-remote.json`.
+- Documentação pública de Company OS, Desktop Commander, integração, API, matriz de paridade e estado honesto atualizada.
+- Verificações desta rodada: testes `internal/agent`, `server` e `internal/multillm`, testes JSON dos presets e build Vite/TypeScript aprovados. OAuth PKCE, pareamento, conta, agentes físicos, connectors de social/afiliados/dropshipping e operação empresarial real continuam dependências externas.

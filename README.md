@@ -18,7 +18,9 @@ Este repositório público reúne a base Ollama DZ23 e a evolução agentic do p
 
 ![Settings e Agentic Control Center](docs/images/screens/class-a-plus-settings.png)
 
-As imagens acima são capturas reais das rotas `/`, `/agentic` e `/settings`, produzidas contra um servidor Ollama local sem provider externo. A Settings mostra o Control Center sanitizado e mantém explícito quando uma capacidade não está configurada. Para conhecer a árvore completa, as telas planejadas de builder/mobile e os limites de cada integração, veja a [árvore de produto](docs/agentic/PRODUCT_TREE.md), a [matriz de paridade](docs/agentic/PARITY_MATRIX.md), a [integração HarnessRouter](docs/agentic/HARNESSROUTER.md) e a [galeria visual](docs/CLASS_A_PLUS_GUIDE.md#telas-e-estado-visual). Mockups conceituais são identificados como conceito dentro da própria imagem; eles não são apresentados como funcionalidades concluídas.
+![Company OS](docs/images/screens/class-a-plus-company.png)
+
+As imagens acima são capturas reais das rotas `/`, `/agentic`, `/settings` e `/company`, produzidas contra um servidor Ollama local sem provider externo. A Settings mostra o Control Center sanitizado e o Company OS mostra dados gerados pelo smoke test local. Para conhecer a árvore completa, as telas planejadas de builder/mobile e os limites de cada integração, veja a [árvore de produto](docs/agentic/PRODUCT_TREE.md), a [matriz de paridade](docs/agentic/PARITY_MATRIX.md), a [integração HarnessRouter](docs/agentic/HARNESSROUTER.md), a [documentação Company OS](docs/agentic/COMPANY_OS.md) e a [galeria visual](docs/CLASS_A_PLUS_GUIDE.md#telas-e-estado-visual). Mockups conceituais são identificados como conceito dentro da própria imagem; eles não são apresentados como funcionalidades concluídas.
 
 | Recurso | Documento |
 |---|---|
@@ -27,6 +29,8 @@ As imagens acima são capturas reais das rotas `/`, `/agentic` e `/settings`, pr
 | API e endpoints | [`agentic/API.md`](docs/agentic/API.md) |
 | Integrações, OAuth, SAML, MCP e deploy | [`agentic/INTEGRATIONS.md`](docs/agentic/INTEGRATIONS.md) |
 | HarnessRouter, UHP, Codex/Claude Code plugáveis | [`agentic/HARNESSROUTER.md`](docs/agentic/HARNESSROUTER.md) + [`dz23-harnessrouter.json`](examples/dz23-harnessrouter.json) |
+| Company OS: empresa, KPIs, backlog, ciclos e guardrails | [`agentic/COMPANY_OS.md`](docs/agentic/COMPANY_OS.md) |
+| Desktop Commander local e Remote MCP | [`agentic/DESKTOP_COMMANDER_REMOTE.md`](docs/agentic/DESKTOP_COMMANDER_REMOTE.md) + [`dz23-desktop-commander-remote.json`](examples/dz23-desktop-commander-remote.json) |
 | Roadmap e status por fase | [`agentic/ROADMAP.md`](docs/agentic/ROADMAP.md) |
 | Árvore Manus observável + Classe A+ unificado | [`agentic/PRODUCT_TREE.md`](docs/agentic/PRODUCT_TREE.md) |
 | Matriz de paridade e evidências | [`agentic/PARITY_MATRIX.md`](docs/agentic/PARITY_MATRIX.md) |

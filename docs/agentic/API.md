@@ -4,7 +4,7 @@ A primeira API agentic roda no mesmo listener do Ollama e é local-first. Ela cr
 
 ## Configuração
 
-Defina `OLLAMA_AGENT_ROOT` para o diretório que pode ser usado pelas missões. Por padrão, o runtime usa um diretório temporário do sistema. Defina `OLLAMA_AGENT_STORE` para o diretório persistente de missões e eventos. Se `OLLAMA_AGENT_MODEL` estiver definido, o runtime tenta usar esse modelo para gerar o plano JSON; em caso de erro, usa o planner determinístico seguro. `OLLAMA_AGENT_EMBED_MODEL` ativa memória semântica sobre a API `/api/embed`; `OLLAMA_AGENT_CONNECTORS` e `OLLAMA_AGENT_MCP` apontam para os manifestos de integração descritos em [INTEGRATIONS.md](INTEGRATIONS.md). `OLLAMA_AGENT_AUTH_STORE` habilita o store de identidade; `OLLAMA_AGENT_AUTH_REQUIRED=true` exige Bearer token; `OLLAMA_AGENT_CREDENTIAL_KEY` é obrigatório para persistir credenciais OAuth cifradas; `OLLAMA_AGENT_MEDIA_BASE_URL` e `OLLAMA_AGENT_MEDIA_API_KEY` ativam o adapter multimídia HTTPS.
+Defina `OLLAMA_AGENT_ROOT` para o diretório que pode ser usado pelas missões. Por padrão, o runtime usa um diretório temporário do sistema. Defina `OLLAMA_AGENT_STORE` para o diretório persistente de missões, eventos e empresas. Se `OLLAMA_AGENT_MODEL` estiver definido, o runtime tenta usar esse modelo para gerar o plano JSON; em caso de erro, usa o planner determinístico seguro. `OLLAMA_AGENT_EMBED_MODEL` ativa memória semântica sobre a API `/api/embed`; `OLLAMA_AGENT_CONNECTORS`, `OLLAMA_AGENT_MCP` e `OLLAMA_AGENT_REMOTE_MCP` apontam para os manifestos de integração descritos em [INTEGRATIONS.md](INTEGRATIONS.md). `OLLAMA_AGENT_AUTH_STORE` habilita o store de identidade; `OLLAMA_AGENT_AUTH_REQUIRED=true` exige Bearer token; `OLLAMA_AGENT_CREDENTIAL_KEY` é obrigatório para persistir credenciais OAuth cifradas; `OLLAMA_AGENT_MEDIA_BASE_URL` e `OLLAMA_AGENT_MEDIA_API_KEY` ativam o adapter multimídia HTTPS.
 
 ```bash
 export OLLAMA_AGENT_ROOT=/home/usuario/dz23-workspaces
@@ -13,6 +13,7 @@ export OLLAMA_AGENT_MODEL=qwen3-coder:latest
 export OLLAMA_AGENT_EMBED_MODEL=nomic-embed-text
 export OLLAMA_AGENT_CONNECTORS=/etc/ollama-dz23/agent-connectors.json
 export OLLAMA_AGENT_MCP=/etc/ollama-dz23/agent-mcp.json
+export OLLAMA_AGENT_REMOTE_MCP=/etc/ollama-dz23/agent-remote-mcp.json
 ollama serve
 ```
 
@@ -122,9 +123,30 @@ curl -sS -X POST http://localhost:11434/api/agent/v1/webhooks/SCHEDULE_ID \
   -d '{"event":"push","ref":"main"}'
 ```
 
+## Company OS
+
+Uma empresa é criada no tenant ativo e persistida em `OLLAMA_AGENT_STORE/companies`. A criação inicial gera CEO/Estratégia, Produto, Engenharia, Marketing, Vendas, Suporte e Operações. Roadmap, metas, backlog e ciclos são dados da empresa, não fixtures da UI.
+
+```bash
+curl -sS -X POST http://localhost:11434/api/agent/v1/companies \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Minha empresa","mission":"Resolver um problema real","business_model":"SaaS","budget":{"currency":"BRL","monthly_limit_cents":100000,"approval_threshold_cents":10000}}'
+
+curl -sS http://localhost:11434/api/agent/v1/companies
+curl -sS http://localhost:11434/api/agent/v1/companies/COMPANY_ID/report
+curl -sS -X POST http://localhost:11434/api/agent/v1/companies/COMPANY_ID/backlog \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"Validar oferta com clientes","priority":10,"owner_department":"sales"}'
+curl -sS -X POST http://localhost:11434/api/agent/v1/companies/COMPANY_ID/cycles \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Ciclo diário","objective":"Revisar métricas e executar o próximo item","frequency":"daily","interval_seconds":86400}'
+```
+
+Criar um ciclo também cria um schedule persistente com workspace `company://COMPANY_ID`. `POST /companies/COMPANY_ID/pause` impede que o worker crie novas missões para os ciclos dessa empresa. Gasto em anúncios/contratos ou acima do limiar exige `approved:true`; limite excedido e anomalias de alta severidade pausam a empresa.
+
 ## Tools da primeira fatia
 
-`workspace.list` lê entradas do workspace autorizado e limita a quantidade retornada. `workspace.read` lê no máximo 1 MiB e rejeita traversal. `workspace.write` exige approval, limita o payload, escreve com permissões restritas e cria um manifesto com tamanho e SHA-256. `terminal.exec` existe em modo conservador e só permite `pwd`, `ls` e `git status` com argumentos separados; shell interpolation e outros executáveis são bloqueados. `sandbox.exec` executa Python ou Node em user namespace, sem rede, com um bind apenas do workspace e limite de tempo/output; ainda exige approval. `browser.operator` usa Chromium/Playwright com perfil persistente por sessão, bloqueio SSRF, snapshot, click, fill, press, upload, download, screenshot e estado `approval_required` para takeover humano. `desktop.companion` possui adapters Linux, macOS e Windows para screenshot, mouse, teclado, clipboard e processos através de executáveis separados e sem shell concatenado. `mcp.call` usa JSON-RPC stdio com lifecycle, timeout, env allowlist e methods allowlisted. `connector.http` chama GitHub, Google, Slack, Discord ou WhatsApp somente por operação HTTPS declarada.
+`workspace.list` lê entradas do workspace autorizado e limita a quantidade retornada. `workspace.read` lê no máximo 1 MiB e rejeita traversal. `workspace.write` exige approval, limita o payload, escreve com permissões restritas e cria um manifesto com tamanho e SHA-256. `terminal.exec` existe em modo conservador e só permite `pwd`, `ls` e `git status` com argumentos separados; shell interpolation e outros executáveis são bloqueados. `sandbox.exec` executa Python ou Node em user namespace, sem rede, com um bind apenas do workspace e limite de tempo/output; ainda exige approval. `browser.operator` usa Chromium/Playwright com perfil persistente por sessão, bloqueio SSRF, snapshot, click, fill, press, upload, download, screenshot e estado `approval_required` para takeover humano. `desktop.companion` possui adapters Linux, macOS e Windows para screenshot, mouse, teclado, clipboard e processos através de executáveis separados e sem shell concatenado. `mcp.call` usa JSON-RPC stdio com lifecycle, timeout, env allowlist e methods allowlisted. `mcp.remote.call` usa Remote MCP Streamable HTTP, exige HTTPS fora de loopback, aceita bearer apenas por variável de ambiente e mantém allowlist de métodos; OAuth PKCE e pareamento do provedor são externos. `connector.http` chama GitHub, Google, Slack, Discord ou WhatsApp somente por operação HTTPS declarada.
 
 ## OAuth e organizações
 
