@@ -41,6 +41,7 @@ type Runtime struct {
 	deployments      *DeploymentManager
 	mu               *sync.Mutex
 	running          map[string]bool
+	activeCancels    map[string]context.CancelFunc
 }
 
 type RuntimeConfig struct {
@@ -159,7 +160,7 @@ func NewRuntime(config RuntimeConfig) (*Runtime, error) {
 			return nil, err
 		}
 	}
-	runtime := &Runtime{store: store, planner: planner, tools: tools, capabilityPolicy: capabilityPolicy, workspaceRoot: root, context: contextStore, company: companyStore, remoteMCP: config.RemoteMCP, metrics: &RuntimeMetrics{}, connectors: config.Connectors, mcp: config.MCP, queue: queue, redisQueue: config.RedisQueue, traces: traces, telemetry: telemetry, media: config.Media, builder: builder, collaboration: collaboration, push: config.Push, deployments: config.Deployments, mu: &sync.Mutex{}, running: make(map[string]bool)}
+	runtime := &Runtime{store: store, planner: planner, tools: tools, capabilityPolicy: capabilityPolicy, workspaceRoot: root, context: contextStore, company: companyStore, remoteMCP: config.RemoteMCP, metrics: &RuntimeMetrics{}, connectors: config.Connectors, mcp: config.MCP, queue: queue, redisQueue: config.RedisQueue, traces: traces, telemetry: telemetry, media: config.Media, builder: builder, collaboration: collaboration, push: config.Push, deployments: config.Deployments, mu: &sync.Mutex{}, running: make(map[string]bool), activeCancels: make(map[string]context.CancelFunc)}
 	orchestrator, err := NewAgentOrchestrator(filepath.Join(root, ".agent-orchestrator"), runtime.SubagentRunner)
 	if err != nil {
 		return nil, err
@@ -548,16 +549,21 @@ func (r *Runtime) Run(ctx context.Context, id string) (runErr error) {
 	if id == "" {
 		return errors.New("mission id is required")
 	}
+	runCtx, cancel := context.WithCancel(ctx)
 	r.mu.Lock()
 	if r.running[id] {
 		r.mu.Unlock()
+		cancel()
 		return nil
 	}
 	r.running[id] = true
+	r.activeCancels[id] = cancel
 	r.mu.Unlock()
 	defer func() {
+		cancel()
 		r.mu.Lock()
 		delete(r.running, id)
+		delete(r.activeCancels, id)
 		r.mu.Unlock()
 	}()
 
@@ -585,6 +591,9 @@ func (r *Runtime) Run(ctx context.Context, id string) (runErr error) {
 	_ = r.event(mission, "mission.running", "", nil)
 
 	for index := 0; index < len(mission.Plan); index++ {
+		if r.missionCancelled(id) {
+			return nil
+		}
 		step := &mission.Plan[index]
 		if step.State == StepSucceeded {
 			continue
@@ -620,8 +629,11 @@ func (r *Runtime) Run(ctx context.Context, id string) (runErr error) {
 		}
 		_ = r.event(mission, "step.started", step.ID, map[string]any{"tool": step.Kind, "attempt": step.Attempts})
 		toolSpan := r.traces.StartForOrganization(mission.OrganizationID, "tr_"+mission.ID, missionSpan.ID(), "tool."+step.Kind, map[string]any{"mission_id": mission.ID, "step_id": step.ID, "tool": step.Kind})
-		result, executeErr := tool.Execute(ctx, ToolContext{MissionID: mission.ID, StepID: step.ID, Workspace: mission.Workspace, OrganizationID: mission.OrganizationID}, step.Input)
+		result, executeErr := tool.Execute(runCtx, ToolContext{MissionID: mission.ID, StepID: step.ID, Workspace: mission.Workspace, OrganizationID: mission.OrganizationID}, step.Input)
 		toolSpan.End("ok", executeErr)
+		if r.missionCancelled(id) {
+			return nil
+		}
 		if executeErr != nil {
 			if step.Attempts < 2 {
 				r.metrics.retries.Add(1)
@@ -649,6 +661,9 @@ func (r *Runtime) Run(ctx context.Context, id string) (runErr error) {
 		}
 		_ = r.event(mission, "step.succeeded", step.ID, map[string]any{"artifacts": len(result.Artifacts)})
 	}
+	if r.missionCancelled(id) {
+		return nil
+	}
 	completed := time.Now().UTC()
 	mission.State = MissionCompleted
 	r.metrics.missionsCompleted.Add(1)
@@ -663,18 +678,37 @@ func (r *Runtime) Run(ctx context.Context, id string) (runErr error) {
 }
 
 func (r *Runtime) Cancel(id string) (Mission, error) {
-	mission, err := r.store.GetMission(strings.TrimSpace(id))
+	id = strings.TrimSpace(id)
+	mission, err := r.store.GetMission(id)
 	if err != nil {
 		return Mission{}, err
 	}
 	if mission.State == MissionCompleted {
 		return Mission{}, errors.New("completed mission cannot be cancelled")
 	}
+	r.mu.Lock()
+	cancel := r.activeCancels[id]
+	r.mu.Unlock()
+	if mission.State == MissionCancelled {
+		if cancel != nil {
+			cancel()
+		}
+		return mission, nil
+	}
+	for index := range mission.Plan {
+		if mission.Plan[index].State == StepPending || mission.Plan[index].State == StepRunning || mission.Plan[index].State == StepBlocked {
+			mission.Plan[index].State = StepBlocked
+			mission.Plan[index].Error = "mission cancelled"
+		}
+	}
 	mission.State = MissionCancelled
 	mission.Version++
 	mission.UpdatedAt = time.Now().UTC()
 	if err := r.store.PutMission(mission); err != nil {
 		return Mission{}, err
+	}
+	if cancel != nil {
+		cancel()
 	}
 	_ = r.event(mission, "mission.cancelled", "", nil)
 	return mission, nil
@@ -743,14 +777,28 @@ func (r *Runtime) decideApprovalForActor(missionID, approvalID string, approved 
 		}
 		mission.Version++
 		mission.UpdatedAt = time.Now().UTC()
-		if err := r.store.PutMission(mission); err != nil {
-			return Mission{}, err
+		var saveErr error
+		if requireNonce {
+			saveErr = r.store.PutMissionIfVersion(mission, expectedVersion)
+			if errors.Is(saveErr, ErrMissionVersionConflict) {
+				saveErr = ErrApprovalVersionConflict
+			}
+		} else {
+			saveErr = r.store.PutMission(mission)
+		}
+		if saveErr != nil {
+			return Mission{}, saveErr
 		}
 		r.metrics.approvals.Add(1)
 		_ = r.event(mission, "approval.decided", mission.Approvals[index].StepID, map[string]any{"approved": approved, "reason": reason})
 		return mission, nil
 	}
 	return Mission{}, errors.New("approval not found or already decided")
+}
+
+func (r *Runtime) missionCancelled(id string) bool {
+	mission, err := r.store.GetMission(strings.TrimSpace(id))
+	return err == nil && mission.State == MissionCancelled
 }
 
 func (r *Runtime) Events(id string) ([]Event, error) {

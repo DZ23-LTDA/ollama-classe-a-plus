@@ -10,6 +10,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -200,6 +202,80 @@ func (p fixedPlanner) Plan(_ context.Context, _ Mission) ([]Step, error) {
 	return append([]Step(nil), p.steps...), nil
 }
 
+type cancellationProbeTool struct {
+	started chan struct{}
+	release chan struct{}
+	calls   atomic.Int32
+}
+
+func (t *cancellationProbeTool) Descriptor() ToolDescriptor {
+	return ToolDescriptor{Name: "workspace.read", Version: "test", Description: "cancellation probe", Risk: RiskRead, Scopes: []string{"workspace:read"}}
+}
+
+func (t *cancellationProbeTool) Execute(ctx context.Context, _ ToolContext, _ map[string]any) (ToolResult, error) {
+	call := t.calls.Add(1)
+	if call == 1 {
+		close(t.started)
+		select {
+		case <-ctx.Done():
+			return ToolResult{}, ctx.Err()
+		case <-t.release:
+		}
+	}
+	return ToolResult{Value: map[string]any{"calls": call}}, nil
+}
+
+func TestRuntimeCancelInterruptsActiveToolAndPreventsNextStep(t *testing.T) {
+	probe := &cancellationProbeTool{started: make(chan struct{}), release: make(chan struct{})}
+	registry := NewRegistry()
+	registry.Register(probe)
+	runtime, err := NewRuntime(RuntimeConfig{
+		Store:         NewMemoryStore(),
+		Tools:         registry,
+		WorkspaceRoot: t.TempDir(),
+		Planner: fixedPlanner{steps: []Step{
+			{ID: "step_1", Kind: "workspace.read", Title: "blocking", Risk: RiskRead, State: StepPending},
+			{ID: "step_2", Kind: "workspace.read", Title: "must not run", Risk: RiskRead, State: StepPending},
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mission, err := runtime.CreateMission(context.Background(), CreateMissionRequest{Objective: "cancel active tool"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	runDone := make(chan error, 1)
+	go func() { runDone <- runtime.Run(context.Background(), mission.ID) }()
+	select {
+	case <-probe.started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("tool did not start")
+	}
+	if _, err := runtime.Cancel(mission.ID); err != nil {
+		t.Fatal(err)
+	}
+	close(probe.release)
+	select {
+	case err := <-runDone:
+		if err != nil {
+			t.Fatalf("cancelled run returned error: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("cancelled tool did not stop")
+	}
+	cancelled, err := runtime.GetMission(mission.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cancelled.State != MissionCancelled {
+		t.Fatalf("state = %s, want CANCELLED", cancelled.State)
+	}
+	if calls := probe.calls.Load(); calls != 1 {
+		t.Fatalf("tool calls = %d, want exactly one", calls)
+	}
+}
+
 type dlpResultTool struct{}
 
 func (dlpResultTool) Descriptor() ToolDescriptor {
@@ -384,6 +460,52 @@ func TestApprovalCASAndNonceAreSingleUse(t *testing.T) {
 	}
 	if _, err := runtime.DecideApprovalForActorCAS(mission.ID, approval.ID, true, "replay", "admin_a", "org_a", decided.Version, approval.Nonce); err == nil {
 		t.Fatal("approval nonce was reusable")
+	}
+}
+
+func TestApprovalCASConcurrentDecisionsHaveOneWinner(t *testing.T) {
+	runtime, err := NewRuntime(RuntimeConfig{Store: NewMemoryStore(), WorkspaceRoot: t.TempDir(), Planner: fixedPlanner{steps: []Step{{ID: "step_1", Kind: "workspace.write", Title: "write", Risk: RiskWrite, RequiresApproval: true, Input: map[string]any{"path": "approval-concurrent.txt", "content": "ok"}}}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mission, err := runtime.CreateMission(context.Background(), CreateMissionRequest{Objective: "approval concurrent CAS", OrganizationID: "org_a"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	approval := mission.Approvals[0]
+	start := make(chan struct{})
+	results := make(chan error, 2)
+	var group sync.WaitGroup
+	for _, actor := range []string{"admin_a", "admin_b"} {
+		group.Add(1)
+		go func(actor string) {
+			defer group.Done()
+			<-start
+			_, decideErr := runtime.DecideApprovalForActorCAS(mission.ID, approval.ID, true, "approved", actor, "org_a", mission.Version, approval.Nonce)
+			results <- decideErr
+		}(actor)
+	}
+	close(start)
+	group.Wait()
+	close(results)
+	winners := 0
+	conflicts := 0
+	for decideErr := range results {
+		if decideErr == nil {
+			winners++
+		} else if errors.Is(decideErr, ErrApprovalVersionConflict) {
+			conflicts++
+		}
+	}
+	if winners != 1 || conflicts != 1 {
+		t.Fatalf("winners=%d conflicts=%d", winners, conflicts)
+	}
+	decided, err := runtime.GetMission(mission.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if decided.Approvals[0].Status != ApprovalApproved {
+		t.Fatalf("approval status = %s, want APPROVED", decided.Approvals[0].Status)
 	}
 }
 

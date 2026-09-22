@@ -15,9 +15,12 @@ type Store interface {
 	GetMission(id string) (Mission, error)
 	ListMissions() ([]Mission, error)
 	PutMission(mission Mission) error
+	PutMissionIfVersion(mission Mission, expectedVersion int64) error
 	AppendEvent(event Event) error
 	ListEvents(missionID string) ([]Event, error)
 }
+
+var ErrMissionVersionConflict = errors.New("mission version conflict")
 
 type JSONStore struct {
 	mu         sync.RWMutex
@@ -87,6 +90,24 @@ func (s *JSONStore) PutMission(mission Mission) error {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.missions[mission.ID] = cloneMission(mission)
+	if !s.persistent {
+		return nil
+	}
+	path := filepath.Join(s.root, "missions", mission.ID+".json")
+	return writeJSONAtomic(path, redactMissionForPersistence(mission))
+}
+
+func (s *JSONStore) PutMissionIfVersion(mission Mission, expectedVersion int64) error {
+	if strings.TrimSpace(mission.ID) == "" {
+		return errors.New("mission id is required")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	current, ok := s.missions[mission.ID]
+	if !ok || current.Version != expectedVersion {
+		return ErrMissionVersionConflict
+	}
 	s.missions[mission.ID] = cloneMission(mission)
 	if !s.persistent {
 		return nil

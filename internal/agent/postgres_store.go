@@ -221,6 +221,45 @@ func (s *PostgresStore) PutMission(mission Mission) error {
 	return tx.Commit()
 }
 
+func (s *PostgresStore) PutMissionIfVersion(mission Mission, expectedVersion int64) error {
+	if strings.TrimSpace(mission.ID) == "" {
+		return errors.New("mission id is required")
+	}
+	if !s.systemAccess && strings.TrimSpace(mission.OrganizationID) != s.organizationID {
+		return os.ErrPermission
+	}
+	mission = redactMissionForPersistence(mission)
+	plan, err := json.Marshal(mission.Plan)
+	if err != nil {
+		return err
+	}
+	approvals, err := json.Marshal(mission.Approvals)
+	if err != nil {
+		return err
+	}
+	artifacts, err := json.Marshal(mission.Artifacts)
+	if err != nil {
+		return err
+	}
+	tx, err := s.begin(context.Background())
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	result, err := tx.Exec(`UPDATE agent_missions SET version=$1,objective=$2,model=$3,workspace=$4,project_id=$5,organization_id=$6,auto_run=$7,state=$8,plan=$9,approvals=$10,artifacts=$11,last_error=$12,updated_at=$13,completed_at=$14 WHERE id=$15 AND version=$16`, mission.Version, mission.Objective, mission.Model, mission.Workspace, mission.ProjectID, mission.OrganizationID, mission.AutoRun, mission.State, plan, approvals, artifacts, mission.LastError, mission.UpdatedAt, mission.CompletedAt, mission.ID, expectedVersion)
+	if err != nil {
+		return err
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows != 1 {
+		return ErrMissionVersionConflict
+	}
+	return tx.Commit()
+}
+
 func (s *PostgresStore) AppendEvent(event Event) error {
 	if event.ID == "" || event.MissionID == "" {
 		return errors.New("event id and mission id are required")
