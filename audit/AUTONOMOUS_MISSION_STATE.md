@@ -1400,3 +1400,20 @@ classification: preview/local RC em hardening
 open_risks: distributed RLS/DLQ/OTLP proof, production TLS/secrets manager
 next_action: commit/push, then continue remaining P0/P1s; no main merge
 ```
+
+
+## Publicação da slice P0 Compose/infrastructure defaults — 2026-09-22
+
+```yaml
+state: FIXING
+iteration: 22
+commit: a07d1a68
+branch: feat/manus-parity-omniroute
+remote: https://github.com/DZ23-LTDA/ollama-classe-a-plus.git
+pull_request: https://github.com/DZ23-LTDA/ollama-classe-a-plus/pull/1
+working_tree: checkpoint pending commit
+published: true
+proofs: integrity/static Compose checks and diff check PASS; Docker integration remains NOT_RUN_DOCKER_UNAVAILABLE
+classification: preview/local RC em hardening
+next_slice: continue remaining P0/P1s, especially provider/runtime UI contracts and release evidence; no main merge
+```
