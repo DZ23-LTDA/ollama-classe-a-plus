@@ -221,3 +221,8 @@ Connectors, MCP stdio, Remote MCP e skills passaram a carregar ownership opciona
 ## 2026-09-22 — CI/release quality gates
 
 O workflow agentic passou a verificar suíte Go completa, vet, build, UI tests/build e mobile typecheck. O release workflow ganhou quality gate obrigatório antes dos builds e da publicação; signing, SBOM e provenance continuam condicionais ao ambiente GitHub/credenciais reais.
+
+
+## 2026-09-22 — Grok provider contract
+
+Grok passou a validar modelo contra allowlist e catálogo no health probe; a rota HTTP rejeita `stream:true` explicitamente até existir endpoint SSE de produção.

@@ -134,6 +134,10 @@ grep -q 'npm test -- --run' .github/workflows/dz23-agentic-quality.yaml
 grep -q 'npm run build' .github/workflows/dz23-agentic-quality.yaml
 grep -q 'CGO_ENABLED=1 go vet ./...' .github/workflows/dz23-agentic-quality.yaml
 grep -q 'needs: \[darwin-build, windows-app, docker-build-push, quality\]' .github/workflows/release.yaml
+grep -q 'ErrModelNotAllowed' internal/grok/client.go
+grep -q 'validateCatalogModel' internal/grok/client.go
+grep -q 'Grok streaming is not exposed' server/grok_routes.go
+grep -q 'TestGrokResponsesRejectsStreamBeforeUpstream' server/grok_routes_test.go
 grep -q 'Capabilities' internal/agent/runtime.go
 grep -q 'Evaluation' internal/agent/evaluation.go
 for route in projects library scheduled skills plugins tasks company; do

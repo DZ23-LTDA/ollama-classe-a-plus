@@ -80,6 +80,7 @@ type Client struct {
 	BaseURL               string
 	APIKey                string
 	Model                 string
+	AllowedModels         []string
 	HTTPClient            *http.Client
 	AllowInsecureLoopback bool
 	MaxRetries            int
@@ -91,8 +92,10 @@ type Client struct {
 }
 
 var (
-	ErrInvalidBaseURL = errors.New("grok base URL must use HTTPS; insecure HTTP is allowed only for loopback tests")
-	ErrCircuitOpen    = errors.New("grok provider circuit is open")
+	ErrInvalidBaseURL       = errors.New("grok base URL must use HTTPS; insecure HTTP is allowed only for loopback tests")
+	ErrCircuitOpen          = errors.New("grok provider circuit is open")
+	ErrModelNotAllowed      = errors.New("grok model is not allowlisted")
+	ErrStreamingUnsupported = errors.New("grok HTTP route does not expose streaming")
 )
 
 func NewClient(baseURL, apiKey, model string) (*Client, error) {
@@ -101,7 +104,53 @@ func NewClient(baseURL, apiKey, model string) (*Client, error) {
 	if err != nil || parsed.Host == "" || parsed.User != nil || (parsed.Scheme != "https" && !(parsed.Scheme == "http" && isLoopback(parsed.Hostname()))) {
 		return nil, ErrInvalidBaseURL
 	}
-	return &Client{BaseURL: baseURL, APIKey: strings.TrimSpace(apiKey), Model: strings.TrimSpace(model), HTTPClient: &http.Client{Timeout: 60 * time.Second}, MaxRetries: 2, Backoff: 150 * time.Millisecond}, nil
+	model = strings.TrimSpace(model)
+	client := &Client{BaseURL: baseURL, APIKey: strings.TrimSpace(apiKey), Model: model, HTTPClient: &http.Client{Timeout: 60 * time.Second}, MaxRetries: 2, Backoff: 150 * time.Millisecond}
+	if model != "" {
+		client.AllowedModels = []string{model}
+	}
+	return client, nil
+}
+
+func (c *Client) SetAllowedModels(models ...string) error {
+	allowed := make([]string, 0, len(models))
+	seen := make(map[string]struct{}, len(models))
+	for _, model := range models {
+		model = strings.TrimSpace(model)
+		if model == "" {
+			continue
+		}
+		if _, ok := seen[model]; ok {
+			continue
+		}
+		seen[model] = struct{}{}
+		allowed = append(allowed, model)
+	}
+	if len(allowed) == 0 {
+		return ErrModelNotAllowed
+	}
+	c.AllowedModels = allowed
+	return nil
+}
+
+func (c *Client) validateModel(model string) error {
+	model = strings.TrimSpace(model)
+	if model == "" {
+		model = strings.TrimSpace(c.Model)
+	}
+	if model == "" {
+		return errors.New("grok model is required")
+	}
+	allowed := c.AllowedModels
+	if len(allowed) == 0 {
+		allowed = []string{c.Model}
+	}
+	for _, candidate := range allowed {
+		if model == strings.TrimSpace(candidate) {
+			return nil
+		}
+	}
+	return fmt.Errorf("%w: %s", ErrModelNotAllowed, model)
 }
 
 func (c *Client) endpoint(path string) string {
@@ -114,11 +163,14 @@ func (c *Client) endpoint(path string) string {
 }
 
 func (c *Client) Responses(ctx context.Context, request ResponseRequest) (Response, error) {
+	if request.Stream {
+		return Response{}, ErrStreamingUnsupported
+	}
 	if strings.TrimSpace(request.Model) == "" {
 		request.Model = c.Model
 	}
-	if strings.TrimSpace(request.Model) == "" {
-		return Response{}, errors.New("grok model is required")
+	if err := c.validateModel(request.Model); err != nil {
+		return Response{}, err
 	}
 	payload, err := json.Marshal(request)
 	if err != nil {
@@ -151,8 +203,8 @@ func (c *Client) StreamResponses(ctx context.Context, request ResponseRequest, o
 	if strings.TrimSpace(request.Model) == "" {
 		request.Model = c.Model
 	}
-	if request.Model == "" {
-		return errors.New("grok model is required")
+	if err := c.validateModel(request.Model); err != nil {
+		return err
 	}
 	request.Stream = true
 	payload, err := json.Marshal(request)
@@ -243,9 +295,38 @@ func (c *Client) Probe(ctx context.Context) ProviderStatus {
 		status.State, status.LastError = StatusUnavailable, fmt.Sprintf("HTTP %d: %s", code, truncate(string(body), 300))
 		return status
 	}
+	if err := c.validateCatalogModel(body); err != nil {
+		status.State, status.LastError = StatusUnavailable, err.Error()
+		return status
+	}
 	status.Healthy = true
 	status.State = StatusHealthy
 	return status
+}
+
+func (c *Client) validateCatalogModel(body []byte) error {
+	var payload struct {
+		Data []struct {
+			ID string `json:"id"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return fmt.Errorf("decode Grok model catalog: %w", err)
+	}
+	allowed := c.AllowedModels
+	if len(allowed) == 0 {
+		allowed = []string{c.Model}
+	}
+	available := make(map[string]struct{}, len(payload.Data))
+	for _, item := range payload.Data {
+		available[strings.TrimSpace(item.ID)] = struct{}{}
+	}
+	for _, model := range allowed {
+		if _, ok := available[strings.TrimSpace(model)]; ok {
+			return nil
+		}
+	}
+	return fmt.Errorf("configured Grok model is not present in provider catalog")
 }
 
 func (c *Client) LastStatus() ProviderStatus {

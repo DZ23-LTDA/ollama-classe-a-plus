@@ -240,3 +240,8 @@ Lifecycle autenticado agora é tenant-aware para Connector, MCP stdio, Remote MC
 ## Incremento 2026-09-22 — CI/release quality gates
 
 CI agora cobre Go/UI/mobile de forma explícita e o release depende desse quality job. A próxima validação deve ocorrer no GitHub Actions com Docker/RLS/Redis/OTLP, runners físicos e credenciais de assinatura; o sandbox local não substitui essas provas.
+
+
+## Incremento 2026-09-22 — Grok/provider contract
+
+O contrato Grok agora rejeita modelo arbitrário, valida catálogo no health e não promete streaming HTTP ainda. A próxima etapa de paridade é expor uma rota SSE com backpressure/cancelamento e testes reais contra o provider, sem esconder falhas de credencial.

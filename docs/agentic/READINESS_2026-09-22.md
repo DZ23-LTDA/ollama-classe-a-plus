@@ -200,3 +200,10 @@ Regressões criam recursos em `org-a` e `org-b`, confirmam filtragem de lista e 
 O workflow `dz23-agentic-quality` foi corrigido para YAML válido, removeu `npm ci` sem lockfile do mobile, e passou a executar typecheck, Vitest e build de produção da UI além de typecheck mobile, integrity, suíte Go completa, vet e build. O Browser Operator mantém instalação e fallback explícito do Chromium. O workflow de release ganhou um job `quality` independente com esses gates e todos os builds/publicação dependem dele; isso bloqueia publicação de tag quando a qualidade falha.
 
 A validação local confirmou parser YAML, integrity guard e `git diff --check`. Esta sandbox não executa GitHub Actions, Docker distribuído, builds físicos macOS/Windows nem signing. SBOM/provenance/attestation continuam dependentes do runner e das credenciais/configurações de release; não foram declarados como concluídos localmente.
+
+
+## Slice P1 de Grok/provider contract — 2026-09-22
+
+O cliente Grok agora rejeita modelos fora de uma allowlist server-configured (`OLLAMA_AGENT_GROK_MODELS`, com o modelo padrão como fallback), e `Probe` só marca o provider como saudável quando o catálogo remoto contém pelo menos um modelo configurado. A rota HTTP `/api/agent/v1/grok/responses` rejeita `stream:true` com `501 Not Implemented` antes de chamar o upstream, evitando declarar streaming de produção quando o handler não expõe SSE; a API interna `StreamResponses` permanece testada para uma futura rota dedicada.
+
+Testes cobrem modelo arbitrário, stream rejeitado, catálogo compatível/incompatível, allowlist por ambiente e não chamada ao upstream. Gates completos Go/integrity/build/UI/mobile passaram. Nenhuma credencial xAI foi usada ou declarada conectada; health real contra xAI continua dependente de credencial válida e ambiente autorizado.

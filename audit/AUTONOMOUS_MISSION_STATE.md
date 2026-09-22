@@ -1335,3 +1335,28 @@ proofs: YAML parser, integrity guard and diff check PASS; CI now declares full G
 classification: preview/local RC em hardening
 next_slice: continue remaining P0s, especially runtime/provider contracts and release evidence; no main merge
 ```
+
+
+## Slice P1 Grok/provider contract validada — aguardando publicação — 2026-09-22
+
+```yaml
+state: RELEASING
+iteration: 21
+base_commit: 111a6328
+working_tree: Grok contract changes/tests/docs still uncommitted
+implemented:
+  - configured model allowlist
+  - provider catalog validation in health probe
+  - HTTP stream:true explicit 501 until SSE route exists
+  - negative tests for arbitrary model, stream and upstream avoidance
+proofs:
+  - integrity guard: PASS
+  - CGO_ENABLED=1 go test ./... -count=1: PASS
+  - CGO_ENABLED=1 go vet ./...: PASS
+  - CGO_ENABLED=1 go build: PASS
+  - UI Vitest/build: PASS; known >500KB warning
+  - mobile typecheck: PASS
+classification: preview/local RC em hardening
+open_risks: xAI credential/real provider validation, production SSE, remaining provider UI contracts
+next_action: commit/push, then continue remaining P0/P1s; no main merge
+```

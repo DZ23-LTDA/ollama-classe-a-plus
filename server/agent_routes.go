@@ -64,7 +64,17 @@ func newAgentGrokClient() (*grok.Client, error) {
 	if model == "" {
 		model = "grok-4"
 	}
-	return grok.NewClient(baseURL, os.Getenv("XAI_API_KEY"), model)
+	client, err := grok.NewClient(baseURL, os.Getenv("XAI_API_KEY"), model)
+	if err != nil {
+		return nil, err
+	}
+	if raw := strings.TrimSpace(os.Getenv("OLLAMA_AGENT_GROK_MODELS")); raw != "" {
+		models := strings.FieldsFunc(raw, func(r rune) bool { return r == ',' || r == '\n' || r == '\t' || r == ' ' })
+		if err := client.SetAllowedModels(models...); err != nil {
+			return nil, fmt.Errorf("OLLAMA_AGENT_GROK_MODELS: %w", err)
+		}
+	}
+	return client, nil
 }
 
 func agentAuthRequired() (bool, error) {

@@ -29,6 +29,10 @@ func (a *agentAPI) grokResponses(c *gin.Context) {
 		writeAgentError(c, http.StatusBadRequest, err)
 		return
 	}
+	if request.Stream {
+		writeAgentError(c, http.StatusNotImplemented, errors.New("Grok streaming is not exposed by this route yet"))
+		return
+	}
 	response, err := a.grok.Responses(c.Request.Context(), request)
 	if err != nil {
 		writeAgentError(c, http.StatusBadGateway, err)

@@ -181,3 +181,8 @@ Lifecycle autenticado de Connector, MCP stdio, Remote MCP e Skill agora exige ow
 ## Slice P0 validada — CI/release quality gates — 2026-09-22
 
 Quality CI corrigiu indentação do Browser Operator e adicionou Go full/vet/build, UI Vitest/build e mobile typecheck. Release ganhou job de quality obrigatório para builds e publicação. Ações GitHub, Docker distribuído, runners físicos, signing e attestation ainda precisam de execução real; a alteração não os finge concluídos.
+
+
+## Slice P1 validada — Grok/provider contract — 2026-09-22
+
+Modelos Grok agora são allowlisted e o health probe valida catálogo. O endpoint HTTP rejeita stream antes do upstream com `501`, mantendo a capacidade interna de streaming separada de uma promessa pública. Credenciais xAI e streaming real continuam não comprovados externamente.

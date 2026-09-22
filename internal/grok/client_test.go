@@ -2,6 +2,7 @@ package grok
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -29,6 +30,45 @@ func TestResponsesUsesBearerAndDecodesOutput(t *testing.T) {
 	}
 	if response.ID != "resp_1" || response.OutputText != "hello" || response.Usage.TotalTokens != 7 {
 		t.Fatalf("response = %+v", response)
+	}
+}
+
+func TestResponsesRejectsUnallowlistedModelAndStream(t *testing.T) {
+	client, err := NewClient("http://127.0.0.1:1", "key", "grok-4")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.Responses(context.Background(), ResponseRequest{Model: "grok-arbitrary", Input: "hi"}); !errors.Is(err, ErrModelNotAllowed) {
+		t.Fatalf("model error = %v", err)
+	}
+	if _, err := client.Responses(context.Background(), ResponseRequest{Stream: true, Input: "hi"}); !errors.Is(err, ErrStreamingUnsupported) {
+		t.Fatalf("stream error = %v", err)
+	}
+}
+
+func TestProbeValidatesConfiguredModelCatalog(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/models" {
+			t.Fatalf("path = %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":[{"id":"grok-4"}]}`))
+	}))
+	defer server.Close()
+	client, err := NewClient(server.URL, "key", "grok-4")
+	if err != nil {
+		t.Fatal(err)
+	}
+	status := client.Probe(context.Background())
+	if !status.Healthy {
+		t.Fatalf("healthy status = %+v", status)
+	}
+	if err := client.SetAllowedModels("grok-4.1"); err != nil {
+		t.Fatal(err)
+	}
+	status = client.Probe(context.Background())
+	if status.Healthy || status.LastError == "" {
+		t.Fatalf("unexpected missing-model status = %+v", status)
 	}
 }
 
