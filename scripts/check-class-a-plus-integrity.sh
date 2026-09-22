@@ -124,6 +124,12 @@ grep -q 'runToolCommand' internal/agent/tools.go
 grep -q 'ulimit -t 55' internal/agent/tools.go
 grep -q 'TestRunToolCommandKillsProcessGroupOnCancellation' internal/agent/tools_test.go
 grep -q 'best-effort-unshare' internal/agent/tools.go
+grep -q 'ErrPluginOrganizationScope' internal/agent/plugin_scope.go
+grep -q 'SetEnabledForOrganization' internal/agent/connectors.go
+grep -q 'ListForOrganization' internal/agent/mcp.go
+grep -q 'SkillsForOrganization' internal/agent/context.go
+grep -q 'TestPluginManagersEnforceOrganizationOwnership' internal/agent/plugin_scope_test.go
+grep -q 'pluginCatalog' server/plugin_routes.go
 grep -q 'Capabilities' internal/agent/runtime.go
 grep -q 'Evaluation' internal/agent/evaluation.go
 for route in projects library scheduled skills plugins tasks company; do

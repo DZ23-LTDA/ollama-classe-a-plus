@@ -19,6 +19,7 @@ import (
 
 type ConnectorConfig struct {
 	ID             string               `json:"id"`
+	OrganizationID string               `json:"organization_id,omitempty"`
 	Provider       string               `json:"provider"`
 	BaseURL        string               `json:"base_url"`
 	TokenEnv       string               `json:"token_env,omitempty"`
@@ -111,6 +112,22 @@ func (m *ConnectorManager) List() []ConnectorConfig {
 	return result
 }
 
+func (m *ConnectorManager) ListForOrganization(organizationID string) []ConnectorConfig {
+	organizationID = strings.TrimSpace(organizationID)
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	result := make([]ConnectorConfig, 0)
+	for _, connector := range m.connectors {
+		if connector.OrganizationID != "" && !pluginOwnedByOrganization(connector.OrganizationID, organizationID) {
+			continue
+		}
+		copy := connector
+		copy.TokenEnv = ""
+		result = append(result, copy)
+	}
+	return result
+}
+
 func (m *ConnectorManager) SetEnabled(id string, enabled bool) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -124,12 +141,42 @@ func (m *ConnectorManager) SetEnabled(id string, enabled bool) error {
 	return nil
 }
 
+func (m *ConnectorManager) SetEnabledForOrganization(organizationID, id string, enabled bool) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	connector, ok := m.connectors[strings.TrimSpace(id)]
+	if !ok {
+		return fmt.Errorf("connector %q is not registered", id)
+	}
+	if !pluginOwnedByOrganization(connector.OrganizationID, strings.TrimSpace(organizationID)) {
+		return ErrPluginOrganizationScope
+	}
+	connector.Disabled = !enabled
+	m.connectors[connector.ID] = connector
+	return nil
+}
+
 func (m *ConnectorManager) Remove(id string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	id = strings.TrimSpace(id)
 	if _, ok := m.connectors[id]; !ok {
 		return fmt.Errorf("connector %q is not registered", id)
+	}
+	delete(m.connectors, id)
+	return nil
+}
+
+func (m *ConnectorManager) RemoveForOrganization(organizationID, id string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	id = strings.TrimSpace(id)
+	connector, ok := m.connectors[id]
+	if !ok {
+		return fmt.Errorf("connector %q is not registered", id)
+	}
+	if !pluginOwnedByOrganization(connector.OrganizationID, strings.TrimSpace(organizationID)) {
+		return ErrPluginOrganizationScope
 	}
 	delete(m.connectors, id)
 	return nil

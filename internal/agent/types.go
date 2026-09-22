@@ -174,13 +174,14 @@ type Memory struct {
 }
 
 type SkillManifest struct {
-	ID          string   `json:"id"`
-	Version     string   `json:"version"`
-	Description string   `json:"description"`
-	Scopes      []string `json:"scopes,omitempty"`
-	Tools       []string `json:"tools,omitempty"`
-	Trusted     bool     `json:"trusted"`
-	Enabled     bool     `json:"enabled"`
+	ID             string   `json:"id"`
+	OrganizationID string   `json:"organization_id,omitempty"`
+	Version        string   `json:"version"`
+	Description    string   `json:"description"`
+	Scopes         []string `json:"scopes,omitempty"`
+	Tools          []string `json:"tools,omitempty"`
+	Trusted        bool     `json:"trusted"`
+	Enabled        bool     `json:"enabled"`
 }
 
 type Schedule struct {

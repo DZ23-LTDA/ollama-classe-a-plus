@@ -1,6 +1,7 @@
 package server
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -21,12 +22,34 @@ func (a *agentAPI) requirePluginAdmin(c *gin.Context) bool {
 }
 
 func pluginCatalog(c *gin.Context, a *agentAPI) {
+	organizationID := ""
+	if a.authRequired {
+		organizationID = agentOrganizationID(c)
+	}
+	connectors := a.runtime.Connectors()
+	mcp := a.runtime.MCPServers()
+	remoteMCP := a.runtime.RemoteMCPServers()
+	skills := a.context.Skills()
+	if a.authRequired {
+		connectors = a.runtime.ConnectorsForOrganization(organizationID)
+		mcp = a.runtime.MCPServersForOrganization(organizationID)
+		remoteMCP = a.runtime.RemoteMCPServersForOrganization(organizationID)
+		skills = a.runtime.SkillsForOrganization(organizationID)
+	}
 	c.JSON(http.StatusOK, gin.H{
-		"connectors": a.runtime.Connectors(),
-		"mcp":        a.runtime.MCPServers(),
-		"remote_mcp": a.runtime.RemoteMCPServers(),
-		"skills":     a.context.Skills(),
+		"connectors": connectors,
+		"mcp":        mcp,
+		"remote_mcp": remoteMCP,
+		"skills":     skills,
 	})
+}
+
+func writePluginLifecycleError(c *gin.Context, err error) {
+	status := http.StatusNotFound
+	if errors.Is(err, agent.ErrPluginOrganizationScope) {
+		status = http.StatusForbidden
+	}
+	writeAgentError(c, status, err)
 }
 
 func (a *agentAPI) enableConnector(c *gin.Context)  { a.connectorLifecycle(c, true, false) }
@@ -37,13 +60,22 @@ func (a *agentAPI) connectorLifecycle(c *gin.Context, enabled, remove bool) {
 		return
 	}
 	var err error
+	organizationID := agentOrganizationID(c)
 	if remove {
-		err = a.runtime.RemoveConnector(c.Param("id"))
+		if a.authRequired {
+			err = a.runtime.RemoveConnectorForOrganization(organizationID, c.Param("id"))
+		} else {
+			err = a.runtime.RemoveConnector(c.Param("id"))
+		}
 	} else {
-		err = a.runtime.SetConnectorEnabled(c.Param("id"), enabled)
+		if a.authRequired {
+			err = a.runtime.SetConnectorEnabledForOrganization(organizationID, c.Param("id"), enabled)
+		} else {
+			err = a.runtime.SetConnectorEnabled(c.Param("id"), enabled)
+		}
 	}
 	if err != nil {
-		writeAgentError(c, http.StatusNotFound, err)
+		writePluginLifecycleError(c, err)
 		return
 	}
 	pluginCatalog(c, a)
@@ -57,13 +89,22 @@ func (a *agentAPI) mcpLifecycle(c *gin.Context, enabled, remove bool) {
 		return
 	}
 	var err error
+	organizationID := agentOrganizationID(c)
 	if remove {
-		err = a.runtime.RemoveMCP(c.Param("id"))
+		if a.authRequired {
+			err = a.runtime.RemoveMCPForOrganization(organizationID, c.Param("id"))
+		} else {
+			err = a.runtime.RemoveMCP(c.Param("id"))
+		}
 	} else {
-		err = a.runtime.SetMCPEnabled(c.Param("id"), enabled)
+		if a.authRequired {
+			err = a.runtime.SetMCPEnabledForOrganization(organizationID, c.Param("id"), enabled)
+		} else {
+			err = a.runtime.SetMCPEnabled(c.Param("id"), enabled)
+		}
 	}
 	if err != nil {
-		writeAgentError(c, http.StatusNotFound, err)
+		writePluginLifecycleError(c, err)
 		return
 	}
 	pluginCatalog(c, a)
@@ -77,13 +118,22 @@ func (a *agentAPI) remoteMCPLifecycle(c *gin.Context, enabled, remove bool) {
 		return
 	}
 	var err error
+	organizationID := agentOrganizationID(c)
 	if remove {
-		err = a.runtime.RemoveRemoteMCP(c.Param("id"))
+		if a.authRequired {
+			err = a.runtime.RemoveRemoteMCPForOrganization(organizationID, c.Param("id"))
+		} else {
+			err = a.runtime.RemoveRemoteMCP(c.Param("id"))
+		}
 	} else {
-		err = a.runtime.SetRemoteMCPEnabled(c.Param("id"), enabled)
+		if a.authRequired {
+			err = a.runtime.SetRemoteMCPEnabledForOrganization(organizationID, c.Param("id"), enabled)
+		} else {
+			err = a.runtime.SetRemoteMCPEnabled(c.Param("id"), enabled)
+		}
 	}
 	if err != nil {
-		writeAgentError(c, http.StatusNotFound, err)
+		writePluginLifecycleError(c, err)
 		return
 	}
 	pluginCatalog(c, a)
@@ -97,13 +147,22 @@ func (a *agentAPI) skillLifecycle(c *gin.Context, enabled, remove bool) {
 		return
 	}
 	var err error
+	organizationID := agentOrganizationID(c)
 	if remove {
-		err = a.runtime.RemoveSkill(c.Param("id"))
+		if a.authRequired {
+			err = a.runtime.RemoveSkillForOrganization(organizationID, c.Param("id"))
+		} else {
+			err = a.runtime.RemoveSkill(c.Param("id"))
+		}
 	} else {
-		err = a.runtime.SetSkillEnabled(c.Param("id"), enabled)
+		if a.authRequired {
+			err = a.runtime.SetSkillEnabledForOrganization(organizationID, c.Param("id"), enabled)
+		} else {
+			err = a.runtime.SetSkillEnabled(c.Param("id"), enabled)
+		}
 	}
 	if err != nil {
-		writeAgentError(c, http.StatusNotFound, err)
+		writePluginLifecycleError(c, err)
 		return
 	}
 	pluginCatalog(c, a)

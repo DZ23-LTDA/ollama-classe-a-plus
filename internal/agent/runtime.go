@@ -805,3 +805,87 @@ func (r *Runtime) resolveWorkspace(requested string) (string, error) {
 	}
 	return candidate, nil
 }
+
+func (r *Runtime) ConnectorsForOrganization(organizationID string) []ConnectorConfig {
+	if r.connectors == nil {
+		return nil
+	}
+	return r.connectors.ListForOrganization(organizationID)
+}
+
+func (r *Runtime) SetConnectorEnabledForOrganization(organizationID, id string, enabled bool) error {
+	if r.connectors == nil {
+		return errors.New("connector manager is unavailable")
+	}
+	return r.connectors.SetEnabledForOrganization(organizationID, id, enabled)
+}
+
+func (r *Runtime) RemoveConnectorForOrganization(organizationID, id string) error {
+	if r.connectors == nil {
+		return errors.New("connector manager is unavailable")
+	}
+	return r.connectors.RemoveForOrganization(organizationID, id)
+}
+
+func (r *Runtime) MCPServersForOrganization(organizationID string) []MCPServerConfig {
+	if r.mcp == nil {
+		return nil
+	}
+	return r.mcp.ListForOrganization(organizationID)
+}
+
+func (r *Runtime) SetMCPEnabledForOrganization(organizationID, id string, enabled bool) error {
+	if r.mcp == nil {
+		return errors.New("MCP manager is unavailable")
+	}
+	return r.mcp.SetEnabledForOrganization(organizationID, id, enabled)
+}
+
+func (r *Runtime) RemoveMCPForOrganization(organizationID, id string) error {
+	if r.mcp == nil {
+		return errors.New("MCP manager is unavailable")
+	}
+	return r.mcp.RemoveForOrganization(organizationID, id)
+}
+
+func (r *Runtime) RemoteMCPServersForOrganization(organizationID string) []RemoteMCPServerConfig {
+	if r.remoteMCP == nil {
+		return nil
+	}
+	return r.remoteMCP.ListForOrganization(organizationID)
+}
+
+func (r *Runtime) SetRemoteMCPEnabledForOrganization(organizationID, id string, enabled bool) error {
+	if r.remoteMCP == nil {
+		return errors.New("remote MCP manager is unavailable")
+	}
+	return r.remoteMCP.SetEnabledForOrganization(organizationID, id, enabled)
+}
+
+func (r *Runtime) RemoveRemoteMCPForOrganization(organizationID, id string) error {
+	if r.remoteMCP == nil {
+		return errors.New("remote MCP manager is unavailable")
+	}
+	return r.remoteMCP.RemoveForOrganization(organizationID, id)
+}
+
+func (r *Runtime) SkillsForOrganization(organizationID string) []SkillManifest {
+	if r.context == nil {
+		return nil
+	}
+	return r.context.SkillsForOrganization(organizationID)
+}
+
+func (r *Runtime) SetSkillEnabledForOrganization(organizationID, id string, enabled bool) error {
+	if r.context == nil {
+		return errors.New("context store is unavailable")
+	}
+	return r.context.SetSkillEnabledForOrganization(organizationID, id, enabled)
+}
+
+func (r *Runtime) RemoveSkillForOrganization(organizationID, id string) error {
+	if r.context == nil {
+		return errors.New("context store is unavailable")
+	}
+	return r.context.RemoveSkillForOrganization(organizationID, id)
+}

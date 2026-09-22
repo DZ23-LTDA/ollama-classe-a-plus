@@ -19,6 +19,7 @@ import (
 
 type RemoteMCPServerConfig struct {
 	ID             string            `json:"id"`
+	OrganizationID string            `json:"organization_id,omitempty"`
 	URL            string            `json:"url"`
 	TokenEnv       string            `json:"token_env,omitempty"`
 	HeadersEnv     map[string]string `json:"headers_env,omitempty"`
@@ -173,6 +174,34 @@ func (m *RemoteMCPManager) List() []RemoteMCPServerConfig {
 	return result
 }
 
+func (m *RemoteMCPManager) ListForOrganization(organizationID string) []RemoteMCPServerConfig {
+	organizationID = strings.TrimSpace(organizationID)
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	result := make([]RemoteMCPServerConfig, 0)
+	for _, config := range m.servers {
+		if config.OrganizationID != "" && !pluginOwnedByOrganization(config.OrganizationID, organizationID) {
+			continue
+		}
+		copy := config
+		copy.HeadersEnv = mapsClone(config.HeadersEnv)
+		copy.AllowedMethods = append([]string(nil), config.AllowedMethods...)
+		result = append(result, copy)
+	}
+	return result
+}
+
+func mapsClone(input map[string]string) map[string]string {
+	if input == nil {
+		return nil
+	}
+	result := make(map[string]string, len(input))
+	for key, value := range input {
+		result[key] = value
+	}
+	return result
+}
+
 func (m *RemoteMCPManager) SetEnabled(id string, enabled bool) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -186,12 +215,43 @@ func (m *RemoteMCPManager) SetEnabled(id string, enabled bool) error {
 	return nil
 }
 
+func (m *RemoteMCPManager) SetEnabledForOrganization(organizationID, id string, enabled bool) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	id = strings.TrimSpace(id)
+	config, ok := m.servers[id]
+	if !ok {
+		return fmt.Errorf("remote MCP server %q is not registered", id)
+	}
+	if !pluginOwnedByOrganization(config.OrganizationID, strings.TrimSpace(organizationID)) {
+		return ErrPluginOrganizationScope
+	}
+	config.Disabled = !enabled
+	m.servers[id] = config
+	return nil
+}
+
 func (m *RemoteMCPManager) Remove(id string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	id = strings.TrimSpace(id)
 	if _, ok := m.servers[id]; !ok {
 		return fmt.Errorf("remote MCP server %q is not registered", id)
+	}
+	delete(m.servers, id)
+	return nil
+}
+
+func (m *RemoteMCPManager) RemoveForOrganization(organizationID, id string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	id = strings.TrimSpace(id)
+	config, ok := m.servers[id]
+	if !ok {
+		return fmt.Errorf("remote MCP server %q is not registered", id)
+	}
+	if !pluginOwnedByOrganization(config.OrganizationID, strings.TrimSpace(organizationID)) {
+		return ErrPluginOrganizationScope
 	}
 	delete(m.servers, id)
 	return nil

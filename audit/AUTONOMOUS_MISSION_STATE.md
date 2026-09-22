@@ -1254,3 +1254,28 @@ proofs: integrity, Go tests/vet/build, internal/agent suite, UI Vitest/build, mo
 classification: preview/local RC em hardening; containment partial, not strong sandbox
 next_slice: plugin/MCP tenant ownership or release/CI hardening; no main merge
 ```
+
+
+## Slice P0 plugin/MCP/skill ownership validada — aguardando publicação — 2026-09-22
+
+```yaml
+state: RELEASING
+iteration: 19
+base_commit: 88a6e7e3
+working_tree: plugin ownership changes/tests/docs still uncommitted
+implemented:
+  - organization_id on Connector/MCP/Remote MCP/Skill metadata
+  - organization-filtered catalog with global read-only compatibility
+  - scoped enable/disable/remove lifecycle
+  - cross-tenant negative tests
+proofs:
+  - integrity guard: PASS
+  - CGO_ENABLED=1 go test ./... -count=1: PASS
+  - CGO_ENABLED=1 go vet ./...: PASS
+  - CGO_ENABLED=1 go build: PASS
+  - UI Vitest/build: PASS; known >500KB warning
+  - mobile typecheck: PASS
+classification: preview/local RC em hardening
+open_risks: server-owned tenant registration, skill attestation, strong MCP isolation, distributed/RLS proof
+next_action: commit/push, then continue release/CI or plugin registration; no main merge
+```

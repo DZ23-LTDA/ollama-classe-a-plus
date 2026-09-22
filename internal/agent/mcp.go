@@ -18,6 +18,7 @@ import (
 
 type MCPServerConfig struct {
 	ID               string   `json:"id"`
+	OrganizationID   string   `json:"organization_id,omitempty"`
 	Command          string   `json:"command"`
 	Args             []string `json:"args,omitempty"`
 	WorkingDirectory string   `json:"working_directory,omitempty"`
@@ -114,12 +115,46 @@ func (m *MCPManager) List() []MCPServerConfig {
 	return result
 }
 
+func (m *MCPManager) ListForOrganization(organizationID string) []MCPServerConfig {
+	organizationID = strings.TrimSpace(organizationID)
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	result := make([]MCPServerConfig, 0)
+	for _, server := range m.servers {
+		if server.config.OrganizationID != "" && !pluginOwnedByOrganization(server.config.OrganizationID, organizationID) {
+			continue
+		}
+		config := server.config
+		config.Args = append([]string(nil), config.Args...)
+		config.EnvironmentVars = append([]string(nil), config.EnvironmentVars...)
+		result = append(result, config)
+	}
+	return result
+}
+
 func (m *MCPManager) SetEnabled(id string, enabled bool) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	server, ok := m.servers[strings.TrimSpace(id)]
 	if !ok {
 		return fmt.Errorf("MCP server %q is not registered", id)
+	}
+	server.config.Disabled = !enabled
+	if !enabled {
+		_ = server.Stop()
+	}
+	return nil
+}
+
+func (m *MCPManager) SetEnabledForOrganization(organizationID, id string, enabled bool) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	server, ok := m.servers[strings.TrimSpace(id)]
+	if !ok {
+		return fmt.Errorf("MCP server %q is not registered", id)
+	}
+	if !pluginOwnedByOrganization(server.config.OrganizationID, strings.TrimSpace(organizationID)) {
+		return ErrPluginOrganizationScope
 	}
 	server.config.Disabled = !enabled
 	if !enabled {
@@ -135,6 +170,22 @@ func (m *MCPManager) Remove(id string) error {
 	server, ok := m.servers[id]
 	if !ok {
 		return fmt.Errorf("MCP server %q is not registered", id)
+	}
+	_ = server.Stop()
+	delete(m.servers, id)
+	return nil
+}
+
+func (m *MCPManager) RemoveForOrganization(organizationID, id string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	id = strings.TrimSpace(id)
+	server, ok := m.servers[id]
+	if !ok {
+		return fmt.Errorf("MCP server %q is not registered", id)
+	}
+	if !pluginOwnedByOrganization(server.config.OrganizationID, strings.TrimSpace(organizationID)) {
+		return ErrPluginOrganizationScope
 	}
 	_ = server.Stop()
 	delete(m.servers, id)

@@ -171,3 +171,8 @@ OIDC discovery/JWKS/userinfo/token exchange agora usam egress sem proxy, redirec
 ## Slice P0 validada — tool process containment — 2026-09-22
 
 Terminal/sandbox tools ganharam grupo de processo encerrável, timeout, output bound, stderr redaction, ambiente mínimo e `ulimit` best-effort no sandbox. O resultado é explicitamente `best-effort`; seccomp/cgroups, quotas fortes e testes físicos por plataforma continuam abertos, portanto não equivale a sandbox forte.
+
+
+## Slice P0 validada — plugin/MCP/skill ownership — 2026-09-22
+
+Lifecycle autenticado de Connector, MCP stdio, Remote MCP e Skill agora exige ownership exato; catálogos preservam recursos sem owner como globais read-only. Testes negativos cobrem duas organizações e ausência de mutação cross-tenant. Registro tenant-owned server-side, attestation e isolamento forte de processos ainda permanecem abertos.

@@ -230,3 +230,8 @@ Os endpoints OAuth/OIDC agora compartilham política de egress sem proxy/redirec
 ## Incremento 2026-09-22 — tool process containment
 
 Tools agora têm lifecycle de grupo, redaction e limites best-effort reportados. A próxima fronteira de isolamento é implementar/adotar seccomp, cgroups, quotas e políticas específicas por plataforma; até isso ser testado, o runtime continua classificado como contenção parcial.
+
+
+## Incremento 2026-09-22 — plugin/MCP/skill ownership
+
+Lifecycle autenticado agora é tenant-aware para Connector, MCP stdio, Remote MCP e Skill. Recursos globais são read-only nesse caminho; a próxima etapa é implementar registro server-owned por organização, attestation de skills e isolamento de execução MCP por tenant.

@@ -211,3 +211,8 @@ OIDC discovery, JWKS, userinfo e token exchange passaram a bloquear proxy/redire
 ## 2026-09-22 — tool process containment
 
 Terminal e sandbox tools passaram a usar grupo de processos encerrável, limites de timeout/saída, stderr redacted e status explícito de isolamento. O sandbox usa `ulimit` best-effort quando disponível; seccomp/cgroups e sandbox forte permanecem fora do claim.
+
+
+## 2026-09-22 — plugin/MCP/skill ownership
+
+Connectors, MCP stdio, Remote MCP e skills passaram a carregar ownership opcional por organização; lifecycle autenticado usa métodos scoped e nega cross-tenant/global mutation, enquanto catálogo global permanece read-only.

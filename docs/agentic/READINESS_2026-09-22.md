@@ -186,3 +186,10 @@ Regressões cobrem redirect OAuth e socket privado real, além de validação de
 `terminal.exec` e `sandbox.exec` agora iniciam processo em grupo próprio e encerram o grupo ao cancelar ou atingir timeout, evitando deixar filhos órfãos no caminho comum. Saídas stdout/stderr são limitadas e passam por `RedactDLP` antes de retornar; o resultado informa a postura `best-effort-process-group` ou `best-effort-unshare`. O sandbox `unshare` aplica, quando suportado pelo shell/kernel, limites best-effort de CPU, memória virtual, processos, descriptors e tamanho de arquivo via `ulimit`, além de continuar com user/mount/PID/network namespaces e ambiente mínimo.
 
 Testes cobrem redaction de stderr, status explícito, cancelamento rápido e encerramento do grupo; a suíte `internal/agent` e os gates completos passaram. Isso não é sandbox forte: seccomp, cgroups, enforcement robusto de PID/memória/CPU e validação real em Windows/macOS/Linux continuam pendentes. O produto deve mostrar essa limitação ao operador em vez de alegar isolamento equivalente a E2B.
+
+
+## Slice P0 de ownership de plugins/MCP/skills — 2026-09-22
+
+Connector, MCP stdio, Remote MCP e Skill manifests agora possuem `organization_id` quando são tenant-owned. Catálogos autenticados mostram recursos tenant-owned da organização ativa e preservam recursos sem owner como configuração global read-only; operações enable/disable/remove autenticadas exigem ownership exato e retornam `403` para outro tenant ou para recurso global, sem mutação. O modo local sem autenticação continua usando lifecycle compatível no bind loopback.
+
+Regressões criam recursos em `org-a` e `org-b`, confirmam filtragem de lista e rejeitam mutation cross-tenant para Connector, MCP, Remote MCP e Skill. Os gates completos passaram: integrity guard, Go tests/vet/build, UI Vitest/build e mobile typecheck. Ainda faltam endpoints server-owned para registrar novos recursos por organização, assinatura/attestation de skills, isolamento de execução MCP por tenant e prova distribuída com Postgres/RLS.
