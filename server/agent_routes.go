@@ -1188,7 +1188,11 @@ func (a *agentAPI) deleteProject(c *gin.Context) {
 }
 
 func (a *agentAPI) projectForRequest(c *gin.Context) (agent.Project, error) {
-	project, err := a.context.GetProject(c.Param("id"))
+	return a.projectForRequestID(c, c.Param("id"))
+}
+
+func (a *agentAPI) projectForRequestID(c *gin.Context, projectID string) (agent.Project, error) {
+	project, err := a.context.GetProject(strings.TrimSpace(projectID))
 	if err != nil {
 		return agent.Project{}, err
 	}
@@ -1211,10 +1215,18 @@ func (a *agentAPI) collabActor(c *gin.Context) string {
 }
 
 func (a *agentAPI) collabSnapshot(c *gin.Context) {
+	if _, err := a.projectForRequestID(c, c.Param("project_id")); err != nil {
+		writeAgentError(c, statusForAgentError(err), err)
+		return
+	}
 	c.JSON(http.StatusOK, a.runtime.Collaboration().Snapshot(c.Param("project_id")))
 }
 
 func (a *agentAPI) collabComment(c *gin.Context) {
+	if _, err := a.projectForRequestID(c, c.Param("project_id")); err != nil {
+		writeAgentError(c, statusForAgentError(err), err)
+		return
+	}
 	var request struct {
 		Body string `json:"body"`
 	}
@@ -1231,6 +1243,10 @@ func (a *agentAPI) collabComment(c *gin.Context) {
 }
 
 func (a *agentAPI) collabPresence(c *gin.Context) {
+	if _, err := a.projectForRequestID(c, c.Param("project_id")); err != nil {
+		writeAgentError(c, statusForAgentError(err), err)
+		return
+	}
 	var request struct {
 		Status string `json:"status"`
 	}
@@ -1247,6 +1263,10 @@ func (a *agentAPI) collabPresence(c *gin.Context) {
 }
 
 func (a *agentAPI) collabStream(c *gin.Context) {
+	if _, err := a.projectForRequestID(c, c.Param("project_id")); err != nil {
+		writeAgentError(c, statusForAgentError(err), err)
+		return
+	}
 	c.Header("Content-Type", "text/event-stream")
 	c.Header("Cache-Control", "no-cache")
 	c.Header("Connection", "keep-alive")
@@ -1270,6 +1290,10 @@ func (a *agentAPI) collabStream(c *gin.Context) {
 }
 
 func (a *agentAPI) addMemory(c *gin.Context) {
+	if _, err := a.projectForRequest(c); err != nil {
+		writeAgentError(c, statusForAgentError(err), err)
+		return
+	}
 	var memory agent.Memory
 	if err := decodeJSON(c, &memory); err != nil {
 		writeAgentError(c, http.StatusBadRequest, err)
@@ -1285,6 +1309,10 @@ func (a *agentAPI) addMemory(c *gin.Context) {
 }
 
 func (a *agentAPI) searchMemories(c *gin.Context) {
+	if _, err := a.projectForRequest(c); err != nil {
+		writeAgentError(c, statusForAgentError(err), err)
+		return
+	}
 	memories, err := a.context.SearchMemoriesContext(c.Request.Context(), c.Param("id"), c.Query("q"), 20)
 	if err != nil {
 		writeAgentError(c, http.StatusBadRequest, err)
@@ -1320,6 +1348,19 @@ func (a *agentAPI) createMission(c *gin.Context) {
 	if value, ok := c.Get("agent.organization"); ok {
 		if organization, ok := value.(agent.Organization); ok {
 			request.OrganizationID = organization.ID
+		}
+	}
+	if strings.TrimSpace(request.ProjectID) != "" {
+		project, err := a.projectForRequestID(c, request.ProjectID)
+		if err != nil {
+			writeAgentError(c, statusForAgentError(err), err)
+			return
+		}
+		if strings.TrimSpace(request.Workspace) == "" {
+			request.Workspace = project.Root
+		} else if filepath.Clean(request.Workspace) != filepath.Clean(project.Root) {
+			writeAgentError(c, http.StatusBadRequest, errors.New("mission workspace must match the selected project"))
+			return
 		}
 	}
 	mission, err := a.scopedRuntime(c).CreateMission(c.Request.Context(), request)
@@ -1551,7 +1592,7 @@ func (a *agentAPI) ingestProject(c *gin.Context) {
 		return
 	}
 	request.ProjectID = c.Param("id")
-	project, err := a.runtime.Context().GetProject(request.ProjectID)
+	project, err := a.projectForRequest(c)
 	if err != nil {
 		writeAgentError(c, statusForAgentError(err), err)
 		return
