@@ -226,3 +226,10 @@ O teste negativo server-side e os gates completos Go/integrity/UI passaram. A im
 ## Slice P1 de release artifact integrity — 2026-09-22
 
 O job final de release passou a rejeitar artefatos ausentes ou vazios antes de gerar checksums. A attestation de provenance pode ser executada somente quando a variável de ambiente GitHub `OLLAMA_ENABLE_ATTESTATIONS=true` estiver configurada, usando a permissão OIDC/attestations; caso contrário, permanece explicitamente não executada. A sandbox não publicou release, assinou binários ou executou Actions, portanto essas provas seguem externas.
+
+
+## Slice P0 de tenant isolation em jobs/replay — 2026-09-22
+
+Listagem e replay da fila agora são filtrados pela organização proprietária da missão. Um tenant não recebe jobs de outra organização e o replay cross-tenant retorna `403` sem alterar o estado da fila. A regressão HTTP foi adicionada ao teste combinado de escopo.
+
+Gates completos Go/integrity/build/UI/mobile passaram. O isolamento ainda depende de prova distribuída com Redis/PostgreSQL reais e de revisão de outras superfícies de execução, mas jobs/replay não permanecem mais como leitura/mutação global no handler.

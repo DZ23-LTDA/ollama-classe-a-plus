@@ -149,6 +149,10 @@ grep -q 'TestRuntimeRejectsUnconfiguredMissionProvider' internal/agent/runtime_t
 grep -q 'Empty release artifact' .github/workflows/release.yaml
 grep -q 'actions/attest-build-provenance@v2' .github/workflows/release.yaml
 grep -q 'OLLAMA_ENABLE_ATTESTATIONS' .github/workflows/release.yaml
+grep -q 'QueueJobsForOrganization' internal/agent/runtime.go
+grep -q 'ReplayJobForOrganization' internal/agent/runtime.go
+grep -q 'TestRuntimeQueueJobsOrganizationScope' internal/agent/runtime_test.go
+grep -q 'cross-tenant job replay' server/p0_scope_test.go
 grep -q 'Capabilities' internal/agent/runtime.go
 grep -q 'Evaluation' internal/agent/evaluation.go
 for route in projects library scheduled skills plugins tasks company; do

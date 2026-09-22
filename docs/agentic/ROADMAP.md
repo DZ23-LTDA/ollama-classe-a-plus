@@ -260,3 +260,8 @@ A seleção de provider deixou de ser apenas cosmética: o runtime valida e pers
 ## Incremento 2026-09-22 — release artifact integrity
 
 O release valida presença/tamanho dos artefatos e oferece attestation condicional. A assinatura de instaladores/binários, SBOM ligado aos artefatos finais e execução real do release ainda dependem de credenciais, policies e runners do operador.
+
+
+## Incremento 2026-09-22 — jobs/replay scoped
+
+Queue list/replay agora consultam a organização da missão antes de expor ou mutar jobs. A validação distribuída Redis e recuperação após restart continuam pendentes no runner Docker.

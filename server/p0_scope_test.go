@@ -114,4 +114,30 @@ func TestAgentP0StoresRejectCrossTenantReadsAndMutations(t *testing.T) {
 	if heartbeatRecorder.Code != http.StatusForbidden {
 		t.Fatalf("cross-tenant heartbeat status=%d body=%s", heartbeatRecorder.Code, heartbeatRecorder.Body.String())
 	}
+
+	mission, err := runtime.CreateMission(context.Background(), agent.CreateMissionRequest{Objective: "queued tenant", OrganizationID: "org-a"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	queued, err := runtime.EnqueueMission(mission.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	jobsContext, jobsRecorder := orgContext(t, http.MethodGet, "/jobs", "org-b")
+	api.jobs(jobsContext)
+	var jobsPayload struct {
+		Jobs []agent.QueueJob `json:"jobs"`
+	}
+	if err := json.Unmarshal(jobsRecorder.Body.Bytes(), &jobsPayload); err != nil {
+		t.Fatal(err)
+	}
+	if jobsRecorder.Code != http.StatusOK || len(jobsPayload.Jobs) != 0 {
+		t.Fatalf("cross-tenant jobs code=%d jobs=%+v", jobsRecorder.Code, jobsPayload.Jobs)
+	}
+	replayContext, replayRecorder := orgContext(t, http.MethodPost, "/jobs/"+queued.ID+"/replay", "org-b")
+	replayContext.Params = gin.Params{{Key: "id", Value: queued.ID}}
+	api.replayJob(replayContext)
+	if replayRecorder.Code != http.StatusForbidden {
+		t.Fatalf("cross-tenant job replay status=%d body=%s", replayRecorder.Code, replayRecorder.Body.String())
+	}
 }

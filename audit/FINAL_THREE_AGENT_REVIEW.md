@@ -201,3 +201,8 @@ A UI transporta provider e o runtime rejeita seleções sem adapter implementado
 ## Slice P1 validada — release artifact integrity — 2026-09-22
 
 O release bloqueia artefatos vazios/ausentes e só ativa provenance attestation com flag e permissões explícitas. Signing, SBOM final e publicação real permanecem não comprovados nesta sandbox.
+
+
+## Slice P0 validada — jobs/replay tenant scope — 2026-09-22
+
+Queue list/replay usa ownership da missão e o teste HTTP confirma `403` sem mutação cross-tenant. Redis distribuído e restart recovery ainda não foram executados nesta sandbox.

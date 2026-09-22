@@ -241,3 +241,8 @@ A Nova tarefa envia e persiste `provider`; apenas `ollama-local` é aceito até 
 ## 2026-09-22 — release artifact integrity
 
 Release agora falha para artefatos ausentes/vazios e pode gerar attestation de provenance somente com configuração explícita `OLLAMA_ENABLE_ATTESTATIONS=true` no ambiente GitHub.
+
+
+## 2026-09-22 — tenant isolation de jobs/replay
+
+Fila de jobs agora filtra listagem e replay pela organização da missão, negando cross-tenant sem mutação.

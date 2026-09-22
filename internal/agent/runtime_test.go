@@ -77,6 +77,37 @@ func TestRuntimeRejectsUnconfiguredMissionProvider(t *testing.T) {
 	}
 }
 
+func TestRuntimeQueueJobsOrganizationScope(t *testing.T) {
+	root := t.TempDir()
+	runtime, err := NewRuntime(RuntimeConfig{Store: NewMemoryStore(), Planner: RulePlanner{}, WorkspaceRoot: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mission, err := runtime.CreateMission(context.Background(), CreateMissionRequest{Objective: "fila tenant", OrganizationID: "org_a"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	job, err := runtime.EnqueueMission(mission.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	jobs, err := runtime.QueueJobsForOrganization("org_a", "")
+	if err != nil || len(jobs) != 1 || jobs[0].ID != job.ID {
+		t.Fatalf("org_a jobs=%+v err=%v", jobs, err)
+	}
+	jobs, err = runtime.QueueJobsForOrganization("org_b", "")
+	if err != nil || len(jobs) != 0 {
+		t.Fatalf("org_b jobs=%+v err=%v", jobs, err)
+	}
+	if _, err := runtime.ReplayJobForOrganization(job.ID, "org_b"); !errors.Is(err, ErrQueueJobForbidden) {
+		t.Fatalf("cross-tenant replay error=%v", err)
+	}
+	jobs, err = runtime.QueueJobsForOrganization("org_a", "")
+	if err != nil || len(jobs) != 1 || jobs[0].Status != QueuePending {
+		t.Fatalf("job mutated after rejected replay: %+v err=%v", jobs, err)
+	}
+}
+
 func TestRuntimeRequiresApprovalBeforeWritingAndBuildsArtifact(t *testing.T) {
 	root := t.TempDir()
 	runtime, err := NewRuntime(RuntimeConfig{Store: NewMemoryStore(), Planner: fixedPlanner{steps: []Step{{ID: "step_1", Kind: "workspace.write", Title: "write", Risk: RiskWrite, RequiresApproval: true, State: StepPending, Input: map[string]any{"path": "result.txt", "content": "hello"}}}}, WorkspaceRoot: root})

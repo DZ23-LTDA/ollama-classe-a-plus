@@ -67,6 +67,7 @@ type RuntimeConfig struct {
 var (
 	ErrApprovalVersionConflict = errors.New("approval mission version conflict")
 	ErrApprovalNonceMismatch   = errors.New("approval nonce mismatch")
+	ErrQueueJobForbidden       = errors.New("job is outside the active organization")
 )
 
 func NewRuntime(config RuntimeConfig) (*Runtime, error) {
@@ -479,6 +480,46 @@ func (r *Runtime) ReplayJob(jobID string) (QueueJob, error) {
 		return r.redisQueue.Replay(jobID)
 	}
 	return r.queue.Replay(jobID)
+}
+
+func (r *Runtime) QueueJobsForOrganization(organizationID string, status QueueStatus) ([]QueueJob, error) {
+	jobs := r.QueueJobs(status)
+	organizationID = strings.TrimSpace(organizationID)
+	if organizationID == "" {
+		return jobs, nil
+	}
+	filtered := make([]QueueJob, 0, len(jobs))
+	for _, job := range jobs {
+		mission, err := r.store.GetMission(job.MissionID)
+		if err != nil {
+			continue
+		}
+		if mission.OrganizationID == organizationID {
+			filtered = append(filtered, job)
+		}
+	}
+	return filtered, nil
+}
+
+func (r *Runtime) ReplayJobForOrganization(jobID, organizationID string) (QueueJob, error) {
+	organizationID = strings.TrimSpace(organizationID)
+	if organizationID == "" {
+		return r.ReplayJob(jobID)
+	}
+	for _, job := range r.QueueJobs("") {
+		if job.ID != strings.TrimSpace(jobID) {
+			continue
+		}
+		mission, err := r.store.GetMission(job.MissionID)
+		if err != nil {
+			return QueueJob{}, err
+		}
+		if mission.OrganizationID != organizationID {
+			return QueueJob{}, ErrQueueJobForbidden
+		}
+		return r.ReplayJob(jobID)
+	}
+	return QueueJob{}, os.ErrNotExist
 }
 
 func (r *Runtime) ListTools() []ToolDescriptor {

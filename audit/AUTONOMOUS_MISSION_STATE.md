@@ -1494,3 +1494,26 @@ proofs: integrity/YAML/diff checks PASS; release execution/signing NOT_RUN in sa
 classification: preview/local RC em hardening
 next_slice: continue remaining P0/P1s and external evidence; no main merge
 ```
+
+
+## Slice P0 jobs/replay tenant scope validada — aguardando publicação — 2026-09-22
+
+```yaml
+state: RELEASING
+iteration: 25
+base_commit: 17325891
+working_tree: jobs/runtime/server/tests/docs changes still uncommitted
+implemented:
+  - organization-filtered queue listing
+  - organization-checked replay
+  - HTTP cross-tenant 403/no-mutation regression
+proofs:
+  - focused Go tests: PASS
+  - full Go test/vet/build: PASS
+  - integrity: PASS
+  - UI Vitest/build: PASS; known >500KB warning
+  - mobile typecheck: PASS
+classification: preview/local RC em hardening
+open_risks: Redis distributed/restart proof and remaining execution surfaces
+next_action: commit/push, then continue remaining P0/P1s; no main merge
+```

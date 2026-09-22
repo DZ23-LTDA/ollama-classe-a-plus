@@ -992,11 +992,15 @@ func (a *agentAPI) mcp(c *gin.Context) {
 }
 
 func (a *agentAPI) jobs(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"jobs": a.runtime.QueueJobs(agent.QueueStatus(c.Query("status")))})
+	jobs, err := a.scopedRuntime(c).QueueJobsForOrganization(agentOrganizationID(c), agent.QueueStatus(c.Query("status")))
+	if err != nil {
+		writeAgentError(c, statusForAgentError(err), err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"jobs": jobs})
 }
-
 func (a *agentAPI) replayJob(c *gin.Context) {
-	job, err := a.runtime.ReplayJob(c.Param("id"))
+	job, err := a.scopedRuntime(c).ReplayJobForOrganization(c.Param("id"), agentOrganizationID(c))
 	if err != nil {
 		writeAgentError(c, statusForAgentError(err), err)
 		return
@@ -2103,7 +2107,7 @@ func statusForAgentError(err error) int {
 	if status := companyErrorStatus(err); status != 0 {
 		return status
 	}
-	if errors.Is(err, errAgentForbidden) || errors.Is(err, agent.ErrBuilderForbidden) || errors.Is(err, agent.ErrOrchestrationForbidden) || errors.Is(err, agent.ErrDeviceForbidden) {
+	if errors.Is(err, errAgentForbidden) || errors.Is(err, agent.ErrBuilderForbidden) || errors.Is(err, agent.ErrOrchestrationForbidden) || errors.Is(err, agent.ErrDeviceForbidden) || errors.Is(err, agent.ErrQueueJobForbidden) {
 		return http.StatusForbidden
 	}
 	if errors.Is(err, agent.ErrApprovalVersionConflict) {
