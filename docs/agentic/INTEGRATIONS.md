@@ -15,7 +15,7 @@ export DZ23_WHATSAPP_TOKEN='...'
 
 O exemplo [agent-connectors.json](../../examples/agent-connectors.json) cobre GitHub, Google Workspace, Slack, Discord e WhatsApp Cloud. Cada chamada exige uma operação declarada, método permitido e prefixo de caminho permitido. Redirects são desativados, o timeout é limitado e a resposta é limitada a 2 MiB. Operações de escrita são tools de efeito externo e exigem approval do runtime.
 
-O fluxo de autenticação OAuth usa PKCE, state one-time, armazenamento AES-GCM e refresh server-side. Configure os endpoints do provider e `OLLAMA_AGENT_CREDENTIAL_KEY` fora do repositório. Tokens pessoais por `token_env` continuam disponíveis apenas para desenvolvimento ou conectores explicitamente não multiusuário.
+O fluxo de autenticação OAuth usa PKCE, state one-time, armazenamento AES-GCM, refresh server-side com rotação/CAS e revogação local com endpoint remoto opcional. Configure os endpoints do provider, incluindo `OLLAMA_AGENT_OAUTH_<PROVIDER>_REVOCATION_URL` quando suportado, e `OLLAMA_AGENT_CREDENTIAL_KEY` fora do repositório. Tokens pessoais por `token_env` continuam disponíveis apenas para desenvolvimento ou conectores explicitamente não multiusuário. A implementação possui testes com provider TLS fixture; a homologação contra cada IdP, revocation semantics, quotas e rotação real continua dependente de conta de teste do operador.
 
 ## SAML enterprise
 

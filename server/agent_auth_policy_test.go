@@ -56,6 +56,34 @@ func TestOnlyCompanionConnectRouteUsesDeviceHandshake(t *testing.T) {
 	}
 }
 
+func TestPublicSSORouteDoesNotBypassAuthenticatedOAuthLifecycle(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, path := range []string{
+		"/api/agent/v1/auth/oauth/github/start",
+		"/api/agent/v1/auth/oauth/github/callback",
+		"/api/agent/v1/auth/saml/enterprise/start",
+		"/api/agent/v1/auth/saml/enterprise/metadata",
+		"/api/agent/v1/auth/saml/enterprise/acs",
+	} {
+		context, _ := gin.CreateTestContext(httptest.NewRecorder())
+		context.Request = httptest.NewRequest("GET", path, nil)
+		if !isPublicSSORoute(context) {
+			t.Fatalf("expected public SSO route: %s", path)
+		}
+	}
+	for _, path := range []string{
+		"/api/agent/v1/auth/oauth/github/refresh",
+		"/api/agent/v1/auth/oauth/github/revoke",
+		"/api/agent/v1/auth/saml/enterprise/disable",
+	} {
+		context, _ := gin.CreateTestContext(httptest.NewRecorder())
+		context.Request = httptest.NewRequest("POST", path, nil)
+		if isPublicSSORoute(context) {
+			t.Fatalf("unexpected public SSO bypass: %s", path)
+		}
+	}
+}
+
 func TestDevTokenOnlyAllowsActualLoopback(t *testing.T) {
 	for _, test := range []struct {
 		name string

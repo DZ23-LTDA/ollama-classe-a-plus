@@ -4,7 +4,7 @@ A primeira API agentic roda no mesmo listener do Ollama e é local-first. Ela cr
 
 ## Configuração
 
-Defina `OLLAMA_AGENT_ROOT` para o diretório que pode ser usado pelas missões. Por padrão, o runtime usa um diretório temporário do sistema. Defina `OLLAMA_AGENT_STORE` para o diretório persistente de missões, eventos e empresas. Se `OLLAMA_AGENT_MODEL` estiver definido, o runtime tenta usar esse modelo para gerar o plano JSON; em caso de erro, usa o planner determinístico seguro. `OLLAMA_AGENT_EMBED_MODEL` ativa memória semântica sobre a API `/api/embed`; `OLLAMA_AGENT_CONNECTORS`, `OLLAMA_AGENT_MCP` e `OLLAMA_AGENT_REMOTE_MCP` apontam para os manifestos de integração descritos em [INTEGRATIONS.md](INTEGRATIONS.md). `OLLAMA_AGENT_AUTH_STORE` habilita o store de identidade; `OLLAMA_AGENT_AUTH_REQUIRED=true` exige Bearer token; `OLLAMA_AGENT_CREDENTIAL_KEY` é obrigatório para persistir credenciais OAuth cifradas; `OLLAMA_AGENT_MEDIA_BASE_URL` e `OLLAMA_AGENT_MEDIA_API_KEY` ativam o adapter multimídia HTTPS.
+Defina `OLLAMA_AGENT_ROOT` para o diretório que pode ser usado pelas missões. Por padrão, o runtime usa um diretório temporário do sistema. Defina `OLLAMA_AGENT_STORE` para o diretório persistente de missões, eventos e empresas. Se `OLLAMA_AGENT_MODEL` estiver definido, o runtime tenta usar esse modelo para gerar o plano JSON; em caso de erro, usa o planner determinístico seguro. `OLLAMA_AGENT_EMBED_MODEL` ativa memória semântica sobre a API `/api/embed`; `OLLAMA_AGENT_CONNECTORS`, `OLLAMA_AGENT_MCP` e `OLLAMA_AGENT_REMOTE_MCP` apontam para os manifestos de integração descritos em [INTEGRATIONS.md](INTEGRATIONS.md). `OLLAMA_AGENT_AUTH_STORE` habilita o store de identidade; `OLLAMA_AGENT_AUTH_REQUIRED=true` exige Bearer token; `OLLAMA_AGENT_CREDENTIAL_KEY` é obrigatório para persistir credenciais OAuth cifradas; cada provider OAuth pode declarar `OLLAMA_AGENT_OAUTH_<PROVIDER>_REVOCATION_URL`; `OLLAMA_AGENT_MEDIA_BASE_URL` e `OLLAMA_AGENT_MEDIA_API_KEY` ativam o adapter multimídia HTTPS.
 
 ```bash
 export OLLAMA_AGENT_ROOT=/home/usuario/dz23-workspaces
@@ -175,6 +175,22 @@ O endpoint `GET /companies/COMPANY_ID/growth/report` resume campanhas ativas, co
 ## OAuth e organizações
 
 Com `OLLAMA_AGENT_AUTH_REQUIRED=true`, a API valida sessão, organização e RBAC antes de permitir ações. O fluxo `GET /auth/oauth/:provider/start` exige `redirect_uri` e `code_verifier` PKCE; o callback consome `state` uma única vez, troca o código no servidor e cifra access/refresh tokens com AES-GCM usando `OLLAMA_AGENT_CREDENTIAL_KEY`. Configure URLs e nomes das variáveis de segredo por provider sem colocar valores no repositório.
+
+Depois do callback, o cliente pode renovar e revogar uma credencial somente dentro da organização autenticada:
+
+```bash
+curl -sS -X POST http://localhost:11434/api/agent/v1/auth/oauth/github/refresh \
+  -H 'Authorization: Bearer TOKEN' \
+  -H 'Content-Type: application/json' \
+  -d '{"credential_id":"CREDENTIAL_ID"}'
+
+curl -i -X POST http://localhost:11434/api/agent/v1/auth/oauth/github/revoke \
+  -H 'Authorization: Bearer TOKEN' \
+  -H 'Content-Type: application/json' \
+  -d '{"credential_id":"CREDENTIAL_ID"}'
+```
+
+O refresh faz rotação quando o provider retorna um novo refresh token, usa CAS para impedir duas renovações concorrentes e não retorna ciphertext. A revogação chama o endpoint do provider quando `REVOCATION_URL` está configurado e sempre persiste a revogação local após uma resposta 2xx. O bypass público de SSO não se aplica a refresh ou revoke.
 
 Para encerrar uma sessão local, envie o bearer atual a `POST /api/agent/v1/auth/logout`. O servidor revoga o token e responde `204`; o cliente deve limpar sua cópia em memória mesmo se a chamada falhar. `403` indica escopo/RBAC recusado e não deve ser tratado como expiração automática da sessão.
 

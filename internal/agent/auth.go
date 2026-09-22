@@ -33,6 +33,11 @@ import (
 	"github.com/google/uuid"
 )
 
+var (
+	ErrOAuthCredentialConflict = errors.New("oauth credential changed during refresh")
+	ErrOAuthCredentialRevoked  = errors.New("oauth credential is revoked")
+)
+
 type User struct {
 	ID                      string    `json:"id"`
 	Email                   string    `json:"email"`
@@ -93,14 +98,15 @@ type OAuthState struct {
 }
 
 type OAuthCredential struct {
-	ID                     string    `json:"id"`
-	UserID                 string    `json:"user_id"`
-	OrganizationID         string    `json:"organization_id"`
-	Provider               string    `json:"provider"`
-	AccessTokenCiphertext  string    `json:"access_token_ciphertext"`
-	RefreshTokenCiphertext string    `json:"refresh_token_ciphertext,omitempty"`
-	ExpiresAt              time.Time `json:"expires_at,omitempty"`
-	UpdatedAt              time.Time `json:"updated_at"`
+	ID                     string     `json:"id"`
+	UserID                 string     `json:"user_id"`
+	OrganizationID         string     `json:"organization_id"`
+	Provider               string     `json:"provider"`
+	AccessTokenCiphertext  string     `json:"access_token_ciphertext"`
+	RefreshTokenCiphertext string     `json:"refresh_token_ciphertext,omitempty"`
+	ExpiresAt              time.Time  `json:"expires_at,omitempty"`
+	UpdatedAt              time.Time  `json:"updated_at"`
+	RevokedAt              *time.Time `json:"revoked_at,omitempty"`
 }
 
 type AuthStore struct {
@@ -501,7 +507,7 @@ func (s *AuthStore) OAuthAccessTokenForOrganization(organizationID, provider str
 	s.mu.RLock()
 	var selected OAuthCredential
 	for _, credential := range s.credentials {
-		if credential.OrganizationID == organizationID && credential.Provider == provider && credential.UpdatedAt.After(selected.UpdatedAt) {
+		if credential.RevokedAt == nil && credential.OrganizationID == organizationID && credential.Provider == provider && credential.UpdatedAt.After(selected.UpdatedAt) {
 			selected = credential
 		}
 	}
@@ -520,12 +526,30 @@ func (s *AuthStore) OAuthAccessTokenForOrganization(organizationID, provider str
 }
 
 func (s *AuthStore) RefreshOAuthCredential(ctx context.Context, provider OAuthProvider, credentialID string, client *http.Client) (OAuthCredential, error) {
+	return s.refreshOAuthCredential(ctx, "", provider, credentialID, client)
+}
+
+func (s *AuthStore) RefreshOAuthCredentialForOrganization(ctx context.Context, organizationID string, provider OAuthProvider, credentialID string, client *http.Client) (OAuthCredential, error) {
+	return s.refreshOAuthCredential(ctx, strings.TrimSpace(organizationID), provider, credentialID, client)
+}
+
+func (s *AuthStore) refreshOAuthCredential(ctx context.Context, organizationID string, provider OAuthProvider, credentialID string, client *http.Client) (OAuthCredential, error) {
 	s.mu.RLock()
 	credential, ok := s.credentials[credentialID]
 	s.mu.RUnlock()
 	if !ok {
 		return OAuthCredential{}, os.ErrNotExist
 	}
+	if credential.Provider != provider.Name {
+		return OAuthCredential{}, errors.New("oauth credential provider mismatch")
+	}
+	if organizationID != "" && credential.OrganizationID != organizationID {
+		return OAuthCredential{}, errors.New("oauth credential is outside the active organization")
+	}
+	if credential.RevokedAt != nil {
+		return OAuthCredential{}, ErrOAuthCredentialRevoked
+	}
+	originalUpdatedAt := credential.UpdatedAt
 	refresh, err := decryptCredential(credential.RefreshTokenCiphertext)
 	if err != nil {
 		return OAuthCredential{}, err
@@ -537,7 +561,8 @@ func (s *AuthStore) RefreshOAuthCredential(ctx context.Context, provider OAuthPr
 		client = http.DefaultClient
 	}
 	form := url.Values{"grant_type": {"refresh_token"}, "refresh_token": {refresh}, "client_id": {os.Getenv(provider.ClientIDEnv)}, "client_secret": {os.Getenv(provider.SecretEnv)}}
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, provider.TokenURL, strings.NewReader(form.Encode()))
+	client = oauthClient(client)
+	request, err := oauthRequest(ctx, http.MethodPost, provider.TokenURL, strings.NewReader(form.Encode()))
 	if err != nil {
 		return OAuthCredential{}, err
 	}
@@ -573,10 +598,59 @@ func (s *AuthStore) RefreshOAuthCredential(ctx context.Context, provider OAuthPr
 	}
 	credential.UpdatedAt = time.Now().UTC()
 	s.mu.Lock()
+	current, currentOK := s.credentials[credential.ID]
+	if !currentOK || !current.UpdatedAt.Equal(originalUpdatedAt) {
+		s.mu.Unlock()
+		return OAuthCredential{}, ErrOAuthCredentialConflict
+	}
+	if current.RevokedAt != nil {
+		s.mu.Unlock()
+		return OAuthCredential{}, ErrOAuthCredentialRevoked
+	}
 	s.credentials[credential.ID] = credential
 	err = s.persistLocked()
 	s.mu.Unlock()
 	return credential, err
+}
+
+func (s *AuthStore) RevokeOAuthCredentialForOrganization(ctx context.Context, organizationID, credentialID string, provider OAuthProvider, client *http.Client) error {
+	organizationID = strings.TrimSpace(organizationID)
+	credentialID = strings.TrimSpace(credentialID)
+	s.mu.RLock()
+	credential, ok := s.credentials[credentialID]
+	s.mu.RUnlock()
+	if !ok {
+		return os.ErrNotExist
+	}
+	if credential.OrganizationID != organizationID || credential.Provider != provider.Name {
+		return errors.New("oauth credential is outside the active organization")
+	}
+	if credential.RevokedAt != nil {
+		return ErrOAuthCredentialRevoked
+	}
+	originalUpdatedAt := credential.UpdatedAt
+	if strings.TrimSpace(provider.RevocationURL) != "" {
+		access, err := decryptCredential(credential.AccessTokenCiphertext)
+		if err != nil {
+			return err
+		}
+		if err := provider.Revoke(ctx, client, access); err != nil {
+			return err
+		}
+	}
+	now := time.Now().UTC()
+	s.mu.Lock()
+	current, currentOK := s.credentials[credential.ID]
+	if !currentOK || !current.UpdatedAt.Equal(originalUpdatedAt) {
+		s.mu.Unlock()
+		return ErrOAuthCredentialConflict
+	}
+	current.RevokedAt = &now
+	current.UpdatedAt = now
+	s.credentials[current.ID] = current
+	err := s.persistLocked()
+	s.mu.Unlock()
+	return err
 }
 
 func (s *AuthStore) Users() []User {
@@ -763,6 +837,7 @@ type OAuthProvider struct {
 	Name                  string   `json:"name"`
 	AuthorizeURL          string   `json:"authorize_url"`
 	TokenURL              string   `json:"token_url"`
+	RevocationURL         string   `json:"revocation_url,omitempty"`
 	UserInfoURL           string   `json:"userinfo_url,omitempty"`
 	IssuerURL             string   `json:"issuer_url,omitempty"`
 	Audience              string   `json:"audience,omitempty"`
@@ -812,7 +887,7 @@ func (p OAuthProvider) Validate() error {
 			return err
 		}
 	}
-	for _, raw := range []string{p.AuthorizeURL, p.TokenURL} {
+	for _, raw := range []string{p.AuthorizeURL, p.TokenURL, p.RevocationURL} {
 		if strings.TrimSpace(raw) == "" {
 			continue
 		}
@@ -1149,4 +1224,41 @@ func (p OAuthProvider) ExchangeCode(ctx context.Context, client *http.Client, co
 		return nil, fmt.Errorf("oauth token exchange failed with status %d", response.StatusCode)
 	}
 	return payload, nil
+}
+
+func (p OAuthProvider) Revoke(ctx context.Context, client *http.Client, accessToken string) error {
+	if err := p.Validate(); err != nil {
+		return err
+	}
+	if strings.TrimSpace(p.RevocationURL) == "" {
+		return errors.New("oauth revocation endpoint is not configured")
+	}
+	if strings.TrimSpace(accessToken) == "" {
+		return errors.New("oauth access token is required for revocation")
+	}
+	if client == nil {
+		client = http.DefaultClient
+	}
+	client = oauthClient(client)
+	form := url.Values{
+		"token":           {accessToken},
+		"token_type_hint": {"access_token"},
+		"client_id":       {os.Getenv(p.ClientIDEnv)},
+		"client_secret":   {os.Getenv(p.SecretEnv)},
+	}
+	request, err := oauthRequest(ctx, http.MethodPost, p.RevocationURL, strings.NewReader(form.Encode()))
+	if err != nil {
+		return err
+	}
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	response, err := client.Do(request)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+	_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 1<<20))
+	if response.StatusCode/100 != 2 {
+		return fmt.Errorf("oauth revocation failed with status %d", response.StatusCode)
+	}
+	return nil
 }

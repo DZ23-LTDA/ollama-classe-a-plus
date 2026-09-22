@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"encoding/base32"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -240,5 +241,85 @@ func TestRecoveryCodesAreOneTimeAndEncrypted(t *testing.T) {
 	}
 	if string(data) == "" || string(data) == codes[0] {
 		t.Fatal("recovery data was not persisted as a structured record")
+	}
+}
+
+func TestOAuthRefreshRotatesTokensAndRevokeIsTenantScoped(t *testing.T) {
+	t.Setenv("OLLAMA_AGENT_CREDENTIAL_KEY", "oauth-lifecycle-test-key-long-enough")
+	t.Setenv("DZ23_OAUTH_CLIENT", "client-fixture")
+	t.Setenv("DZ23_OAUTH_SECRET", "secret-fixture")
+	var revocationToken string
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/token":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"access_token":"rotated-access","refresh_token":"rotated-refresh","expires_in":3600}`))
+		case "/revoke":
+			body, _ := io.ReadAll(r.Body)
+			revocationToken = string(body)
+			w.WriteHeader(http.StatusOK)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	provider := OAuthProvider{Name: "github", AuthorizeURL: "https://idp.example.test/authorize", TokenURL: server.URL + "/token", RevocationURL: server.URL + "/revoke", ClientIDEnv: "DZ23_OAUTH_CLIENT", SecretEnv: "DZ23_OAUTH_SECRET"}
+	root := t.TempDir()
+	store, err := NewAuthStore(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	owner, err := store.CreateUser("oauth-owner@example.com", "OAuth Owner")
+	if err != nil {
+		t.Fatal(err)
+	}
+	orgA, _, err := store.CreateOrganization("OAuth A", owner)
+	if err != nil {
+		t.Fatal(err)
+	}
+	other, err := store.CreateUser("oauth-other@example.com", "OAuth Other")
+	if err != nil {
+		t.Fatal(err)
+	}
+	orgB, _, err := store.CreateOrganization("OAuth B", other)
+	if err != nil {
+		t.Fatal(err)
+	}
+	credential, err := store.StoreOAuthCredential(provider.Name, owner.ID, orgA.ID, map[string]any{"access_token": "initial-access", "refresh_token": "initial-refresh", "expires_in": float64(60)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.RefreshOAuthCredentialForOrganization(context.Background(), orgB.ID, provider, credential.ID, server.Client()); err == nil || !strings.Contains(err.Error(), "outside the active organization") {
+		t.Fatalf("cross-tenant refresh error = %v", err)
+	}
+	rotated, err := store.RefreshOAuthCredentialForOrganization(context.Background(), orgA.ID, provider, credential.ID, server.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rotated.RevokedAt != nil || rotated.ID != credential.ID {
+		t.Fatalf("rotated credential = %+v", rotated)
+	}
+	access, _, err := store.OAuthAccessTokenForOrganization(orgA.ID, provider.Name)
+	if err != nil || access != "rotated-access" {
+		t.Fatalf("rotated access=%q err=%v", access, err)
+	}
+	if err := store.RevokeOAuthCredentialForOrganization(context.Background(), orgB.ID, credential.ID, provider, server.Client()); err == nil || !strings.Contains(err.Error(), "outside the active organization") {
+		t.Fatalf("cross-tenant revoke error = %v", err)
+	}
+	if err := store.RevokeOAuthCredentialForOrganization(context.Background(), orgA.ID, credential.ID, provider, server.Client()); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(revocationToken, "token=rotated-access") {
+		t.Fatalf("revocation request did not carry rotated access token: %q", revocationToken)
+	}
+	if _, _, err := store.OAuthAccessTokenForOrganization(orgA.ID, provider.Name); err == nil {
+		t.Fatal("revoked credential remained usable")
+	}
+	reloaded, err := NewAuthStore(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := reloaded.OAuthAccessTokenForOrganization(orgA.ID, provider.Name); err == nil {
+		t.Fatal("revocation was not persisted")
 	}
 }

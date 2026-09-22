@@ -320,6 +320,8 @@ func (a *agentAPI) register(r *gin.Engine) {
 	group.POST("/auth/mfa/recovery/generate", a.generateRecoveryCodes)
 	group.GET("/auth/oauth/:provider/start", a.oauthStart)
 	group.GET("/auth/oauth/:provider/callback", a.oauthCallback)
+	group.POST("/auth/oauth/:provider/refresh", a.oauthRefresh)
+	group.POST("/auth/oauth/:provider/revoke", a.oauthRevoke)
 	group.GET("/auth/saml/:provider/start", a.samlStart)
 	group.GET("/auth/saml/:provider/metadata", a.samlMetadata)
 	group.POST("/auth/saml/:provider/acs", a.samlACS)
@@ -450,7 +452,7 @@ func (a *agentAPI) authMiddleware(c *gin.Context) {
 		c.Next()
 		return
 	}
-	if (strings.Contains(c.Request.URL.Path, "/auth/oauth/") || strings.Contains(c.Request.URL.Path, "/auth/saml/")) && strings.EqualFold(strings.TrimSpace(os.Getenv("OLLAMA_AGENT_AUTH_SSO_PUBLIC")), "true") {
+	if isPublicSSORoute(c) && strings.EqualFold(strings.TrimSpace(os.Getenv("OLLAMA_AGENT_AUTH_SSO_PUBLIC")), "true") {
 		c.Next()
 		return
 	}
@@ -502,6 +504,19 @@ func (a *agentAPI) authMiddleware(c *gin.Context) {
 
 func isCompanionConnectRoute(fullPath string) bool {
 	return strings.TrimSpace(fullPath) == "/api/agent/v1/devices/:id/connect"
+}
+
+func isPublicSSORoute(c *gin.Context) bool {
+	path := c.FullPath()
+	if path == "" {
+		path = c.Request.URL.Path
+	}
+	for _, prefix := range []string{"/api/agent/v1/auth/oauth/", "/api/agent/v1/auth/saml/"} {
+		if strings.HasPrefix(path, prefix) && (strings.HasSuffix(path, "/start") || strings.HasSuffix(path, "/callback") || strings.HasSuffix(path, "/metadata") || strings.HasSuffix(path, "/acs")) {
+			return true
+		}
+	}
+	return false
 }
 
 func isDevTokenRequestAllowed(c *gin.Context) bool {
@@ -770,7 +785,7 @@ func oauthProviderFromEnv(name string) agent.OAuthProvider {
 			redirects = append(redirects, value)
 		}
 	}
-	return agent.OAuthProvider{Name: name, AuthorizeURL: os.Getenv(prefix + "_AUTHORIZE_URL"), TokenURL: os.Getenv(prefix + "_TOKEN_URL"), UserInfoURL: os.Getenv(prefix + "_USERINFO_URL"), IssuerURL: os.Getenv(prefix + "_ISSUER_URL"), Audience: os.Getenv(prefix + "_AUDIENCE"), ClientIDEnv: os.Getenv(prefix + "_CLIENT_ID_ENV"), SecretEnv: os.Getenv(prefix + "_CLIENT_SECRET_ENV"), RedirectURIs: redirects, AllowLoopbackRedirect: strings.EqualFold(os.Getenv(prefix+"_ALLOW_LOOPBACK_REDIRECT"), "true")}
+	return agent.OAuthProvider{Name: name, AuthorizeURL: os.Getenv(prefix + "_AUTHORIZE_URL"), TokenURL: os.Getenv(prefix + "_TOKEN_URL"), RevocationURL: os.Getenv(prefix + "_REVOCATION_URL"), UserInfoURL: os.Getenv(prefix + "_USERINFO_URL"), IssuerURL: os.Getenv(prefix + "_ISSUER_URL"), Audience: os.Getenv(prefix + "_AUDIENCE"), ClientIDEnv: os.Getenv(prefix + "_CLIENT_ID_ENV"), SecretEnv: os.Getenv(prefix + "_SECRET_ENV"), RedirectURIs: redirects, AllowLoopbackRedirect: strings.EqualFold(os.Getenv(prefix+"_ALLOW_LOOPBACK_REDIRECT"), "true")}
 }
 
 func prepareOIDCProvider(ctx context.Context, provider agent.OAuthProvider) (agent.OAuthProvider, error) {
@@ -940,6 +955,75 @@ func (a *agentAPI) oauthCallback(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"access_token": localToken, "token": session, "credential_id": credential.ID, "provider": provider.Name, "organization": organization, "expires_at": credential.ExpiresAt})
+}
+
+func oauthCredentialPublic(credential agent.OAuthCredential) gin.H {
+	return gin.H{
+		"credential_id": credential.ID,
+		"provider":      credential.Provider,
+		"expires_at":    credential.ExpiresAt,
+		"updated_at":    credential.UpdatedAt,
+		"revoked_at":    credential.RevokedAt,
+	}
+}
+
+func (a *agentAPI) oauthRefresh(c *gin.Context) {
+	provider, err := prepareOIDCProvider(c.Request.Context(), oauthProviderFromEnv(c.Param("provider")))
+	if err != nil {
+		writeAgentError(c, http.StatusBadRequest, err)
+		return
+	}
+	var request struct {
+		CredentialID string `json:"credential_id"`
+	}
+	if err := decodeJSON(c, &request); err != nil || strings.TrimSpace(request.CredentialID) == "" {
+		if err == nil {
+			err = errors.New("credential_id is required")
+		}
+		writeAgentError(c, http.StatusBadRequest, err)
+		return
+	}
+	credential, err := a.auth.RefreshOAuthCredentialForOrganization(c.Request.Context(), agentOrganizationID(c), provider, request.CredentialID, http.DefaultClient)
+	if err != nil {
+		status := http.StatusBadGateway
+		if errors.Is(err, agent.ErrOAuthCredentialConflict) {
+			status = http.StatusConflict
+		} else if errors.Is(err, agent.ErrOAuthCredentialRevoked) || strings.Contains(err.Error(), "outside the active organization") {
+			status = http.StatusForbidden
+		}
+		writeAgentError(c, status, err)
+		return
+	}
+	c.JSON(http.StatusOK, oauthCredentialPublic(credential))
+}
+
+func (a *agentAPI) oauthRevoke(c *gin.Context) {
+	provider, err := prepareOIDCProvider(c.Request.Context(), oauthProviderFromEnv(c.Param("provider")))
+	if err != nil {
+		writeAgentError(c, http.StatusBadRequest, err)
+		return
+	}
+	var request struct {
+		CredentialID string `json:"credential_id"`
+	}
+	if err := decodeJSON(c, &request); err != nil || strings.TrimSpace(request.CredentialID) == "" {
+		if err == nil {
+			err = errors.New("credential_id is required")
+		}
+		writeAgentError(c, http.StatusBadRequest, err)
+		return
+	}
+	if err := a.auth.RevokeOAuthCredentialForOrganization(c.Request.Context(), agentOrganizationID(c), request.CredentialID, provider, http.DefaultClient); err != nil {
+		status := http.StatusBadGateway
+		if errors.Is(err, agent.ErrOAuthCredentialConflict) {
+			status = http.StatusConflict
+		} else if errors.Is(err, agent.ErrOAuthCredentialRevoked) || strings.Contains(err.Error(), "outside the active organization") {
+			status = http.StatusForbidden
+		}
+		writeAgentError(c, status, err)
+		return
+	}
+	c.Status(http.StatusNoContent)
 }
 
 func (a *agentAPI) samlStart(c *gin.Context) {
