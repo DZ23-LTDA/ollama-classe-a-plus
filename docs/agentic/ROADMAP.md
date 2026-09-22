@@ -317,3 +317,8 @@ O loader de manifestos MCP passou a ter regressões de servidor que exercitam o 
 ## Incremento 2026-09-22 — MCP JSON-RPC correlation
 
 O transporte stdio agora separa notificações sem `id` da resposta correlacionada. Permanecem como trabalho de hardening: reader dedicado com multiplexação segura, cancelamento de requests individuais, framing/streaming completo, auditoria por chamada e sessão/reconexão Remote MCP.
+
+
+## Remediação 2026-09-22 — Browser Operator upstream CI
+
+A matriz upstream identificou uma dependência de teste ausente, não uma falha do transporte MCP: `playwright` não era instalado antes de `go test`. O patch pinou a dependência nos jobs `test` e `race` e tornou a escolha do Python portável. Falta o novo run remoto confirmar Linux/macOS/Windows; isso não encerra os blockers de sandbox forte, Browser/desktop real ou release.

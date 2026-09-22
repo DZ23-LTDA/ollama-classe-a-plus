@@ -412,6 +412,22 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+      - name: Install Browser Operator dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          if command -v python3 >/dev/null 2>&1; then
+            python_bin=python3
+          else
+            python_bin=python
+          fi
+          if [ "${RUNNER_OS}" = "Linux" ]; then
+            "$python_bin" -m pip install --user --break-system-packages 'playwright==1.53.2'
+            "$python_bin" -m playwright install --with-deps chromium
+          else
+            "$python_bin" -m pip install --user 'playwright==1.53.2'
+            "$python_bin" -m playwright install chromium
+          fi
       - name: Cache MLX Darwin release payload
         if: ${{ startsWith(matrix.os, 'macos') }}
         uses: actions/cache@v4
@@ -490,6 +506,22 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+      - name: Install Browser Operator dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          if command -v python3 >/dev/null 2>&1; then
+            python_bin=python3
+          else
+            python_bin=python
+          fi
+          if [ "${RUNNER_OS}" = "Linux" ]; then
+            "$python_bin" -m pip install --user --break-system-packages 'playwright==1.53.2'
+            "$python_bin" -m playwright install --with-deps chromium
+          else
+            "$python_bin" -m pip install --user 'playwright==1.53.2'
+            "$python_bin" -m playwright install chromium
+          fi
       # app/ui embeds app/dist, so the UI has to be built before app/... will
       # even compile.
       - name: Build UI

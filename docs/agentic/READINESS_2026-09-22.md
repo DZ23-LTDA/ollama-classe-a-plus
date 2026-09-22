@@ -320,3 +320,10 @@ Evidências: testes focused normal e race, integrity guard e gates Go anteriores
 O transporte MCP stdio agora descarta notificações JSON-RPC sem `id` enquanto aguarda a resposta correlacionada ao request. Respostas com `id` ausente, nulo ou diferente continuam sendo tratadas como falha de correlação, evitando aceitar uma resposta de outra operação. A regressão normal e race passou com fixture local.
 
 Isso não implementa multiplexação concorrente, framing completo, sessão Remote MCP ou auditoria persistida por chamada.
+
+
+## Remediação do Browser Operator no workflow upstream — 2026-09-22
+
+O run upstream `test` no head `e8017591` deixou `test (ubuntu-latest)` e `race (ubuntu-latest)` vermelhos porque o teste `TestBrowserOperatorNavigateAndSnapshot` encontrou `ModuleNotFoundError: No module named 'playwright'`. O workflow `dz23-agentic-quality` do fork permaneceu verde, pois já instala a dependência.
+
+A correção local adiciona Playwright `1.53.2` pinado aos jobs upstream `test` e `race`, instala Chromium com dependências no Linux e sem essa flag em macOS/Windows, e torna o launcher Go portável ao escolher `python3` ou `python` no `PATH`. Integrity, YAML, Browser Operator normal/race e gates Go locais passaram. A confirmação remota desta correção ainda está pendente; hardware/platform matrix upstream continua fora do controle do sandbox.

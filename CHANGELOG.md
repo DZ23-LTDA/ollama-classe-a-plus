@@ -301,3 +301,8 @@ Foi adicionada cobertura de servidor para carregar manifestos MCP stdio e Remote
 ## 2026-09-22 — correlação JSON-RPC MCP
 
 MCP stdio passou a ignorar notificações JSON-RPC sem identificador e aguardar o response com o `id` do request. A regressão inclui execução normal e race; multiplexação e transporte externo continuam fora da prova local.
+
+
+## 2026-09-22 — Browser Operator no workflow upstream
+
+O teste upstream revelou que os jobs `test`/`race` não instalavam o módulo Python Playwright, embora o Browser Operator o importe. O workflow agora instala Playwright `1.53.2` e Chromium nos jobs relevantes, com tratamento Linux/macOS/Windows; o launcher Go deixou de depender de `/usr/bin/python3` fixo. O CI remoto desta correção ainda precisa concluir.

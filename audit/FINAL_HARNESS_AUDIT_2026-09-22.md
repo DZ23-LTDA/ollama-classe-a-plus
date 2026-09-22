@@ -409,3 +409,8 @@ Este documento preserva os achados originais como histórico. As slices publicad
 | C-15 UI/mobile | **Verde em gates locais**: Vitest/build/typecheck mobile | dispositivos físicos, distribuição e jornadas reais continuam `NOT_RUN` |
 
 **Classificação vigente:** preview/local RC em hardening. Este addendum não revoga os blockers externos nem autoriza alegações de credenciais, contas, devices, deploys, marketplace, app review, signing ou release concluídos.
+
+
+## Addendum — Browser Operator upstream CI — 2026-09-22
+
+O run upstream `35750983274` falhou em `go test`/`go test -race` porque o workflow não instalava o módulo Python `playwright`, importado por `browser_helper.py`; o log confirmou `ModuleNotFoundError`. O workflow agentic do fork já instalava essa dependência e permaneceu verde. O patch adiciona Playwright `1.53.2` e Chromium aos jobs upstream relevantes, com instalação de dependências OS somente no Linux, e torna o launcher Go compatível com `python3` ou `python` no `PATH`. A correção trata CI/portabilidade; não prova Browser/desktop completo, sandbox forte ou release production-ready. A confirmação remota do novo head permanece pendente.

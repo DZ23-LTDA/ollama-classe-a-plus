@@ -263,3 +263,8 @@ Os loaders de configuração do servidor agora possuem testes positivos e negati
 ## Correlação MCP com notificações — 2026-09-22
 
 A regressão do transporte stdio demonstra que uma notificação JSON-RPC sem `id` não é confundida com a resposta do request. O sistema continua falhando fechado para ID divergente. A correção não encerra os achados de multiplexação, auditoria, sessão Remote MCP ou sandbox forte.
+
+
+## Remediação do Browser Operator upstream — 2026-09-22
+
+A auditoria do run `35750983274` encontrou `ModuleNotFoundError` de Playwright no teste Browser Operator, enquanto o workflow agentic do fork passou. A correção adiciona instalação pinada de Playwright/Chromium aos jobs upstream e remove o caminho Python Linux-only do launcher Go. A reprodução local passou teste normal/race, mas a matriz remota, especialmente plataformas e hardware, ainda é evidência pendente. Nenhum claim de produção-ready é alterado.

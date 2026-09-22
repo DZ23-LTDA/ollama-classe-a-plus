@@ -1893,3 +1893,21 @@ remote_evidence: pending for this SHA
 classification: preview/local RC em hardening; NÃO final; NÃO production-ready
 next_action: verify integrity/quality remote, then continue audit trail and Remote MCP session work
 ```
+
+
+## Correção do Browser Operator upstream CI — aguardando publicação — 2026-09-22
+
+```yaml
+state: RELEASING
+iteration: 36
+base_commit: e8017591
+root_cause: upstream test/race omitted Python Playwright; Browser Operator test failed with ModuleNotFoundError
+files:
+  - .github/workflows/test.yaml
+  - internal/agent/browser.go
+  - scripts/check-class-a-plus-integrity.sh
+local_evidence: integrity; YAML; focused Browser Operator normal/race; local go test and agent/server race = PASS
+remote_evidence: pending
+classification: preview/local RC em hardening; NÃO final; NÃO production-ready
+next_action: commit/push this fix, verify remote test/race and continue remaining P0/P1 audit slices
+```

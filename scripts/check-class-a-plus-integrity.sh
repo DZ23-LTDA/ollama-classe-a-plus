@@ -113,6 +113,8 @@ grep -q 'MCP command must be an absolute executable path' internal/agent/mcp.go
 	grep -q 'TestLoadAgentMCPBootstrapsStrictManifest' server/agent_mcp_bootstrap_test.go
 	grep -q 'TestLoadAgentRemoteMCPRejectsEmptyAllowlist' server/agent_mcp_bootstrap_test.go
 	grep -q 'configureMCPProcess' internal/agent/mcp_process_unix.go
+grep -q 'browserPythonExecutable' internal/agent/browser.go
+grep -q "playwright==1.53.2" .github/workflows/test.yaml
 grep -q 'media destination connected to a private address' internal/agent/media.go
 grep -q 'validateMediaMagic' internal/agent/media.go
 grep -q 'TestMediaMaterializeRejectsRedirectAndInvalidMagic' internal/agent/media_test.go
