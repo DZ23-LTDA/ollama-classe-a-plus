@@ -55,6 +55,28 @@ func TestRuntimePersistsAndRunsReadMission(t *testing.T) {
 	}
 }
 
+func TestRuntimeRejectsUnconfiguredMissionProvider(t *testing.T) {
+	root := t.TempDir()
+	store, err := NewJSONStore(filepath.Join(root, ".store"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	runtime, err := NewRuntime(RuntimeConfig{Store: store, Planner: RulePlanner{}, WorkspaceRoot: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runtime.CreateMission(context.Background(), CreateMissionRequest{Objective: "testar provider", Provider: "claude"}); err == nil || !strings.Contains(err.Error(), "not configured") {
+		t.Fatalf("provider error = %v", err)
+	}
+	mission, err := runtime.CreateMission(context.Background(), CreateMissionRequest{Objective: "usar provider local"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if mission.Provider != "ollama-local" {
+		t.Fatalf("provider = %q", mission.Provider)
+	}
+}
+
 func TestRuntimeRequiresApprovalBeforeWritingAndBuildsArtifact(t *testing.T) {
 	root := t.TempDir()
 	runtime, err := NewRuntime(RuntimeConfig{Store: NewMemoryStore(), Planner: fixedPlanner{steps: []Step{{ID: "step_1", Kind: "workspace.write", Title: "write", Risk: RiskWrite, RequiresApproval: true, State: StepPending, Input: map[string]any{"path": "result.txt", "content": "hello"}}}}, WorkspaceRoot: root})

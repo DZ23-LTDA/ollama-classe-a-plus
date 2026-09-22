@@ -49,6 +49,7 @@ const (
 
 type CreateMissionRequest struct {
 	Objective      string   `json:"objective"`
+	Provider       string   `json:"provider,omitempty"`
 	Model          string   `json:"model,omitempty"`
 	Workspace      string   `json:"workspace,omitempty"`
 	ProjectID      string   `json:"project_id,omitempty"`
@@ -61,6 +62,7 @@ type Mission struct {
 	ID             string             `json:"id"`
 	Version        int64              `json:"version"`
 	Objective      string             `json:"objective"`
+	Provider       string             `json:"provider,omitempty"`
 	Model          string             `json:"model,omitempty"`
 	Workspace      string             `json:"workspace,omitempty"`
 	ProjectID      string             `json:"project_id,omitempty"`

@@ -231,3 +231,8 @@ Grok passou a validar modelo contra allowlist e catálogo no health probe; a rot
 ## 2026-09-22 — Compose secure defaults
 
 PostgreSQL/Redis/OTLP foram limitados a loopback por padrão; PostgreSQL/Redis exigem secrets de ambiente e CI usa credenciais efêmeras. O sandbox local não possui Docker, então a integração distribuída permanece dependente do Actions.
+
+
+## 2026-09-22 — provider selection contract
+
+A Nova tarefa envia e persiste `provider`; apenas `ollama-local` é aceito até adapters Claude/Codex/OmniRoute reais existirem. A UI marca os demais como não conectados.

@@ -312,6 +312,13 @@ func (r *Runtime) CreateMission(ctx context.Context, request CreateMissionReques
 	if len(objective) > 8<<10 {
 		return Mission{}, errors.New("objective is too long")
 	}
+	provider := strings.TrimSpace(request.Provider)
+	if provider == "" {
+		provider = "ollama-local"
+	}
+	if provider != "ollama-local" {
+		return Mission{}, fmt.Errorf("provider %q is not configured in this runtime", provider)
+	}
 	workspace, err := r.resolveWorkspace(request.Workspace)
 	if err != nil {
 		return Mission{}, err
@@ -321,7 +328,7 @@ func (r *Runtime) CreateMission(ctx context.Context, request CreateMissionReques
 		capabilities = []string{"workspace:read", "workspace:write"}
 	}
 	now := time.Now().UTC()
-	mission := Mission{ID: "mis_" + uuid.NewString(), Version: 1, Objective: objective, Model: strings.TrimSpace(request.Model), Workspace: workspace, ProjectID: strings.TrimSpace(request.ProjectID), OrganizationID: strings.TrimSpace(request.OrganizationID), Capabilities: capabilities, AutoRun: request.AutoRun, State: MissionPlanning, CreatedAt: now, UpdatedAt: now}
+	mission := Mission{ID: "mis_" + uuid.NewString(), Version: 1, Objective: objective, Provider: provider, Model: strings.TrimSpace(request.Model), Workspace: workspace, ProjectID: strings.TrimSpace(request.ProjectID), OrganizationID: strings.TrimSpace(request.OrganizationID), Capabilities: capabilities, AutoRun: request.AutoRun, State: MissionPlanning, CreatedAt: now, UpdatedAt: now}
 	if err := r.store.PutMission(mission); err != nil {
 		return Mission{}, err
 	}

@@ -191,3 +191,8 @@ Modelos Grok agora são allowlisted e o health probe valida catálogo. O endpoin
 ## Slice P0 validada — Compose/infrastructure defaults — 2026-09-22
 
 Compose agora usa loopback-only, passwords de ambiente e Redis autenticado; CI injeta secrets efêmeros. A composição foi validada estaticamente/integrity, mas Docker/Compose e os serviços distribuídos não executaram nesta sandbox.
+
+
+## Slice P1 validada — provider selection contract — 2026-09-22
+
+A UI transporta provider e o runtime rejeita seleções sem adapter implementado. Claude/Codex/OmniRoute não são apresentados como conectados; execução externa, credenciais por tenant e streaming ainda permanecem pendentes.

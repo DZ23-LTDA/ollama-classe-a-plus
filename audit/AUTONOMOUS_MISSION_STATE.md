@@ -1417,3 +1417,24 @@ proofs: integrity/static Compose checks and diff check PASS; Docker integration 
 classification: preview/local RC em hardening
 next_slice: continue remaining P0/P1s, especially provider/runtime UI contracts and release evidence; no main merge
 ```
+
+
+## Slice P1 provider selection contract validada — aguardando publicação — 2026-09-22
+
+```yaml
+state: RELEASING
+iteration: 23
+base_commit: e762761d
+working_tree: provider runtime/UI/docs changes still uncommitted
+implemented:
+  - explicit provider field in mission request/result
+  - server rejects Claude/Codex/OmniRoute/automatic until real adapter exists
+  - UI disables unconnected providers and sends provider for local runtime
+proofs:
+  - integrity guard: PASS
+  - focused/runtime Go tests: PASS
+  - UI Vitest/build: PASS; known >500KB warning
+classification: preview/local RC em hardening
+open_risks: external provider adapters, credentials, OAuth refresh, streaming
+next_action: commit/push, then continue remaining P0/P1s; no main merge
+```

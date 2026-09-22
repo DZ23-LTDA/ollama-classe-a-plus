@@ -214,3 +214,10 @@ Testes cobrem modelo arbitrário, stream rejeitado, catálogo compatível/incomp
 A composição agentic passou a exigir `OLLAMA_AGENT_POSTGRES_PASSWORD` e `OLLAMA_AGENT_REDIS_PASSWORD`, usar role PostgreSQL não-superuser, Redis com `requirepass` e portas PostgreSQL/Redis/OTLP ligadas a `127.0.0.1` por padrão. O init SQL não contém mais credencial fixa. O workflow distribuído cria passwords efêmeras por execução e injeta URLs autenticadas nos testes.
 
 O integrity guard e `git diff --check` passaram. Docker/Compose não está instalado nesta sandbox; `docker compose config` e o teste real PostgreSQL/Redis/OTLP ficaram `NOT_RUN_DOCKER_UNAVAILABLE`, não sendo tratados como prova local. O GitHub Actions continua sendo a prova autoritativa dessa integração.
+
+
+## Slice P1 de provider selection contract — 2026-09-22
+
+A seleção de motor na Nova tarefa agora envia `provider` explicitamente e o runtime persiste essa escolha. Como somente o planner Ollama local está implementado nesta árvore, providers Claude/Codex/OmniRoute/automático aparecem como não conectados na UI e são rejeitados pelo servidor com erro de configuração, em vez de serem enviados silenciosamente ao Ollama como se fossem adapters reais.
+
+O teste negativo server-side e os gates completos Go/integrity/UI passaram. A implementação de adapters externos, renovação OAuth e execução real dos CLIs continuam pendentes e não são declaradas conectadas.

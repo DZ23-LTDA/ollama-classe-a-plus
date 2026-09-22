@@ -250,3 +250,8 @@ O contrato Grok agora rejeita modelo arbitrário, valida catálogo no health e n
 ## Incremento 2026-09-22 — Compose secure defaults
 
 A stack local agora exige secrets e loopback binding. Falta executar e inspecionar a integração PostgreSQL/RLS, Redis/DLQ e OTLP em runner Docker real; essa prova não pode ser substituída por YAML estático.
+
+
+## Incremento 2026-09-22 — provider selection contract
+
+A seleção de provider deixou de ser apenas cosmética: o runtime valida e persiste o provider real. A próxima etapa é implementar adapters externos isolados, com credenciais por organização, health/allowlist, streaming e testes; até lá a UI mantém esses motores desativados.

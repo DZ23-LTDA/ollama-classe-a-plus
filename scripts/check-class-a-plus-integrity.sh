@@ -142,6 +142,10 @@ grep -q '127.0.0.1:' deploy/docker-compose.agentic.yml
 grep -q 'OLLAMA_AGENT_POSTGRES_PASSWORD' deploy/docker-compose.agentic.yml
 grep -q 'OLLAMA_AGENT_REDIS_PASSWORD' deploy/docker-compose.agentic.yml
 if grep -Rqi 'change-me-local-only' deploy; then echo 'fixed development credential found'; exit 1; fi
+grep -q 'Provider       string' internal/agent/types.go
+grep -q 'provider != "ollama-local"' internal/agent/runtime.go
+grep -q 'Claude / Anthropic (não conectado)' app/ui/app/src/components/AgenticConsole.tsx
+grep -q 'TestRuntimeRejectsUnconfiguredMissionProvider' internal/agent/runtime_test.go
 grep -q 'Capabilities' internal/agent/runtime.go
 grep -q 'Evaluation' internal/agent/evaluation.go
 for route in projects library scheduled skills plugins tasks company; do
