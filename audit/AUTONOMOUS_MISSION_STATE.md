@@ -496,7 +496,7 @@ next_action: run complete release gates, capture final screens, commit and push 
 ## Publicação da rodada operacional — 2026-09-22
 
 ```yaml
-commit: c9aa8f8941ea55f28ab8e9d70f5a79c6f08ea81f
+commit: d0809136fdda6871a7371bd632750972cbb65305
 branch: feat/manus-parity-omniroute
 remote: https://github.com/DZ23-LTDA/ollama-classe-a-plus.git
 pull_request: https://github.com/DZ23-LTDA/ollama-classe-a-plus/pull/1
