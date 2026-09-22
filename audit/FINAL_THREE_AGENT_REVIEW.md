@@ -206,3 +206,8 @@ O release bloqueia artefatos vazios/ausentes e só ativa provenance attestation 
 ## Slice P0 validada — jobs/replay tenant scope — 2026-09-22
 
 Queue list/replay usa ownership da missão e o teste HTTP confirma `403` sem mutação cross-tenant. Redis distribuído e restart recovery ainda não foram executados nesta sandbox.
+
+
+## Slice P0 validada — artifact manifest path safety — 2026-09-22
+
+`BuildArtifactManifest` rejeita symlink e resolução externa antes da leitura. A correção foi coberta por regressões de arquivo regular e symlink.

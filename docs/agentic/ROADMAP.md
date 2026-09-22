@@ -265,3 +265,8 @@ O release valida presença/tamanho dos artefatos e oferece attestation condicion
 ## Incremento 2026-09-22 — jobs/replay scoped
 
 Queue list/replay agora consultam a organização da missão antes de expor ou mutar jobs. A validação distribuída Redis e recuperação após restart continuam pendentes no runner Docker.
+
+
+## Incremento 2026-09-22 — artifact manifest path safety
+
+A geração de manifests reutiliza a contenção de symlink do workspace. Exportação assinada, armazenamento distribuído e validações físicas de artefatos continuam pendentes.

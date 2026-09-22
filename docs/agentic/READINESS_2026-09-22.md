@@ -233,3 +233,10 @@ O job final de release passou a rejeitar artefatos ausentes ou vazios antes de g
 Listagem e replay da fila agora são filtrados pela organização proprietária da missão. Um tenant não recebe jobs de outra organização e o replay cross-tenant retorna `403` sem alterar o estado da fila. A regressão HTTP foi adicionada ao teste combinado de escopo.
 
 Gates completos Go/integrity/build/UI/mobile passaram. O isolamento ainda depende de prova distribuída com Redis/PostgreSQL reais e de revisão de outras superfícies de execução, mas jobs/replay não permanecem mais como leitura/mutação global no handler.
+
+
+## Slice P0 de artifact manifest path safety — 2026-09-22
+
+`BuildArtifactManifest` agora rejeita componentes symlink e resoluções fora do workspace antes de calcular hash, tamanho ou MIME. Foram adicionados testes para symlink externo e arquivo regular.
+
+Gates completos Go/integrity/build/UI/mobile passaram. Isso protege a geração do manifest; a prova de publicação/exportação em todos os runtimes e adapters distribuídos continua separada.

@@ -1534,3 +1534,26 @@ proofs: focused/full Go, vet/build, integrity, UI and mobile gates PASS; distrib
 classification: preview/local RC em hardening
 next_slice: continue remaining P0/P1s and external evidence; no main merge
 ```
+
+
+## Slice P0 artifact manifest path safety validada — aguardando publicação — 2026-09-22
+
+```yaml
+state: RELEASING
+iteration: 26
+base_commit: f10aa8e9
+working_tree: artifact/docs changes still uncommitted
+implemented:
+  - reject symlink components before artifact hashing
+  - reject paths resolving outside workspace
+  - regression tests for external symlink and regular file
+proofs:
+  - focused/full Go tests: PASS
+  - vet/build: PASS
+  - integrity: PASS
+  - UI Vitest/build: PASS; known >500KB warning
+  - mobile typecheck: PASS
+classification: preview/local RC em hardening
+open_risks: distributed artifact stores/export signing and other external proofs
+next_action: commit/push, then continue remaining P0/P1s; no main merge
+```

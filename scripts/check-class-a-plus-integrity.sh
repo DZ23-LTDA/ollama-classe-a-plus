@@ -153,6 +153,8 @@ grep -q 'QueueJobsForOrganization' internal/agent/runtime.go
 grep -q 'ReplayJobForOrganization' internal/agent/runtime.go
 grep -q 'TestRuntimeQueueJobsOrganizationScope' internal/agent/runtime_test.go
 grep -q 'cross-tenant job replay' server/p0_scope_test.go
+grep -q 'rejectSymlinkComponents(root, candidate)' internal/agent/artifacts.go
+grep -q 'TestBuildArtifactManifestRejectsSymlinkOutsideWorkspace' internal/agent/artifacts_test.go
 grep -q 'Capabilities' internal/agent/runtime.go
 grep -q 'Evaluation' internal/agent/evaluation.go
 for route in projects library scheduled skills plugins tasks company; do

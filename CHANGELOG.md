@@ -246,3 +246,8 @@ Release agora falha para artefatos ausentes/vazios e pode gerar attestation de p
 ## 2026-09-22 — tenant isolation de jobs/replay
 
 Fila de jobs agora filtra listagem e replay pela organização da missão, negando cross-tenant sem mutação.
+
+
+## 2026-09-22 — artifact manifest path safety
+
+Manifests de artefatos agora rejeitam symlinks e resoluções fora do workspace antes de ler e hashear arquivos.
