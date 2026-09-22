@@ -90,7 +90,7 @@ export async function agentFetch<T>(path: string, init: RequestInit = {}): Promi
   const response = await fetch(`${API_BASE}${path}`, { ...init, headers: { "Content-Type": "application/json", ...agentHeaders(), ...(init.headers ?? {}) } });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
-    if (response.status === 401 || response.status === 403) clearAgentSession();
+    if (response.status === 401) clearAgentSession();
     throw new Error(typeof body?.error === "string" ? body.error : response.statusText || "Agent API request failed");
   }
   return body as T;

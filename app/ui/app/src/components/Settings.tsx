@@ -240,15 +240,16 @@ export default function Settings() {
 
       queryClient.setQueryData<CloudStatusResponse | null>(
         ["cloudStatus"],
-        previous
-          ? {
-              ...previous,
-              disabled: !enabled || envForcesDisabled,
-            }
-          : {
-              disabled: !enabled,
-              source: "config",
-            },
+        (): CloudStatusResponse | null =>
+          previous
+            ? {
+                ...previous,
+                disabled: !enabled || envForcesDisabled,
+              }
+            : {
+                disabled: !enabled,
+                source: "config",
+              },
       );
 
       return { previous };

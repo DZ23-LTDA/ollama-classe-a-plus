@@ -34,6 +34,18 @@ describe("agent session security", () => {
     expect(dispatchEvent).toHaveBeenCalled();
   });
 
+  it("keeps the session on forbidden responses", async () => {
+    const dispatchEvent = vi.fn();
+    vi.stubGlobal("window", { dispatchEvent });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: "organization denied" }), { status: 403 })));
+    setAgentSession("session-token", "org-a");
+
+    await expect(agentFetch("/api/agent/v1/projects/org-b")).rejects.toThrow("organization denied");
+
+    expect(hasAgentSession()).toBe(true);
+    expect(dispatchEvent).not.toHaveBeenCalled();
+  });
+
   it("rejects empty session tokens", () => {
     expect(() => setAgentSession("   ")).toThrow("session token is required");
     expect(hasAgentSession()).toBe(false);
