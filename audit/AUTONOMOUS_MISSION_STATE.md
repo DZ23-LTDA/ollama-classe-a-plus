@@ -1798,3 +1798,21 @@ upstream_test_current_head: NOT_RUN
 classification: preview/local RC em hardening; NÃO final; NÃO production-ready
 next_action: publish this evidence-only commit, then verify test.yaml on the current PR head
 ```
+
+
+## Publicação da evidência quality e bloqueio de sincronização upstream — 2026-09-22
+
+```yaml
+state: FIXING
+iteration: 33
+commit: c184c472
+branch: feat/manus-parity-omniroute
+remote: class-a-plus/feat/manus-parity-omniroute
+remote_runs:
+  - class-a-plus-integrity: 35749696520 PASS
+  - dz23-agentic-quality: 35749696581 PASS
+upstream_test_current_head: NOT_RUN
+upstream_observation: test.yaml has pull_request-only trigger; GitHub PR API remained at 428a99bd while branch ref is c184c472; no current-head test run exists
+classification: preview/local RC em hardening; NÃO final; NÃO production-ready
+next_action: continue next internal P0 slice; re-check upstream trigger later without treating historical queued runs as evidence
+```
