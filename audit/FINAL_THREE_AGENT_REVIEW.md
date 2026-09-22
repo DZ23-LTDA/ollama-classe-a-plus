@@ -273,3 +273,10 @@ A auditoria do run `35750983274` encontrou `ModuleNotFoundError` de Playwright n
 ## Follow-up verificado — workflow upstream sem fila infinita — 2026-09-22
 
 O run `35755046119` não era um teste único travado: sua matriz nativa aguardava runners customizados indisponíveis, enquanto `test` e `race` Ubuntu falharam por uma versão Playwright inexistente no índice. O patch substitui a dependência por `1.63.0`, corrige a concorrência e torna a matriz nativa manual e opt-in. Isso melhora a determinismo do PR, mas não equivale a executar GPU, Windows, macOS ou dispositivos físicos; a classificação continua preview/local RC em hardening.
+
+
+## Validação independente — upstream CI multiplataforma — 2026-09-22
+
+A correção de CI convergiu por diagnóstico observável, sem relaxar assertions ou remover jobs. O head `de0e86772e96372789c10d924eb5738f8808821b` passou os quatro workflows relevantes: integrity `35769597628`, agentic quality `35769597363`, multi-provider `35769597578` e upstream `test` `35769597404`. O upstream passou testes em Linux, macOS e Windows, race em Linux e macOS, patches e `go_mod_tidy`; o workflow agentic passou Go/server, PostgreSQL RLS + Redis DLQ + OTLP, Web/Mobile e SBOM.
+
+O achado é **mitigado para o caminho normal de CI**. A matriz GPU/nativa não foi executada e permanece manual/opt-in com runners do operador. O resultado não altera os achados P0/P1 de sandbox forte, autorização distribuída, OAuth revocation, adapters externos, validação física de desktop/mobile, signing/provenance e homologação. A decisão permanece **FIXING / preview-local em hardening**, sem merge automático em `main`.

@@ -1911,3 +1911,38 @@ remote_evidence: pending; prior run 35755046119 cancelled after queued custom li
 classification: preview/local RC em hardening; NÃO final; NÃO production-ready
 next_action: verify remote test/race with Playwright 1.63.0; native GPU matrix is manual opt-in and requires configured runners; continue remaining P0/P1 audit slices
 ```
+
+
+## Validação remota do hardening de CI multiplataforma — 2026-09-22
+
+```yaml
+state: FIXING
+iteration: 37
+commits:
+  - 5db7261e: upstream lint/test OAuth response cleanup
+  - 86a2706b: portable Browser Operator executable discovery and full lint cleanup
+  - 849781af: Darwin companion gofumpt cleanup
+  - de0e8677: Windows platform lint/build cleanup
+branch: feat/manus-parity-omniroute
+remote: class-a-plus/feat/manus-parity-omniroute
+head_sha: de0e86772e96372789c10d924eb5738f8808821b
+local_evidence:
+  - integrity guard, YAML parse, git diff --check: PASS
+  - golangci-lint v2.13.2: 0 issues
+  - CGO_ENABLED=1 go test ./... -count=1: PASS
+  - CGO_ENABLED=1 go test -race ./... -count=1: PASS
+  - CGO_ENABLED=1 go vet ./... and go build: PASS
+  - GOOS=windows affected-package lint and test compilation: PASS
+remote_evidence:
+  - class-a-plus-integrity PR run 35769597628: PASS
+  - dz23-agentic-quality PR run 35769597363: PASS (Go/server, PostgreSQL RLS + Redis DLQ + OTLP, Web/Mobile, SBOM)
+  - dz23-multi-provider PR run 35769597578: PASS
+  - upstream test PR run 35769597404: PASS (Linux, macOS and Windows test; Linux/macOS race; patches; go_mod_tidy)
+  - push duplicate integrity/agentic runs 35769592895/35769592096: PASS
+pr_checks: 21 successful, 3 skipped, 0 failing, 0 pending
+warnings: non-blocking GitHub Actions Node 20 and ubuntu-latest migration notices
+native_matrix: skipped on pull_request; available only via workflow_dispatch with run_native_matrix=true and compatible operator runners
+classification: preview/local RC em hardening; NÃO final; NÃO production-ready
+blockers: strong sandbox/process isolation, auth/session/CSRF/IdP lifecycle, OAuth revocation, external provider/deploy/media contracts, physical device/mobile/desktop validation, signing/provenance and store/app review remain open
+next_action: continue the next internal P0/P1 slice; do not merge main automatically
+```

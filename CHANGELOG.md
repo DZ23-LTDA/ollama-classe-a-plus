@@ -311,3 +311,8 @@ O teste upstream revelou que os jobs `test`/`race` não instalavam o módulo Pyt
 ## 2026-09-22 — workflow upstream preso e Playwright corrigido
 
 O run upstream `35755046119` foi cancelado após confirmar jobs nativos `linux`/`windows` aguardando runners customizados inexistentes no PR. A pinagem anterior do Playwright também era inválida no índice do runner; os jobs `test`/`race` passam a usar `1.63.0`. A matriz nativa agora é manual e opt-in (`workflow_dispatch` + `run_native_matrix=true`), sem mascarar a ausência de hardware/runners como validação concluída.
+
+
+## 2026-09-22 — upstream CI multiplataforma verde no head publicado
+
+Os commits `5db7261e`, `86a2706b`, `849781af` e `de0e8677` corrigiram os achados determinísticos do golangci-lint, tornaram o Browser Operator capaz de localizar o Chromium instalado pelo Playwright e normalizaram os arquivos de companion Darwin/Windows. O head `de0e86772e96372789c10d924eb5738f8808821b` passou `class-a-plus-integrity` (`35769597628`), `dz23-agentic-quality` (`35769597363`), `dz23-multi-provider` (`35769597578`) e o upstream `test` (`35769597404`). O upstream executou test em Linux/macOS/Windows e race em Linux/macOS. Isso valida o caminho normal de CI, mas não executa a matriz GPU/nativa manual nem comprova sandbox forte, credenciais, deploys, dispositivos físicos, signing ou produção.

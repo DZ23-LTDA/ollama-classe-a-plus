@@ -334,3 +334,14 @@ A correção local adiciona Playwright `1.63.0` pinado aos jobs upstream `test` 
 O run upstream `35755046119` foi cancelado de forma controlada depois de permanecer com uma matriz nativa Linux/Windows dependente de runners customizados indisponíveis no PR público. Os dois jobs Ubuntu também falharam por causa verificável: a pinagem inicial `playwright==1.53.2` não existia no índice do runner, causando `No matching distribution found` e, em seguida, `ModuleNotFoundError` no Browser Operator.
 
 A correção agora usa Playwright `1.63.0`, corrige o grupo de concorrência e deixa a matriz nativa com GPU disponível somente por `workflow_dispatch` e `run_native_matrix=true`. No caminho normal de pull request permanecem os runners públicos e os gates CPU/test/race aplicáveis. Validação local desta mudança: parser YAML dos três workflows, integrity guard e `git diff --check` passaram. A nova confirmação remota será registrada somente após um run no head publicado.
+
+
+## Validação remota final do caminho normal de CI — 2026-09-22
+
+A sequência de correções publicada nos commits `5db7261e`, `86a2706b`, `849781af` e `de0e8677` fechou os problemas de lint multiplataforma e de descoberta do Chromium gerenciado pelo Playwright. A prova local inclui integrity, parser YAML, `golangci-lint v2.13.2` com zero issues, suíte Go normal e race, vet, build e compilação cruzada dos pacotes Windows afetados.
+
+No head `de0e86772e96372789c10d924eb5738f8808821b`, o GitHub Actions confirmou `class-a-plus-integrity` no run `35769597628`, `dz23-agentic-quality` no run `35769597363`, `dz23-multi-provider` no run `35769597578` e o workflow upstream `test` no run `35769597404`; todos passaram. O upstream executou testes em Linux, macOS e Windows, além de race em Linux e macOS. O PR consolidou 21 checks bem-sucedidos, 3 skipped e nenhum pending ou failing.
+
+Os skips correspondem a jobs condicionais do workflow upstream e não são tratados como aprovação de hardware. A matriz GPU/nativa continua fora do caminho automático e exige `workflow_dispatch` com `run_native_matrix=true` e runners compatíveis configurados pelo operador. Avisos de migração de Node 20 e `ubuntu-latest` são não bloqueantes.
+
+Esta evidência fecha o caminho normal de CI desta slice, mas não altera a classificação global. O produto permanece **preview/local RC em hardening**, e não production-ready. Ainda faltam sandbox forte e isolamento de processos, autenticação/session/CSRF/IdP end-to-end, revogação OAuth, contratos externos reais de providers/deploy/media, validação física de desktop/mobile, signing/provenance e homologação de lojas ou app review.

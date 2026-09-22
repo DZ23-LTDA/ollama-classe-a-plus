@@ -419,3 +419,12 @@ O run upstream `35750983274` falhou em `go test`/`go test -race` porque o workfl
 ## Addendum — workflow upstream preso e dependência Playwright — 2026-09-22
 
 O run `35755046119` foi cancelado depois de confirmar que a matriz `linux`/`windows` dependia de runners customizados não disponíveis no PR público. O mesmo run mostrou a causa independente dos dois jobs Ubuntu: a pinagem `playwright==1.53.2` não era publicada no índice acessível ao runner. A remediação usa `playwright==1.63.0`, corrige o grupo de concorrência e restringe a matriz nativa a execução manual opt-in. A validação local passou, mas a prova remota no novo head e a homologação multiplataforma permanecem abertas.
+
+
+## Addendum — validação remota final do CI upstream — 2026-09-22
+
+A remediação do Browser Operator e do lint condicional por plataforma foi confirmada no head `de0e86772e96372789c10d924eb5738f8808821b`. O workflow upstream `test` passou no run `35769597404`, incluindo testes em Linux, macOS e Windows, race em Linux e macOS, patches e `go_mod_tidy`. Os workflows `class-a-plus-integrity` (`35769597628`), `dz23-agentic-quality` (`35769597363`) e `dz23-multi-provider` (`35769597578`) também passaram. O PR reporta 21 checks bem-sucedidos, 3 skipped, 0 failing e 0 pending.
+
+A causa foi corrigida sem esconder falhas: o Browser Operator agora consegue localizar o Chromium gerenciado pelo Playwright; o lint foi saneado no código compartilhado e nos arquivos condicionais Darwin/Windows; e o erro de credencial protegido foi declarado somente no build não-Windows que o utiliza. Os gates locais também passaram com `golangci-lint v2.13.2`, Go test normal/race, vet, build e compilação cruzada Windows dos pacotes afetados.
+
+Esta evidência fecha o gate do **caminho normal de CI**. Ela não fecha a matriz GPU/nativa, que continua manual e depende de runners compatíveis, nem os blockers de produção listados neste documento. Permanecem abertos sandbox/process isolation forte, auth/session/CSRF/IdP distribuído, OAuth lifecycle/revocation, egress/DLP residual, providers/deploy/media reais, dispositivos físicos, signing/provenance, stores e app review. A classificação vigente continua **preview/local RC em hardening; não production-ready**.

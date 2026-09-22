@@ -327,3 +327,10 @@ A matriz upstream identificou uma dependência de teste ausente, não uma falha 
 ## Follow-up 2026-09-22 — upstream CI sem fila infinita
 
 A matriz nativa herdada foi retirada do caminho automático de pull request porque usa labels `linux`/`windows` e hardware GPU que não existem no ambiente público deste fork. Ela continua disponível apenas como execução manual opt-in quando o operador configurar runners compatíveis. O caminho automático foi corrigido para Playwright `1.63.0`; permanece pendente a prova remota do novo head e a homologação física de cada plataforma.
+
+
+## Validação remota 2026-09-22 — upstream normal multiplataforma verde
+
+O head `de0e86772e96372789c10d924eb5738f8808821b` passou o caminho normal do PR: `test` (`35769597404`), `dz23-agentic-quality` (`35769597363`), `dz23-multi-provider` (`35769597578`) e `class-a-plus-integrity` (`35769597628`). Os jobs upstream de teste passaram em Linux, macOS e Windows, e os jobs race passaram em Linux e macOS. O Browser Operator foi validado no fluxo remoto após a instalação pinada do Playwright e a descoberta portável do executável.
+
+A matriz GPU/nativa continua manual e opt-in (`workflow_dispatch` + `run_native_matrix=true`), porque depende de runners compatíveis do operador. O próximo trabalho permanece nos P0/P1 internos e externos: sandbox forte, autorização/session/CSRF/IdP, OAuth lifecycle, egress residual, adapters reais, device validation, signing/provenance e homologação. A classificação não muda: preview/local RC em hardening.
