@@ -91,3 +91,12 @@ A base passou a incluir um Company OS persistente. Uma empresa é criada no tena
 Também foi implementado um adapter Remote MCP Streamable HTTP e o preset oficial do Desktop Commander. O runtime valida HTTPS fora de loopback, mantém allowlist de métodos, usa bearer apenas por variável server-side e expõe `mcp.remote.call` com approval. O transporte não é confundido com autenticação: OAuth PKCE, conta, device pairing, agente `npx ... remote`, revogação e testes físicos permanecem dependentes do operador e do serviço oficial.
 
 Os próximos gates do Company OS são connectors reais com CRM, e-mail, redes sociais, anúncios, afiliados, ecommerce, logística e analytics, sempre com sandbox, scopes mínimos, DLP, approval e testes de compliance. Os próximos gates do Remote MCP são completar um fluxo OAuth autorizado, parear um dispositivo de teste, executar apenas jornadas reversíveis e validar revogação, logs e desligamento. Nenhum desses gates é simulado pela presente revisão.
+
+
+## Incremento 2026-09-22 — jornadas verticais de Growth, Builder e provider sessions
+
+O Company OS ganhou um **Growth OS local** com campanhas, aprovação, pausa, programas de afiliados, links HTTPS, conversões, catálogo de produtos, pedidos e fulfillment sandbox. O painel `/company` exibe métricas de campanhas ativas, programas, conversões, produtos e pedidos. O smoke `scripts/smoke-company-growth.sh` comprovou criação, bloqueio sem approval, aprovação, lançamento, conversão, estoque e relatório agregado sem chamar serviços externos.
+
+O Builder foi exercitado por API com criação de site, atualização visual, preview com hash de artifact, exportação, publicação local e bloqueio de deploy externo sem `approved:true` em `scripts/smoke-builder.sh`. O gateway multi-provider ganhou cobertura de uma sessão OpenAI-compatible streaming, autenticação de entrada e bearer server-side, incluindo tradução dos chunks para o protocolo nativo.
+
+Estas jornadas são operacionais no ambiente local. O Growth OS não publica anúncios, envia mensagens, compra produtos, cobra clientes ou chama marketplaces; o Builder não foi promovido a deploy externo validado; provider sessions externas continuam dependendo de credenciais, instâncias e harnesses instalados. O próximo passo é conectar cada adapter externo a um sandbox autorizado com idempotência, scopes mínimos, logs, DLP, approval e rollback.

@@ -312,3 +312,31 @@ external_blockers_unchanged:
   - distributed Company OS RLS, IdP, deployment accounts and signed devices
 next_action: commit and push the verified feature branch, then update the public PR; do not merge into main automatically
 ```
+
+
+## Verificação adicional — jornadas verticais Growth/Builder/providers — 2026-09-22
+
+```yaml
+state: CANDIDATE_COMPLETED
+branch: feat/manus-parity-omniroute
+completed:
+  - growth_os_sandbox: campaigns, approvals, launch/pause, affiliate programs/links/conversions, products, orders, inventory and fulfillment
+  - company_growth_ui: Growth OS panel embedded in /company with local metrics and explicit sandbox labels
+  - builder_vertical: create, visual update, preview/hash artifact, export, local publish and external deploy approval gate
+  - provider_sessions: OpenAI-compatible streaming translation with gateway auth and server-side provider bearer
+  - remote_mcp_evidence: official setup source recorded; adapter tests remain green
+proofs:
+  - go test ./internal/agent ./server -count=1: PASS
+  - focused multi-provider streaming/OmniRoute/HarnessRouter tests: PASS
+  - focused Remote MCP tests: PASS
+  - scripts/smoke-company-growth.sh against 127.0.0.1:3001: PASS
+  - scripts/smoke-builder.sh against 127.0.0.1:3001: PASS
+  - UI npm run build: PASS
+  - Chromium capture /company with Growth OS: PASS
+external_blockers:
+  - Desktop Commander OAuth PKCE, account, device pairing, physical agent, remote call and revocation; no test token/device is provisioned
+  - real social/CRM/affiliate/ecommerce/ads/logistics/analytics connectors and compliance staging
+  - real provider sessions for Claude/Codex/OmniRoute/HarnessRouter with operator credentials
+  - distributed PostgreSQL/Redis/OTLP, IdP, deployment accounts and physical desktop/mobile tests
+next_action: run full integrity/backend/UI gates, stage the complete diff, commit and update the public PR
+```

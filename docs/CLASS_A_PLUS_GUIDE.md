@@ -25,14 +25,14 @@ A arquitetura é local-first. Um operador pode começar apenas com o binário e 
 | Browser Operator | Implementado como adapter Playwright | Requer Chromium e configuração de sessão/allowlist. |
 | Companion | Implementado com pairing e WebSocket | Transporte TLS/mTLS e adapters por plataforma ainda exigem testes físicos. |
 | Memória e ingestão | Implementado | Memória lexical/semântica e ingestão de formatos documentais suportados. |
-| Builder | Implementado parcialmente | Canvas, bindings, undo/redo, preview, exportação e publicação local. |
+| Builder | Implementado parcialmente | Canvas, bindings, undo/redo, preview, exportação e publicação local; smoke E2E e approval gate de deploy executados. |
 | Deploy externo | Adapters implementados | Vercel, Netlify e generic; smoke real depende de credenciais. |
 | SSO | Implementado em adapters | OAuth/OIDC e SAML exigem IdP, certificados e testes de produção. |
 | Mobile | Base Expo implementada | Push, conflitos avançados, assinatura e lojas ainda dependem de ambiente real. |
 | Modelos locais de mídia | Adapter configurável | Não confundir adapter multimodal com modelos locais completos já distribuídos. |
 | Shell desktop Classe A+ | Parcialmente implementado | Home com composer e recomendações, menu persistente, CRUD real de Projetos e Agendado, catálogos reais de Tasks/Skills/Plugins/Biblioteca e Control Center sanitizado; builder rico, mutações de skills/plugins e todas as superfícies de produção ainda evoluem. |
 | HarnessRouter | Adapter implementado | Provider OpenAI Responses-compatible com `harness_id` server-side para Codex/Claude Code; exige instância, chave e harness instalados para validação ponta a ponta. |
-| Company OS | Implementado localmente nesta rodada | Empresa/tenant, identidade, 7 departamentos, roadmap, KPIs, backlog, ciclos, relatório, budget, approvals e pausa por limite/anomalia; CRM, social, afiliados, dropshipping e ads reais ainda dependem de connectors e ambientes externos. |
+| Company OS | Implementado localmente nesta rodada | Empresa/tenant, identidade, 7 departamentos, roadmap, KPIs, backlog, ciclos, relatório, budget, approvals, pausa por limite/anomalia e Growth OS sandbox para campanhas, afiliados, catálogo e pedidos; CRM, social, marketplaces, fulfillment e ads reais ainda dependem de connectors e ambientes externos. |
 | Desktop Commander Remote MCP | Adapter implementado | Stdio local e Streamable HTTP remoto com allowlist, HTTPS, bearer opcional e approval; OAuth PKCE, conta, device pairing e testes físicos dependem do operador. |
 
 ## Instalação rápida

@@ -57,3 +57,15 @@ Os gates comprovados desta revisão incluem testes focados do runtime/server, bu
 - Presets sem segredos para Desktop Commander local stdio e Remote MCP oficial em `examples/dz23-desktop-commander-mcp.json` e `examples/dz23-desktop-commander-remote.json`.
 - Documentação pública de Company OS, Desktop Commander, integração, API, matriz de paridade e estado honesto atualizada.
 - Verificações desta rodada: testes `internal/agent`, `server` e `internal/multillm`, testes JSON dos presets e build Vite/TypeScript aprovados. OAuth PKCE, pareamento, conta, agentes físicos, connectors de social/afiliados/dropshipping e operação empresarial real continuam dependências externas.
+
+
+## Unreleased — jornadas verticais operacionais — 2026-09-22
+
+- Growth OS local no Company OS: campanhas com approval/launch/pause, programas e links de afiliados com destino HTTPS, conversões, catálogo de produtos, pedidos, approval, fulfillment sandbox, estoque e relatório agregado.
+- Painel visual funcional na rota `/company` para criar e operar campanhas, programas, produtos e pedidos sem transformar estados externos em sucesso falso.
+- Smoke live `scripts/smoke-company-growth.sh` com criação, bloqueio por ausência de approval, aprovação, execução sandbox, conversão, fulfillment e validação de métricas.
+- Smoke live `scripts/smoke-builder.sh` com criação, editor visual, preview com hash, export, publicação local e bloqueio de deploy externo sem aprovação explícita.
+- Teste de provider session streaming OpenAI-compatible com autenticação do gateway, bearer server-side e tradução de eventos para o protocolo nativo.
+- Teste do adapter Desktop Commander Remote MCP e registro da evidência oficial de setup; OAuth, conta, pareamento, agente físico e revogação continuam pendentes por falta de credenciais/dispositivo autorizados.
+
+A rodada não publica campanhas, não movimenta dinheiro, não envia pedidos, não conecta contas sociais/CRM/marketplaces e não declara providers externos como conectados. Os fluxos comprovados são locais e reversíveis.

@@ -12,10 +12,12 @@ required_files=(
   "docs/agentic/DESKTOP_COMMANDER_REMOTE.md"
   "internal/agent/runtime.go"
   "internal/agent/company.go"
+  "internal/agent/company_growth.go"
   "internal/agent/mcp_remote.go"
   "internal/multillm/registry.go"
   "server/agent_routes.go"
   "server/company_routes.go"
+  "server/company_growth_routes.go"
   "app/ui/app/src/components/AppSidebar.tsx"
   "app/ui/app/src/components/AgenticControlCenter.tsx"
   "app/ui/app/src/routes/agentic.tsx"
@@ -26,6 +28,9 @@ required_files=(
   "app/ui/app/src/routes/plugins.tsx"
   "app/ui/app/src/routes/tasks.tsx"
   "app/ui/app/src/routes/company.tsx"
+  "app/ui/app/src/components/CompanyGrowthPanel.tsx"
+  "scripts/smoke-company-growth.sh"
+  "scripts/smoke-builder.sh"
 )
 
 for file in "${required_files[@]}"; do
@@ -39,6 +44,8 @@ grep -q 'Nova tarefa' app/ui/app/src/components/AppSidebar.tsx
 grep -q 'Agentic Control Center' app/ui/app/src/components/AgenticControlCenter.tsx
 grep -q 'RemoteMCP' internal/agent/runtime.go
 grep -q 'mcp.remote.call' internal/agent/mcp_remote.go
+grep -q 'Growth OS' app/ui/app/src/components/CompanyGrowthPanel.tsx
+grep -q 'addCompanyCampaign' server/company_growth_routes.go
 for route in projects library scheduled skills plugins tasks company; do
   grep -q "routes/${route}" app/ui/app/src/routeTree.gen.ts || {
     echo "route tree is missing /${route}" >&2
