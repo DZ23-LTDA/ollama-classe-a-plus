@@ -48,6 +48,7 @@ type connectorLoopbackContextKey struct{}
 
 func NewConnectorManager() *ConnectorManager {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.Proxy = nil
 	transport.DialContext = connectorDialContext
 	return &ConnectorManager{connectors: make(map[string]ConnectorConfig), client: &http.Client{Transport: transport, CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return errors.New("connector redirects are disabled") }}}
 }
@@ -175,6 +176,9 @@ func (m *ConnectorManager) call(ctx context.Context, connectorID, operationName,
 		return 0, "", fmt.Errorf("connector operation %q is not allowlisted", operationName)
 	}
 	_ = operation
+	if len(body) > 1<<20 {
+		return 0, "", errors.New("connector request payload exceeds limit")
+	}
 	base, _ := url.Parse(config.BaseURL)
 	relative, err := url.Parse(requestPath)
 	if err != nil || relative.IsAbs() || !validConnectorPath(relative.Path) {
@@ -198,18 +202,57 @@ func (m *ConnectorManager) call(ctx context.Context, connectorID, operationName,
 	if token != "" {
 		request.Header.Set("Authorization", "Bearer "+token)
 	}
-	client := *m.client
-	client.Timeout = time.Duration(config.TimeoutSeconds) * time.Second
+	client := connectorClientForRequest(m.client, time.Duration(config.TimeoutSeconds)*time.Second)
 	response, err := client.Do(request)
 	if err != nil {
 		return 0, "", err
 	}
 	defer response.Body.Close()
-	data, err := io.ReadAll(io.LimitReader(response.Body, 2<<20))
+	data, err := readLimitedConnectorBody(response.Body, 2<<20)
 	if err != nil {
 		return response.StatusCode, "", err
 	}
 	return response.StatusCode, string(data), nil
+}
+
+func connectorClientForRequest(base *http.Client, timeout time.Duration) *http.Client {
+	if base == nil {
+		client := NewConnectorManager().client
+		client.Timeout = timeout
+		return client
+	}
+	client := *base
+	client.Timeout = timeout
+	client.CheckRedirect = func(_ *http.Request, _ []*http.Request) error { return errors.New("connector redirects are disabled") }
+	switch transport := base.Transport.(type) {
+	case nil:
+		safe := http.DefaultTransport.(*http.Transport).Clone()
+		safe.Proxy = nil
+		safe.DialContext = connectorDialContext
+		client.Transport = safe
+	case *http.Transport:
+		safe := transport.Clone()
+		safe.Proxy = nil
+		safe.DialContext = connectorDialContext
+		client.Transport = safe
+	default:
+		safe := http.DefaultTransport.(*http.Transport).Clone()
+		safe.Proxy = nil
+		safe.DialContext = connectorDialContext
+		client.Transport = safe
+	}
+	return &client
+}
+
+func readLimitedConnectorBody(reader io.Reader, limit int64) ([]byte, error) {
+	data, err := io.ReadAll(io.LimitReader(reader, limit+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(data)) > limit {
+		return nil, errors.New("connector response payload exceeds limit")
+	}
+	return data, nil
 }
 
 func findConnectorOperation(operations []ConnectorOperation, name, method, requestPath string) (ConnectorOperation, bool) {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -63,5 +64,33 @@ func TestConnectorPathPrefixMatchesSegments(t *testing.T) {
 	}
 	if connectorPathMatches("/users-privileged", "/users") {
 		t.Fatal("must not match a different path segment")
+	}
+}
+
+func TestConnectorEgressBlocksRedirectsAndBoundsPayloads(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/redirect":
+			http.Redirect(w, r, "/final", http.StatusFound)
+		case "/large":
+			_, _ = w.Write([]byte(strings.Repeat("x", 2<<20+1)))
+		default:
+			_, _ = w.Write([]byte(`{"ok":true}`))
+		}
+	}))
+	defer server.Close()
+	manager := NewConnectorManager()
+	manager.client = server.Client()
+	if err := manager.Register(ConnectorConfig{ID: "egress", Provider: "test", BaseURL: server.URL, Operations: []ConnectorOperation{{Name: "read", Methods: []string{"GET", "POST"}, PathPrefixes: []string{"/"}}}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := manager.CallForOrganization(context.Background(), "org_test", "egress", "read", "GET", "/redirect", nil); err == nil || !strings.Contains(err.Error(), "redirect") {
+		t.Fatalf("expected redirect rejection, got %v", err)
+	}
+	if _, _, err := manager.CallForOrganization(context.Background(), "org_test", "egress", "read", "GET", "/large", nil); err == nil || !strings.Contains(err.Error(), "payload") {
+		t.Fatalf("expected response limit rejection, got %v", err)
+	}
+	if _, _, err := manager.CallForOrganization(context.Background(), "org_test", "egress", "read", "POST", "/final", []byte(strings.Repeat("x", 1<<20+1))); err == nil || !strings.Contains(err.Error(), "payload") {
+		t.Fatalf("expected request limit rejection, got %v", err)
 	}
 }

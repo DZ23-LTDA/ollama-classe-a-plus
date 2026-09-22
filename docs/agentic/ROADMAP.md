@@ -205,3 +205,8 @@ A contenção de processo MCP stdio ganhou cwd privado, ambiente mínimo, allowl
 ## Incremento 2026-09-22 — Media egress/download
 
 Downloads de mídia agora compartilham a postura de proxy nil, redirect bloqueado, IP conectado, limite bounded e MIME/magic validation. O próximo trabalho deve alinhar upload/Connector egress à mesma política sem redigir credenciais operacionais autorizadas, além de executar testes distribuídos com DNS/TLS controlados.
+
+
+## Incremento 2026-09-22 — Connector egress parity
+
+Connectors agora compartilham bloqueio de proxy/redirect, verificação do IP conectado e limites bounded de payload com Remote MCP e Media. A próxima etapa precisa definir classificação/consentimento para payload externo e injeção de credenciais, além de cobrir upload e testes distribuídos sem afirmar integração externa conectada.

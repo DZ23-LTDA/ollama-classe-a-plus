@@ -186,3 +186,8 @@ MCP stdio passou a usar executável absoluto não-symlink, cwd privado, ambiente
 ## 2026-09-22 — Media egress/download hardening
 
 Downloads de mídia agora bloqueiam redirects e proxy ambiental, verificam o IP conectado, aplicam limites bounded e validam MIME/magic antes de materializar PNG/JPEG/WebP/MP4/WAV. Testes negativos cobrem redirects, MIME incompatível, conteúdo falso, overflow e destinos privados.
+
+
+## 2026-09-22 — Connector egress parity
+
+Connectors passaram a bloquear proxy ambiental e redirects mesmo com client HTTP substituído, manter verificação de IP conectado e aplicar limites bounded de request/response. Testes negativos cobrem redirects e payloads oversized sem depender de uma conta externa.

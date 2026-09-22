@@ -151,3 +151,10 @@ A classificação permanece **contenção best-effort**, não sandbox forte. Ain
 O MediaManager passou a usar transport sem proxy ambiental, dialer com verificação do IP efetivamente conectado e redirects desabilitados. Downloads de provider aceitam HTTPS ou HTTP explícito em loopback, rejeitam userinfo/fragments, fazem leitura bounded com detecção de overflow e validam `Content-Type` contra a extensão e magic bytes de PNG, JPEG, WebP, MP4 e WAV antes de materializar o artefato. Respostas JSON e áudio também têm limites explícitos.
 
 Regressões locais cobrem redirect, MIME mismatch, magic inválido, payload acima do limite e socket privado. Os gates completos passaram: integrity guard, Go tests/vet/build, Vitest 20/199, UI build e mobile typecheck. O upload de transcrição ainda é limitado por tamanho de entrada, e testes de rede distribuída/TLS real continuam necessários.
+
+
+## Slice P0 de Connector egress parity — 2026-09-22
+
+Connectors agora aplicam transport sem proxy ambiental também quando o client é substituído por um transport HTTP customizado, preservam o dialer que verifica o IP efetivamente conectado, bloqueiam redirects em cada request e limitam request body a 1 MiB e response body a 2 MiB com detecção de overflow. Regressões cobrem redirect, resposta oversized e request oversized, além dos testes de OAuth tenant-scoped existentes.
+
+Os gates completos passaram: integrity guard, Go tests/vet/build, Vitest 20/199, UI build e mobile typecheck. O contrato de egress não redige credenciais operacionais autorizadas; ainda é necessário separar classificação de dados de usuário, injeção de segredo e payload externo, além de validar uploads e redes distribuídas reais.

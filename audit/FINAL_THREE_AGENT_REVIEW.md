@@ -146,3 +146,8 @@ MCP stdio agora aplica allowlist de executável absoluto não-symlink, cwd priva
 ## Slice P0 validada — Media egress/download — 2026-09-22
 
 Downloads remotos de mídia passaram a bloquear redirects, proxy ambiental e destinos privados efetivamente conectados; respostas são bounded e só viram artefato após MIME/magic validation. Regressões cobrem redirect, MIME incompatível, magic inválido, overflow e IP privado. A paridade de egress para upload/Connectors, assim como testes distribuídos de DNS/TLS, ainda permanece aberta.
+
+
+## Slice P0 validada — Connector egress parity — 2026-09-22
+
+Connectors agora removem proxy ambiental, bloqueiam redirects, verificam o IP efetivamente conectado e limitam request/response. Testes negativos reproduzem redirect e payloads oversized em TLS local. A classificação de dados do usuário versus credenciais operacionais, uploads e validação distribuída permanecem abertas.

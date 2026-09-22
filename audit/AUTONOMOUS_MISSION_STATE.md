@@ -1037,3 +1037,30 @@ proofs: integrity, Go tests/vet/build, UI Vitest/build, mobile typecheck and Med
 classification: preview/local RC em hardening
 next_slice: Connector/upload egress parity or platform sandbox primitives; no main merge
 ```
+
+
+## Slice P0 Connector egress parity validada — aguardando publicação — 2026-09-22
+
+```yaml
+state: RELEASING
+iteration: 14
+base_commit: b1a098bf
+working_tree: Connector egress changes/tests/docs still uncommitted
+implemented:
+  - proxy disabled on default and custom HTTP transports
+  - redirects blocked on every request
+  - connected IP validation retained
+  - request 1 MiB and response 2 MiB bounded limits
+proofs:
+  - focused Connector tests: PASS
+  - integrity guard: PASS
+  - CGO_ENABLED=1 go test ./... -count=1: PASS
+  - CGO_ENABLED=1 go vet ./...: PASS
+  - CGO_ENABLED=1 go build: PASS
+  - UI Vitest 20/199: PASS
+  - UI build: PASS; known >500KB warning
+  - mobile typecheck: PASS
+classification: preview/local RC em hardening
+open_risks: external payload classification/credential injection, upload egress, distributed network tests, strong sandbox
+next_action: commit/push, then close a focused product/security contract or platform sandbox primitive
+```
