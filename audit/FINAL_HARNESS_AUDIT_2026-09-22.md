@@ -413,4 +413,9 @@ Este documento preserva os achados originais como histórico. As slices publicad
 
 ## Addendum — Browser Operator upstream CI — 2026-09-22
 
-O run upstream `35750983274` falhou em `go test`/`go test -race` porque o workflow não instalava o módulo Python `playwright`, importado por `browser_helper.py`; o log confirmou `ModuleNotFoundError`. O workflow agentic do fork já instalava essa dependência e permaneceu verde. O patch adiciona Playwright `1.53.2` e Chromium aos jobs upstream relevantes, com instalação de dependências OS somente no Linux, e torna o launcher Go compatível com `python3` ou `python` no `PATH`. A correção trata CI/portabilidade; não prova Browser/desktop completo, sandbox forte ou release production-ready. A confirmação remota do novo head permanece pendente.
+O run upstream `35750983274` falhou em `go test`/`go test -race` porque o workflow não instalava o módulo Python `playwright`, importado por `browser_helper.py`; o log confirmou `ModuleNotFoundError`. O workflow agentic do fork já instalava essa dependência e permaneceu verde. O patch adiciona Playwright `1.63.0` e Chromium aos jobs upstream relevantes, com instalação de dependências OS somente no Linux, e torna o launcher Go compatível com `python3` ou `python` no `PATH`. A matriz nativa Linux/Windows foi tornada manual e opt-in por depender de runners compatíveis. A correção trata CI/portabilidade; não prova Browser/desktop completo, sandbox forte ou release production-ready. A confirmação remota do novo head permanece pendente.
+
+
+## Addendum — workflow upstream preso e dependência Playwright — 2026-09-22
+
+O run `35755046119` foi cancelado depois de confirmar que a matriz `linux`/`windows` dependia de runners customizados não disponíveis no PR público. O mesmo run mostrou a causa independente dos dois jobs Ubuntu: a pinagem `playwright==1.53.2` não era publicada no índice acessível ao runner. A remediação usa `playwright==1.63.0`, corrige o grupo de concorrência e restringe a matriz nativa a execução manual opt-in. A validação local passou, mas a prova remota no novo head e a homologação multiplataforma permanecem abertas.

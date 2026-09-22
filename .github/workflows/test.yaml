@@ -7,10 +7,17 @@ concurrency:
   # For non-PR pushes, concurrency.group needs to be unique for every distinct
   # CI run we want to have happen. Use run_id, which in practice means all
   # non-PR CI runs will be allowed to run without preempting each other.
-  group: ${{ github.workflow }}-$${{ github.pull_request.number || github.run_id }}
+  group: ${{ github.workflow }}-${{ github.pull_request.number || github.run_id }}
   cancel-in-progress: true
 
 on:
+  workflow_dispatch:
+    inputs:
+      run_native_matrix:
+        description: 'Run the optional Linux/Windows native GPU matrix (requires configured self-hosted runners)'
+        required: false
+        default: false
+        type: boolean
   pull_request:
     paths:
       - '**/*'
@@ -30,7 +37,16 @@ jobs:
         with:
           fetch-depth: 0
       - id: changes
+        shell: bash
         run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo changed=True | tee -a "$GITHUB_OUTPUT"
+            echo app_changed=True | tee -a "$GITHUB_OUTPUT"
+            echo go_mod_changed=True | tee -a "$GITHUB_OUTPUT"
+            echo enginehash=manual-${{ github.sha }} | tee -a "$GITHUB_OUTPUT"
+            exit 0
+          fi
           changed() {
             local BASE=${{ github.event.pull_request.base.sha }}
             local HEAD=${{ github.event.pull_request.head.sha }}
@@ -80,7 +96,7 @@ jobs:
 
   linux:
     needs: [changes]
-    if: needs.changes.outputs.changed == 'True'
+    if: github.event_name == 'workflow_dispatch' && inputs.run_native_matrix == true && needs.changes.outputs.changed == 'True'
     strategy:
       matrix:
         include:
@@ -176,7 +192,7 @@ jobs:
           test -x "$RUNNER_TEMP/ollama-local/lib/ollama/llama-quantize"
   windows:
     needs: [changes]
-    if: needs.changes.outputs.changed == 'True'
+    if: github.event_name == 'workflow_dispatch' && inputs.run_native_matrix == true && needs.changes.outputs.changed == 'True'
     strategy:
       matrix:
         include:
@@ -422,10 +438,10 @@ jobs:
             python_bin=python
           fi
           if [ "${RUNNER_OS}" = "Linux" ]; then
-            "$python_bin" -m pip install --user --break-system-packages 'playwright==1.53.2'
+            "$python_bin" -m pip install --user --break-system-packages 'playwright==1.63.0'
             "$python_bin" -m playwright install --with-deps chromium
           else
-            "$python_bin" -m pip install --user 'playwright==1.53.2'
+            "$python_bin" -m pip install --user 'playwright==1.63.0'
             "$python_bin" -m playwright install chromium
           fi
       - name: Cache MLX Darwin release payload
@@ -516,10 +532,10 @@ jobs:
             python_bin=python
           fi
           if [ "${RUNNER_OS}" = "Linux" ]; then
-            "$python_bin" -m pip install --user --break-system-packages 'playwright==1.53.2'
+            "$python_bin" -m pip install --user --break-system-packages 'playwright==1.63.0'
             "$python_bin" -m playwright install --with-deps chromium
           else
-            "$python_bin" -m pip install --user 'playwright==1.53.2'
+            "$python_bin" -m pip install --user 'playwright==1.63.0'
             "$python_bin" -m playwright install chromium
           fi
       # app/ui embeds app/dist, so the UI has to be built before app/... will

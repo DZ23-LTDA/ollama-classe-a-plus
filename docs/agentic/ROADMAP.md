@@ -322,3 +322,8 @@ O transporte stdio agora separa notificações sem `id` da resposta correlaciona
 ## Remediação 2026-09-22 — Browser Operator upstream CI
 
 A matriz upstream identificou uma dependência de teste ausente, não uma falha do transporte MCP: `playwright` não era instalado antes de `go test`. O patch pinou a dependência nos jobs `test` e `race` e tornou a escolha do Python portável. Falta o novo run remoto confirmar Linux/macOS/Windows; isso não encerra os blockers de sandbox forte, Browser/desktop real ou release.
+
+
+## Follow-up 2026-09-22 — upstream CI sem fila infinita
+
+A matriz nativa herdada foi retirada do caminho automático de pull request porque usa labels `linux`/`windows` e hardware GPU que não existem no ambiente público deste fork. Ela continua disponível apenas como execução manual opt-in quando o operador configurar runners compatíveis. O caminho automático foi corrigido para Playwright `1.63.0`; permanece pendente a prova remota do novo head e a homologação física de cada plataforma.

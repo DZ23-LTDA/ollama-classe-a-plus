@@ -305,4 +305,9 @@ MCP stdio passou a ignorar notificações JSON-RPC sem identificador e aguardar 
 
 ## 2026-09-22 — Browser Operator no workflow upstream
 
-O teste upstream revelou que os jobs `test`/`race` não instalavam o módulo Python Playwright, embora o Browser Operator o importe. O workflow agora instala Playwright `1.53.2` e Chromium nos jobs relevantes, com tratamento Linux/macOS/Windows; o launcher Go deixou de depender de `/usr/bin/python3` fixo. O CI remoto desta correção ainda precisa concluir.
+O teste upstream revelou que os jobs `test`/`race` não instalavam o módulo Python Playwright, embora o Browser Operator o importe. O workflow agora instala Playwright `1.63.0` e Chromium nos jobs relevantes, com tratamento Linux/macOS/Windows; o launcher Go deixou de depender de `/usr/bin/python3` fixo. A matriz nativa Linux/Windows foi tornada manual e opt-in porque requer runners compatíveis. O CI remoto desta correção ainda precisa concluir.
+
+
+## 2026-09-22 — workflow upstream preso e Playwright corrigido
+
+O run upstream `35755046119` foi cancelado após confirmar jobs nativos `linux`/`windows` aguardando runners customizados inexistentes no PR. A pinagem anterior do Playwright também era inválida no índice do runner; os jobs `test`/`race` passam a usar `1.63.0`. A matriz nativa agora é manual e opt-in (`workflow_dispatch` + `run_native_matrix=true`), sem mascarar a ausência de hardware/runners como validação concluída.

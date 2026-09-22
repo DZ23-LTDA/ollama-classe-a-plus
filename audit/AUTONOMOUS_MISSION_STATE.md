@@ -1901,13 +1901,13 @@ next_action: verify integrity/quality remote, then continue audit trail and Remo
 state: RELEASING
 iteration: 36
 base_commit: e8017591
-root_cause: upstream test/race omitted Python Playwright; Browser Operator test failed with ModuleNotFoundError
+root_cause: upstream test/race omitted Python Playwright; the initial pin was unpublished and failed with No matching distribution and ModuleNotFoundError
 files:
   - .github/workflows/test.yaml
   - internal/agent/browser.go
   - scripts/check-class-a-plus-integrity.sh
 local_evidence: integrity; YAML; focused Browser Operator normal/race; local go test and agent/server race = PASS
-remote_evidence: pending
+remote_evidence: pending; prior run 35755046119 cancelled after queued custom linux/windows matrix was confirmed unavailable
 classification: preview/local RC em hardening; NÃO final; NÃO production-ready
-next_action: commit/push this fix, verify remote test/race and continue remaining P0/P1 audit slices
+next_action: verify remote test/race with Playwright 1.63.0; native GPU matrix is manual opt-in and requires configured runners; continue remaining P0/P1 audit slices
 ```

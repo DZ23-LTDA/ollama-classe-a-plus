@@ -326,4 +326,11 @@ Isso não implementa multiplexação concorrente, framing completo, sessão Remo
 
 O run upstream `test` no head `e8017591` deixou `test (ubuntu-latest)` e `race (ubuntu-latest)` vermelhos porque o teste `TestBrowserOperatorNavigateAndSnapshot` encontrou `ModuleNotFoundError: No module named 'playwright'`. O workflow `dz23-agentic-quality` do fork permaneceu verde, pois já instala a dependência.
 
-A correção local adiciona Playwright `1.53.2` pinado aos jobs upstream `test` e `race`, instala Chromium com dependências no Linux e sem essa flag em macOS/Windows, e torna o launcher Go portável ao escolher `python3` ou `python` no `PATH`. Integrity, YAML, Browser Operator normal/race e gates Go locais passaram. A confirmação remota desta correção ainda está pendente; hardware/platform matrix upstream continua fora do controle do sandbox.
+A correção local adiciona Playwright `1.63.0` pinado aos jobs upstream `test` e `race`, instala Chromium com dependências no Linux e sem essa flag em macOS/Windows, e torna o launcher Go portável ao escolher `python3` ou `python` no `PATH`. A matriz nativa Linux/Windows com GPUs foi restringida a `workflow_dispatch` com `run_native_matrix=true`, pois depende de runners compatíveis não disponíveis no PR público. Integrity, YAML, Browser Operator normal/race e gates Go locais passaram. A confirmação remota desta correção ainda está pendente.
+
+
+## Follow-up do workflow upstream preso — 2026-09-22
+
+O run upstream `35755046119` foi cancelado de forma controlada depois de permanecer com uma matriz nativa Linux/Windows dependente de runners customizados indisponíveis no PR público. Os dois jobs Ubuntu também falharam por causa verificável: a pinagem inicial `playwright==1.53.2` não existia no índice do runner, causando `No matching distribution found` e, em seguida, `ModuleNotFoundError` no Browser Operator.
+
+A correção agora usa Playwright `1.63.0`, corrige o grupo de concorrência e deixa a matriz nativa com GPU disponível somente por `workflow_dispatch` e `run_native_matrix=true`. No caminho normal de pull request permanecem os runners públicos e os gates CPU/test/race aplicáveis. Validação local desta mudança: parser YAML dos três workflows, integrity guard e `git diff --check` passaram. A nova confirmação remota será registrada somente após um run no head publicado.

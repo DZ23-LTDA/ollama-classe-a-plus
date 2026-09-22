@@ -267,4 +267,9 @@ A regressão do transporte stdio demonstra que uma notificação JSON-RPC sem `i
 
 ## Remediação do Browser Operator upstream — 2026-09-22
 
-A auditoria do run `35750983274` encontrou `ModuleNotFoundError` de Playwright no teste Browser Operator, enquanto o workflow agentic do fork passou. A correção adiciona instalação pinada de Playwright/Chromium aos jobs upstream e remove o caminho Python Linux-only do launcher Go. A reprodução local passou teste normal/race, mas a matriz remota, especialmente plataformas e hardware, ainda é evidência pendente. Nenhum claim de produção-ready é alterado.
+A auditoria do run `35750983274` encontrou `ModuleNotFoundError` de Playwright no teste Browser Operator, enquanto o workflow agentic do fork passou. A correção adiciona Playwright `1.63.0`/Chromium aos jobs upstream, remove o caminho Python Linux-only do launcher Go e torna a matriz nativa Linux/Windows manual e opt-in para não aguardar runners ausentes no PR. A reprodução local passou teste normal/race, mas a confirmação remota e a matriz de hardware continuam pendentes. Nenhum claim de produção-ready é alterado.
+
+
+## Follow-up verificado — workflow upstream sem fila infinita — 2026-09-22
+
+O run `35755046119` não era um teste único travado: sua matriz nativa aguardava runners customizados indisponíveis, enquanto `test` e `race` Ubuntu falharam por uma versão Playwright inexistente no índice. O patch substitui a dependência por `1.63.0`, corrige a concorrência e torna a matriz nativa manual e opt-in. Isso melhora a determinismo do PR, mas não equivale a executar GPU, Windows, macOS ou dispositivos físicos; a classificação continua preview/local RC em hardening.
