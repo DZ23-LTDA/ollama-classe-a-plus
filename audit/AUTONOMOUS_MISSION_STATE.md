@@ -1517,3 +1517,20 @@ classification: preview/local RC em hardening
 open_risks: Redis distributed/restart proof and remaining execution surfaces
 next_action: commit/push, then continue remaining P0/P1s; no main merge
 ```
+
+
+## Publicação da slice P0 jobs/replay tenant scope — 2026-09-22
+
+```yaml
+state: FIXING
+iteration: 25
+commit: 287484e7
+branch: feat/manus-parity-omniroute
+remote: https://github.com/DZ23-LTDA/ollama-classe-a-plus.git
+pull_request: https://github.com/DZ23-LTDA/ollama-classe-a-plus/pull/1
+working_tree: checkpoint pending commit
+published: true
+proofs: focused/full Go, vet/build, integrity, UI and mobile gates PASS; distributed Redis not run locally
+classification: preview/local RC em hardening
+next_slice: continue remaining P0/P1s and external evidence; no main merge
+```
