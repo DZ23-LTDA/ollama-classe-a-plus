@@ -106,6 +106,52 @@ func TestProxyRoutesConfiguredModelAndRedactsClientAuthorization(t *testing.T) {
 	}
 }
 
+func TestProxyRoutesLocalOmniRouteGateway(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	var gotPath, gotModel, gotAuthorization string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		gotAuthorization = r.Header.Get("Authorization")
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		gotModel, _ = body["model"].(string)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"omniroute-test","choices":[{"message":{"role":"assistant","content":"local gateway answer"},"finish_reason":"stop"}]}`))
+	}))
+	defer upstream.Close()
+
+	t.Setenv("OMNIROUTE_TEST_KEY", "omniroute-secret")
+	r := &Registry{
+		providers: map[string]Provider{"omniroute": {
+			Name:                  "omniroute",
+			Type:                  ProviderTypeOpenAICompatible,
+			BaseURL:               upstream.URL + "/v1",
+			APIKeyEnv:             "OMNIROUTE_TEST_KEY",
+			AllowPrivate:          true,
+			AllowInsecureLoopback: true,
+		}},
+		models: map[string]Model{"omniroute/auto": {ID: "omniroute/auto", UpstreamID: "auto", Provider: "omniroute", Available: true}},
+	}
+	router := gin.New()
+	router.Use(NewGateway(r, nil).Middleware())
+	router.POST("/v1/chat/completions", func(c *gin.Context) { t.Fatal("request was not proxied") })
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"omniroute/auto","messages":[{"role":"user","content":"hello"}]}`))
+	req.RemoteAddr = "127.0.0.1:12345"
+	req.Header.Set("Authorization", "Bearer client-secret")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK || gotPath != "/v1/chat/completions" || gotModel != "auto" {
+		t.Fatalf("status=%d path=%q model=%q body=%s", rec.Code, gotPath, gotModel, rec.Body.String())
+	}
+	if gotAuthorization != "Bearer omniroute-secret" {
+		t.Fatalf("upstream authorization = %q", gotAuthorization)
+	}
+}
+
 func TestCLIProviderRequiresExplicitExecutionAndReturnsCompletion(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	t.Setenv("DZ23_CLI_HELPER", "1")

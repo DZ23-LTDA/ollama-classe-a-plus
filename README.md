@@ -14,7 +14,9 @@ Este repositório público reúne a base Ollama DZ23 e a evolução agentic do p
 
 ![Mission Console atual](docs/images/screens/agentic-console.png)
 
-O Mission Console acima é uma captura real da rota `/agentic` com dados demonstrativos controlados. Para conhecer as telas planejadas de configuração, builder e mobile, veja a [galeria visual](docs/CLASS_A_PLUS_GUIDE.md#telas-e-estado-visual). Mockups conceituais são identificados como conceito dentro da própria imagem; eles não são apresentados como funcionalidades concluídas.
+![Settings e Agentic Control Center](docs/images/screens/class-a-plus-settings.png)
+
+As imagens acima são capturas reais das rotas `/agentic` e `/settings`. A Settings mostra o Control Center sanitizado e mantém explícito quando o backend nativo de preferências não está disponível. Para conhecer a árvore completa, as telas planejadas de builder/mobile e os limites de cada integração, veja a [árvore de produto](docs/agentic/PRODUCT_TREE.md), a [matriz de paridade](docs/agentic/PARITY_MATRIX.md) e a [galeria visual](docs/CLASS_A_PLUS_GUIDE.md#telas-e-estado-visual). Mockups conceituais são identificados como conceito dentro da própria imagem; eles não são apresentados como funcionalidades concluídas.
 
 | Recurso | Documento |
 |---|---|
@@ -23,6 +25,8 @@ O Mission Console acima é uma captura real da rota `/agentic` com dados demonst
 | API e endpoints | [`agentic/API.md`](docs/agentic/API.md) |
 | Integrações, OAuth, SAML, MCP e deploy | [`agentic/INTEGRATIONS.md`](docs/agentic/INTEGRATIONS.md) |
 | Roadmap e status por fase | [`agentic/ROADMAP.md`](docs/agentic/ROADMAP.md) |
+| Árvore Manus observável + Classe A+ unificado | [`agentic/PRODUCT_TREE.md`](docs/agentic/PRODUCT_TREE.md) |
+| Matriz de paridade e evidências | [`agentic/PARITY_MATRIX.md`](docs/agentic/PARITY_MATRIX.md) |
 
 Start building with open models.
 
@@ -134,7 +138,7 @@ The fork now includes an agentic runtime with persistent missions, validated pla
 ollama agent create --objective "inspecionar o workspace" --auto-run
 ```
 
-Read [the agentic architecture](docs/agentic/ARCHITECTURE.md), [the integrations guide](docs/agentic/INTEGRATIONS.md), [the executable roadmap](docs/agentic/ROADMAP.md), [the API guide](docs/agentic/API.md), the [phase 7 delivery note](docs/agentic/PHASE7_DELIVERY.md), the [phase 8 delivery note](docs/agentic/PHASE8_DELIVERY.md), and the [harness comparison synthesis](docs/agentic/HARNESS_COMPARISON_SYNTHESIS.md). The Web Agentic Console and an Expo mobile client are included as operator surfaces. Provider credentials, EAS signing, external OAuth/OIDC/SAML configuration, Tesseract installation and hosting credentials remain deployment responsibilities; the code does not execute an external publish without explicit approval.
+Read [the product tree](docs/agentic/PRODUCT_TREE.md), [the parity matrix](docs/agentic/PARITY_MATRIX.md), [the agentic architecture](docs/agentic/ARCHITECTURE.md), [the integrations guide](docs/agentic/INTEGRATIONS.md), [the executable roadmap](docs/agentic/ROADMAP.md), [the API guide](docs/agentic/API.md), the [phase 7 delivery note](docs/agentic/PHASE7_DELIVERY.md), the [phase 8 delivery note](docs/agentic/PHASE8_DELIVERY.md), and the [harness comparison synthesis](docs/agentic/HARNESS_COMPARISON_SYNTHESIS.md). The Web Agentic Console and an Expo mobile client are included as operator surfaces. Provider credentials, EAS signing, external OAuth/OIDC/SAML configuration, Tesseract installation and hosting credentials remain deployment responsibilities; the code does not execute an external publish without explicit approval.
 
 ### Python
 

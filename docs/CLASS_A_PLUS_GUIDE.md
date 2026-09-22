@@ -8,7 +8,7 @@ O **Ollama Classe A+** é a distribuição experimental do Ollama DZ23 que combi
 
 ## Visão geral
 
-O produto é organizado em quatro superfícies. O servidor Ollama continua responsável pelo runtime de modelos, APIs compatíveis e gerenciamento local. O runtime agentic adiciona missões, planejamento, execução, approvals, artefatos, memória, filas e eventos. A interface web oferece o Agentic Console para operação. O cliente Expo e os companions representam a camada de operação remota, pareamento de dispositivos e notificações.
+O produto é organizado em quatro superfícies. O servidor Ollama continua responsável pelo runtime de modelos, APIs compatíveis e gerenciamento local. O runtime agentic adiciona missões, planejamento, execução, approvals, artefatos, memória, filas e eventos. A interface web oferece o Agentic Console, um shell de workspace com Nova tarefa, Agente, Tarefas, Agendado, Habilidades, Plugins, Biblioteca, Projetos e Configurações, além do Agentic Control Center. O cliente Expo e os companions representam a camada de operação remota, pareamento de dispositivos e notificações.
 
 A arquitetura é local-first. Um operador pode começar apenas com o binário e um modelo local, adicionar um planner configurado, habilitar armazenamento PostgreSQL, workers Redis, OpenTelemetry, conectores, MCP, SAML, OAuth, mídia, publicação e companions conforme a necessidade. Cada capacidade opcional é configurada explicitamente e não deve receber credenciais dentro do repositório.
 
@@ -18,6 +18,7 @@ A arquitetura é local-first. Um operador pode começar apenas com o binário e 
 |---|---|---|
 | Chat e API Ollama | Implementado na base herdada | Preserva os comandos e contratos principais do Ollama. |
 | Multi-provider DZ23 | Implementado | Provedores explicitamente configurados e endpoints compatíveis. |
+| OmniRoute | Adapter OpenAI-compatible com preset local | Exige instância OmniRoute, chave e smoke test do operador; auto-routing externo não é inventado pelo Classe A+. |
 | Missões agentic | Implementado | Plano validado, execução, eventos, recovery e artefatos. |
 | Approvals e sandbox | Implementado | Tools classificadas e execução protegida por políticas do servidor. |
 | Multiagente e pesquisa | Implementado localmente | Papéis, orçamento, síntese, citações, cache, robots e SSRF guard. |
@@ -29,6 +30,7 @@ A arquitetura é local-first. Um operador pode começar apenas com o binário e 
 | SSO | Implementado em adapters | OAuth/OIDC e SAML exigem IdP, certificados e testes de produção. |
 | Mobile | Base Expo implementada | Push, conflitos avançados, assinatura e lojas ainda dependem de ambiente real. |
 | Modelos locais de mídia | Adapter configurável | Não confundir adapter multimodal com modelos locais completos já distribuídos. |
+| Shell desktop Classe A+ | Parcialmente implementado | Rotas reais e estados vazios foram adicionados; CRUD persistido de Biblioteca, Projetos, Agendado, Skills e Plugins ainda será conectado aos contratos agentic. |
 
 ## Instalação rápida
 

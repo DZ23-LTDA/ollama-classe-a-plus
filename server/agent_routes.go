@@ -204,6 +204,7 @@ func (a *agentAPI) register(r *gin.Engine) {
 	group := r.Group("/api/agent/v1")
 	group.Use(a.authMiddleware)
 	group.GET("/health", a.health)
+	group.GET("/config/safe", a.safeConfig)
 	group.GET("/auth/session", a.authSession)
 	group.POST("/auth/dev/token", a.devToken)
 	group.POST("/auth/mfa/enable", a.enableMFA)
@@ -380,6 +381,37 @@ func missionVersionMatches(c *gin.Context, mission agent.Mission) bool {
 
 func (a *agentAPI) health(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "ok", "runtime": "agent-v1"})
+}
+
+func (a *agentAPI) safeConfig(c *gin.Context) {
+	store := "local"
+	if strings.TrimSpace(os.Getenv("OLLAMA_AGENT_DATABASE_URL")) != "" {
+		store = "postgres"
+	}
+	queue := "local"
+	if strings.TrimSpace(os.Getenv("OLLAMA_AGENT_REDIS_URL")) != "" {
+		queue = "redis"
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"runtime":                  "agent-v1",
+		"store":                    store,
+		"queue":                    queue,
+		"auth_required":            a.authRequired,
+		"approval_gated_tools":     true,
+		"workspace_isolation":      true,
+		"planner_model_configured": envConfigured("OLLAMA_AGENT_MODEL"),
+		"embedding_configured":     envConfigured("OLLAMA_AGENT_EMBED_MODEL"),
+		"connectors_configured":    envConfigured("OLLAMA_AGENT_CONNECTORS"),
+		"mcp_configured":           envConfigured("OLLAMA_AGENT_MCP"),
+		"media_configured":         envConfigured("OLLAMA_AGENT_MEDIA_BASE_URL"),
+		"deployments_configured":   envConfigured("OLLAMA_AGENT_DEPLOYMENTS"),
+		"otlp_configured":          envConfigured("OLLAMA_AGENT_OTLP_ENDPOINT"),
+		"push_configured":          envConfigured("OLLAMA_AGENT_PUSH_ENDPOINT"),
+	})
+}
+
+func envConfigured(name string) bool {
+	return strings.TrimSpace(os.Getenv(name)) != "" || strings.TrimSpace(os.Getenv(name+"_FILE")) != ""
 }
 
 func (a *agentAPI) authSession(c *gin.Context) {

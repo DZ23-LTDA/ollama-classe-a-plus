@@ -22,20 +22,21 @@ type Config struct {
 }
 
 type Provider struct {
-	Name           string        `json:"name"`
-	Type           string        `json:"type"`
-	BaseURL        string        `json:"base_url"`
-	APIKeyEnv      string        `json:"api_key_env,omitempty"`
-	Models         []ModelConfig `json:"models"`
-	Priority       int           `json:"priority,omitempty"`
-	Enabled        *bool         `json:"enabled,omitempty"`
-	Executable     string        `json:"executable,omitempty"`
-	Args           []string      `json:"args,omitempty"`
-	AllowExecution bool          `json:"allow_execution,omitempty"`
-	TimeoutSeconds int           `json:"timeout_seconds,omitempty"`
-	Paths          []string      `json:"paths,omitempty"`
-	AuthStyle      string        `json:"auth_style,omitempty"`
-	AllowPrivate   bool          `json:"allow_private,omitempty"`
+	Name                  string        `json:"name"`
+	Type                  string        `json:"type"`
+	BaseURL               string        `json:"base_url"`
+	APIKeyEnv             string        `json:"api_key_env,omitempty"`
+	Models                []ModelConfig `json:"models"`
+	Priority              int           `json:"priority,omitempty"`
+	Enabled               *bool         `json:"enabled,omitempty"`
+	Executable            string        `json:"executable,omitempty"`
+	Args                  []string      `json:"args,omitempty"`
+	AllowExecution        bool          `json:"allow_execution,omitempty"`
+	TimeoutSeconds        int           `json:"timeout_seconds,omitempty"`
+	Paths                 []string      `json:"paths,omitempty"`
+	AuthStyle             string        `json:"auth_style,omitempty"`
+	AllowPrivate          bool          `json:"allow_private,omitempty"`
+	AllowInsecureLoopback bool          `json:"allow_insecure_loopback,omitempty"`
 }
 
 const (
@@ -158,8 +159,13 @@ func validateProvider(p Provider) error {
 		}
 	} else {
 		u, err := url.Parse(p.BaseURL)
-		if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil {
-			return fmt.Errorf("provider %q requires an HTTPS base_url without userinfo", p.Name)
+		if err != nil || u.Host == "" || u.User != nil {
+			return fmt.Errorf("provider %q requires a valid base_url without userinfo", p.Name)
+		}
+		if u.Scheme != "https" {
+			if u.Scheme != "http" || !p.AllowInsecureLoopback || !p.AllowPrivate || !isLoopbackHostname(u.Hostname()) {
+				return fmt.Errorf("provider %q requires HTTPS; insecure HTTP is allowed only for explicitly enabled loopback services", p.Name)
+			}
 		}
 		if ip := net.ParseIP(u.Hostname()); ip != nil && !p.AllowPrivate && unsafeProviderIP(ip) {
 			return fmt.Errorf("provider %q targets a private address; set allow_private explicitly for trusted local services", p.Name)
@@ -176,6 +182,14 @@ func validateProvider(p Provider) error {
 		}
 	}
 	return nil
+}
+
+func isLoopbackHostname(hostname string) bool {
+	if strings.EqualFold(strings.TrimSpace(hostname), "localhost") {
+		return true
+	}
+	ip := net.ParseIP(strings.Trim(hostname, "[]"))
+	return ip != nil && ip.IsLoopback()
 }
 
 func (p Provider) SupportsPath(path string) bool {

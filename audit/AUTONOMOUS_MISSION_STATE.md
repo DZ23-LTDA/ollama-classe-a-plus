@@ -208,3 +208,28 @@ remaining_external:
   - signed installers, physical devices, store distribution and full local media models
 next_action: commit phase 8, package a reproducible archive and continue provider-specific production smoke tests only with operator credentials.
 ```
+
+## Rodada 2026-09-22 — árvore de produto, shell desktop e OmniRoute
+```yaml
+state: CANDIDATE_COMPLETED
+branch: feat/manus-parity-omniroute
+features:
+  - product_tree: Manus observable surface, current Classe A+ tree and unified target tree
+  - parity_matrix: evidence states and acceptance journeys
+  - desktop_shell: real routes for projects, library, scheduled, skills, plugins and tasks
+  - settings_control_center: sanitized runtime/provider/approval/integration status
+  - safe_config_endpoint: GET /api/agent/v1/config/safe without secrets or private paths
+  - omniroute_loopback: explicit local HTTP opt-in plus preset and proxy smoke tests
+  - screenshots: Chromium captures for shell routes and Settings
+proofs:
+  - CGO_ENABLED=0 go test ./internal/agent -count=1: PASS
+  - CGO_ENABLED=1 go test ./server ./cmd/launch ./internal/multillm -count=1: PASS
+  - UI npm run build: PASS
+  - Chromium route capture: PASS for projects, library, scheduled, skills, plugins, tasks, agentic and settings
+  - git diff --check: PASS
+remaining_external:
+  - OmniRoute instance, credentials, provider discovery and fallback smoke outside the fixture
+  - CRUD persistence for new shell surfaces and complete provider settings editor
+  - real browser/desktop/mobile devices, distributed staging, IdP, deploy accounts and signed releases
+next_action: review diff, commit the feature branch, publish branch for review and continue the vertical flow Nova tarefa -> missão -> approval -> artifact.
+```

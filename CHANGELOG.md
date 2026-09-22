@@ -2,6 +2,16 @@
 
 Este arquivo registra as entregas públicas da distribuição `DZ23-LTDA/ollama-classe-a-plus`. O projeto mantém a atribuição e a licença do Ollama upstream; os recursos agentic específicos estão descritos com seus limites no [guia Classe A+](docs/CLASS_A_PLUS_GUIDE.md).
 
+## Unreleased — rodada de paridade observável
+
+- Árvore de produto completa em [`docs/agentic/PRODUCT_TREE.md`](docs/agentic/PRODUCT_TREE.md), separando superfície observável, estado atual e alvo unificado.
+- Matriz de paridade em [`docs/agentic/PARITY_MATRIX.md`](docs/agentic/PARITY_MATRIX.md), com gates para Manus, Claude, Codex, OmniRoute e demais famílias de harness.
+- Shell desktop com rotas reais de Projetos, Biblioteca, Agendado, Habilidades, Plugins e Tarefas, além de navegação lateral Classe A+.
+- Agentic Control Center na Settings com catálogo de modelos e configuração sanitizada; o estado sem backend permanece explícito.
+- Endpoint `GET /api/agent/v1/config/safe` sem tokens, caminhos privados ou valores sensíveis.
+- Preset OmniRoute local, opt-in HTTP loopback protegido e smoke tests de forwarding/bearer server-side.
+- Screenshots reais das novas rotas capturadas com Chromium e notas de proveniência atualizadas.
+
 ## [0.1.0] — Preview público
 
 ### Incluído

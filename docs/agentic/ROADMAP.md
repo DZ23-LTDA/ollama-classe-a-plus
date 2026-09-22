@@ -63,3 +63,13 @@ A fase adicionou adapter SAML baseado em `crewjam/saml`, incluindo metadata, Aut
 ## Incremento 2026-09-21 — Publicação real de builders
 
 Foi adicionado o DeploymentManager com adapters Vercel, Netlify e generic, coleta segura de arquivos, limites, redirects bloqueados, token server-side e approval explícito. O próximo gate é executar smoke contra contas reais e completar adapters de AWS/Cloudflare conforme credenciais e requisitos de cada ambiente; a publicação externa nunca é simulada como concluída apenas por existir um preview local.
+
+## Incremento 2026-09-22 — Árvore de produto, shell desktop e OmniRoute
+
+Foi criada a árvore pública [`PRODUCT_TREE.md`](PRODUCT_TREE.md), que separa a superfície observável de um desktop agentic, a árvore atual do Classe A+ e a árvore-alvo unificada com Claude, Codex, OmniRoute, coding agents, pesquisa, builders, mobile, colaboração e operações. A matriz [`PARITY_MATRIX.md`](PARITY_MATRIX.md) passa a ser o contrato de honestidade para diferenciar `VALIDADA LOCALMENTE`, `ADAPTER IMPLEMENTADO`, `PARCIAL` e `PENDENTE`.
+
+O shell web ganhou rotas reais para Biblioteca, Projetos, Agendado, Habilidades, Plugins e Tarefas, além de uma navegação lateral com Nova tarefa, Agente, workspace e conta. A Settings ganhou o Agentic Control Center com catálogo de modelos, status sanitizado de runtime, approvals, isolamento, conectores, MCP, mídia, deploy e OTLP. O endpoint `/api/agent/v1/config/safe` nunca retorna tokens, caminhos privados ou valores de configuração.
+
+O multi-provider agora aceita HTTP somente para um serviço numérico de loopback quando `allow_private` e `allow_insecure_loopback` estão explicitamente definidos. Isso permite o preset [`examples/dz23-omniroute.json`](../../examples/dz23-omniroute.json) para uma instância OmniRoute local, mantendo HTTPS obrigatório para hosts externos. Foram adicionados testes de carregamento, rejeição de HTTP externo e encaminhamento com bearer server-side. A integração continua dependente de uma instância OmniRoute, credencial e smoke test do operador.
+
+As telas novas têm estados vazios honestos e ações de entrada. CRUD persistido, colaboração, editor drag-and-drop, provider discovery completo e deploy real continuam como próximos gates; a interface não os apresenta como concluídos.
