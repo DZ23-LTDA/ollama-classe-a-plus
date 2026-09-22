@@ -1149,3 +1149,20 @@ classification: preview/local RC em hardening
 open_risks: web login wiring, native secure-storage physical builds, backend session cookie/CSRF strategy, strong sandbox
 next_action: run full gates, commit/push, then continue backend OAuth egress or sandbox controls
 ```
+
+
+## Publicação da slice P0 session handling web/mobile — 2026-09-22
+
+```yaml
+state: FIXING
+iteration: 16
+commit: 772b07a1
+branch: feat/manus-parity-omniroute
+remote: https://github.com/DZ23-LTDA/ollama-classe-a-plus.git
+pull_request: https://github.com/DZ23-LTDA/ollama-classe-a-plus/pull/1
+working_tree: checkpoint pending commit
+published: true
+proofs: integrity, Go tests/vet/build, UI security Vitest/build, mobile typecheck all PASS
+classification: preview/local RC em hardening
+next_slice: wire web login to memory session, OAuth endpoint egress, or platform sandbox; no main merge
+```
