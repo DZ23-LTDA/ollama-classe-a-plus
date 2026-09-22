@@ -15,7 +15,7 @@ type plannerChatStub struct {
 	err      error
 }
 
-func (s *plannerChatStub) Chat(_ context.Context, request *api.ChatRequest, callback func(api.ChatResponse) error) error {
+func (s *plannerChatStub) Chat(_ context.Context, request *api.ChatRequest, callback api.ChatResponseFunc) error {
 	s.model = request.Model
 	if s.err != nil {
 		return s.err

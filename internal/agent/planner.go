@@ -15,7 +15,7 @@ type Planner interface {
 }
 
 type plannerChatClient interface {
-	Chat(ctx context.Context, request *api.ChatRequest, callback func(api.ChatResponse) error) error
+	Chat(ctx context.Context, request *api.ChatRequest, callback api.ChatResponseFunc) error
 }
 
 type RulePlanner struct{}
