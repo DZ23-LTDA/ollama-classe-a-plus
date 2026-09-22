@@ -144,6 +144,28 @@ curl -sS -X POST http://localhost:11434/api/agent/v1/companies/COMPANY_ID/cycles
 
 Criar um ciclo também cria um schedule persistente com workspace `company://COMPANY_ID`. `POST /companies/COMPANY_ID/pause` impede que o worker crie novas missões para os ciclos dessa empresa. Gasto em anúncios/contratos ou acima do limiar exige `approved:true`; limite excedido e anomalias de alta severidade pausam a empresa.
 
+O Growth OS local usa approval explícito antes de qualquer efeito externo:
+
+```bash
+curl -sS -X POST http://localhost:11434/api/agent/v1/companies/COMPANY_ID/campaigns \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Campanha de validação","channel":"social","objective":"Gerar leads","daily_budget_cents":0}'
+curl -sS -X POST http://localhost:11434/api/agent/v1/companies/COMPANY_ID/campaigns/CAMPAIGN_ID/approve
+curl -sS -X POST http://localhost:11434/api/agent/v1/companies/COMPANY_ID/campaigns/CAMPAIGN_ID/launch
+
+curl -sS -X POST http://localhost:11434/api/agent/v1/companies/COMPANY_ID/products \
+  -H 'Content-Type: application/json' \
+  -d '{"sku":"SKU-001","name":"Produto sandbox","supplier":"Fornecedor sandbox","cost_cents":500,"price_cents":1200,"inventory":10}'
+curl -sS -X POST http://localhost:11434/api/agent/v1/companies/COMPANY_ID/orders \
+  -H 'Content-Type: application/json' \
+  -d '{"product_id":"PRODUCT_ID","customer_ref":"customer-test","quantity":1}'
+curl -sS -X POST http://localhost:11434/api/agent/v1/companies/COMPANY_ID/orders/ORDER_ID/approve
+curl -sS -X POST http://localhost:11434/api/agent/v1/companies/COMPANY_ID/orders/ORDER_ID/fulfill \
+  -H 'Content-Type: application/json' -d '{"tracking_code":"SANDBOX-001"}'
+```
+
+O endpoint `GET /companies/COMPANY_ID/growth/report` resume campanhas ativas, conversões de afiliados, catálogo, pedidos e receita registrada. A implementação não chama redes sociais, redes de afiliados, marketplaces, fornecedores, gateways de pagamento ou transportadoras.
+
 ## Tools da primeira fatia
 
 `workspace.list` lê entradas do workspace autorizado e limita a quantidade retornada. `workspace.read` lê no máximo 1 MiB e rejeita traversal. `workspace.write` exige approval, limita o payload, escreve com permissões restritas e cria um manifesto com tamanho e SHA-256. `terminal.exec` existe em modo conservador e só permite `pwd`, `ls` e `git status` com argumentos separados; shell interpolation e outros executáveis são bloqueados. `sandbox.exec` executa Python ou Node em user namespace, sem rede, com um bind apenas do workspace e limite de tempo/output; ainda exige approval. `browser.operator` usa Chromium/Playwright com perfil persistente por sessão, bloqueio SSRF, snapshot, click, fill, press, upload, download, screenshot e estado `approval_required` para takeover humano. `desktop.companion` possui adapters Linux, macOS e Windows para screenshot, mouse, teclado, clipboard e processos através de executáveis separados e sem shell concatenado. `mcp.call` usa JSON-RPC stdio com lifecycle, timeout, env allowlist e methods allowlisted. `mcp.remote.call` usa Remote MCP Streamable HTTP, exige HTTPS fora de loopback, aceita bearer apenas por variável de ambiente e mantém allowlist de métodos; OAuth PKCE e pareamento do provedor são externos. `connector.http` chama GitHub, Google, Slack, Discord ou WhatsApp somente por operação HTTPS declarada.

@@ -411,3 +411,36 @@ func TestAnthropicProviderTranslatesNativeChat(t *testing.T) {
 		t.Fatalf("status=%d path=%q model=%q system=%q body=%s", recorder.Code, gotPath, gotModel, gotSystem, recorder.Body.String())
 	}
 }
+
+func TestProxyTranslatesOpenAIStreamingSession(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	var gotAuthorization string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuthorization = r.Header.Get("Authorization")
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = io.WriteString(w, "data: {\"choices\":[{\"delta\":{\"content\":\"chunk-one\"}}]}\n\n")
+		_, _ = io.WriteString(w, "data: {\"choices\":[{\"delta\":{\"content\":\" chunk-two\"},\"finish_reason\":\"stop\"}]}\n\n")
+		_, _ = io.WriteString(w, "data: [DONE]\n\n")
+	}))
+	defer upstream.Close()
+	t.Setenv("STREAM_KEY", "stream-secret")
+	t.Setenv("GATEWAY_KEY", "gateway-secret")
+	registry := &Registry{
+		providers:        map[string]Provider{"stream": {Name: "stream", Type: ProviderTypeOpenAICompatible, BaseURL: upstream.URL + "/v1", APIKeyEnv: "STREAM_KEY", Paths: []string{"/api/chat"}, AllowPrivate: true, AllowInsecureLoopback: true}},
+		models:           map[string]Model{"stream/model": {ID: "stream/model", UpstreamID: "stream-model", Provider: "stream", Available: true}},
+		gatewayAPIKeyEnv: "GATEWAY_KEY",
+	}
+	router := gin.New()
+	router.Use(NewGateway(registry, upstream.Client()).Middleware())
+	router.POST("/api/chat", func(c *gin.Context) { t.Fatal("stream request was not proxied") })
+	req := httptest.NewRequest(http.MethodPost, "/api/chat", strings.NewReader(`{"model":"stream/model","stream":true,"messages":[{"role":"user","content":"hello"}]}`))
+	req.Header.Set("Authorization", "Bearer gateway-secret")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || gotAuthorization != "Bearer stream-secret" {
+		t.Fatalf("status=%d authorization=%q body=%s", rec.Code, gotAuthorization, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "chunk-one") || !strings.Contains(rec.Body.String(), "chunk-two") || !strings.Contains(rec.Body.String(), `"done":true`) {
+		t.Fatalf("translated stream missing expected chunks: %s", rec.Body.String())
+	}
+}

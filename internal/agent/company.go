@@ -111,27 +111,32 @@ type CompanyCycle struct {
 }
 
 type Company struct {
-	ID             string               `json:"id"`
-	OrganizationID string               `json:"organization_id"`
-	Name           string               `json:"name"`
-	Mission        string               `json:"mission,omitempty"`
-	Positioning    string               `json:"positioning,omitempty"`
-	BusinessModel  string               `json:"business_model,omitempty"`
-	TargetAudience string               `json:"target_audience,omitempty"`
-	Offer          string               `json:"offer,omitempty"`
-	Website        string               `json:"website,omitempty"`
-	Currency       string               `json:"currency"`
-	Status         CompanyStatus        `json:"status"`
-	Departments    []CompanyDepartment  `json:"departments"`
-	Channels       []CompanyChannel     `json:"channels,omitempty"`
-	Roadmap        []CompanyRoadmapItem `json:"roadmap,omitempty"`
-	Goals          []CompanyGoal        `json:"goals,omitempty"`
-	Backlog        []CompanyBacklogItem `json:"backlog,omitempty"`
-	Cycles         []CompanyCycle       `json:"cycles,omitempty"`
-	Budget         CompanyBudget        `json:"budget"`
-	Risk           CompanyRisk          `json:"risk"`
-	CreatedAt      time.Time            `json:"created_at"`
-	UpdatedAt      time.Time            `json:"updated_at"`
+	ID                string                    `json:"id"`
+	OrganizationID    string                    `json:"organization_id"`
+	Name              string                    `json:"name"`
+	Mission           string                    `json:"mission,omitempty"`
+	Positioning       string                    `json:"positioning,omitempty"`
+	BusinessModel     string                    `json:"business_model,omitempty"`
+	TargetAudience    string                    `json:"target_audience,omitempty"`
+	Offer             string                    `json:"offer,omitempty"`
+	Website           string                    `json:"website,omitempty"`
+	Currency          string                    `json:"currency"`
+	Status            CompanyStatus             `json:"status"`
+	Departments       []CompanyDepartment       `json:"departments"`
+	Channels          []CompanyChannel          `json:"channels,omitempty"`
+	Roadmap           []CompanyRoadmapItem      `json:"roadmap,omitempty"`
+	Goals             []CompanyGoal             `json:"goals,omitempty"`
+	Backlog           []CompanyBacklogItem      `json:"backlog,omitempty"`
+	Cycles            []CompanyCycle            `json:"cycles,omitempty"`
+	Campaigns         []CompanyCampaign         `json:"campaigns,omitempty"`
+	AffiliatePrograms []CompanyAffiliateProgram `json:"affiliate_programs,omitempty"`
+	AffiliateLinks    []CompanyAffiliateLink    `json:"affiliate_links,omitempty"`
+	Products          []CompanyProduct          `json:"products,omitempty"`
+	Orders            []CompanyOrder            `json:"orders,omitempty"`
+	Budget            CompanyBudget             `json:"budget"`
+	Risk              CompanyRisk               `json:"risk"`
+	CreatedAt         time.Time                 `json:"created_at"`
+	UpdatedAt         time.Time                 `json:"updated_at"`
 }
 
 type CompanyReport struct {

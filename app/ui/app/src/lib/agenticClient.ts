@@ -43,12 +43,18 @@ export type CompanyCycle = { id: string; name: string; objective: string; freque
 export type AgentCompany = {
   id: string; organization_id: string; name: string; mission?: string; positioning?: string; business_model?: string;
   target_audience?: string; offer?: string; website?: string; currency: string; status: string;
-  departments: CompanyDepartment[]; roadmap?: CompanyRoadmapItem[]; goals?: CompanyGoal[]; backlog?: CompanyBacklogItem[]; cycles?: CompanyCycle[];
+  departments: CompanyDepartment[]; roadmap?: CompanyRoadmapItem[]; goals?: CompanyGoal[]; backlog?: CompanyBacklogItem[]; cycles?: CompanyCycle[]; campaigns?: CompanyCampaign[]; affiliate_programs?: CompanyAffiliateProgram[]; affiliate_links?: CompanyAffiliateLink[]; products?: CompanyProduct[]; orders?: CompanyOrder[];
   budget: { currency: string; monthly_limit_cents: number; spent_cents: number; approval_threshold_cents: number; require_approval_for_ads: boolean; require_approval_for_sales: boolean };
   risk: { paused: boolean; pause_reason?: string; anomaly_count: number; last_anomaly?: string };
   created_at: string; updated_at: string;
 };
 export type AgentCompanyReport = { company: AgentCompany; open_backlog: number; completed_backlog: number; goals_on_track: number; goals_at_risk: number; enabled_cycles: number; budget_utilization_pct: number };
+export type CompanyCampaign = { id: string; name: string; channel: string; objective: string; status: string; daily_budget_cents: number; approval_required: boolean; approved: boolean; conversions: number; spend_cents: number };
+export type CompanyAffiliateProgram = { id: string; name: string; network: string; status: string; commission_bps: number; approval_required: boolean; approved: boolean };
+export type CompanyAffiliateLink = { id: string; program_id: string; product_id?: string; destination: string; conversions: number; revenue_cents: number };
+export type CompanyProduct = { id: string; sku: string; name: string; supplier: string; cost_cents: number; price_cents: number; inventory: number; status: string };
+export type CompanyOrder = { id: string; product_id: string; customer_ref: string; quantity: number; total_cents: number; status: string; approved: boolean; tracking_code?: string };
+export type CompanyGrowthReport = { company: AgentCompany; campaigns_total: number; campaigns_active: number; affiliate_programs: number; affiliate_conversions: number; products: number; pending_orders: number; fulfilled_orders: number; revenue_cents: number };
 
 function agentHeaders(): Record<string, string> {
   if (typeof window === "undefined") return {};
@@ -93,3 +99,16 @@ export const pauseCompany = (id: string, reason: string) => agentFetch<AgentComp
 export const resumeCompany = (id: string) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/resume`, { method: "POST", body: "{}" });
 export const recordCompanyAnomaly = (id: string, severity: string, reason: string) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/anomalies`, { method: "POST", body: JSON.stringify({ severity, reason }) });
 export const recordCompanySpend = (id: string, category: string, amount_cents: number, approved: boolean) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/spend`, { method: "POST", body: JSON.stringify({ category, amount_cents, approved }) });
+export const getCompanyGrowthReport = (id: string) => agentFetch<CompanyGrowthReport>(`/api/agent/v1/companies/${encodeURIComponent(id)}/growth/report`);
+export const addCompanyCampaign = (id: string, payload: Record<string, unknown>) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/campaigns`, { method: "POST", body: JSON.stringify(payload) });
+export const approveCompanyCampaign = (id: string, campaignID: string) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/campaigns/${encodeURIComponent(campaignID)}/approve`, { method: "POST", body: "{}" });
+export const launchCompanyCampaign = (id: string, campaignID: string) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/campaigns/${encodeURIComponent(campaignID)}/launch`, { method: "POST", body: "{}" });
+export const pauseCompanyCampaign = (id: string, campaignID: string) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/campaigns/${encodeURIComponent(campaignID)}/pause`, { method: "POST", body: "{}" });
+export const addCompanyAffiliateProgram = (id: string, payload: Record<string, unknown>) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/affiliate-programs`, { method: "POST", body: JSON.stringify(payload) });
+export const approveCompanyAffiliateProgram = (id: string, programID: string) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/affiliate-programs/${encodeURIComponent(programID)}/approve`, { method: "POST", body: "{}" });
+export const addCompanyAffiliateLink = (id: string, payload: Record<string, unknown>) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/affiliate-links`, { method: "POST", body: JSON.stringify(payload) });
+export const recordCompanyAffiliateConversion = (id: string, linkID: string, revenue_cents: number) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/affiliate-links/${encodeURIComponent(linkID)}/conversion`, { method: "POST", body: JSON.stringify({ revenue_cents }) });
+export const addCompanyProduct = (id: string, payload: Record<string, unknown>) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/products`, { method: "POST", body: JSON.stringify(payload) });
+export const createCompanyOrder = (id: string, payload: Record<string, unknown>) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/orders`, { method: "POST", body: JSON.stringify(payload) });
+export const approveCompanyOrder = (id: string, orderID: string) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/orders/${encodeURIComponent(orderID)}/approve`, { method: "POST", body: "{}" });
+export const fulfillCompanyOrder = (id: string, orderID: string, tracking_code: string) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/orders/${encodeURIComponent(orderID)}/fulfill`, { method: "POST", body: JSON.stringify({ tracking_code }) });

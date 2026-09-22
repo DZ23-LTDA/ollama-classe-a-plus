@@ -31,6 +31,14 @@ A arquitetura está preparada para acrescentar departamentos e connectors de mar
 
 Afiliados e dropshipping podem ser implementados por connectors allowlisted para plataformas, catálogos, CRM, e-mail, redes sociais, analytics e logística. Nesta revisão eles não são declarados como integrações concluídas: faltam contratos específicos, credenciais, escopos, testes de sandbox, políticas de marca, compliance, devoluções, impostos e validação de pedidos reais.
 
+## Growth OS sandbox
+
+O Company OS agora inclui um **Growth OS local** para testar o ciclo de campanhas, afiliados e dropshipping sem chamar plataformas externas. Uma campanha nasce como `draft`, um programa de afiliados nasce como `pending` e um pedido nasce como `pending_approval`. Aprovar é uma ação separada de iniciar campanha, criar link ou fulfillar pedido.
+
+O módulo registra campanhas, canais, orçamento diário, aprovação, impressões, cliques, conversões e gasto. Programas de afiliados possuem rede e comissão. Links exigem destino HTTPS e programa aprovado. Produtos têm SKU, fornecedor, custo, preço e estoque. Pedidos são associados a cliente e produto; fulfillment sandbox exige aprovação, código de rastreio e estoque suficiente. O relatório `/growth/report` consolida campanhas ativas, conversões, produtos, pedidos e receita registrada.
+
+Esse fluxo é **sandbox local**. Ele não publica anúncios, envia posts, cria contas, acessa marketplaces, compra estoque, cobra clientes, movimenta dinheiro, chama transportadoras ou envia pedidos reais. Connectors reais só podem ser adicionados depois de escopos mínimos, secrets server-side, sandbox do provedor, approval, DLP, idempotência, compliance e testes autorizados.
+
 ## API principal
 
 Todas as rotas ficam sob `/api/agent/v1` e exigem o mesmo escopo de organização do runtime:
@@ -45,6 +53,10 @@ Todas as rotas ficam sob `/api/agent/v1` e exigem o mesmo escopo de organizaçã
 | Pausar/retomar | `POST /companies/:id/pause`, `/resume` |
 | Registrar anomalia | `POST /companies/:id/anomalies` |
 | Registrar gasto | `POST /companies/:id/spend` |
+| Growth report | `GET /companies/:id/growth/report` |
+| Campanha e approval | `POST /companies/:id/campaigns`, `/campaigns/:campaign_id/approve`, `/launch`, `/pause` |
+| Afiliados | `POST /companies/:id/affiliate-programs`, `/affiliate-links`, `/conversion` |
+| Catálogo e pedidos | `POST /companies/:id/products`, `/orders`, `/orders/:order_id/approve`, `/fulfill` |
 
 Os dados locais são persistidos em `OLLAMA_AGENT_STORE/companies`. A integração PostgreSQL existente continua sendo o caminho para missões/eventos distribuídos; a persistência empresarial distribuída e RLS específico de Company OS são próximos gates.
 

@@ -269,6 +269,12 @@ func companyErrorStatus(err error) int {
 		return http.StatusNotFound
 	case errors.Is(err, agent.ErrCompanyBudgetExceeded), errors.Is(err, agent.ErrCompanyApprovalRequired):
 		return http.StatusConflict
+	case errors.Is(err, agent.ErrCompanyCampaignNotFound), errors.Is(err, agent.ErrCompanyAffiliateNotFound), errors.Is(err, agent.ErrCompanyProductNotFound), errors.Is(err, agent.ErrCompanyOrderNotFound):
+		return http.StatusNotFound
+	case errors.Is(err, agent.ErrCompanyApprovalRequiredForExternal):
+		return http.StatusConflict
+	case errors.Is(err, agent.ErrCompanyInvalidExternalURL):
+		return http.StatusBadRequest
 	case errors.Is(err, agent.ErrCompanyPaused):
 		return http.StatusLocked
 	case strings.Contains(strings.ToLower(err.Error()), "company"):
