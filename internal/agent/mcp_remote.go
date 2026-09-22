@@ -75,15 +75,12 @@ func (m *RemoteMCPManager) Register(config RemoteMCPServerConfig) error {
 	if ip := net.ParseIP(parsed.Hostname()); ip != nil && remoteMCPPrivateIP(ip) && !ip.IsLoopback() {
 		return errors.New("remote MCP destination cannot be a private address")
 	}
-	if strings.ContainsAny(config.TokenEnv, "=\x00\r\n") {
+	if config.TokenEnv != "" && !validEnvName(config.TokenEnv) {
 		return errors.New("remote MCP token_env is invalid")
 	}
 	for header, envName := range config.HeadersEnv {
-		if strings.TrimSpace(header) == "" || strings.ContainsAny(header, "\x00\r\n") {
+		if !validRemoteMCPHeaderName(header) || !validEnvName(envName) {
 			return errors.New("remote MCP header name is invalid")
-		}
-		if strings.TrimSpace(envName) == "" || strings.ContainsAny(envName, "=\x00\r\n") {
-			return errors.New("remote MCP header environment name is invalid")
 		}
 	}
 	if len(config.AllowedMethods) == 0 {
@@ -303,6 +300,24 @@ func remoteMCPContains(values []string, wanted string) bool {
 		}
 	}
 	return false
+}
+
+func validRemoteMCPHeaderName(value string) bool {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return false
+	}
+	for _, char := range value {
+		if char <= 32 || char >= 127 || strings.ContainsRune("()<>@,;:\\\"/[]?={}", char) {
+			return false
+		}
+	}
+	switch strings.ToLower(value) {
+	case "host", "content-length", "transfer-encoding", "connection", "proxy-connection", "proxy-authorization", "upgrade", "te", "trailer":
+		return false
+	default:
+		return true
+	}
 }
 
 func lastSSEData(body []byte) []byte {

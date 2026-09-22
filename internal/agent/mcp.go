@@ -56,6 +56,11 @@ func (m *MCPManager) Register(config MCPServerConfig) error {
 		}
 		allowed[method] = true
 	}
+	for _, name := range config.EnvironmentVars {
+		if !validEnvName(strings.TrimSpace(name)) {
+			return fmt.Errorf("invalid MCP environment variable %q", name)
+		}
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if old := m.servers[config.ID]; old != nil {

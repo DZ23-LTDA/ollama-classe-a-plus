@@ -74,3 +74,20 @@ func TestRemoteMCPRequiresAllowlist(t *testing.T) {
 		t.Fatal("expected empty remote MCP allowlist rejection")
 	}
 }
+
+func TestRemoteMCPRejectsInvalidHeaderEnvironment(t *testing.T) {
+	manager := NewRemoteMCPManager()
+	config := RemoteMCPServerConfig{
+		ID:             "invalid-header",
+		URL:            "https://example.com/mcp",
+		AllowedMethods: []string{"tools/list"},
+		HeadersEnv:     map[string]string{"X-Test": "INVALID-NAME"},
+	}
+	if err := manager.Register(config); err == nil {
+		t.Fatal("expected invalid environment name rejection")
+	}
+	config.HeadersEnv = map[string]string{"Host": "VALID_NAME"}
+	if err := manager.Register(config); err == nil {
+		t.Fatal("expected restricted transport header rejection")
+	}
+}

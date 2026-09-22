@@ -531,3 +531,63 @@ external_blockers:
   - OAuth, app reviews, devices, GPU, signed installers, stores and deploy accounts
 next_action: commit and push readiness report plus Browser Operator CI fix; do not claim universal production readiness
 ```
+
+
+## Retomada após auditoria independente ampliada — 2026-09-22
+
+```yaml
+mission_id: class-a-plus-final-hardening-2026-09-22
+state: FIXING
+iteration: 4
+objective: corrigir P0 internos reproduzíveis por slices verticais, sem declarar produção-ready enquanto isolamento, approvals, sandbox, egress/DLP, Company/Builder e release permanecerem incompletos
+branch: feat/manus-parity-omniroute
+head_before_publish: 9b2d2e87
+working_tree_at_checkpoint: hardening local não commitado; revisar antes de publicar
+
+completed_this_iteration:
+  - connectors: organização obrigatória, matching de path por segmento e bloqueio de destinos DNS privados
+  - remote_mcp: validação de TokenEnv/HeadersEnv e headers de transporte
+  - mcp_stdio: validação estrita de nomes de variáveis de ambiente
+  - plugin_lifecycle: owner/admin obrigatório quando auth está ativa
+  - browser_operator: fallback para Chromium conhecido quando caminho configurado não existe
+  - plugin_routes_test: matriz owner/admin/operator/viewer/local mode
+  - ci: instalação/verificação mais robusta de Browser Operator
+  - docs: readiness, roadmap, changelog e revisão ajustados para não afirmar conclusão universal
+
+proofs_local:
+  - scripts/check-class-a-plus-integrity.sh: PASS
+  - focused connector/mcp/plugin/browser/server tests: PASS
+  - CGO_ENABLED=1 go test ./... -count=1: PASS
+  - CGO_ENABLED=1 go vet ./...: PASS
+  - CGO_ENABLED=1 go build: PASS
+  - UI Vitest: 20 arquivos / 199 testes PASS
+  - UI npm run build: PASS, warning conhecido de chunks >500KB
+  - mobile npm run typecheck: PASS
+  - Browser Operator com executável inválido e fallback local: PASS
+
+audited_open_p0:
+  - tenant isolation/object authorization para orchestration, traces, devices/pairing, Builder, plugins/MCP/skills e CRUD completo
+  - approval policy separada de execute, aprovador autorizado, CAS/nonce/expiração e anti-auto-approval
+  - sandbox/MCP stdio sem isolamento forte comprovado; faltam seccomp/cgroups/rlimits/PID/memory/process-group limits
+  - SSRF/DNS rebinding/redirect-chain e IP efetivamente conectado para Remote MCP/connectors/media
+  - DLP/redaction antes de Step.Result, events, traces e payloads externos
+  - CompanyCreateRequest allowlisted, empresa/agente pausados e gasto atômico dentro do budget
+  - Builder OrganizationID, ownership, entry/symlink/XSS e manifest de artifacts
+  - dev-token, OAuth redirect allowlist, bearer desktop e claims de provider/UI
+  - CI/release: quality dependency, SBOM/provenance/signing e smoke pós-build
+
+external_blockers:
+  - credenciais e OAuth de providers, Composio, xAI e Desktop Commander
+  - app review/sandboxes de TikTok Shop, Meta, Shopify e canais de commerce
+  - PostgreSQL/RLS, Redis, OTLP, IdP, Docker/staging distribuído
+  - runners Windows/macOS, GPU, dispositivos móveis, assinatura e lojas
+
+current_task: publicar somente a camada de hardening local já implementada; depois iniciar tenant isolation por testes negativos
+next_actions:
+  - revisar diff e atualizar este checkpoint com o SHA publicado
+  - commit/push sem merge para main e confirmar PR #1
+  - criar duas organizações em teste HTTP e provar 403/no mutation em Builder, Company/Growth, orchestration, traces e devices
+  - atualizar novamente a auditoria apenas com evidência reproduzível
+classification: preview/local RC em hardening; NÃO final, NÃO production-ready
+rollback: reverter o commit deste slice na branch feature; não force-push e não alterar main
+```

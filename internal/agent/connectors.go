@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -43,8 +44,12 @@ type ConnectorManager struct {
 
 var ErrConnectorDisabled = errors.New("connector is disabled")
 
+type connectorLoopbackContextKey struct{}
+
 func NewConnectorManager() *ConnectorManager {
-	return &ConnectorManager{connectors: make(map[string]ConnectorConfig), client: &http.Client{CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return errors.New("connector redirects are disabled") }}}
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.DialContext = connectorDialContext
+	return &ConnectorManager{connectors: make(map[string]ConnectorConfig), client: &http.Client{Transport: transport, CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return errors.New("connector redirects are disabled") }}}
 }
 
 func (m *ConnectorManager) SetOAuthStore(store *AuthStore) {
@@ -130,10 +135,13 @@ func (m *ConnectorManager) Remove(id string) error {
 }
 
 func (m *ConnectorManager) Call(ctx context.Context, connectorID, operationName, method, requestPath string, body []byte) (int, string, error) {
-	return m.call(ctx, connectorID, operationName, method, requestPath, body, "")
+	return 0, "", errors.New("connector organization scope is required; use CallForOrganization")
 }
 
 func (m *ConnectorManager) CallForOrganization(ctx context.Context, organizationID, connectorID, operationName, method, requestPath string, body []byte) (int, string, error) {
+	if strings.TrimSpace(organizationID) == "" {
+		return 0, "", errors.New("connector organization scope is required")
+	}
 	m.mu.RLock()
 	config, ok := m.connectors[strings.TrimSpace(connectorID)]
 	auth := m.auth
@@ -174,7 +182,8 @@ func (m *ConnectorManager) call(ctx context.Context, connectorID, operationName,
 	}
 	base.Path = path.Join(strings.TrimSuffix(base.Path, "/"), relative.Path)
 	base.RawQuery = relative.RawQuery
-	request, err := http.NewRequestWithContext(ctx, strings.ToUpper(method), base.String(), bytes.NewReader(body))
+	requestContext := context.WithValue(ctx, connectorLoopbackContextKey{}, connectorHostIsLoopback(base.Hostname()))
+	request, err := http.NewRequestWithContext(requestContext, strings.ToUpper(method), base.String(), bytes.NewReader(body))
 	if err != nil {
 		return 0, "", err
 	}
@@ -220,12 +229,55 @@ func findConnectorOperation(operations []ConnectorOperation, name, method, reque
 			return operation, false
 		}
 		for _, prefix := range operation.PathPrefixes {
-			if strings.HasPrefix(requestPath, prefix) {
+			if connectorPathMatches(requestPath, prefix) {
 				return operation, true
 			}
 		}
 	}
 	return ConnectorOperation{}, false
+}
+
+func connectorPathMatches(requestPath, prefix string) bool {
+	requestPath = strings.TrimSpace(requestPath)
+	prefix = strings.TrimSpace(prefix)
+	if prefix == "/" {
+		return strings.HasPrefix(requestPath, "/")
+	}
+	prefix = strings.TrimSuffix(prefix, "/")
+	return requestPath == prefix || strings.HasPrefix(requestPath, prefix+"/")
+}
+
+func connectorHostIsLoopback(host string) bool {
+	if strings.EqualFold(strings.TrimSpace(host), "localhost") {
+		return true
+	}
+	ip := net.ParseIP(strings.Trim(host, "[]"))
+	return ip != nil && ip.IsLoopback()
+}
+
+func connectorPrivateIP(ip net.IP) bool {
+	return ip.IsLoopback() || ip.IsUnspecified() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsMulticast()
+}
+
+func connectorDialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	dialer := &net.Dialer{Timeout: 10 * time.Second}
+	conn, err := dialer.DialContext(ctx, network, address)
+	if err != nil {
+		return nil, err
+	}
+	remote, _, splitErr := net.SplitHostPort(conn.RemoteAddr().String())
+	if splitErr != nil {
+		_ = conn.Close()
+		return nil, errors.New("connector destination is invalid")
+	}
+	if ip := net.ParseIP(remote); ip != nil && connectorPrivateIP(ip) {
+		allowedLoopback, _ := ctx.Value(connectorLoopbackContextKey{}).(bool)
+		if !(allowedLoopback && ip.IsLoopback()) {
+			_ = conn.Close()
+			return nil, errors.New("connector destination resolves to a private address")
+		}
+	}
+	return conn, nil
 }
 
 func validConnectorPath(value string) bool {

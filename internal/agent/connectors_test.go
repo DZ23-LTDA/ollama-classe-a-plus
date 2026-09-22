@@ -46,3 +46,22 @@ func TestConnectorUsesTenantOAuthCredential(t *testing.T) {
 		t.Fatalf("status=%d response=%q err=%v", status, response, err)
 	}
 }
+
+func TestConnectorRequiresOrganizationScope(t *testing.T) {
+	manager := NewConnectorManager()
+	if _, _, err := manager.Call(context.Background(), "github", "profile", "GET", "/user", nil); err == nil {
+		t.Fatal("expected direct connector call to require organization scope")
+	}
+	if _, _, err := manager.CallForOrganization(context.Background(), "", "github", "profile", "GET", "/user", nil); err == nil {
+		t.Fatal("expected empty organization scope to be rejected")
+	}
+}
+
+func TestConnectorPathPrefixMatchesSegments(t *testing.T) {
+	if !connectorPathMatches("/users/123", "/users") {
+		t.Fatal("expected child path to match")
+	}
+	if connectorPathMatches("/users-privileged", "/users") {
+		t.Fatal("must not match a different path segment")
+	}
+}

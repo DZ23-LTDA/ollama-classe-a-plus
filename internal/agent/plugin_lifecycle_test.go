@@ -16,7 +16,7 @@ func TestConnectorLifecycleDisablesCalls(t *testing.T) {
 	if err := manager.SetEnabled("c", false); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := manager.Call(context.Background(), "c", "read", "GET", "/", nil); !errors.Is(err, ErrConnectorDisabled) {
+	if _, _, err := manager.CallForOrganization(context.Background(), "org_test", "c", "read", "GET", "/", nil); !errors.Is(err, ErrConnectorDisabled) {
 		t.Fatalf("expected disabled connector, got %v", err)
 	}
 	if err := manager.SetEnabled("c", true); err != nil {

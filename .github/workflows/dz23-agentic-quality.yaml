@@ -31,12 +31,14 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - name: Install Browser Operator dependencies
-        run: |
-          python3 -m pip install --user --break-system-packages playwright
-          python3 -m playwright install --with-deps chromium
-          browser_path="$(python3 -c 'from playwright.sync_api import sync_playwright; p=sync_playwright().start(); print(p.chromium.executable_path); p.stop()')"
-          echo "OLLAMA_AGENT_BROWSER_EXECUTABLE=$browser_path" >> "$GITHUB_ENV"
+	      - name: Install Browser Operator dependencies
+	        run: |
+	          python3 -m pip install --user --break-system-packages playwright
+	          python3 -m playwright install --with-deps chromium
+	          browser_path="$(python3 -c 'from playwright.sync_api import sync_playwright; p=sync_playwright().start(); print(p.chromium.executable_path); p.stop()')"
+	          if [ ! -x "$browser_path" ] && [ -x /usr/bin/chromium ]; then browser_path=/usr/bin/chromium; fi
+	          test -x "$browser_path"
+	          echo "OLLAMA_AGENT_BROWSER_EXECUTABLE=$browser_path" >> "$GITHUB_ENV"
       - run: go mod verify
       - run: gofmt -l internal/agent server/companion_ws.go server/agent_routes.go | tee /tmp/gofmt.txt && test ! -s /tmp/gofmt.txt
       - run: ./scripts/check-class-a-plus-integrity.sh

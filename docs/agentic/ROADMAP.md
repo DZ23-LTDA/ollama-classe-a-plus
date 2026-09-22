@@ -145,3 +145,10 @@ Foi executado um smoke seguro com as chaves fornecidas pelo operador: catálogos
 A auditoria do CI encontrou falha no teste real do Browser Operator porque o job não instalava a dependência Python Playwright/Chromium. O workflow agora instala a dependência e exporta o executável descoberto; o teste específico passa localmente. O CI remoto do novo commit ainda precisa concluir para fechar essa pendência.
 
 A classificação continua **release candidate local-first**, não produção universal. O relatório [`READINESS_2026-09-22.md`](READINESS_2026-09-22.md) é a fonte de verdade para os resultados, a rotação obrigatória das chaves fornecidas e os blockers externos restantes.
+
+
+## Incremento 2026-09-22 — hardening de egress e lifecycle administrativo
+
+A revisão de prontidão foi ampliada com escopo obrigatório de organização para connectors, matching seguro por segmento, bloqueio de destinos privados após resolução DNS, validação estrita de headers/ambiente no MCP e autorização administrativa para lifecycle global de plugins. O Browser Operator ganhou fallback de executável Chromium e teste de regressão com caminho ausente.
+
+O resultado fecha riscos internos de baixo nível sem afirmar produção universal. Os próximos gates continuam sendo distribuídos (PostgreSQL/RLS, Redis, OTLP), IdP/OAuth, providers e toolkits com contas autorizadas, canais de social commerce, dispositivos físicos, GPU, assinatura, lojas e deploy externo.

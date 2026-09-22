@@ -5,7 +5,7 @@
 
 ## Conclusão
 
-A rodada removeu os bloqueadores internos reproduzíveis identificados na auditoria consolidada anterior. O repositório possui uma base local-first funcional, com contratos, persistência, UI, smoke tests e guardrails de segurança. O resultado é um **candidato de release preview endurecido**, não uma declaração de que todas as contas externas, dispositivos, lojas e ambientes distribuídos estão validados.
+A rodada corrigiu uma camada adicional de riscos reproduzíveis em connectors, MCP, lifecycle administrativo e Browser Operator, mas a auditoria independente de 2026-09-22 encontrou **P0s internos ainda abertos** em isolamento multi-tenant, approvals, sandbox/process isolation, SSRF/DNS rebinding, DLP, Builder e release. O repositório possui uma base local-first funcional, com contratos, persistência, UI, smoke tests e guardrails parciais. O resultado correto é **preview/local RC em hardening**, não produto final nem produção-ready.
 
 ## Achados resolvidos
 
@@ -52,9 +52,9 @@ Ainda faltam credenciais e ambientes autorizados para Composio, xAI, Desktop Com
 
 ## Decisão de release
 
-**Classificação:** `CANDIDATE_COMPLETED` para hardening local e release preview.
-**Não classificar como produção universal:** os blockers externos acima permanecem.
-**Próxima ação segura:** publicar a branch verificada na PR pública, atualizar o checkpoint e manter a validação externa como jornadas separadas com credenciais, approval e rollback.
+**Classificação:** `FIXING` / preview-local em hardening. A branch ainda não satisfaz os gates de conclusão porque existem P0 internos reproduzíveis, além dos blockers externos listados abaixo.
+**Não classificar como produção universal:** os blockers internos e externos permanecem.
+**Próxima ação segura:** publicar somente a camada verificada de hardening na PR pública, depois corrigir os P0 em slices verticais com testes negativos de tenant, approval, egress, DLP e Builder antes de qualquer classificação de conclusão.
 
 
 ## Achados da auditoria original que permanecem abertos
@@ -78,3 +78,16 @@ A rodada seguinte transformou adapters em superfícies operacionais locais. Grok
 As evidências adicionais foram `scripts/smoke-company-growth.sh`, `scripts/smoke-builder.sh`, `app/ui/app/scripts/smoke-shell.mjs`, captura Chromium das dez rotas do shell, `CGO_ENABLED=1 go test ./... -count=1`, `CGO_ENABLED=1 go vet ./...`, build Go, build UI, 20 arquivos/199 testes Vitest, typecheck mobile e integrity guard. O gate distribuído PostgreSQL/Redis/OTLP ficou `N/A` neste sandbox porque Docker não está instalado; não foi convertido em sucesso.
 
 A classificação permanece `CANDIDATE_COMPLETED` para o release preview local. Os blockers externos continuam: contas e quotas xAI/Composio/Desktop Commander, OAuth e app review de redes sociais/marketplaces, staging distribuído, IdP, GPU, dispositivos físicos, assinatura, lojas e deploy do operador.
+
+
+## Correções posteriores — 2026-09-22
+
+A iteração final corrigiu riscos internos adicionais: `ConnectorManager.Call` não permite mais chamada sem organização; o caminho de operação usa matching por segmento; o dialer rejeita redes privadas resolvidas por DNS, liberando somente loopback explícito; Remote MCP e MCP stdio validam nomes de ambiente e Remote MCP rejeita headers de transporte; lifecycle global de plugins exige owner/admin quando autenticado; e o Browser Operator possui fallback de Chromium para caminhos configurados ausentes.
+
+Provas: testes focados de connectors/MCP/server passaram; integrity guard passou; `CGO_ENABLED=1 go test ./... -count=1`, `CGO_ENABLED=1 go vet ./...`, build Go, Vitest 20/199, build UI, typecheck mobile e Browser Operator com caminho inválido passaram localmente. O CI remoto desta nova revisão ainda depende do workflow disparado após o commit.
+
+## Estado após a auditoria independente ampliada — 2026-09-22
+
+A auditoria ampliada foi considerada como evidência de risco, não como conclusão. Permanecem P0 internos que impedem declarar o produto final: isolamento por organização ainda não é demonstrado de forma uniforme para orchestration, traces, devices/pairing, Builder, plugins/MCP/skills e todas as operações CRUD; approvals ainda precisam de separação forte entre `approve` e `execute`, CAS/nonce e política de aprovador; o sandbox stdio/local continua sendo contenção best-effort sem seccomp/cgroups/rlimits/PID limits comprovados; Remote MCP/connectors/media ainda precisam de verificação do IP efetivamente conectado, redirect-chain e DLP uniforme; Company/Growth ainda aceitam invariantes server-managed e gasto/estado privilegiado que exigem correção atômica; Builder/artifacts precisam de ownership, entry validation e proteção contra symlink/XSS; release/CI ainda não prova o pacote de supply chain completo.
+
+O próximo incremento deve começar por testes negativos cross-tenant e por DTOs allowlisted/ownership no servidor. Enquanto esses testes não passarem, `CANDIDATE_COMPLETED` não é uma classificação válida para o conjunto do produto. O Growth OS permanece sandbox local reversível e adapters externos permanecem não conectados sem credenciais, conta, dispositivo, sandbox ou evidência autorizada.

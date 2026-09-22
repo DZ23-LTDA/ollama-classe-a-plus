@@ -51,3 +51,22 @@ func TestOnlyCompanionConnectRouteUsesDeviceHandshake(t *testing.T) {
 		}
 	}
 }
+
+func TestDevTokenOnlyAllowsActualLoopback(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		addr string
+		want bool
+	}{
+		{name: "ipv4 loopback", addr: "127.0.0.1:1234", want: true},
+		{name: "ipv6 loopback", addr: "[::1]:1234", want: true},
+		{name: "private network is not loopback", addr: "192.168.1.10:1234", want: false},
+		{name: "missing peer is denied", addr: "", want: false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if got := isLoopbackRemoteAddr(test.addr); got != test.want {
+				t.Fatalf("isLoopbackRemoteAddr(%q) = %v, want %v", test.addr, got, test.want)
+			}
+		})
+	}
+}

@@ -69,3 +69,14 @@ O workflow `.github/workflows/dz23-agentic-quality.yaml` agora instala Playwrigh
 O projeto pode ser entregue agora para **desenvolvimento local, avaliação do runtime, testes de providers com credenciais rotacionadas e construção de jornadas agentic**. Ele não deve ser vendido ou documentado como uma plataforma já validada em produção, como uma cópia interna do Manus/Grok/Claude/Codex, nem como uma operação comercial autônoma sem os gates externos acima.
 
 A próxima barreira objetiva é publicar a correção do Browser Operator, aguardar o CI e, depois, executar staging distribuído e integrações externas uma por uma, sempre com escopos mínimos, approval, idempotência, rollback e nenhuma chave no Git.
+
+
+## Hardening posterior ao smoke de APIs — 2026-09-22
+
+A rodada posterior fechou quatro riscos internos que ainda eram ajustáveis sem credenciais externas. Chamadas de connector agora exigem `organization_id` no caminho tenant-aware; o matching de `path_prefixes` respeita limites de segmento; e o transporte padrão rejeita destinos privados resolvidos por DNS, mantendo loopback somente quando o próprio `BaseURL` é loopback. O Remote MCP passou a validar nomes de ambiente e bloquear headers de transporte que poderiam interferir no framing HTTP. O MCP stdio aplica a mesma validação às variáveis herdadas.
+
+Alterações globais de lifecycle de connectors, MCP, Remote MCP e skills agora exigem papel `owner` ou `admin` quando o runtime está autenticado. O modo local-first sem autenticação continua disponível somente no bind loopback já protegido pelo middleware. O Browser Operator passou a escolher um fallback conhecido de Chromium quando um caminho configurado não existe; o teste específico passou localmente inclusive com caminho configurado inválido.
+
+Os gates desta iteração passaram localmente: integrity guard, `CGO_ENABLED=1 go test ./... -count=1`, `CGO_ENABLED=1 go vet ./...`, build Go, testes UI (20 arquivos/199 testes), build UI, typecheck Expo mobile e teste Browser Operator isolado. A nova revisão pública ainda precisa concluir no GitHub; o resultado remoto deve ser associado ao SHA desta iteração, não ao workflow histórico.
+
+Essas correções não convertem adapters em integrações externas conectadas. Continuam pendentes, por dependerem de autoridade, contas, ambientes ou dispositivos reais, os testes distribuídos PostgreSQL/RLS, Redis e OTLP, OAuth/SSO contra IdP, Composio, xAI, Desktop Commander Remote, canais sociais e marketplaces, GPU/modelos multimídia, runners físicos, assinatura/lojas e deploy externo.

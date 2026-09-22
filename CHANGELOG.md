@@ -121,3 +121,14 @@ A rodada continua sem conectar contas externas nem publicar posts, anúncios, pr
 - Erros do Browser Operator agora incluem stderr sanitizado para diagnóstico de dependência, sem expor credenciais.
 
 As credenciais fornecidas no anexo foram tratadas como expostas por terem sido compartilhadas em texto aberto; devem ser revogadas e recriadas pelo operador. Nenhum provider externo é promovido a integração de produção apenas por responder a um health check.
+
+
+## Unreleased — hardening de connectors, plugins e Browser Operator — 2026-09-22
+
+- Connectors passaram a exigir escopo de organização em chamadas operacionais, respeitar fronteiras de segmento nos `path_prefixes` e rejeitar destinos privados resolvidos por DNS, com exceção explícita apenas para loopback configurado.
+- Remote MCP e MCP stdio passaram a validar nomes de ambiente; Remote MCP também bloqueia headers HTTP de transporte e framing.
+- Lifecycle global de connectors, MCP, Remote MCP e skills exige `owner`/`admin` no modo autenticado; o modo local permanece restrito ao listener loopback.
+- Browser Operator agora usa fallback de Chromium quando um caminho configurado está ausente, preservando diagnóstico e validação de URL.
+- Gates locais aprovados: integrity guard, suíte Go completa com CGO, `go vet`, build Go, Vitest 20/199, build UI, typecheck mobile e teste Browser Operator com caminho inválido.
+
+A classificação permanece release candidate local-first. Integrações externas, ambientes distribuídos, dispositivos físicos, assinaturas, lojas e deploys reais continuam condicionados a credenciais, aprovação, sandbox e validação do operador.

@@ -434,7 +434,7 @@ func (a *agentAPI) authMiddleware(c *gin.Context) {
 		c.Next()
 		return
 	}
-	if strings.HasSuffix(c.Request.URL.Path, "/auth/dev/token") && strings.EqualFold(strings.TrimSpace(os.Getenv("OLLAMA_AGENT_AUTH_DEV")), "true") {
+	if strings.HasSuffix(c.Request.URL.Path, "/auth/dev/token") && isDevTokenRequestAllowed(c) {
 		c.Next()
 		return
 	}
@@ -490,6 +490,23 @@ func (a *agentAPI) authMiddleware(c *gin.Context) {
 
 func isCompanionConnectRoute(fullPath string) bool {
 	return strings.TrimSpace(fullPath) == "/api/agent/v1/devices/:id/connect"
+}
+
+func isDevTokenRequestAllowed(c *gin.Context) bool {
+	return strings.EqualFold(strings.TrimSpace(os.Getenv("OLLAMA_AGENT_AUTH_DEV")), "true") && isLoopbackRemoteAddr(c.Request.RemoteAddr)
+}
+
+func isLoopbackRemoteAddr(remoteAddr string) bool {
+	remoteAddr = strings.TrimSpace(remoteAddr)
+	if remoteAddr == "" {
+		return false
+	}
+	host, _, err := net.SplitHostPort(remoteAddr)
+	if err != nil {
+		host = strings.Trim(remoteAddr, "[]")
+	}
+	ip := net.ParseIP(strings.Trim(host, "[]"))
+	return ip != nil && ip.IsLoopback()
 }
 
 func (a *agentAPI) scopedRuntime(c *gin.Context) *agent.Runtime {
@@ -688,7 +705,7 @@ func (a *agentAPI) registerPush(c *gin.Context) {
 }
 
 func (a *agentAPI) devToken(c *gin.Context) {
-	if !strings.EqualFold(strings.TrimSpace(os.Getenv("OLLAMA_AGENT_AUTH_DEV")), "true") {
+	if !isDevTokenRequestAllowed(c) {
 		c.AbortWithStatus(http.StatusNotFound)
 		return
 	}
