@@ -303,3 +303,10 @@ O resultado é mitigação observável, não homologação de cgroup/AppArmor/SE
 ## Follow-up independente — audit mobile — 2026-09-22
 
 A triagem inicialmente reportada foi concluída. Como o fix automático exigia Expo 57/React Native 0.87 major, a remediação adotou overrides transitivos mínimos: `image-size@2.0.4`, `postcss@8.5.28` e `uuid@11.1.1`. O lock, typecheck, Expo web export e `npm audit --omit=dev` passaram com zero vulnerabilidades de produção. A decisão é manter a migração major fora desta slice até haver testes físicos Android/iOS.
+
+
+## Validação independente — CI normal final no head e6e0632b — 2026-09-22
+
+A revisão confirmou o head `e6e0632ba5ff0495ed4b061221c90696478b3d67` nos quatro workflows do PR: upstream `test` `35794443450`, integrity `35794443307`, multi-provider `35794443300` e agentic quality `35794443501`, todos PASS. O conjunto ficou em 21 checks successful, 3 skipped, 0 failing e 0 pending. O upstream executou as plataformas públicas disponíveis e o workflow agentic cobriu Go/server, Browser Operator, serviços distribuídos, Web/Mobile e SBOM.
+
+A troca para `npm ci` torna os gates web/mobile reproduzíveis; o audit de produção mobile permanece zero. Os skips de licença e matriz nativa não contam como aprovação. O resultado mitiga o caminho normal de CI, mas não fecha sandbox de host, IdP/OAuth, providers externos, deploys, devices, signing, stores ou homologação. A decisão continua **FIXING / preview-local em hardening**, sem merge automático em `main`.

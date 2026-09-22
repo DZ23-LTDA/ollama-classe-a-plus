@@ -2024,3 +2024,31 @@ next_action: concluir evidência CI do head, triage de vulnerabilidades mobile e
 ## Follow-up mobile dependency audit — 2026-09-22
 
 A triagem do `npm audit --omit=dev` mostrou que os 18 achados vinham de transitivos do Expo 53/React Native 0.79: `image-size`, `postcss` e `uuid`. Em vez de executar `npm audit fix --force` e migrar majors sem validação, foram adicionados overrides mínimos (`image-size@2.0.4`, `postcss@8.5.28`, `uuid@11.1.1`). Após resolver o lock, o typecheck, Expo web export e `npm audit --omit=dev` passaram; o audit agora reporta `0` vulnerabilidades de produção. A migração Expo/React Native major continua uma tarefa separada que exige testes Android/iOS físicos.
+
+
+## CI normal verde após mobile audit e installs reproduzíveis — 2026-09-22
+
+```yaml
+state: FIXING
+iteration: 40
+branch: feat/manus-parity-omniroute
+head_sha: e6e0632ba5ff0495ed4b061221c90696478b3d67
+commits:
+  - 482bdd39: overrides transitivos mobile e audit de produção zero
+  - ddbe2fab: integrity guard para sandbox, mobile e release contracts
+  - e6e0632b: npm ci nos gates agentic/release web e mobile
+local_evidence:
+  - npm ci mobile/web, mobile typecheck e web tsc: PASS
+  - npm audit --omit=dev: 0 vulnerabilities
+  - integrity, YAML e diff check: PASS
+remote_evidence:
+  - upstream test PR 35794443450: PASS; Linux, macOS, Windows, race Linux/macOS, patches e go_mod_tidy
+  - class-a-plus-integrity PR 35794443307: PASS
+  - dz23-multi-provider PR 35794443300: PASS
+  - dz23-agentic-quality PR 35794443501: PASS; Go/server, PostgreSQL RLS + Redis DLQ + OTLP, Web/Mobile e SBOM
+pr_checks: 21 successful, 3 skipped, 0 failing, 0 pending
+native_matrix: não executada; workflow_dispatch + run_native_matrix=true, runners compatíveis do operador
+classification: preview/local RC em hardening; NÃO final; NÃO production-ready
+blockers: host sandbox/AppArmor/SELinux e isolamento forte homologado, auth/IdP/OAuth externos, providers/deploy/media/marketplaces, devices físicos, push remoto, signing/provenance efetiva, rollback, stores/app review e homologação externa
+next_action: continuar P0/P1 independentes e manter PR #1 aberto; não fazer merge automático em main
+```

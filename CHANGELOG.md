@@ -343,3 +343,10 @@ No head `a7bc82f5`, integrity push `35793674459` e PR `35793679458` passaram; os
 ## 2026-09-22 — remediação transitiva do audit mobile
 
 O audit inicial do pacote Expo encontrou 18 vulnerabilidades transitivas, cuja correção automática exigia Expo/React Native major. A solução publicada usa overrides mínimos para `image-size@2.0.4`, `postcss@8.5.28` e `uuid@11.1.1`; typecheck, Expo web export e `npm audit --omit=dev` passaram com zero vulnerabilidades de produção. A migração major e a validação física continuam separadas.
+
+
+## 2026-09-22 — CI normal verde no head e6e0632b
+
+O head `e6e0632ba5ff0495ed4b061221c90696478b3d67` passou upstream `test` (`35794443450`), integrity (`35794443307`), multi-provider (`35794443300`) e agentic quality (`35794443501`). O PR ficou com 21 checks successful, 3 skipped, 0 failing e 0 pending. O upstream executou Linux/macOS/Windows e race Linux/macOS; o workflow agentic passou Go/server, RLS + Redis DLQ + OTLP, Web/Mobile e SBOM.
+
+Os gates Node agora usam `npm ci` com lockfile versionado. A matriz nativa/GPU continua manual e opt-in; os skips não são tratados como homologação física. O produto segue preview/local RC em hardening.

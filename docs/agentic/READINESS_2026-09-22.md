@@ -370,3 +370,12 @@ O pacote mobile reportou 18 vulnerabilidades de produção no `npm audit` (11 mo
 ## Follow-up de dependências mobile — 2026-09-22
 
 A triagem do audit mobile foi concluída sem force upgrade. Os achados transitivos de `image-size`, `postcss` e `uuid` receberam overrides mínimos compatíveis no package lock (`2.0.4`, `8.5.28` e `11.1.1`); `npm run typecheck`, Expo web export e `npm audit --omit=dev` passaram, com `0` vulnerabilidades de produção no estado atual. Isso não substitui uma migração futura de Expo/React Native major nem testes físicos Android/iOS.
+
+
+## Validação final do caminho normal de CI — head e6e0632b — 2026-09-22
+
+O head `e6e0632ba5ff0495ed4b061221c90696478b3d67` passou todos os workflows normais do PR: upstream `test` `35794443450`, `class-a-plus-integrity` `35794443307`, `dz23-multi-provider` `35794443300` e `dz23-agentic-quality` `35794443501`. O upstream confirmou Linux, macOS e Windows, race em Linux/macOS, patches e `go_mod_tidy`; o workflow agentic confirmou Go/server, Browser Operator, PostgreSQL RLS + Redis DLQ + OTLP, Web/Mobile e SBOM. O PR reporta 21 checks bem-sucedidos, 3 skipped, 0 failing e 0 pending.
+
+O patch também trocou instalações Node não determinísticas por `npm ci` nos gates web/mobile, mantendo a cadeia reproduzível pelos lockfiles. O audit de produção mobile permanece em zero após os overrides transitivos. Os três jobs `test/linux`, `test/windows` e `test/go_license` skipped não são aprovação de hardware nem licença; a matriz GPU/nativa continua manual/opt-in.
+
+Esta evidência fecha o caminho normal de CI, não a prontidão de produção. Continuam abertos host sandbox realmente homologado, AppArmor/SELinux, auth/IdP/OAuth e providers externos, deploy/media/marketplaces, push remoto, dispositivos físicos, signing/provenance, rollback, stores/app review e homologação externa. A classificação permanece **preview/local RC em hardening**, não production-ready.

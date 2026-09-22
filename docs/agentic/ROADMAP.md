@@ -355,3 +355,10 @@ A classificação continua **preview/local RC em hardening**. A matriz GPU/nativ
 ## Follow-up 2026-09-22 — audit mobile sem force upgrade
 
 Os 18 achados transitivos do primeiro audit mobile foram tratados com overrides mínimos para `image-size`, `postcss` e `uuid`, sem migrar Expo/React Native major no escuro. O lock foi resolvido e `npm audit --omit=dev` agora retorna zero vulnerabilidades de produção; typecheck e export web continuam verdes. Migração de SDK major, testes físicos Android/iOS e distribuição permanecem tarefas de validação separadas.
+
+
+## Validação 2026-09-22 — caminho normal de CI e6e0632b
+
+O head `e6e0632b` fechou o caminho normal do PR com upstream test, integrity, multi-provider e agentic quality verdes. A matriz comprovou Linux/macOS/Windows, race aplicável, Browser Operator, Go/server, RLS + Redis DLQ + OTLP, Web/Mobile e SBOM; os gates Node usam `npm ci` com lockfiles. Permanecem fora do resultado os jobs nativos/GPU manuais e os skips condicionais.
+
+O roadmap agora prioriza validações que não podem ser simuladas honestamente nesta sandbox: host strict com cgroup/AppArmor/SELinux, IdP/OAuth/provider real, deploy/media/marketplace, push e dispositivos físicos, signing/provenance/rollback e stores/app review. A classificação permanece **preview/local RC em hardening**.

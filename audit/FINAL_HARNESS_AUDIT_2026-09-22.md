@@ -451,3 +451,10 @@ A classificação vigente permanece **preview/local RC em hardening; não produc
 ## Addendum — follow-up de dependências mobile — 2026-09-22
 
 O audit de produção inicialmente reportou 18 vulnerabilidades transitivas. A análise de ranges mostrou que o fix sugerido exigia major do Expo/React Native; foram preferidos overrides compatíveis para `image-size@2.0.4`, `postcss@8.5.28` e `uuid@11.1.1`, com lock resolvido. O estado atual passa `npm audit --omit=dev` com zero vulnerabilidades, typecheck e Expo web export. Isso não comprova compatibilidade física Android/iOS nem elimina a necessidade de uma futura migração major controlada.
+
+
+## Addendum — CI normal verde no head e6e0632b — 2026-09-22
+
+O head `e6e0632ba5ff0495ed4b061221c90696478b3d67` passou upstream `test` (`35794443450`), `class-a-plus-integrity` (`35794443307`), `dz23-multi-provider` (`35794443300`) e `dz23-agentic-quality` (`35794443501`). O upstream passou Linux, macOS, Windows, race Linux/macOS, patches e go_mod_tidy; o workflow agentic passou Go/server, Browser Operator, PostgreSQL RLS + Redis DLQ + OTLP, Web/Mobile e SBOM. O PR consolidou 21 successful, 3 skipped, 0 failing e 0 pending.
+
+O gate de integrity agora protege explicitamente sandbox strict, isolamento mobile e release SBOM/checksum; os gates Node usam `npm ci`. Isso é evidência do caminho normal de CI, não um release assinado nem homologação dos skips. A matriz GPU/nativa continua manual/opt-in e permanecem abertos sandbox de host, IdP/OAuth/providers/deploy/media reais, dispositivos, push remoto, signing/provenance efetiva, rollback, stores/app review e produção.
