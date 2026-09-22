@@ -1360,3 +1360,20 @@ classification: preview/local RC em hardening
 open_risks: xAI credential/real provider validation, production SSE, remaining provider UI contracts
 next_action: commit/push, then continue remaining P0/P1s; no main merge
 ```
+
+
+## Publicação da slice P1 Grok/provider contract — 2026-09-22
+
+```yaml
+state: FIXING
+iteration: 21
+commit: 0739dec7
+branch: feat/manus-parity-omniroute
+remote: https://github.com/DZ23-LTDA/ollama-classe-a-plus.git
+pull_request: https://github.com/DZ23-LTDA/ollama-classe-a-plus/pull/1
+working_tree: checkpoint pending commit
+published: true
+proofs: integrity, Go tests/vet/build, UI Vitest/build, mobile typecheck and Grok negative tests all PASS
+classification: preview/local RC em hardening
+next_slice: continue remaining P0/P1s, especially provider/runtime UI contracts and release evidence; no main merge
+```
