@@ -705,3 +705,20 @@ proofs:
 classification: preview/local RC em hardening; P0s restantes não resolvidos
 next_action: commit/push slice e depois plugins/MCP/skills/artifacts ou approval policy, sem mergear main
 ```
+
+
+## Publicação da slice P0 orchestration/traces/devices — 2026-09-22
+
+```yaml
+state: FIXING
+iteration: 6
+commit: 07c56edd
+branch: feat/manus-parity-omniroute
+remote: https://github.com/DZ23-LTDA/ollama-classe-a-plus.git
+pull_request: https://github.com/DZ23-LTDA/ollama-classe-a-plus/pull/1
+working_tree: clean
+published: true
+proofs: integrity, Go tests/vet/build, UI Vitest/build, mobile typecheck and HTTP cross-tenant P0 regression all PASS
+classification: preview/local RC em hardening
+next_slice: plugins/MCP/skills/artifacts ownership or approval policy; do not merge main or claim final readiness
+```
