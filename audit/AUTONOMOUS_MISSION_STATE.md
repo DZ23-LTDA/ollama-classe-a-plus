@@ -975,3 +975,20 @@ classification: preview/local RC; MCP stdio containment best-effort, not strong 
 open_risks: seccomp/cgroups/rlimits/PID-memory-CPU controls, physical platform tests, Media/Connector egress parity
 next_action: commit/push, then continue Media/Connector egress or platform sandbox primitives
 ```
+
+
+## Publicação da slice P0 MCP stdio lifecycle — 2026-09-22
+
+```yaml
+state: FIXING
+iteration: 12
+commit: 86302569
+branch: feat/manus-parity-omniroute
+remote: https://github.com/DZ23-LTDA/ollama-classe-a-plus.git
+pull_request: https://github.com/DZ23-LTDA/ollama-classe-a-plus/pull/1
+working_tree: checkpoint pending commit
+published: true
+proofs: integrity, Go tests/vet/build, UI Vitest/build, mobile typecheck and MCP stdio negative lifecycle tests all PASS
+classification: preview/local RC; stdio containment best-effort, not strong sandbox
+next_slice: Media/Connector egress parity or platform sandbox primitives; no main merge
+```
