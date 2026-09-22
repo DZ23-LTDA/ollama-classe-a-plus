@@ -101,3 +101,61 @@ func TestCompanyAnomalyAndWorkspaceGuard(t *testing.T) {
 		t.Fatalf("normal workspace parser = %q", got)
 	}
 }
+
+func TestCompanyCreateResetsServerManagedFields(t *testing.T) {
+	store, err := NewCompanyStore("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	created, err := store.Create(Company{
+		ID:             "attacker-controlled",
+		OrganizationID: "org-a",
+		Name:           "Allowlisted",
+		Status:         CompanyPaused,
+		Roadmap:        []CompanyRoadmapItem{{ID: "forged"}},
+		Budget:         CompanyBudget{SpentCents: 9999},
+		Risk:           CompanyRisk{Paused: true, PauseReason: "forged"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if created.ID == "attacker-controlled" || created.Status != CompanyActive || len(created.Roadmap) != 0 || created.Budget.SpentCents != 0 || created.Risk.Paused {
+		t.Fatalf("server-managed fields were accepted: %+v", created)
+	}
+}
+
+func TestCompanyAgentSpendFailsAtomicallyAtBudgetAndPause(t *testing.T) {
+	store, err := NewCompanyStore("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	company, err := store.Create(Company{OrganizationID: "org-a", Name: "Budgeted"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.mutate(company.ID, func(current *Company) error {
+		current.Agents[0].BudgetCents = 100
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.RecordAgentSpend(company.ID, "ceo", 80); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.RecordAgentSpend(company.ID, "ceo", 30); !errors.Is(err, ErrCompanyAgentBudgetExceeded) {
+		t.Fatalf("expected atomic agent budget error, got %v", err)
+	}
+	current, err := store.Get(company.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if current.Agents[0].SpentCents != 80 || current.Agents[0].Status == "paused" {
+		t.Fatalf("agent spend mutated after rejected over-budget request: %+v", current.Agents[0])
+	}
+	if _, err := store.PauseAgent(company.ID, "ceo", "manual test pause"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.RecordAgentSpend(company.ID, "ceo", 1); !errors.Is(err, ErrCompanyPaused) {
+		t.Fatalf("expected paused agent rejection, got %v", err)
+	}
+}

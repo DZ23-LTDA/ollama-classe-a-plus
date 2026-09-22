@@ -80,3 +80,12 @@ Alterações globais de lifecycle de connectors, MCP, Remote MCP e skills agora 
 Os gates desta iteração passaram localmente: integrity guard, `CGO_ENABLED=1 go test ./... -count=1`, `CGO_ENABLED=1 go vet ./...`, build Go, testes UI (20 arquivos/199 testes), build UI, typecheck Expo mobile e teste Browser Operator isolado. A nova revisão pública ainda precisa concluir no GitHub; o resultado remoto deve ser associado ao SHA desta iteração, não ao workflow histórico.
 
 Essas correções não convertem adapters em integrações externas conectadas. Continuam pendentes, por dependerem de autoridade, contas, ambientes ou dispositivos reais, os testes distribuídos PostgreSQL/RLS, Redis e OTLP, OAuth/SSO contra IdP, Composio, xAI, Desktop Commander Remote, canais sociais e marketplaces, GPU/modelos multimídia, runners físicos, assinatura/lojas e deploy externo.
+
+
+## Slice P0 de ownership e invariantes Company — 2026-09-22
+
+O primeiro slice P0 após a auditoria ampliada fechou uma fronteira específica, não a auditoria inteira. Projetos Builder agora carregam `organization_id`; listagem, lookup, mutação visual, undo/redo, preview, export, publish, deploy e preview de arquivo passam por lookup scoped no servidor. O entry precisa existir, nomes usados em templates HTML são escapados e preview/export recusam symlinks que resolvam fora do projeto. O Company OS passou a criar empresas por DTO allowlisted, resetando ID, status, coleções, gasto, risco e timestamps server-managed; gasto de agente pausado ou acima do budget falha sem incrementar o valor gasto.
+
+A evidência reproduzível desta slice é o teste HTTP `server/builder_scope_test.go` com duas organizações, que confirma listagem vazia e `403` sem mutação para o tenant errado; testes de Builder para entry ausente, nome com XSS, symlink e organização; e testes Company para create privilegiado e gasto atômico. Os gates completos passaram: integrity guard, `CGO_ENABLED=1 go test ./... -count=1`, `go vet`, build Go, Vitest (20 arquivos/199 testes), build UI e typecheck mobile.
+
+Ainda não é produção-ready. Permanecem P0 em orchestration/traces/devices/pairing e demais objetos, approvals com separação forte de aprovador, sandbox/MCP process isolation, SSRF/DNS rebinding e DLP, lifecycle pausado de todas as mutações Growth/Social, bearer/redirect/session handling, CI/release e validações distribuídas/externas. A classificação continua **preview/local RC em hardening**.

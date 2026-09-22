@@ -32,14 +32,12 @@ func (a *agentAPI) companies(c *gin.Context) {
 }
 
 func (a *agentAPI) createCompany(c *gin.Context) {
-	var input agent.Company
+	var input agent.CompanyCreateRequest
 	if err := decodeJSON(c, &input); err != nil {
 		writeAgentError(c, http.StatusBadRequest, err)
 		return
 	}
-	input.ID = ""
-	input.OrganizationID = companyOrganizationID(c)
-	company, err := a.runtime.CompanyStore().Create(input)
+	company, err := a.runtime.CompanyStore().CreateRequest(input, companyOrganizationID(c))
 	if err != nil {
 		writeAgentError(c, statusForAgentError(err), err)
 		return
@@ -267,7 +265,7 @@ func companyErrorStatus(err error) int {
 	switch {
 	case errors.Is(err, agent.ErrCompanyNotFound):
 		return http.StatusNotFound
-	case errors.Is(err, agent.ErrCompanyBudgetExceeded), errors.Is(err, agent.ErrCompanyApprovalRequired):
+	case errors.Is(err, agent.ErrCompanyBudgetExceeded), errors.Is(err, agent.ErrCompanyAgentBudgetExceeded), errors.Is(err, agent.ErrCompanyApprovalRequired):
 		return http.StatusConflict
 	case errors.Is(err, agent.ErrCompanyCampaignNotFound), errors.Is(err, agent.ErrCompanyAffiliateNotFound), errors.Is(err, agent.ErrCompanyProductNotFound), errors.Is(err, agent.ErrCompanyOrderNotFound):
 		return http.StatusNotFound

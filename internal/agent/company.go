@@ -164,6 +164,26 @@ type CompanyUpdate struct {
 	Currency       string `json:"currency"`
 }
 
+type CompanyCreateBudgetRequest struct {
+	Currency                string `json:"currency"`
+	MonthlyLimitCents       int64  `json:"monthly_limit_cents"`
+	ApprovalThresholdCents  int64  `json:"approval_threshold_cents"`
+	RequireApprovalForAds   bool   `json:"require_approval_for_ads"`
+	RequireApprovalForSales bool   `json:"require_approval_for_sales"`
+}
+
+type CompanyCreateRequest struct {
+	Name           string                     `json:"name"`
+	Mission        string                     `json:"mission"`
+	Positioning    string                     `json:"positioning"`
+	BusinessModel  string                     `json:"business_model"`
+	TargetAudience string                     `json:"target_audience"`
+	Offer          string                     `json:"offer"`
+	Website        string                     `json:"website"`
+	Currency       string                     `json:"currency"`
+	Budget         CompanyCreateBudgetRequest `json:"budget"`
+}
+
 var (
 	ErrCompanyNotFound         = errors.New("company not found")
 	ErrCompanyBudgetExceeded   = errors.New("company budget limit exceeded; company paused")
@@ -229,6 +249,27 @@ func (s *CompanyStore) persistLocked(company Company) error {
 }
 
 func (s *CompanyStore) Create(company Company) (Company, error) {
+	company.ID = ""
+	company.Status = ""
+	company.Departments = nil
+	company.Agents = nil
+	company.Channels = nil
+	company.Roadmap = nil
+	company.Goals = nil
+	company.Backlog = nil
+	company.Cycles = nil
+	company.Campaigns = nil
+	company.AffiliatePrograms = nil
+	company.AffiliateLinks = nil
+	company.Products = nil
+	company.Orders = nil
+	company.SocialAccounts = nil
+	company.SocialDrafts = nil
+	company.SocialMetrics = nil
+	company.Budget.SpentCents = 0
+	company.Risk = CompanyRisk{}
+	company.CreatedAt = time.Time{}
+	company.UpdatedAt = time.Time{}
 	company.Name = strings.TrimSpace(company.Name)
 	if company.Name == "" {
 		return Company{}, errors.New("company name is required")
@@ -275,6 +316,31 @@ func (s *CompanyStore) Create(company Company) (Company, error) {
 		return Company{}, err
 	}
 	return company, nil
+}
+
+func (s *CompanyStore) CreateRequest(request CompanyCreateRequest, organizationID string) (Company, error) {
+	organizationID = strings.TrimSpace(organizationID)
+	if organizationID == "" {
+		return Company{}, errors.New("company organization is required")
+	}
+	return s.Create(Company{
+		OrganizationID: organizationID,
+		Name:           request.Name,
+		Mission:        request.Mission,
+		Positioning:    request.Positioning,
+		BusinessModel:  request.BusinessModel,
+		TargetAudience: request.TargetAudience,
+		Offer:          request.Offer,
+		Website:        request.Website,
+		Currency:       request.Currency,
+		Budget: CompanyBudget{
+			Currency:                request.Budget.Currency,
+			MonthlyLimitCents:       request.Budget.MonthlyLimitCents,
+			ApprovalThresholdCents:  request.Budget.ApprovalThresholdCents,
+			RequireApprovalForAds:   request.Budget.RequireApprovalForAds,
+			RequireApprovalForSales: request.Budget.RequireApprovalForSales,
+		},
+	})
 }
 
 func (s *CompanyStore) List(organizationID string) []Company {

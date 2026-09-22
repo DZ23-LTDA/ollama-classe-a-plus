@@ -591,3 +591,73 @@ next_actions:
 classification: preview/local RC em hardening; NÃO final, NÃO production-ready
 rollback: reverter o commit deste slice na branch feature; não force-push e não alterar main
 ```
+
+
+## Publicação do slice de hardening — 2026-09-22
+
+```yaml
+state: FIXING
+iteration: 4
+commit: 3f7e4065
+branch: feat/manus-parity-omniroute
+remote: https://github.com/DZ23-LTDA/ollama-classe-a-plus.git
+pull_request: https://github.com/DZ23-LTDA/ollama-classe-a-plus/pull/1
+published: true
+working_tree: clean
+changes_published:
+  - connector organization scope, path-segment matching and DNS private-destination denial
+  - strict MCP stdio/Remote MCP environment/header validation
+  - owner/admin guard for authenticated global plugin lifecycle
+  - Browser Operator Chromium fallback and CI diagnostics
+  - dev-token restricted to actual TCP loopback plus explicit development flag
+  - negative plugin and auth policy regressions
+proofs:
+  - scripts/check-class-a-plus-integrity.sh: PASS
+  - CGO_ENABLED=1 go test ./... -count=1: PASS
+  - CGO_ENABLED=1 go vet ./...: PASS
+  - CGO_ENABLED=1 go build: PASS
+  - UI Vitest: 20 files / 199 tests PASS
+  - UI npm run build: PASS; known >500KB chunk warning remains
+  - mobile npm ci && npm run typecheck: PASS
+  - Browser Operator invalid configured path fallback: PASS
+warnings:
+  - npm ci reports 18 audit findings in the existing mobile dependency graph (11 moderate, 7 high); not silently treated as resolved
+  - distributed Docker/PostgreSQL/Redis/OTLP gates remain N/A because Docker/staging are unavailable here
+open_p0_next:
+  - implement Builder OrganizationID and object authorization first, with cross-tenant 403/no-mutation tests
+  - then CompanyCreateRequest allowlist and atomic paused/budget spend tests
+next_action: implement Builder tenant slice on top of 3f7e4065; do not merge main or claim final readiness
+```
+
+
+## Slice P0 Builder/Company validado — aguardando publicação — 2026-09-22
+
+```yaml
+state: RELEASING
+iteration: 5
+base_commit: 3f7e4065
+working_tree: alterações do slice P0 ainda não commitadas
+implemented:
+  - BuilderProject.OrganizationID e métodos GetForOrganization/ListForOrganization
+  - ownership server-side em list/create/visual/undo/redo/preview/export/publish/deploy/preview-file
+  - entry obrigatório, template HTML escaped e preview/export sem symlink externo
+  - server.Builder HTTP cross-tenant 403/no-mutation regression
+  - CompanyCreateRequest allowlisted e reset de server-managed fields
+  - RecordAgentSpend nega empresa/agente pausados e over-budget sem incremento
+proofs:
+  - focused Builder/Company/AgentAuth tests: PASS
+  - HTTP cross-tenant Builder test: PASS
+  - integrity guard: PASS
+  - CGO_ENABLED=1 go test ./... -count=1: PASS
+  - CGO_ENABLED=1 go vet ./...: PASS
+  - CGO_ENABLED=1 go build: PASS
+  - UI Vitest 20/199: PASS
+  - UI build: PASS; known >500KB warning
+  - mobile typecheck: PASS
+remaining_p0:
+  - orchestration/traces/devices/pairing and plugin/MCP/skills object scope
+  - approval policy/role separation/CAS/nonce and external-effect gates
+  - sandbox process isolation, Remote MCP/connectors/media DNS rebinding and DLP
+  - paused state coverage for all Company/Growth/Social mutations
+next_action: review secret diff, commit and push slice; then continue with orchestration/traces/devices tenant tests
+```

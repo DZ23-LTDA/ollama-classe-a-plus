@@ -20,6 +20,9 @@ required_files=(
 	  "internal/agent/company_growth.go"
 	  "internal/agent/company_social.go"
 	  "internal/agent/company_agents.go"
+	  "internal/agent/company_test.go"
+	  "internal/agent/builder.go"
+	  "internal/agent/builder_test.go"
 	  "internal/agent/evaluation.go"
 	  "internal/agent/browser_helper.py"
 	  "internal/agent/connectors.go"
@@ -36,6 +39,7 @@ required_files=(
 	  "server/grok_routes.go"
 	  "server/plugin_routes.go"
 	  "server/plugin_routes_test.go"
+	  "server/builder_scope_test.go"
 	  "server/company_routes.go"
   "server/company_growth_routes.go"
   "app/ui/app/src/components/AppSidebar.tsx"
@@ -73,6 +77,9 @@ grep -q 'grokResponses' server/grok_routes.go
 grep -q 'SetConnectorEnabled' internal/agent/runtime.go
 grep -q 'connectorPathMatches' internal/agent/connectors.go
 grep -q 'validRemoteMCPHeaderName' internal/agent/mcp_remote.go
+grep -q 'GetForOrganization' internal/agent/builder.go
+grep -q 'CreateRequest' internal/agent/company.go
+grep -q 'ErrCompanyAgentBudgetExceeded' internal/agent/company_agents.go
 grep -q 'Capabilities' internal/agent/runtime.go
 grep -q 'Evaluation' internal/agent/evaluation.go
 for route in projects library scheduled skills plugins tasks company; do

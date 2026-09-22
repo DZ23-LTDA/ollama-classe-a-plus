@@ -1749,7 +1749,7 @@ func (a *agentAPI) mediaTone(c *gin.Context) {
 }
 
 func (a *agentAPI) builders(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"projects": a.runtime.Builder().List()})
+	c.JSON(http.StatusOK, gin.H{"projects": a.runtime.Builder().ListForOrganization(companyOrganizationID(c))})
 }
 
 func (a *agentAPI) createBuilder(c *gin.Context) {
@@ -1758,6 +1758,7 @@ func (a *agentAPI) createBuilder(c *gin.Context) {
 		writeAgentError(c, http.StatusBadRequest, err)
 		return
 	}
+	spec.OrganizationID = companyOrganizationID(c)
 	project, err := a.runtime.Builder().Create(c.Request.Context(), spec)
 	if err != nil {
 		writeAgentError(c, http.StatusBadRequest, err)
@@ -1767,6 +1768,10 @@ func (a *agentAPI) createBuilder(c *gin.Context) {
 }
 
 func (a *agentAPI) previewBuilder(c *gin.Context) {
+	if _, err := a.builderForRequest(c); err != nil {
+		writeAgentError(c, statusForAgentError(err), err)
+		return
+	}
 	project, artifact, err := a.runtime.Builder().Preview(c.Request.Context(), c.Param("id"))
 	if err != nil {
 		writeAgentError(c, statusForAgentError(err), err)
@@ -1776,6 +1781,10 @@ func (a *agentAPI) previewBuilder(c *gin.Context) {
 }
 
 func (a *agentAPI) updateBuilderVisual(c *gin.Context) {
+	if _, err := a.builderForRequest(c); err != nil {
+		writeAgentError(c, statusForAgentError(err), err)
+		return
+	}
 	var request struct {
 		Components []agent.VisualComponent `json:"components"`
 	}
@@ -1792,6 +1801,10 @@ func (a *agentAPI) updateBuilderVisual(c *gin.Context) {
 }
 
 func (a *agentAPI) undoBuilder(c *gin.Context) {
+	if _, err := a.builderForRequest(c); err != nil {
+		writeAgentError(c, statusForAgentError(err), err)
+		return
+	}
 	project, err := a.runtime.Builder().Undo(c.Request.Context(), c.Param("id"))
 	if err != nil {
 		writeAgentError(c, statusForAgentError(err), err)
@@ -1801,6 +1814,10 @@ func (a *agentAPI) undoBuilder(c *gin.Context) {
 }
 
 func (a *agentAPI) redoBuilder(c *gin.Context) {
+	if _, err := a.builderForRequest(c); err != nil {
+		writeAgentError(c, statusForAgentError(err), err)
+		return
+	}
 	project, err := a.runtime.Builder().Redo(c.Request.Context(), c.Param("id"))
 	if err != nil {
 		writeAgentError(c, statusForAgentError(err), err)
@@ -1810,6 +1827,10 @@ func (a *agentAPI) redoBuilder(c *gin.Context) {
 }
 
 func (a *agentAPI) exportBuilder(c *gin.Context) {
+	if _, err := a.builderForRequest(c); err != nil {
+		writeAgentError(c, statusForAgentError(err), err)
+		return
+	}
 	project, archivePath, err := a.runtime.Builder().Export(c.Request.Context(), c.Param("id"))
 	if err != nil {
 		writeAgentError(c, statusForAgentError(err), err)
@@ -1819,6 +1840,10 @@ func (a *agentAPI) exportBuilder(c *gin.Context) {
 }
 
 func (a *agentAPI) exportProfessionalBuilder(c *gin.Context) {
+	if _, err := a.builderForRequest(c); err != nil {
+		writeAgentError(c, statusForAgentError(err), err)
+		return
+	}
 	project, outputPath, err := a.runtime.Builder().ExportProfessional(c.Request.Context(), c.Param("id"), c.Param("format"))
 	if err != nil {
 		writeAgentError(c, statusForAgentError(err), err)
@@ -1828,6 +1853,10 @@ func (a *agentAPI) exportProfessionalBuilder(c *gin.Context) {
 }
 
 func (a *agentAPI) publishBuilder(c *gin.Context) {
+	if _, err := a.builderForRequest(c); err != nil {
+		writeAgentError(c, statusForAgentError(err), err)
+		return
+	}
 	project, publishedPath, err := a.runtime.Builder().PublishLocal(c.Request.Context(), c.Param("id"))
 	if err != nil {
 		writeAgentError(c, statusForAgentError(err), err)
@@ -1863,7 +1892,7 @@ func (a *agentAPI) deployBuilder(c *gin.Context) {
 		writeAgentError(c, http.StatusNotImplemented, errors.New("no deployment providers are configured"))
 		return
 	}
-	project, err := a.runtime.Builder().Get(c.Param("id"))
+	project, err := a.builderForRequest(c)
 	if err != nil {
 		writeAgentError(c, statusForAgentError(err), err)
 		return
@@ -1877,7 +1906,7 @@ func (a *agentAPI) deployBuilder(c *gin.Context) {
 }
 
 func (a *agentAPI) builderPreviewFile(c *gin.Context) {
-	project, err := a.runtime.Builder().Get(c.Param("id"))
+	project, err := a.builderForRequest(c)
 	if err != nil {
 		writeAgentError(c, statusForAgentError(err), err)
 		return
@@ -1899,6 +1928,10 @@ func (a *agentAPI) builderPreviewFile(c *gin.Context) {
 	c.File(path)
 }
 
+func (a *agentAPI) builderForRequest(c *gin.Context) (agent.BuilderProject, error) {
+	return a.runtime.Builder().GetForOrganization(c.Param("id"), companyOrganizationID(c))
+}
+
 func containedPath(root, requested string) (string, error) {
 	if strings.TrimSpace(requested) == "" {
 		return "", errors.New("input_path is required")
@@ -1918,6 +1951,18 @@ func containedPath(root, requested string) (string, error) {
 	relative, err := filepath.Rel(rootAbs, candidate)
 	if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) || filepath.IsAbs(relative) {
 		return "", errors.New("input_path escapes mission workspace")
+	}
+	realRoot, err := filepath.EvalSymlinks(rootAbs)
+	if err != nil {
+		return "", err
+	}
+	realCandidate, err := filepath.EvalSymlinks(candidate)
+	if err != nil {
+		return "", err
+	}
+	realRelative, err := filepath.Rel(realRoot, realCandidate)
+	if err != nil || realRelative == ".." || strings.HasPrefix(realRelative, ".."+string(filepath.Separator)) || filepath.IsAbs(realRelative) {
+		return "", errors.New("input_path resolves outside mission workspace")
 	}
 	return candidate, nil
 }
@@ -2013,7 +2058,7 @@ func statusForAgentError(err error) int {
 	if status := companyErrorStatus(err); status != 0 {
 		return status
 	}
-	if errors.Is(err, errAgentForbidden) {
+	if errors.Is(err, errAgentForbidden) || errors.Is(err, agent.ErrBuilderForbidden) {
 		return http.StatusForbidden
 	}
 	if errors.Is(err, os.ErrNotExist) {

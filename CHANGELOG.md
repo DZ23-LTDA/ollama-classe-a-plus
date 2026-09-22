@@ -132,3 +132,11 @@ As credenciais fornecidas no anexo foram tratadas como expostas por terem sido c
 - Gates locais aprovados: integrity guard, suíte Go completa com CGO, `go vet`, build Go, Vitest 20/199, build UI, typecheck mobile e teste Browser Operator com caminho inválido.
 
 A classificação permanece release candidate local-first. Integrações externas, ambientes distribuídos, dispositivos físicos, assinaturas, lojas e deploys reais continuam condicionados a credenciais, aprovação, sandbox e validação do operador.
+
+
+## 2026-09-22 — P0 ownership e Company invariants
+
+- Builder projects receberam `OrganizationID` e todas as operações HTTP de projeto passaram a usar lookup/listagem scoped, com teste cross-tenant `403` e ausência de mutação.
+- Builder agora exige entry presente, rejeita symlink no preview/export e escapa nomes inseridos nos templates HTML.
+- Company create passou a usar DTO allowlisted e a resetar campos server-managed; gasto de agente pausado ou acima do budget falha atomicamente.
+- Gates locais do slice passaram; isso não encerra os P0 restantes nem transforma adapters externos em integrações conectadas.

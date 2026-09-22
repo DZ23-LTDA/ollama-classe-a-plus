@@ -26,7 +26,10 @@ type CompanyAgent struct {
 	UpdatedAt        time.Time          `json:"updated_at"`
 }
 
-var ErrCompanyAgentNotFound = errors.New("company agent not found")
+var (
+	ErrCompanyAgentNotFound       = errors.New("company agent not found")
+	ErrCompanyAgentBudgetExceeded = errors.New("company agent budget limit exceeded")
+)
 
 func defaultCompanyAgents() []CompanyAgent {
 	return []CompanyAgent{
@@ -81,18 +84,23 @@ func (s *CompanyStore) ResumeAgent(id, agentID string) (Company, error) {
 }
 
 func (s *CompanyStore) RecordAgentSpend(id, agentID string, amountCents int64) (Company, error) {
-	if amountCents < 0 {
-		return Company{}, errors.New("agent spend cannot be negative")
+	if amountCents <= 0 {
+		return Company{}, errors.New("agent spend must be positive")
 	}
 	return s.mutate(id, func(company *Company) error {
+		if company.Status == CompanyPaused || company.Risk.Paused {
+			return ErrCompanyPaused
+		}
 		for index := range company.Agents {
 			agent := &company.Agents[index]
 			if agent.ID == agentID {
-				agent.SpentCents += amountCents
-				if agent.BudgetCents > 0 && agent.SpentCents > agent.BudgetCents {
-					agent.Status = "paused"
-					agent.PausedReason = "agent budget exceeded"
+				if agent.Status == "paused" {
+					return ErrCompanyPaused
 				}
+				if agent.BudgetCents > 0 && (agent.SpentCents > agent.BudgetCents || amountCents > agent.BudgetCents-agent.SpentCents) {
+					return ErrCompanyAgentBudgetExceeded
+				}
+				agent.SpentCents += amountCents
 				agent.UpdatedAt = time.Now().UTC()
 				return nil
 			}

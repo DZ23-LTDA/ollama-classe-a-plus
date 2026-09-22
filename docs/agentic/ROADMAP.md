@@ -152,3 +152,10 @@ A classificação continua **release candidate local-first**, não produção un
 A revisão de prontidão foi ampliada com escopo obrigatório de organização para connectors, matching seguro por segmento, bloqueio de destinos privados após resolução DNS, validação estrita de headers/ambiente no MCP e autorização administrativa para lifecycle global de plugins. O Browser Operator ganhou fallback de executável Chromium e teste de regressão com caminho ausente.
 
 O resultado fecha riscos internos de baixo nível sem afirmar produção universal. Os próximos gates continuam sendo distribuídos (PostgreSQL/RLS, Redis, OTLP), IdP/OAuth, providers e toolkits com contas autorizadas, canais de social commerce, dispositivos físicos, GPU, assinatura, lojas e deploy externo.
+
+
+## Incremento 2026-09-22 — primeiro slice P0 de ownership
+
+A primeira correção pós-auditoria ampliada protegeu Builder por organização e fechou invariantes server-managed do Company create e do gasto de agentes. O slice inclui testes negativos para duas organizações, entry inexistente, XSS em template, symlink e excesso de budget. O próximo trabalho deve levar o mesmo padrão a orchestration, traces, devices/pairing, plugins/MCP/skills e artifacts, seguido da política de approvals separada de execute.
+
+O resultado permanece **preview/local RC em hardening**. A existência de teste local não comprova RLS distribuído, sandbox forte, providers externos, dispositivos, assinatura ou deploy de produção.
