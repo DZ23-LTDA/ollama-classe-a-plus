@@ -465,7 +465,7 @@ cd /home/workspace
 	var stdout, stderr bytes.Buffer
 	command.Stdout = &limitedBuffer{Buffer: &stdout, Limit: 128 << 10}
 	command.Stderr = &limitedBuffer{Buffer: &stderr, Limit: 128 << 10}
-	if err := runToolCommand(deadline, command); err != nil {
+	if err := runToolCommand(deadline, command, control); err != nil {
 		isolation := "best-effort-unshare"
 		limits := "ulimit-context-timeout-output-bounded"
 		if strict {
@@ -483,7 +483,7 @@ cd /home/workspace
 	return ToolResult{Value: map[string]any{"stdout": RedactDLP(stdout.String()), "stderr": RedactDLP(stderr.String()), "exit_code": 0, "execution_isolation": isolation, "resource_limits": limits}}, nil
 }
 
-func runToolCommand(ctx context.Context, command *exec.Cmd) error {
+func runToolCommand(ctx context.Context, command *exec.Cmd, controls ...*sandboxControl) error {
 	if err := command.Start(); err != nil {
 		return err
 	}
@@ -493,6 +493,9 @@ func runToolCommand(ctx context.Context, command *exec.Cmd) error {
 	case err := <-done:
 		return err
 	case <-ctx.Done():
+		if len(controls) > 0 {
+			killSandboxControl(controls[0])
+		}
 		terminateToolProcess(command)
 		<-done
 		return ctx.Err()
