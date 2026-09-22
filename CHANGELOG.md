@@ -110,3 +110,14 @@ Missões agora persistem `capabilities` e recebem somente `workspace:read`/`work
 - Smoke real aprovado para Growth OS, Builder e shell Chromium; build UI, Vitest, testes backend, integrity guard e contratos locais permanecem verdes.
 
 A rodada continua sem conectar contas externas nem publicar posts, anúncios, produtos, pedidos ou deploys públicos. xAI, Composio, Desktop Commander, social commerce, marketplaces, PostgreSQL/RLS, Redis, OTLP, IdP, GPU, dispositivos físicos, assinatura e lojas exigem ambientes e credenciais autorizados.
+
+
+## Unreleased — smoke de APIs e correção do Browser Operator — 2026-09-22
+
+- Smoke seguro de catálogos provider com as chaves fornecidas, sem persistir ou imprimir valores secretos.
+- Inferência curta em modelo gratuito do OpenRouter aprovada diretamente e pelo gateway local Classe A+ (`/v1/chat/completions`).
+- Relatório público de prontidão em [`docs/agentic/READINESS_2026-09-22.md`](docs/agentic/READINESS_2026-09-22.md), distinguindo adapters, validações locais e blockers externos.
+- Workflow agentic-quality atualizado para instalar Playwright/Chromium antes do teste real do Browser Operator.
+- Erros do Browser Operator agora incluem stderr sanitizado para diagnóstico de dependência, sem expor credenciais.
+
+As credenciais fornecidas no anexo foram tratadas como expostas por terem sido compartilhadas em texto aberto; devem ser revogadas e recriadas pelo operador. Nenhum provider externo é promovido a integração de produção apenas por responder a um health check.

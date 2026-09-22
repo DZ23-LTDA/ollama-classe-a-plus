@@ -40,6 +40,7 @@ As imagens acima são capturas reais das rotas `/`, `/agentic`, `/settings` e `/
 | Matriz de paridade e evidências | [`agentic/PARITY_MATRIX.md`](docs/agentic/PARITY_MATRIX.md) |
 | Proteção contra regressões upstream | [`UPSTREAM_POLICY.md`](UPSTREAM_POLICY.md) + [`check-class-a-plus-integrity.sh`](scripts/check-class-a-plus-integrity.sh) |
 | Hardening, findings e gates de release | [`FINAL_THREE_AGENT_REVIEW.md`](audit/FINAL_THREE_AGENT_REVIEW.md) |
+| Prontidão, smoke de APIs e pendências externas | [`READINESS_2026-09-22.md`](docs/agentic/READINESS_2026-09-22.md) |
 
 Start building with open models.
 

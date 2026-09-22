@@ -78,7 +78,11 @@ func (browserOperatorTool) Execute(ctx context.Context, toolContext ToolContext,
 				return ToolResult{Value: failure}, fmt.Errorf("browser operator: %v", failure["error"])
 			}
 		}
-		return ToolResult{Value: map[string]any{"stderr": stderr.String()}}, err
+		message := strings.TrimSpace(stderr.String())
+		if message != "" {
+			return ToolResult{Value: map[string]any{"stderr": message}}, fmt.Errorf("browser operator: %w: %s", err, message)
+		}
+		return ToolResult{Value: map[string]any{"stderr": message}}, err
 	}
 	var result map[string]any
 	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {

@@ -40,6 +40,8 @@ A arquitetura é local-first. Um operador pode começar apenas com o binário e 
 | Grok Live e Evaluation OS | Verificado localmente | Responses/streaming/status sanitizado, router por capacidades/saúde/custo e casos determinísticos de avaliação; xAI real e datasets externos continuam dependentes de credenciais e quota. |
 | Agentes departamentais e Social OS | Verificado localmente em sandbox | Agentes com supervisor, orçamento, SLA, pausa/retomada, drafts sociais, approval e métricas; contas, publicação e commerce externo permanecem bloqueados até autorização. |
 
+O relatório [`READINESS_2026-09-22.md`](agentic/READINESS_2026-09-22.md) registra o smoke das APIs fornecidas, a chamada gratuita ponta a ponta via OpenRouter e a lista de gates que ainda dependem de contas, hardware, dispositivos ou infraestrutura externa. As chaves usadas no teste foram fornecidas fora do repositório e devem ser rotacionadas pelo operador.
+
 ## Instalação rápida
 
 ### Linux

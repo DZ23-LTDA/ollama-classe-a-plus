@@ -136,3 +136,12 @@ Plugins, MCP e skills agora possuem lifecycle explícito de habilitar, desabilit
 O fluxo de deploy do Builder foi corrigido para verificar approval antes de consultar provider ou retornar ausência de configuração. Os smokes finais passaram para Growth OS, Builder e shell E2E, incluindo criação real de projetos, schedules e missões.
 
 A promoção para produção continua condicionada a credenciais e ambientes externos. Permanecem pendentes os smokes autorizados de xAI/Composio/Desktop Commander, Social Commerce/TikTok Shop/Meta/Shopify, PostgreSQL/RLS/Redis/OTLP, IdP, GPU, runners físicos, assinatura de instaladores, lojas e deploy externo.
+
+
+## Incremento 2026-09-22 — prontidão e smoke de APIs
+
+Foi executado um smoke seguro com as chaves fornecidas pelo operador: catálogos OpenRouter, Groq, DeepSeek, Fireworks, Cerebras, Mistral, NVIDIA, Novita, Cohere, Gemini, Hugging Face, GitHub e Cloudflare responderam; Together, xAI, Hyperbolic e Alibaba foram recusados; o endpoint tentado de Voyage retornou 404 e não foi interpretado como prova de validade ou invalidade. Uma inferência curta no modelo gratuito do OpenRouter respondeu diretamente e também através do gateway Ollama Classe A+ local, comprovando o caminho provider → gateway → cliente.
+
+A auditoria do CI encontrou falha no teste real do Browser Operator porque o job não instalava a dependência Python Playwright/Chromium. O workflow agora instala a dependência e exporta o executável descoberto; o teste específico passa localmente. O CI remoto do novo commit ainda precisa concluir para fechar essa pendência.
+
+A classificação continua **release candidate local-first**, não produção universal. O relatório [`READINESS_2026-09-22.md`](READINESS_2026-09-22.md) é a fonte de verdade para os resultados, a rotação obrigatória das chaves fornecidas e os blockers externos restantes.

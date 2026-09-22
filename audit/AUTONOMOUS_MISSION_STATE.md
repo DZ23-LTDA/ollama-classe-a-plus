@@ -504,3 +504,30 @@ local_tree: clean_after_commit
 public_ci: queued_at_publish
 next_action: external credentialed journeys and distributed staging; do not claim universal production readiness
 ```
+
+
+## Smoke de APIs e correção de CI — 2026-09-22
+
+```yaml
+mission_id: class-a-plus-readiness-api-smoke-2026-09-22
+state: CANDIDATE_COMPLETED
+branch: feat/manus-parity-omniroute
+base_before_commit: dfe07d5665b11f025fb36c6382298e8c053733f5
+proofs:
+  - provider catalog checks executed without printing secrets
+  - OpenRouter free inference HTTP 200
+  - local Ollama Classe A+ gateway model listing HTTP 200
+  - local Ollama Classe A+ gateway chat HTTP 200
+  - Browser Operator focused test passes locally
+  - integrity guard passes locally
+changes:
+  - install Python Playwright/Chromium in dz23-agentic-quality CI job
+  - improve Browser Operator stderr diagnostics
+  - add public readiness report
+external_blockers:
+  - rotate all credentials supplied in plaintext
+  - wait for new GitHub CI result
+  - distributed PostgreSQL/Redis/OTLP staging
+  - OAuth, app reviews, devices, GPU, signed installers, stores and deploy accounts
+next_action: commit and push readiness report plus Browser Operator CI fix; do not claim universal production readiness
+```
