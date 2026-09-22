@@ -1237,3 +1237,20 @@ classification: preview/local RC em hardening; containment partial, not strong s
 open_risks: seccomp/cgroups/physical platform isolation, web login wiring, real IdP/staging
 next_action: commit/push, then continue plugin/MCP tenant ownership or release/CI hardening
 ```
+
+
+## Publicação da slice P0 tool process containment — 2026-09-22
+
+```yaml
+state: FIXING
+iteration: 18
+commit: 3d19f111
+branch: feat/manus-parity-omniroute
+remote: https://github.com/DZ23-LTDA/ollama-classe-a-plus.git
+pull_request: https://github.com/DZ23-LTDA/ollama-classe-a-plus/pull/1
+working_tree: checkpoint pending commit
+published: true
+proofs: integrity, Go tests/vet/build, internal/agent suite, UI Vitest/build, mobile typecheck and process cancellation/redaction tests all PASS
+classification: preview/local RC em hardening; containment partial, not strong sandbox
+next_slice: plugin/MCP tenant ownership or release/CI hardening; no main merge
+```
