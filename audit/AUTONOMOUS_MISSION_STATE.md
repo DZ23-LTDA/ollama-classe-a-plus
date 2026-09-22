@@ -930,3 +930,20 @@ open_risks: Media/Connector egress parity, TLS/DNS distributed tests, strong san
 classification: preview/local RC em hardening
 next_action: commit/push, then unify Media/Connector egress or harden MCP stdio lifecycle
 ```
+
+
+## Publicação da slice P0 Remote MCP egress — 2026-09-22
+
+```yaml
+state: FIXING
+iteration: 11
+commit: b74c25ea
+branch: feat/manus-parity-omniroute
+remote: https://github.com/DZ23-LTDA/ollama-classe-a-plus.git
+pull_request: https://github.com/DZ23-LTDA/ollama-classe-a-plus/pull/1
+working_tree: checkpoint pending commit
+published: true
+proofs: integrity, Go tests/vet/build, UI Vitest/build, mobile typecheck and Remote MCP egress regressions all PASS
+classification: preview/local RC em hardening
+next_slice: Media/Connector egress parity or MCP stdio lifecycle; no main merge
+```
