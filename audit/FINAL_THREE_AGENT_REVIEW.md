@@ -298,3 +298,8 @@ A rodada fechou quatro lacunas internas verificáveis. O sandbox strict Linux ag
 Os gates locais de Go agent/server, vet/build/integrity, mobile typecheck e Expo web export passaram. Integrity push `35793674459` e PR `35793679458` passaram no head `a7bc82f5`; agentic quality, multi-provider e upstream test ainda não estavam concluídos no momento desta revisão. `npm audit` mobile reportou 18 vulnerabilidades de produção (11 moderate, 7 high), sem aplicar correção forçada.
 
 O resultado é mitigação observável, não homologação de cgroup/AppArmor/SELinux, IdP/OAuth/providers externos, push remoto, dispositivos físicos, assinatura/provenance efetiva, rollback ou lojas. A decisão continua **FIXING / preview-local em hardening**, sem merge automático em `main`.
+
+
+## Follow-up independente — audit mobile — 2026-09-22
+
+A triagem inicialmente reportada foi concluída. Como o fix automático exigia Expo 57/React Native 0.87 major, a remediação adotou overrides transitivos mínimos: `image-size@2.0.4`, `postcss@8.5.28` e `uuid@11.1.1`. O lock, typecheck, Expo web export e `npm audit --omit=dev` passaram com zero vulnerabilidades de produção. A decisão é manter a migração major fora desta slice até haver testes físicos Android/iOS.

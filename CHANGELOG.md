@@ -338,3 +338,8 @@ Mutations agentic com `Origin` cross-site são recusadas pela allowlist existent
 O workflow de release passou a gerar SBOM CycloneDX, `release-metadata.json`, `sha256sum.txt` e verificação `sha256sum -c`; attestation GitHub permanece condicional a `OLLAMA_ENABLE_ATTESTATIONS=true`. Isso melhora a cadeia de evidência, mas não é assinatura efetiva de instaladores nem prova de um release tag executado.
 
 No head `a7bc82f5`, integrity push `35793674459` e PR `35793679458` passaram; os workflows agentic/multi-provider/upstream ainda estavam em execução ou fila no momento do registro. O pacote mobile reportou 18 vulnerabilidades de produção no `npm audit` (11 moderate, 7 high), pendentes de triagem.
+
+
+## 2026-09-22 — remediação transitiva do audit mobile
+
+O audit inicial do pacote Expo encontrou 18 vulnerabilidades transitivas, cuja correção automática exigia Expo/React Native major. A solução publicada usa overrides mínimos para `image-size@2.0.4`, `postcss@8.5.28` e `uuid@11.1.1`; typecheck, Expo web export e `npm audit --omit=dev` passaram com zero vulnerabilidades de produção. A migração major e a validação física continuam separadas.

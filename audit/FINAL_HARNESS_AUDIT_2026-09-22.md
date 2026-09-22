@@ -446,3 +446,8 @@ As slices `0459532a`, `e931fcfc`, `a12a15e4`, `d1058209` e `a7bc82f5` mitigaram 
 A evidência remota disponível no head `a7bc82f5` é integrity push `35793674459` PASS e integrity PR `35793679458` PASS. Os demais workflows do PR ainda estavam em execução/fila no momento do checkpoint. O workflow de release não foi executado porque exige tag e ambiente de release; attestation é condicional, e signing/provenance efetiva não foi comprovada. O pacote mobile reportou 18 vulnerabilidades de produção no npm audit (11 moderate, 7 high), que precisam de triagem antes de classificar distribuição como pronta.
 
 A classificação vigente permanece **preview/local RC em hardening; não production-ready**. Permanecem abertos host sandbox real e isolamento forte multi-plataforma, auth/session/CSRF/IdP distribuído, OAuth egress/revocation com providers reais, integrações/deploy/media/marketplaces, push e dispositivos físicos, dependências mobile, instaladores assinados, provenance/rollback efetivos, stores/app review e homologação externa.
+
+
+## Addendum — follow-up de dependências mobile — 2026-09-22
+
+O audit de produção inicialmente reportou 18 vulnerabilidades transitivas. A análise de ranges mostrou que o fix sugerido exigia major do Expo/React Native; foram preferidos overrides compatíveis para `image-size@2.0.4`, `postcss@8.5.28` e `uuid@11.1.1`, com lock resolvido. O estado atual passa `npm audit --omit=dev` com zero vulnerabilidades, typecheck e Expo web export. Isso não comprova compatibilidade física Android/iOS nem elimina a necessidade de uma futura migração major controlada.

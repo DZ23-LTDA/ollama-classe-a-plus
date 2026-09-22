@@ -350,3 +350,8 @@ O sandbox agora possui um caminho Linux strict opt-in com cgroup v2 delegado, na
 O release workflow agora produz SBOM CycloneDX, metadata rastreável por commit/ref, checksum manifest e verificação antes do upload; attestation permanece opcional e nenhuma assinatura/loja foi executada. A próxima etapa deve triagem das 18 vulnerabilidades de produção reportadas pelo npm audit mobile (11 moderate, 7 high), conclusão dos runs do head e, depois, P0/P1 externos: host sandbox real, IdP/OAuth/providers/deploy/media, dispositivos, push remoto e signing/provenance.
 
 A classificação continua **preview/local RC em hardening**. A matriz GPU/nativa segue manual e opt-in.
+
+
+## Follow-up 2026-09-22 — audit mobile sem force upgrade
+
+Os 18 achados transitivos do primeiro audit mobile foram tratados com overrides mínimos para `image-size`, `postcss` e `uuid`, sem migrar Expo/React Native major no escuro. O lock foi resolvido e `npm audit --omit=dev` agora retorna zero vulnerabilidades de produção; typecheck e export web continuam verdes. Migração de SDK major, testes físicos Android/iOS e distribuição permanecem tarefas de validação separadas.

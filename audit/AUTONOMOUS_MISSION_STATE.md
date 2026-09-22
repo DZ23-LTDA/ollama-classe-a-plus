@@ -2019,3 +2019,8 @@ limits:
 blockers: auth/IdP distribuído, OAuth com providers reais, egress/integrations/deploy/media externos, testes físicos, push remoto, signing/provenance efetiva, dependências mobile, stores/app review e homologação externa
 next_action: concluir evidência CI do head, triage de vulnerabilidades mobile e continuar P0/P1 independentes; manter PR aberto e não fazer merge automático em main
 ```
+
+
+## Follow-up mobile dependency audit — 2026-09-22
+
+A triagem do `npm audit --omit=dev` mostrou que os 18 achados vinham de transitivos do Expo 53/React Native 0.79: `image-size`, `postcss` e `uuid`. Em vez de executar `npm audit fix --force` e migrar majors sem validação, foram adicionados overrides mínimos (`image-size@2.0.4`, `postcss@8.5.28`, `uuid@11.1.1`). Após resolver o lock, o typecheck, Expo web export e `npm audit --omit=dev` passaram; o audit agora reporta `0` vulnerabilidades de produção. A migração Expo/React Native major continua uma tarefa separada que exige testes Android/iOS físicos.

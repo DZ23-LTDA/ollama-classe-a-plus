@@ -365,3 +365,8 @@ Mutations agentic autenticadas com `Origin` fora da allowlist `OLLAMA_ORIGINS` s
 No head `a7bc82f5`, integrity passou no push `35793674459` e no PR `35793679458`; `dz23-agentic-quality` (`35793679479`) e `dz23-multi-provider` (`35793679448`) ainda estavam em execução, e upstream `test` (`35793679567`) estava queued no momento do registro. Essa evidência é parcial até os runs concluírem.
 
 O pacote mobile reportou 18 vulnerabilidades de produção no `npm audit` (11 moderate e 7 high), ainda sem triagem/remediação de versão. Permanecem dependências externas e não executadas: cgroup real no host do operador, AppArmor/SELinux, IdP/OAuth real, providers/deploy/media, push remoto, dispositivos físicos, instaladores assinados, provenance efetiva, rollback, stores e app review. A classificação permanece **preview/local RC em hardening**, não production-ready.
+
+
+## Follow-up de dependências mobile — 2026-09-22
+
+A triagem do audit mobile foi concluída sem force upgrade. Os achados transitivos de `image-size`, `postcss` e `uuid` receberam overrides mínimos compatíveis no package lock (`2.0.4`, `8.5.28` e `11.1.1`); `npm run typecheck`, Expo web export e `npm audit --omit=dev` passaram, com `0` vulnerabilidades de produção no estado atual. Isso não substitui uma migração futura de Expo/React Native major nem testes físicos Android/iOS.
