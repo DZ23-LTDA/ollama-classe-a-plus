@@ -1574,3 +1574,20 @@ proofs: focused/full Go, vet/build, integrity, UI and mobile gates PASS
 classification: preview/local RC em hardening
 next_slice: continue remaining P0/P1s and external evidence; no main merge
 ```
+
+
+## Publicação do addendum da auditoria consolidada — 2026-09-22
+
+```yaml
+state: FIXING
+iteration: 27
+audit_commit: 146d203c
+branch: feat/manus-parity-omniroute
+remote: https://github.com/DZ23-LTDA/ollama-classe-a-plus.git
+pull_request: https://github.com/DZ23-LTDA/ollama-classe-a-plus/pull/1
+working_tree: checkpoint pending commit
+published: true
+classification: preview/local RC em hardening
+note: FINAL_HARNESS_AUDIT now distinguishes historical findings from published partial remediations; it does not claim production readiness
+next_action: continue remaining P0/P1s and external evidence; no main merge
+```
