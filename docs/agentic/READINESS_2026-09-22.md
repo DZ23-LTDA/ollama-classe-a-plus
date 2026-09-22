@@ -276,3 +276,10 @@ A execução `35737050056` confirmou que o job Go, SBOM e Web/Mobile passaram, m
 O workflow foi corrigido novamente para consultar a existência da role com `psql -c`, executar `CREATE ROLE` ou `ALTER ROLE` com password hexagonal efêmera e aplicar os grants em uma chamada separada. A limpeza agora injeta somente placeholders não secretos, suficientes para o Compose interpolar a configuração e executar `down -v`, sem recuperar nem persistir os secrets do passo anterior.
 
 Esta segunda correção ainda aguarda nova execução remota. A validação local deve cobrir YAML, integrity, diff, Go, UI e mobile; Docker/PostgreSQL/Redis/OTLP permanecem impossíveis de executar nesta sandbox.
+
+
+## Validação remota do CI distribuído — 2026-09-22
+
+O commit `15e8ae60` foi validado pelo GitHub Actions no run `35737772235`. Todos os jobs passaram: Go agentic/server com Browser Operator, SBOM, Web/Mobile e integração PostgreSQL RLS + Redis DLQ + OTLP. O teste RLS executou com role não-superusuária dedicada; a limpeza Docker terminou sem depender dos secrets do passo de start.
+
+Esta evidência fecha o gate distribuído desta slice, mas não a classificação global do produto. Permanecem P0/P1 internos e dependências externas descritos na matriz e na auditoria; a classificação segue **preview/local RC em hardening**.

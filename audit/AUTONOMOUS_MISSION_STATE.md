@@ -1650,3 +1650,23 @@ proof_pending:
 classification: preview/local RC em hardening; NÃO final; NÃO production-ready
 next_action: executar gates locais, commit/push e acompanhar novo run; não repetir valores sensíveis do CI
 ```
+
+
+## Publicação e validação remota do CI distribuído — 2026-09-22
+
+```yaml
+state: FIXING
+iteration: 29
+commit: 15e8ae6021c5dee3a65917025a1a36aa1c0031d0
+branch: feat/manus-parity-omniroute
+remote_run: 35737772235
+remote_result: PASS
+jobs:
+  - Go agentic/server + Browser Operator: PASS
+  - PostgreSQL RLS + Redis DLQ + OTLP: PASS
+  - Web/mobile quality: PASS
+  - SBOM: PASS
+local_result: PASS
+classification: preview/local RC em hardening; NÃO final; NÃO production-ready
+next_action: selecionar o próximo P0 interno; manter PR aberto e sem merge automático em main
+```

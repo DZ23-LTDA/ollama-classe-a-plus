@@ -280,3 +280,8 @@ A primeira execução pública do workflow ampliado revelou um defeito útil no 
 ## Follow-up 2026-09-22 — bootstrap do smoke distribuído
 
 O segundo run público encontrou uma falha de sintaxe no bootstrap condicional da role PostgreSQL e confirmou que steps separados não compartilham variáveis shell. A correção usa `psql -c` com password efêmera hexagonal no passo de start e placeholders neutros na limpeza. O gate remoto ainda precisa ser repetido; nenhuma classificação de produção foi alterada.
+
+
+## Validação remota 2026-09-22 — distributed quality workflow verde
+
+O run `35737772235` no commit `15e8ae60` passou todos os jobs de qualidade, incluindo PostgreSQL RLS, Redis DLQ e OTLP reais no runner GitHub. O próximo trabalho volta aos P0 internos ainda abertos: capability enforcement completo, sandbox/process isolation forte, egress/DLP residual, storage/IdP e contratos externos.

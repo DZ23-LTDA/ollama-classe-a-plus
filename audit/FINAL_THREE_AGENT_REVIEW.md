@@ -227,3 +227,10 @@ Este achado não fecha os P0 restantes: sandbox forte, capability enforcement, e
 O run `35737050056` manteve Go, SBOM e Web/Mobile verdes, mas falhou no bootstrap PostgreSQL. A causa foi objetiva: `:'app_password'` foi colocado dentro de `DO $$`, onde o servidor recebeu sintaxe inválida; adicionalmente, a etapa `down -v` não herda variáveis shell do passo anterior. O workflow foi corrigido para usar `psql -c` condicional com password gerada em hexadecimal e para executar cleanup com placeholders neutros, sem depender de secrets entre steps.
 
 A nova execução remota é obrigatória antes de marcar o gate distribuído como verde. O produto continua em **FIXING / preview-local em hardening**.
+
+
+## Gate distribuído confirmado — 2026-09-22
+
+Após duas correções incrementais, o run GitHub Actions `35737772235` no commit `15e8ae60` passou integralmente. PostgreSQL RLS, Redis DLQ e OTLP foram executados no runner real; Go/server, Browser Operator, SBOM e Web/Mobile também passaram. O workflow não depende mais de variáveis shell entre steps para cleanup e o teste usa role tenant-scoped não-superusuária.
+
+O gate distribuído está fechado para esta slice. Isso não elimina os demais achados P0/P1 da auditoria nem autoriza declarar produção-ready.

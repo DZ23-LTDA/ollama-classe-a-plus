@@ -266,3 +266,8 @@ O job de integração do `dz23-agentic-quality` foi corrigido após a execução
 ## 2026-09-22 — follow-up do bootstrap PostgreSQL no CI
 
 O run remoto `35737050056` revelou que a primeira correção do smoke ainda usava sintaxe inválida ao combinar variável `psql` com `DO $$`, e que a etapa de cleanup não herdava variáveis locais de outro passo. O workflow agora usa comandos condicionais `CREATE ROLE`/`ALTER ROLE` com password efêmera hexagonal e placeholders não secretos somente para o `docker compose down`. A nova confirmação distribuída permanece pendente.
+
+
+## 2026-09-22 — quality workflow distribuído verde
+
+O run GitHub Actions `35737772235`, no commit `15e8ae60`, passou integralmente: Go/server, Browser Operator, SBOM, Web/Mobile e PostgreSQL RLS + Redis DLQ + OTLP. O smoke agora possui prova remota real com role tenant-scoped não-superusuária e cleanup independente dos secrets do passo anterior.
