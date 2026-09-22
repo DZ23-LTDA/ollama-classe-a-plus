@@ -229,8 +229,15 @@ func (m *DeploymentManager) deployGeneric(ctx context.Context, config DeployConf
 
 func (m *DeploymentManager) deployVercel(ctx context.Context, config DeployConfig, request DeploymentRequest, files []deployFile) (DeploymentResult, error) {
 	payload := map[string]any{"name": request.Name, "target": request.Target, "files": encodeFiles(files)}
+	if config.ProjectID != "" {
+		payload["project"] = config.ProjectID
+	}
 	body, _ := json.Marshal(payload)
-	response, err := m.request(ctx, config, http.MethodPost, "/v13/deployments", body, "application/json")
+	endpoint := "/v13/deployments"
+	if config.AccountID != "" {
+		endpoint += "?teamId=" + url.QueryEscape(config.AccountID)
+	}
+	response, err := m.request(ctx, config, http.MethodPost, endpoint, body, "application/json")
 	if err != nil {
 		return DeploymentResult{}, err
 	}
@@ -238,14 +245,16 @@ func (m *DeploymentManager) deployVercel(ctx context.Context, config DeployConfi
 }
 
 func (m *DeploymentManager) deployNetlify(ctx context.Context, config DeployConfig, request DeploymentRequest, files []deployFile) (DeploymentResult, error) {
-	createPayload, _ := json.Marshal(map[string]any{"name": request.Name})
-	site, err := m.request(ctx, config, http.MethodPost, "/api/v1/sites", createPayload, "application/json")
-	if err != nil {
-		return DeploymentResult{}, err
-	}
-	siteID := firstString(site, "id", "site_id")
+	siteID := config.ProjectID
+	var site map[string]any
+	var err error
 	if siteID == "" {
-		siteID = config.ProjectID
+		createPayload, _ := json.Marshal(map[string]any{"name": request.Name})
+		site, err = m.request(ctx, config, http.MethodPost, "/api/v1/sites", createPayload, "application/json")
+		if err != nil {
+			return DeploymentResult{}, err
+		}
+		siteID = firstString(site, "id", "site_id")
 	}
 	if siteID == "" {
 		return DeploymentResult{}, errors.New("netlify response has no site id")
