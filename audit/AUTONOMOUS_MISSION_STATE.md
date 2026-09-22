@@ -233,3 +233,32 @@ remaining_external:
   - real browser/desktop/mobile devices, distributed staging, IdP, deploy accounts and signed releases
 next_action: review diff, commit the feature branch, publish branch for review and continue the vertical flow Nova tarefa -> missão -> approval -> artifact.
 ```
+
+
+## Checkpoint atual — fluxo vertical e HarnessRouter — 2026-09-22
+
+```yaml
+state: CANDIDATE_COMPLETED
+branch: feat/manus-parity-omniroute
+completed:
+  - shell_home: composer, recommendations, shortcuts and local-first offline fallback
+  - project_schedule_crud: tenant-aware create/list/update/delete with live API
+  - mission_console: provider selector for Ollama, Claude, Codex, OmniRoute and project association
+  - catalogs: connectors, MCP, skills and CLI status with null-safe frontend normalization
+  - observability: JSON metrics route registered for Agentic Console
+  - harnessrouter_adapter: OpenAI Responses-compatible provider with server-side harness_id metadata injection
+  - public_docs: README, manual, parity matrix, roadmap, changelog and screenshots updated
+proofs:
+  - go test ./internal/agent ./server -count=1: PASS
+  - UI npm run build: PASS
+  - live CRUD smoke for projects and schedules against 127.0.0.1:3001: PASS
+  - live mission/list/events smoke: PASS
+  - Chromium capture for home, projects, library, scheduled, skills, plugins, tasks, agentic and settings: PASS
+  - node app/ui/app/scripts/smoke-shell.mjs against Vite and local server: PASS
+  - HarnessRouter metadata proxy regression test: pending final Go gate
+remaining_external:
+  - HarnessRouter instance, provider key and installed harnesses for streaming/follow-up/cancel/artifact validation
+  - builder drag-and-drop and CRDT collaboration
+  - distributed PostgreSQL/Redis/OTLP, IdP, real deploy accounts and physical desktop/mobile tests
+next_action: run focused multillm/server gates, review diff, commit and publish the feature branch without changing main.
+```

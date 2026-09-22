@@ -25,6 +25,7 @@ Esta matriz define o que o Ollama Classe A+ pretende oferecer como plataforma lo
 | Claude | `ADAPTER IMPLEMENTADO`: protocolo Anthropic e integração de lançamento/model settings existentes | Selecionar modelos Claude por credencial própria ou gateway, com tools, streaming e limites visíveis | Smoke com credencial real; nunca armazenar segredo em UI, fixture ou Git |
 | Codex | `ADAPTER IMPLEMENTADO`: proxy/integração de desktop e catálogo/configuração existentes | Usar Codex como provider ou ferramenta de coding mantendo approval, artifacts e logs | Smoke com sessão/credencial real e validação de limites do provider |
 | OmniRoute | `ADAPTER GENÉRICO DISPONÍVEL`: o registry aceita provider OpenAI-compatible; não existe ainda preset nomeado nem teste contra OmniRoute executando | Gateway local configurável com `auto`, fallback, quotas, modelos e endpoint `/v1` exibidos na UI | Preset seguro, teste com instância local real, health/model discovery e documentação de limites |
+| HarnessRouter | `ADAPTER IMPLEMENTADO`: provider OpenAI Responses-compatible, `harness_id` injetado server-side e preset para Codex/Claude Code | Harnesses plugáveis com sessões, streaming, arquivos, artifacts, cancelamento e seleção por metadata | Instância HarnessRouter real, chave, harness instalado, streaming/follow-up/cancelamento/artifacts e teste de falha |
 | Browser Operator | `ADAPTER IMPLEMENTADO`: Playwright, navegação, upload/download, screenshots e takeover | Navegação visual robusta com perfis isolados, approvals e recuperação | Teste com Chromium instalado e jornadas reais em ambiente controlado |
 | Computer use / desktop | `ADAPTER IMPLEMENTADO`: companions por capability e pairing | Tela, mouse, teclado, clipboard e processos com grants revogáveis | Testes físicos Linux/macOS/Windows, instaladores assinados e rollback |
 | Pesquisa profunda | `VALIDADA LOCALMENTE`: pesquisa multiagente, cache, citações, robots e SSRF guard | Paralelização, síntese com fontes, exportação e retomada | Smoke com fontes externas e orçamento/limites observados |
@@ -53,6 +54,12 @@ O [OmniRoute](https://github.com/diegosouzapw/OmniRoute) é tratado como **gatew
 6. exigir approval para mudanças de routing, conexão de contas e ações externas.
 
 Um provider OpenAI-compatible existente não prova que a integração OmniRoute foi validada. O gate será um teste contra uma instância local real, com modelo de teste, auth configurada, falha simulada e verificação de que o fallback não viola a política local-only.
+
+## HarnessRouter: decisão de integração
+
+O [HarnessRouter Community Edition](https://github.com/HarnessRouter/harnessrouter) é um complemento particularmente útil para a meta de reunir vários coding harnesses. Ele implementa uma interface unificada e compatível com OpenAI Responses para harnesses plugáveis, com sessões, streaming, arquivos, artifacts, cancelamento e falhas estruturadas. A integração do Classe A+ está detalhada em [`HARNESSROUTER.md`](HARNESSROUTER.md) e no preset [`examples/dz23-harnessrouter.json`](../../examples/dz23-harnessrouter.json).
+
+O Classe A+ não incorpora o código do HarnessRouter nem trata a licença Apache-2.0 como licença dos CLIs, modelos ou Starter Kits executados por ele. A conexão é opt-in, server-side e substituível. O `harness_id` é configurado por modelo e injetado no campo `metadata` pelo proxy, enquanto chaves ficam fora do browser. O gate de promoção para `VALIDADA LOCALMENTE` exige instância real, provider e harness instalados, além de streaming, follow-up de sessão, cancelamento, artifact e falha/recovery reproduzíveis.
 
 ## Critério de conclusão da paridade
 

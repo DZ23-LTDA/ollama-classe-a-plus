@@ -30,7 +30,8 @@ A arquitetura é local-first. Um operador pode começar apenas com o binário e 
 | SSO | Implementado em adapters | OAuth/OIDC e SAML exigem IdP, certificados e testes de produção. |
 | Mobile | Base Expo implementada | Push, conflitos avançados, assinatura e lojas ainda dependem de ambiente real. |
 | Modelos locais de mídia | Adapter configurável | Não confundir adapter multimodal com modelos locais completos já distribuídos. |
-| Shell desktop Classe A+ | Parcialmente implementado | Rotas reais e estados vazios foram adicionados; CRUD persistido de Biblioteca, Projetos, Agendado, Skills e Plugins ainda será conectado aos contratos agentic. |
+| Shell desktop Classe A+ | Parcialmente implementado | Home com composer e recomendações, menu persistente, CRUD real de Projetos e Agendado, catálogos reais de Tasks/Skills/Plugins/Biblioteca e Control Center sanitizado; builder rico, mutações de skills/plugins e todas as superfícies de produção ainda evoluem. |
+| HarnessRouter | Adapter implementado | Provider OpenAI Responses-compatible com `harness_id` server-side para Codex/Claude Code; exige instância, chave e harness instalados para validação ponta a ponta. |
 
 ## Instalação rápida
 
@@ -182,14 +183,14 @@ A captura abaixo é real da rota `/agentic`, renderizada com Chromium usando fix
 
 ![Mission Console atual](images/screens/agentic-console.png)
 
-A tela de Settings atual ainda é mínima nesta revisão. Por isso o repositório também contém mockups conceituais, todos marcados como **CONCEITO** dentro da própria imagem:
+A tela de Settings atual contém um Agentic Control Center sanitizado, com catálogo de modelos, estado do runtime, capabilities, connectors, MCP, skills e CLIs sem retornar secrets. O repositório também contém mockups conceituais das áreas ainda incompletas, todos marcados como **CONCEITO** dentro da própria imagem:
 
 | Tela | Imagem | Estado |
 |---|---|---|
-| Configurações e integrações | [configuration-mockup.png](images/mockups/configuration-mockup.png) | Direção visual planejada; configuração atual via API/env. |
+| Configurações e integrações | [class-a-plus-settings.png](images/screens/class-a-plus-settings.png) | Screenshot real do Control Center; o mockup [configuration-mockup.png](images/mockups/configuration-mockup.png) continua sendo conceito para áreas futuras. |
 | Builder visual | [builder-mockup.png](images/mockups/builder-mockup.png) | Canvas e histórico têm base; editor rico ainda evolui. |
 | Companion mobile | [mobile-mockup.png](images/mockups/mobile-mockup.png) | Base Expo existe; push, conflitos avançados e lojas pendentes. |
-| Agentic Console real | [agentic-console.png](images/screens/agentic-console.png) | Rota implementada, dados da captura são demonstrativos. |
+| Agentic Console real | [class-a-plus-agentic.png](images/screens/class-a-plus-agentic.png) | Rota implementada; a captura usa backend local e não executa ação externa. |
 
 As notas de proveniência estão em `docs/images/screens/SCREEN_CAPTURE_NOTES.md` e `docs/images/mockups/MOCKUP_NOTES.md`. Isso evita apresentar uma tela conceitual como funcionalidade concluída.
 

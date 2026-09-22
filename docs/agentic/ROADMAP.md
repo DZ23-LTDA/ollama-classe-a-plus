@@ -73,3 +73,12 @@ O shell web ganhou rotas reais para Biblioteca, Projetos, Agendado, Habilidades,
 O multi-provider agora aceita HTTP somente para um serviço numérico de loopback quando `allow_private` e `allow_insecure_loopback` estão explicitamente definidos. Isso permite o preset [`examples/dz23-omniroute.json`](../../examples/dz23-omniroute.json) para uma instância OmniRoute local, mantendo HTTPS obrigatório para hosts externos. Foram adicionados testes de carregamento, rejeição de HTTP externo e encaminhamento com bearer server-side. A integração continua dependente de uma instância OmniRoute, credencial e smoke test do operador.
 
 As telas novas têm estados vazios honestos e ações de entrada. CRUD persistido, colaboração, editor drag-and-drop, provider discovery completo e deploy real continuam como próximos gates; a interface não os apresenta como concluídos.
+
+
+## Incremento 2026-09-22 — fluxo vertical, home e HarnessRouter
+
+A rodada substituiu estados estáticos do shell por contratos reais: Projetos e Agendado possuem criação, listagem, edição/exclusão com escopo de organização; Tarefas e Biblioteca consultam missões/artifacts; Plugins e Habilidades consultam catalogs server-side; e o Agentic Console cria missões com provider (Ollama local, Claude, Codex, OmniRoute) e projeto selecionáveis. A home agora possui composer, recomendações e atalhos funcionais, com fallback offline local-first.
+
+O proxy multi-provider ganhou `harness_id` declarativo por modelo e injeção server-side de `metadata.harness_id`, permitindo o preset opcional [`examples/dz23-harnessrouter.json`](../../examples/dz23-harnessrouter.json) para Codex e Claude Code no [HarnessRouter](https://github.com/HarnessRouter/harnessrouter). Isso é adapter implementado; não é validação de uma instância ou credencial externa.
+
+Provas desta rodada: `go test ./internal/agent ./server`, build Vite, smoke CRUD real contra servidor local, smoke de missão/eventos, captura Chromium das nove rotas e `node app/ui/app/scripts/smoke-shell.mjs` com home, Projects, Scheduled, Plugins, Skills e seleção Claude. O próximo gate é HarnessRouter real com streaming/follow-up/cancelamento/artifacts, seguido de editor drag-and-drop/CRDT e testes distribuídos/IdP/dispositivos.

@@ -8,9 +8,10 @@ await mkdir(outputDir, { recursive: true });
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
 
-for (const route of ["/projects", "/library", "/scheduled", "/skills", "/plugins", "/tasks", "/agentic", "/settings"]) {
+for (const route of ["/", "/projects", "/library", "/scheduled", "/skills", "/plugins", "/tasks", "/agentic", "/settings"]) {
   const name = route.slice(1) || "home";
-  await page.goto(`${baseURL}${route}`, { waitUntil: "networkidle" });
+  await page.goto(`${baseURL}${route}`, { waitUntil: "domcontentloaded", timeout: 30000 });
+  await page.waitForTimeout(1200);
   await page.screenshot({ path: `${outputDir}/class-a-plus-${name}.png`, fullPage: true });
   console.log(`${route} title=${await page.title()} h1=${await page.locator("h1").first().textContent().catch(() => "")}`);
 }

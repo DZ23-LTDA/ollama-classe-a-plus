@@ -1,0 +1,29 @@
+{
+  "gateway_api_key_env": "OLLAMA_DZ23_GATEWAY_KEY",
+  "providers": [
+    {
+      "name": "harnessrouter",
+      "type": "openai-compatible",
+      "base_url": "http://127.0.0.1:3000/api/harness/v1",
+      "api_key_env": "HARNESSROUTER_API_KEY",
+      "allow_private": true,
+      "allow_insecure_loopback": true,
+      "paths": ["/v1/responses"],
+      "priority": 95,
+      "models": [
+        {
+          "id": "codex",
+          "harness_id": "codex",
+          "capabilities": ["chat", "tools", "coding"],
+          "priority": 30
+        },
+        {
+          "id": "claude-code",
+          "harness_id": "claude-code",
+          "capabilities": ["chat", "tools", "coding"],
+          "priority": 25
+        }
+      ]
+    }
+  ]
+}

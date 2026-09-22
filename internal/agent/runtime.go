@@ -277,6 +277,10 @@ func (r *Runtime) GetMission(id string) (Mission, error) {
 	return r.store.GetMission(strings.TrimSpace(id))
 }
 
+func (r *Runtime) ListMissions() ([]Mission, error) {
+	return r.store.ListMissions()
+}
+
 func (r *Runtime) Start(ctx context.Context) {
 	worker := func(jobContext context.Context, job QueueJob) error {
 		return r.Run(jobContext, job.MissionID)
@@ -303,7 +307,7 @@ func (r *Runtime) Start(ctx context.Context) {
 
 func (r *Runtime) resumePending(ctx context.Context) {
 	for _, schedule := range r.context.ClaimDueSchedules(time.Now().UTC()) {
-		_, _ = r.CreateMission(ctx, CreateMissionRequest{Objective: schedule.Objective, Model: schedule.Model, Workspace: schedule.Workspace, ProjectID: schedule.ProjectID, AutoRun: true})
+		_, _ = r.CreateMission(ctx, CreateMissionRequest{Objective: schedule.Objective, Model: schedule.Model, Workspace: schedule.Workspace, ProjectID: schedule.ProjectID, OrganizationID: schedule.OrganizationID, AutoRun: true})
 	}
 	missions, err := r.store.ListMissions()
 	if err != nil {

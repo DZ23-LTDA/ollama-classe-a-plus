@@ -32,6 +32,8 @@ type agentAPI struct {
 	samlServices map[string]*agent.SAMLService
 }
 
+var errAgentForbidden = errors.New("object is outside the active organization")
+
 func newAgentAPI(runtime *agent.Runtime) (*agentAPI, error) {
 	storeRoot := strings.TrimSpace(os.Getenv("OLLAMA_AGENT_AUTH_STORE"))
 	auth, err := agent.NewAuthStore(storeRoot)
@@ -235,6 +237,7 @@ func (a *agentAPI) register(r *gin.Engine) {
 	group.POST("/devices/:id/heartbeat", a.deviceHeartbeat)
 	group.POST("/devices/:id/revoke", a.revokeDevice)
 	group.GET("/devices/:id/connect", a.deviceConnect)
+	group.GET("/metrics", a.metrics)
 	group.POST("/projects/:id/ingest", a.ingestProject)
 	group.GET("/builders", a.builders)
 	group.POST("/builders", a.createBuilder)
@@ -257,9 +260,14 @@ func (a *agentAPI) register(r *gin.Engine) {
 	group.GET("/skills", a.skills)
 	group.GET("/schedules", a.schedules)
 	group.POST("/schedules", a.createSchedule)
+	group.PATCH("/schedules/:id", a.updateSchedule)
+	group.DELETE("/schedules/:id", a.deleteSchedule)
 	group.POST("/webhooks/:schedule_id", a.webhook)
+	group.GET("/projects", a.projects)
 	group.POST("/projects", a.createProject)
 	group.GET("/projects/:id", a.getProject)
+	group.PATCH("/projects/:id", a.updateProject)
+	group.DELETE("/projects/:id", a.deleteProject)
 	group.POST("/projects/:id/memories", a.addMemory)
 	group.GET("/projects/:id/memories", a.searchMemories)
 	group.GET("/collab/:project_id", a.collabSnapshot)
@@ -267,6 +275,7 @@ func (a *agentAPI) register(r *gin.Engine) {
 	group.POST("/collab/:project_id/comments", a.collabComment)
 	group.POST("/collab/:project_id/presence", a.collabPresence)
 	group.POST("/missions", a.createMission)
+	group.GET("/missions", a.missions)
 	group.GET("/missions/:id", a.getMission)
 	group.GET("/missions/:id/events", a.events)
 	group.GET("/missions/:id/events/stream", a.eventStream)
@@ -343,6 +352,15 @@ func (a *agentAPI) scopedRuntime(c *gin.Context) *agent.Runtime {
 		}
 	}
 	return a.runtime
+}
+
+func agentOrganizationID(c *gin.Context) string {
+	if value, ok := c.Get("agent.organization"); ok {
+		if organization, ok := value.(agent.Organization); ok {
+			return organization.ID
+		}
+	}
+	return ""
 }
 
 func (a *agentAPI) missionForRequest(c *gin.Context) (agent.Mission, error) {
@@ -796,7 +814,8 @@ func (a *agentAPI) skills(c *gin.Context) {
 }
 
 func (a *agentAPI) schedules(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"schedules": a.context.ListSchedules()})
+	organizationID := agentOrganizationID(c)
+	c.JSON(http.StatusOK, gin.H{"schedules": a.context.ListSchedulesForOrganization(organizationID)})
 }
 
 func (a *agentAPI) createSchedule(c *gin.Context) {
@@ -805,12 +824,53 @@ func (a *agentAPI) createSchedule(c *gin.Context) {
 		writeAgentError(c, http.StatusBadRequest, err)
 		return
 	}
+	schedule.OrganizationID = agentOrganizationID(c)
 	created, err := a.context.CreateSchedule(schedule)
 	if err != nil {
 		writeAgentError(c, http.StatusBadRequest, err)
 		return
 	}
 	c.JSON(http.StatusCreated, created)
+}
+
+func (a *agentAPI) updateSchedule(c *gin.Context) {
+	var schedule agent.Schedule
+	if err := decodeJSON(c, &schedule); err != nil {
+		writeAgentError(c, http.StatusBadRequest, err)
+		return
+	}
+	current, err := a.context.GetSchedule(c.Param("id"))
+	if err != nil {
+		writeAgentError(c, statusForAgentError(err), err)
+		return
+	}
+	if organizationID := agentOrganizationID(c); organizationID != "" && current.OrganizationID != organizationID {
+		writeAgentError(c, http.StatusForbidden, errAgentForbidden)
+		return
+	}
+	updated, err := a.context.UpdateSchedule(c.Param("id"), schedule)
+	if err != nil {
+		writeAgentError(c, statusForAgentError(err), err)
+		return
+	}
+	c.JSON(http.StatusOK, updated)
+}
+
+func (a *agentAPI) deleteSchedule(c *gin.Context) {
+	current, err := a.context.GetSchedule(c.Param("id"))
+	if err != nil {
+		writeAgentError(c, statusForAgentError(err), err)
+		return
+	}
+	if organizationID := agentOrganizationID(c); organizationID != "" && current.OrganizationID != organizationID {
+		writeAgentError(c, http.StatusForbidden, errAgentForbidden)
+		return
+	}
+	if err := a.context.DeleteSchedule(c.Param("id")); err != nil {
+		writeAgentError(c, statusForAgentError(err), err)
+		return
+	}
+	c.Status(http.StatusNoContent)
 }
 
 func (a *agentAPI) webhook(c *gin.Context) {
@@ -831,7 +891,7 @@ func (a *agentAPI) webhook(c *gin.Context) {
 		return
 	}
 	objective := schedule.Objective + "\nWebhook payload:\n" + string(payload)
-	mission, err := a.runtime.CreateMission(c.Request.Context(), agent.CreateMissionRequest{Objective: objective, Model: schedule.Model, Workspace: schedule.Workspace, ProjectID: schedule.ProjectID, AutoRun: true})
+	mission, err := a.runtime.CreateMission(c.Request.Context(), agent.CreateMissionRequest{Objective: objective, Model: schedule.Model, Workspace: schedule.Workspace, ProjectID: schedule.ProjectID, OrganizationID: schedule.OrganizationID, AutoRun: true})
 	if err != nil {
 		writeAgentError(c, http.StatusBadRequest, err)
 		return
@@ -848,6 +908,21 @@ func verifyAgentWebhook(expected, provided string) bool {
 	return hmac.Equal(expectedSum[:], providedSum[:])
 }
 
+func (a *agentAPI) projects(c *gin.Context) {
+	organizationID := agentOrganizationID(c)
+	projects := a.context.ListProjects()
+	if organizationID != "" {
+		filtered := projects[:0]
+		for _, project := range projects {
+			if project.OrganizationID == organizationID {
+				filtered = append(filtered, project)
+			}
+		}
+		projects = filtered
+	}
+	c.JSON(http.StatusOK, gin.H{"projects": projects})
+}
+
 func (a *agentAPI) createProject(c *gin.Context) {
 	var request struct {
 		Name string `json:"name"`
@@ -857,7 +932,7 @@ func (a *agentAPI) createProject(c *gin.Context) {
 		writeAgentError(c, http.StatusBadRequest, err)
 		return
 	}
-	project, err := a.context.CreateProject(request.Name, request.Root)
+	project, err := a.context.CreateProject(request.Name, request.Root, agentOrganizationID(c))
 	if err != nil {
 		writeAgentError(c, http.StatusBadRequest, err)
 		return
@@ -866,12 +941,57 @@ func (a *agentAPI) createProject(c *gin.Context) {
 }
 
 func (a *agentAPI) getProject(c *gin.Context) {
-	project, err := a.context.GetProject(c.Param("id"))
+	project, err := a.projectForRequest(c)
 	if err != nil {
 		writeAgentError(c, statusForAgentError(err), err)
 		return
 	}
 	c.JSON(http.StatusOK, project)
+}
+
+func (a *agentAPI) updateProject(c *gin.Context) {
+	current, err := a.projectForRequest(c)
+	if err != nil {
+		writeAgentError(c, statusForAgentError(err), err)
+		return
+	}
+	var request struct {
+		Name string `json:"name"`
+		Root string `json:"root,omitempty"`
+	}
+	if err := decodeJSON(c, &request); err != nil {
+		writeAgentError(c, http.StatusBadRequest, err)
+		return
+	}
+	updated, err := a.context.UpdateProject(current.ID, request.Name, request.Root)
+	if err != nil {
+		writeAgentError(c, statusForAgentError(err), err)
+		return
+	}
+	c.JSON(http.StatusOK, updated)
+}
+
+func (a *agentAPI) deleteProject(c *gin.Context) {
+	if _, err := a.projectForRequest(c); err != nil {
+		writeAgentError(c, statusForAgentError(err), err)
+		return
+	}
+	if err := a.context.DeleteProject(c.Param("id")); err != nil {
+		writeAgentError(c, statusForAgentError(err), err)
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+func (a *agentAPI) projectForRequest(c *gin.Context) (agent.Project, error) {
+	project, err := a.context.GetProject(c.Param("id"))
+	if err != nil {
+		return agent.Project{}, err
+	}
+	if organizationID := agentOrganizationID(c); organizationID != "" && project.OrganizationID != organizationID {
+		return agent.Project{}, errAgentForbidden
+	}
+	return project, nil
 }
 
 func (a *agentAPI) collabActor(c *gin.Context) string {
@@ -967,6 +1087,24 @@ func (a *agentAPI) searchMemories(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"project_id": c.Param("id"), "memories": memories})
+}
+
+func (a *agentAPI) missions(c *gin.Context) {
+	missions, err := a.scopedRuntime(c).ListMissions()
+	if err != nil {
+		writeAgentError(c, http.StatusInternalServerError, err)
+		return
+	}
+	if organizationID := agentOrganizationID(c); organizationID != "" {
+		filtered := missions[:0]
+		for _, mission := range missions {
+			if mission.OrganizationID == organizationID {
+				filtered = append(filtered, mission)
+			}
+		}
+		missions = filtered
+	}
+	c.JSON(http.StatusOK, gin.H{"missions": missions})
 }
 
 func (a *agentAPI) createMission(c *gin.Context) {
@@ -1696,6 +1834,9 @@ func writeAgentError(c *gin.Context, status int, err error) {
 }
 
 func statusForAgentError(err error) int {
+	if errors.Is(err, errAgentForbidden) {
+		return http.StatusForbidden
+	}
 	if errors.Is(err, os.ErrNotExist) {
 		return http.StatusNotFound
 	}

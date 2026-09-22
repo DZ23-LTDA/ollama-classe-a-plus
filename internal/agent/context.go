@@ -90,7 +90,7 @@ func NewContextStore(root string) (*ContextStore, error) {
 	return store, nil
 }
 
-func (s *ContextStore) CreateProject(name, root string) (Project, error) {
+func (s *ContextStore) CreateProject(name, root string, organizationIDs ...string) (Project, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return Project{}, errors.New("project name is required")
@@ -99,7 +99,11 @@ func (s *ContextStore) CreateProject(name, root string) (Project, error) {
 		return Project{}, errors.New("project name is too long")
 	}
 	now := time.Now().UTC()
-	project := Project{ID: "prj_" + uuid.NewString(), Name: name, Root: root, CreatedAt: now, UpdatedAt: now}
+	organizationID := ""
+	if len(organizationIDs) > 0 {
+		organizationID = strings.TrimSpace(organizationIDs[0])
+	}
+	project := Project{ID: "prj_" + uuid.NewString(), Name: name, Root: root, OrganizationID: organizationID, CreatedAt: now, UpdatedAt: now}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.projects[project.ID] = project
@@ -111,6 +115,19 @@ func (s *ContextStore) CreateProject(name, root string) (Project, error) {
 	return project, nil
 }
 
+func (s *ContextStore) ListProjects() []Project {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	result := make([]Project, 0, len(s.projects))
+	for _, project := range s.projects {
+		result = append(result, project)
+	}
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].UpdatedAt.After(result[j].UpdatedAt)
+	})
+	return result
+}
+
 func (s *ContextStore) GetProject(id string) (Project, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -119,6 +136,59 @@ func (s *ContextStore) GetProject(id string) (Project, error) {
 		return Project{}, os.ErrNotExist
 	}
 	return project, nil
+}
+
+func (s *ContextStore) UpdateProject(id, name, root string) (Project, error) {
+	id = strings.TrimSpace(id)
+	name = strings.TrimSpace(name)
+	if id == "" {
+		return Project{}, errors.New("project id is required")
+	}
+	if name == "" {
+		return Project{}, errors.New("project name is required")
+	}
+	if len(name) > 200 {
+		return Project{}, errors.New("project name is too long")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	project, ok := s.projects[id]
+	if !ok {
+		return Project{}, os.ErrNotExist
+	}
+	project.Name = name
+	project.Root = root
+	project.UpdatedAt = time.Now().UTC()
+	s.projects[id] = project
+	if s.root != "" {
+		if err := writeJSONAtomic(filepath.Join(s.root, "projects", id+".json"), project); err != nil {
+			return Project{}, err
+		}
+	}
+	return project, nil
+}
+
+func (s *ContextStore) DeleteProject(id string) error {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return errors.New("project id is required")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.projects[id]; !ok {
+		return os.ErrNotExist
+	}
+	delete(s.projects, id)
+	delete(s.memories, id)
+	if s.root != "" {
+		if err := os.Remove(filepath.Join(s.root, "projects", id+".json")); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+		if err := os.Remove(filepath.Join(s.root, "memories", id+".json")); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *ContextStore) SetEmbedder(embedder Embedder) {
@@ -326,14 +396,73 @@ func (s *ContextStore) GetSchedule(id string) (Schedule, error) {
 }
 
 func (s *ContextStore) ListSchedules() []Schedule {
+	return s.ListSchedulesForOrganization("")
+}
+
+func (s *ContextStore) ListSchedulesForOrganization(organizationID string) []Schedule {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	result := make([]Schedule, 0, len(s.schedules))
 	for _, schedule := range s.schedules {
+		if organizationID != "" && schedule.OrganizationID != organizationID {
+			continue
+		}
 		result = append(result, schedule)
 	}
 	sort.Slice(result, func(i, j int) bool { return result[i].NextRunAt.Before(result[j].NextRunAt) })
 	return result
+}
+
+func (s *ContextStore) UpdateSchedule(id string, schedule Schedule) (Schedule, error) {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return Schedule{}, errors.New("schedule id is required")
+	}
+	if strings.TrimSpace(schedule.Objective) == "" {
+		return Schedule{}, errors.New("schedule objective is required")
+	}
+	if schedule.IntervalSeconds < 1 || schedule.IntervalSeconds > 31*24*60*60 {
+		return Schedule{}, errors.New("schedule interval must be between 1 second and 31 days")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	current, ok := s.schedules[id]
+	if !ok {
+		return Schedule{}, os.ErrNotExist
+	}
+	schedule.ID = id
+	schedule.OrganizationID = current.OrganizationID
+	schedule.CreatedAt = current.CreatedAt
+	schedule.UpdatedAt = time.Now().UTC()
+	if schedule.NextRunAt.IsZero() {
+		schedule.NextRunAt = time.Now().UTC().Add(time.Duration(schedule.IntervalSeconds) * time.Second)
+	}
+	s.schedules[id] = schedule
+	if s.root != "" {
+		if err := writeJSONAtomic(filepath.Join(s.root, "schedules", id+".json"), schedule); err != nil {
+			return Schedule{}, err
+		}
+	}
+	return schedule, nil
+}
+
+func (s *ContextStore) DeleteSchedule(id string) error {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return errors.New("schedule id is required")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.schedules[id]; !ok {
+		return os.ErrNotExist
+	}
+	delete(s.schedules, id)
+	if s.root != "" {
+		if err := os.Remove(filepath.Join(s.root, "schedules", id+".json")); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *ContextStore) ClaimDueSchedules(now time.Time) []Schedule {

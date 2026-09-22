@@ -152,6 +152,39 @@ func TestProxyRoutesLocalOmniRouteGateway(t *testing.T) {
 	}
 }
 
+func TestProxyInjectsHarnessRouterMetadata(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	var metadata map[string]any
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		metadata, _ = body["metadata"].(map[string]any)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"harnessrouter-test","object":"response","status":"completed"}`))
+	}))
+	defer upstream.Close()
+
+	r := &Registry{
+		providers: map[string]Provider{"harnessrouter": {Name: "harnessrouter", Type: ProviderTypeOpenAICompatible, BaseURL: upstream.URL + "/v1", Paths: []string{"/v1/responses"}, AllowPrivate: true, AllowInsecureLoopback: true}},
+		models:    map[string]Model{"harnessrouter/codex": {ID: "harnessrouter/codex", UpstreamID: "gpt-test", HarnessID: "codex", Provider: "harnessrouter", Available: true}},
+	}
+	router := gin.New()
+	router.Use(NewGateway(r, nil).Middleware())
+	router.POST("/v1/responses", func(c *gin.Context) { t.Fatal("request was not proxied") })
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(`{"model":"harnessrouter/codex","metadata":{"trace_id":"trace-test"},"input":"hello"}`))
+	request.RemoteAddr = "127.0.0.1:12345"
+	router.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+	if metadata["harness_id"] != "codex" || metadata["trace_id"] != "trace-test" {
+		t.Fatalf("metadata=%v", metadata)
+	}
+}
+
 func TestCLIProviderRequiresExplicitExecutionAndReturnsCompletion(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	t.Setenv("DZ23_CLI_HELPER", "1")

@@ -35,3 +35,41 @@ func TestSemanticMemorySearchRanksByCosineSimilarity(t *testing.T) {
 		t.Fatalf("memories = %+v", memories)
 	}
 }
+
+func TestProjectAndScheduleCRUDPersistsAndDeletes(t *testing.T) {
+	root := t.TempDir()
+	store, err := NewContextStore(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	project, err := store.CreateProject("Workspace", "", "org_test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := store.ListProjects(); len(got) != 1 || got[0].OrganizationID != "org_test" {
+		t.Fatalf("projects = %+v", got)
+	}
+	updatedProject, err := store.UpdateProject(project.ID, "Workspace atualizado", "")
+	if err != nil || updatedProject.Name != "Workspace atualizado" {
+		t.Fatalf("updated project = %+v, err = %v", updatedProject, err)
+	}
+	schedule, err := store.CreateSchedule(Schedule{Objective: "verificar", IntervalSeconds: 60, OrganizationID: "org_test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := store.ListSchedulesForOrganization("org_test"); len(got) != 1 || got[0].ID != schedule.ID {
+		t.Fatalf("schedules = %+v", got)
+	}
+	if _, err := store.UpdateSchedule(schedule.ID, Schedule{Objective: "verificar atualizado", IntervalSeconds: 120, Enabled: true}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.DeleteSchedule(schedule.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.DeleteProject(project.ID); err != nil {
+		t.Fatal(err)
+	}
+	if len(store.ListProjects()) != 0 || len(store.ListSchedules()) != 0 {
+		t.Fatalf("store was not deleted: projects=%v schedules=%v", store.ListProjects(), store.ListSchedules())
+	}
+}

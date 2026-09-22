@@ -37,3 +37,13 @@ Adapters, contratos, testes e documentação não significam que contas externas
 Os gates comprovados desta revisão incluem testes focados do runtime/server, build Go, build/typecheck da UI e typecheck mobile em suas fases correspondentes. O workflow público [`dz23-agentic-quality`](.github/workflows/dz23-agentic-quality.yaml) executa os gates de qualidade e a integração distribuída no GitHub Actions.
 
 [0.1.0]: https://github.com/DZ23-LTDA/ollama-classe-a-plus/releases/tag/v0.1.0
+
+## Unreleased — fluxo vertical funcional e HarnessRouter — 2026-09-22
+
+- CRUD real tenant-aware de Projetos e Agendado, listagem de missões e artifacts na Biblioteca, com ações server-side e confirmação para exclusão.
+- Agentic Console com seleção de Ollama local, Claude, Codex, OmniRoute e projeto persistente; Nova tarefa cria missão real e mantém timeline/approvals.
+- Home do shell com composer, recomendações e atalhos funcionais para slides, site, design, jogos e missões; fallback local-first não bloqueia a aplicação quando Settings está offline.
+- Catalogação funcional de connectors, MCP stdio, skills e CLIs com normalização de respostas nulas e nenhuma exposição de secret.
+- Endpoint JSON `GET /api/agent/v1/metrics` registrado para o Console e smoke E2E live cobrindo home, CRUD, Plugins, Skills e criação de missão.
+- Adapter HarnessRouter por OpenAI Responses-compatible com `harness_id` server-side, teste de preservação de metadata e preset [`examples/dz23-harnessrouter.json`](examples/dz23-harnessrouter.json); a execução real continua dependente de instância, chave e harness instalados.
+- Manual, matriz de paridade, roadmap, checkpoint de missão e screenshots atualizados.

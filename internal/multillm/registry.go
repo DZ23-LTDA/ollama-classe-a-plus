@@ -51,6 +51,7 @@ const (
 
 type ModelConfig struct {
 	ID           string   `json:"id"`
+	HarnessID    string   `json:"harness_id,omitempty"`
 	Capabilities []string `json:"capabilities,omitempty"`
 	Priority     int      `json:"priority,omitempty"`
 }
@@ -58,6 +59,7 @@ type ModelConfig struct {
 type Model struct {
 	ID           string   `json:"id"`
 	UpstreamID   string   `json:"upstream_id"`
+	HarnessID    string   `json:"harness_id,omitempty"`
 	Provider     string   `json:"provider"`
 	Capabilities []string `json:"capabilities,omitempty"`
 	Available    bool     `json:"available"`
@@ -106,7 +108,7 @@ func Load(path string) (*Registry, error) {
 			if _, exists := r.models[id]; exists {
 				return nil, fmt.Errorf("duplicate model %q", id)
 			}
-			r.models[id] = Model{ID: id, UpstreamID: item.ID, Provider: p.Name, Capabilities: append([]string(nil), item.Capabilities...), Available: available, Priority: p.Priority + item.Priority}
+			r.models[id] = Model{ID: id, UpstreamID: item.ID, HarnessID: strings.TrimSpace(item.HarnessID), Provider: p.Name, Capabilities: append([]string(nil), item.Capabilities...), Available: available, Priority: p.Priority + item.Priority}
 		}
 	}
 	return r, nil

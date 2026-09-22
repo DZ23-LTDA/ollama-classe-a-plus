@@ -69,6 +69,12 @@ curl -sS -X POST http://localhost:11434/api/agent/v1/projects \
   -H 'Content-Type: application/json' \
   -d '{"name":"Meu projeto","root":"/workspace"}'
 
+curl -sS http://localhost:11434/api/agent/v1/projects
+curl -sS -X PATCH http://localhost:11434/api/agent/v1/projects/PROJECT_ID \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Meu projeto atualizado","root":"/workspace"}'
+curl -sS -X DELETE http://localhost:11434/api/agent/v1/projects/PROJECT_ID
+
 curl -sS -X POST http://localhost:11434/api/agent/v1/projects/PROJECT_ID/memories \
   -H 'Content-Type: application/json' \
   -d '{"kind":"decision","content":"usar testes de contrato","confidence":1,"source":"operator"}'
@@ -92,12 +98,18 @@ O endpoint Prometheus expõe counters de missões, passos, retries, approvals e 
 
 ## Agendamentos e webhooks
 
-Um schedule cria missões recorrentes. O intervalo é limitado a 31 dias e o claim é idempotente no store.
+Um schedule cria missões recorrentes. O intervalo é limitado a 31 dias e o claim é idempotente no store. `GET /schedules` lista os schedules do tenant ativo; `PATCH /schedules/SCHEDULE_ID` edita o objetivo, intervalo e estado; `DELETE /schedules/SCHEDULE_ID` remove a automação.
 
 ```bash
 curl -sS -X POST http://localhost:11434/api/agent/v1/schedules \
   -H 'Content-Type: application/json' \
   -d '{"objective":"verificar o projeto","interval_seconds":3600,"webhook_secret_env":"DZ23_WEBHOOK_SECRET"}'
+
+curl -sS http://localhost:11434/api/agent/v1/schedules
+curl -sS -X PATCH http://localhost:11434/api/agent/v1/schedules/SCHEDULE_ID \
+  -H 'Content-Type: application/json' \
+  -d '{"objective":"verificar novamente","interval_seconds":7200,"enabled":true}'
+curl -sS -X DELETE http://localhost:11434/api/agent/v1/schedules/SCHEDULE_ID
 ```
 
 Para disparar por evento, configure a variável secreta no ambiente do processo e envie o header `X-Ollama-Agent-Secret`. O valor nunca é gravado no schedule.

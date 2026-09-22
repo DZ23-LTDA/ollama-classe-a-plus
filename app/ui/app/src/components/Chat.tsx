@@ -202,20 +202,40 @@ export default function Chat({ chatId }: { chatId: string }) {
       hasVisionCapability={hasVisionCapability}
     >
       {chatId === "new" ? (
-        <div className="flex flex-col h-screen justify-center relative">
-          <div className="px-6">
-            <ChatForm
-              hasMessages={false}
-              onSubmit={handleChatFormSubmit}
-              chatId={chatId}
-              autoFocus={true}
-              editingMessage={editingMessage}
-              onCancelEdit={handleCancelEdit}
-              isDownloadingModel={isDownloadingModel}
-              isDisabled={isDisabled}
-              onFilesReceived={handleFilesReceived}
-            />
-          </div>
+        <div className="flex min-h-screen flex-col bg-neutral-50 dark:bg-neutral-950">
+          <section className="mx-auto flex w-full max-w-5xl flex-1 flex-col justify-center px-5 pb-16 pt-10 sm:px-8">
+            <div className="mx-auto w-full max-w-3xl text-center">
+              <p className="text-xs font-medium uppercase tracking-[0.22em] text-neutral-400">Ollama Classe A+</p>
+              <h1 className="mt-4 font-serif text-4xl font-medium tracking-tight text-neutral-900 dark:text-neutral-100 sm:text-5xl">O que posso fazer por você?</h1>
+              <p className="mx-auto mt-4 max-w-xl text-sm leading-6 text-neutral-500 dark:text-neutral-400">Converse, pesquise, construa e execute com o runtime local-first. Para missões com plano, ferramentas e approvals, use o Agentic Console.</p>
+              <div className="mt-8 text-left">
+                <ChatForm
+                  hasMessages={false}
+                  onSubmit={handleChatFormSubmit}
+                  chatId={chatId}
+                  autoFocus={true}
+                  editingMessage={editingMessage}
+                  onCancelEdit={handleCancelEdit}
+                  isDownloadingModel={isDownloadingModel}
+                  isDisabled={isDisabled}
+                  onFilesReceived={handleFilesReceived}
+                />
+              </div>
+
+              <div className="mt-3 flex flex-wrap justify-center gap-2">
+                {[['Criar slides', 'Crie uma apresentação profissional com roteiro, conteúdo e exportação.'], ['Criar site', 'Construa um site responsivo com preview e artifacts.'], ['Design', 'Proponha uma interface e um design system para meu produto.'], ['Criar jogos', 'Crie um jogo browser jogável e explique como executar.'], ['Mais', 'Planeje uma missão multiagente para construir e validar um produto.']].map(([label, objective]) => (
+                  <button key={label} type="button" onClick={() => window.location.assign(`/agentic?objective=${encodeURIComponent(objective)}`)} className="rounded-full border border-neutral-200 bg-white px-4 py-2 text-xs font-medium text-neutral-600 transition hover:border-neutral-400 hover:text-neutral-900 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-300 dark:hover:border-neutral-600 dark:hover:text-white">{label}</button>
+                ))}
+              </div>
+
+              <div className="mt-8 text-left">
+                <div className="mb-3 flex items-center justify-between"><h2 className="text-sm font-semibold text-neutral-800 dark:text-neutral-200">Recomendado para você</h2><button type="button" onClick={() => window.location.assign('/agentic?objective=Pesquise%20e%20sintetize%20as%20melhores%20opcoes%20para%20minha%20tarefa')} className="text-xs text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200">Atualizar</button></div>
+                <div className="grid gap-3 md:grid-cols-3">
+                  {[['Audite meu projeto', 'Inspecione o código, encontre riscos e proponha correções testáveis.'], ['Construa um MVP', 'Crie um produto completo, com backend, frontend, testes e preview.'], ['Pesquise o mercado', 'Compare soluções, cite fontes e entregue uma síntese com próximos passos.']].map(([title, objective]) => <button key={title} type="button" onClick={() => window.location.assign(`/agentic?objective=${encodeURIComponent(objective)}`)} className="min-h-28 rounded-2xl border border-neutral-200 bg-white p-4 text-left transition hover:-translate-y-0.5 hover:border-neutral-400 hover:shadow-sm dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-neutral-600"><span className="text-xs text-neutral-400">⌁</span><span className="mt-3 block text-sm font-medium leading-5 text-neutral-800 dark:text-neutral-200">{title}</span><span className="mt-1 block text-xs leading-5 text-neutral-500 dark:text-neutral-400">{objective}</span></button>)}
+                </div>
+              </div>
+            </div>
+          </section>
         </div>
       ) : (
         <main className="flex h-screen w-full flex-col relative allow-context-menu select-none">
