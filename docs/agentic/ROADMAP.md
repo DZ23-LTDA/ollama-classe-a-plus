@@ -225,3 +225,8 @@ Bearer web deixou de ser persistido no localStorage e sessões inválidas são l
 ## Incremento 2026-09-22 — OAuth endpoint egress
 
 Os endpoints OAuth/OIDC agora compartilham política de egress sem proxy/redirect e com IP efetivo seguro. Continua necessário executar um IdP de staging para provar discovery, JWKS, assinatura, audience, nonce, refresh e revogação sem simular credenciais ou declarar SSO de produção.
+
+
+## Incremento 2026-09-22 — tool process containment
+
+Tools agora têm lifecycle de grupo, redaction e limites best-effort reportados. A próxima fronteira de isolamento é implementar/adotar seccomp, cgroups, quotas e políticas específicas por plataforma; até isso ser testado, o runtime continua classificado como contenção parcial.

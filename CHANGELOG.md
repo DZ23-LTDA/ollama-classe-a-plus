@@ -206,3 +206,8 @@ O cliente web agentic removeu bearer persistido em localStorage e passou a usar 
 ## 2026-09-22 — OAuth endpoint egress hardening
 
 OIDC discovery, JWKS, userinfo e token exchange passaram a bloquear proxy/redirects, validar HTTPS e rejeitar IP privado efetivamente conectado. Discovery também valida os endpoints retornados pelo IdP antes de usá-los.
+
+
+## 2026-09-22 — tool process containment
+
+Terminal e sandbox tools passaram a usar grupo de processos encerrável, limites de timeout/saída, stderr redacted e status explícito de isolamento. O sandbox usa `ulimit` best-effort quando disponível; seccomp/cgroups e sandbox forte permanecem fora do claim.

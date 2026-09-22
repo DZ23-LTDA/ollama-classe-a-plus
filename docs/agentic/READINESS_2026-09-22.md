@@ -179,3 +179,10 @@ No mobile, 401/403 removem o token do Expo SecureStore sem enfileirar mutações
 Discovery OIDC, JWKS, userinfo e token exchange passaram a usar um client seguro que remove proxy ambiental, bloqueia redirects e verifica o IP efetivamente conectado, aceitando loopback apenas quando o endpoint configurado é explicitamente loopback. URLs de endpoints rejeitam credentials/fragments e exigem HTTPS; discovery valida issuer e também os endpoints de autorização, token, JWKS e userinfo retornados antes de usá-los.
 
 Regressões cobrem redirect OAuth e socket privado real, além de validação de endpoint existente. Os gates completos passaram: integrity guard, Go tests/vet/build, Vitest 20/199, UI build e mobile typecheck. Um IdP real/staging ainda é necessário para validar discovery, assinatura, audience, nonce, rotação e refresh ponta a ponta.
+
+
+## Slice P0 de contenção best-effort de tools — 2026-09-22
+
+`terminal.exec` e `sandbox.exec` agora iniciam processo em grupo próprio e encerram o grupo ao cancelar ou atingir timeout, evitando deixar filhos órfãos no caminho comum. Saídas stdout/stderr são limitadas e passam por `RedactDLP` antes de retornar; o resultado informa a postura `best-effort-process-group` ou `best-effort-unshare`. O sandbox `unshare` aplica, quando suportado pelo shell/kernel, limites best-effort de CPU, memória virtual, processos, descriptors e tamanho de arquivo via `ulimit`, além de continuar com user/mount/PID/network namespaces e ambiente mínimo.
+
+Testes cobrem redaction de stderr, status explícito, cancelamento rápido e encerramento do grupo; a suíte `internal/agent` e os gates completos passaram. Isso não é sandbox forte: seccomp, cgroups, enforcement robusto de PID/memória/CPU e validação real em Windows/macOS/Linux continuam pendentes. O produto deve mostrar essa limitação ao operador em vez de alegar isolamento equivalente a E2B.

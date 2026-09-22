@@ -120,6 +120,10 @@ grep -q 'Apagar sessão local' apps/mobile-agentic/App.tsx
 grep -q 'oauth destination connected to a private address' internal/agent/auth.go
 grep -q 'validateOAuthEndpointURL' internal/agent/auth.go
 grep -q 'TestOAuthClientBlocksRedirectAndPrivateActualAddress' internal/agent/auth_test.go
+grep -q 'runToolCommand' internal/agent/tools.go
+grep -q 'ulimit -t 55' internal/agent/tools.go
+grep -q 'TestRunToolCommandKillsProcessGroupOnCancellation' internal/agent/tools_test.go
+grep -q 'best-effort-unshare' internal/agent/tools.go
 grep -q 'Capabilities' internal/agent/runtime.go
 grep -q 'Evaluation' internal/agent/evaluation.go
 for route in projects library scheduled skills plugins tasks company; do

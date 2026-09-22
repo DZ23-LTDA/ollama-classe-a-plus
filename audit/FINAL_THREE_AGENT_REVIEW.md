@@ -166,3 +166,8 @@ O bearer web não é mais lido de localStorage: a sessão fica em memória e é 
 ## Slice P0 validada — OAuth endpoint egress — 2026-09-22
 
 OIDC discovery/JWKS/userinfo/token exchange agora usam egress sem proxy, redirects bloqueados e verificação de IP conectado; endpoints retornados por discovery são validados antes do uso. A prova contra IdP real, refresh/revogação e operação SSO de produção permanecem externas ao sandbox.
+
+
+## Slice P0 validada — tool process containment — 2026-09-22
+
+Terminal/sandbox tools ganharam grupo de processo encerrável, timeout, output bound, stderr redaction, ambiente mínimo e `ulimit` best-effort no sandbox. O resultado é explicitamente `best-effort`; seccomp/cgroups, quotas fortes e testes físicos por plataforma continuam abertos, portanto não equivale a sandbox forte.

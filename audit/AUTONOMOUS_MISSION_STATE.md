@@ -1210,3 +1210,30 @@ proofs: integrity, Go tests/vet/build, UI Vitest/build, mobile typecheck and OAu
 classification: preview/local RC em hardening
 next_slice: secure session/CSRF contract or sandbox resource controls; no main merge
 ```
+
+
+## Slice P0 tool process containment validada — aguardando publicação — 2026-09-22
+
+```yaml
+state: RELEASING
+iteration: 18
+base_commit: 16310fa2
+working_tree: tool containment changes/tests/docs still uncommitted
+implemented:
+  - process-group lifecycle and cancellation kill
+  - bounded/redacted stdout and stderr
+  - explicit best-effort isolation/resource status
+  - sandbox ulimit CPU/memory/PID/fd/filesize best effort
+proofs:
+  - focused tools tests: PASS
+  - internal/agent suite: PASS
+  - integrity guard: PASS
+  - CGO_ENABLED=1 go test ./... -count=1: PASS
+  - CGO_ENABLED=1 go vet ./...: PASS
+  - CGO_ENABLED=1 go build: PASS
+  - UI Vitest 20/199 and build: PASS; known >500KB warning
+  - mobile typecheck: PASS
+classification: preview/local RC em hardening; containment partial, not strong sandbox
+open_risks: seccomp/cgroups/physical platform isolation, web login wiring, real IdP/staging
+next_action: commit/push, then continue plugin/MCP tenant ownership or release/CI hardening
+```

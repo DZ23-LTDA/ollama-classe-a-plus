@@ -196,16 +196,17 @@ func (t terminalExecTool) Execute(ctx context.Context, toolContext ToolContext, 
 	}
 	deadline, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	command := exec.CommandContext(deadline, executable, args...)
+	command := exec.Command(executable, args...)
 	command.Dir = toolContext.Workspace
 	command.Env = []string{"PATH=/usr/bin:/bin", "HOME=" + toolContext.Workspace, "PWD=" + toolContext.Workspace}
+	configureToolProcess(command)
 	var stdout, stderr bytes.Buffer
 	command.Stdout = &limitedBuffer{Buffer: &stdout, Limit: 64 << 10}
 	command.Stderr = &limitedBuffer{Buffer: &stderr, Limit: 64 << 10}
-	if err := command.Run(); err != nil {
-		return ToolResult{Value: map[string]any{"stdout": stdout.String(), "stderr": stderr.String()}}, err
+	if err := runToolCommand(deadline, command); err != nil {
+		return ToolResult{Value: map[string]any{"stdout": RedactDLP(stdout.String()), "stderr": RedactDLP(stderr.String()), "execution_isolation": "best-effort-process-group", "resource_limits": "context-timeout-and-output-bounded"}}, err
 	}
-	return ToolResult{Value: map[string]any{"stdout": stdout.String(), "stderr": stderr.String(), "exit_code": 0}}, nil
+	return ToolResult{Value: map[string]any{"stdout": RedactDLP(stdout.String()), "stderr": RedactDLP(stderr.String()), "exit_code": 0, "execution_isolation": "best-effort-process-group", "resource_limits": "context-timeout-and-output-bounded"}}, nil
 }
 
 type limitedBuffer struct {
@@ -400,6 +401,11 @@ func (sandboxExecTool) Execute(ctx context.Context, toolContext ToolContext, inp
 	deadline, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 	mountScript := `set -eu
+ulimit -t 55 || true
+ulimit -v 524288 || true
+ulimit -u 64 || true
+ulimit -n 256 || true
+ulimit -f 1048576 || true
 mount --make-rprivate /
 mount -t tmpfs tmpfs /home
 mkdir -p /home/workspace /tmp
@@ -407,14 +413,31 @@ mount --bind "$1" /home/workspace
 mount -t tmpfs tmpfs /tmp
 cd /home/workspace
 exec "$2" "$3"`
-	command := exec.CommandContext(deadline, "unshare", "--user", "--map-root-user", "--mount", "--pid", "--fork", "--mount-proc", "--net", "/bin/sh", "-c", mountScript, "sandbox", toolContext.Workspace, interpreter, "/home/workspace/.agent-sandbox/"+filepath.Base(codePath))
+	command := exec.Command("unshare", "--user", "--map-root-user", "--mount", "--pid", "--fork", "--mount-proc", "--net", "/bin/sh", "-c", mountScript, "sandbox", toolContext.Workspace, interpreter, "/home/workspace/.agent-sandbox/"+filepath.Base(codePath))
 	command.Dir = toolContext.Workspace
 	command.Env = []string{"PATH=/usr/bin:/bin", "HOME=/home/workspace", "PWD=/home/workspace"}
+	configureToolProcess(command)
 	var stdout, stderr bytes.Buffer
 	command.Stdout = &limitedBuffer{Buffer: &stdout, Limit: 128 << 10}
 	command.Stderr = &limitedBuffer{Buffer: &stderr, Limit: 128 << 10}
-	if err := command.Run(); err != nil {
-		return ToolResult{Value: map[string]any{"stdout": stdout.String(), "stderr": stderr.String()}}, err
+	if err := runToolCommand(deadline, command); err != nil {
+		return ToolResult{Value: map[string]any{"stdout": RedactDLP(stdout.String()), "stderr": RedactDLP(stderr.String()), "execution_isolation": "best-effort-unshare", "resource_limits": "ulimit-context-timeout-output-bounded"}}, err
 	}
-	return ToolResult{Value: map[string]any{"stdout": stdout.String(), "stderr": stderr.String(), "exit_code": 0}}, nil
+	return ToolResult{Value: map[string]any{"stdout": RedactDLP(stdout.String()), "stderr": RedactDLP(stderr.String()), "exit_code": 0, "execution_isolation": "best-effort-unshare", "resource_limits": "ulimit-context-timeout-output-bounded"}}, nil
+}
+
+func runToolCommand(ctx context.Context, command *exec.Cmd) error {
+	if err := command.Start(); err != nil {
+		return err
+	}
+	done := make(chan error, 1)
+	go func() { done <- command.Wait() }()
+	select {
+	case err := <-done:
+		return err
+	case <-ctx.Done():
+		terminateToolProcess(command)
+		<-done
+		return ctx.Err()
+	}
 }
