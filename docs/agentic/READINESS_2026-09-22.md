@@ -165,3 +165,10 @@ Os gates completos passaram: integrity guard, Go tests/vet/build, Vitest 20/199,
 OAuth providers agora carregam `OLLAMA_AGENT_OAUTH_<PROVIDER>_REDIRECT_URIS` como allowlist separada por vírgula, ponto e vírgula ou linha, e só aceitam no start/callback uma URI canônica exatamente presente nessa lista. Redirects exigem HTTPS; HTTP só pode ser usado para loopback quando `..._ALLOW_LOOPBACK_REDIRECT=true` e a URI loopback também está na allowlist. Userinfo, fragmentos e URIs opacas são rejeitados. O AuthStore aplica sintaxe segura e grava a forma canônica no estado PKCE, reduzindo mismatch e evitando confiança em um valor arbitrário do request.
 
 Testes cobrem host não allowlisted, HTTP externo, fragmento, userinfo, loopback explícito e estado inseguro. Os gates completos passaram: integrity guard, Go tests/vet/build, Vitest 20/199, UI build e mobile typecheck. A validação de issuer/audience/nonce OIDC já existente permanece separada; endpoints OAuth ainda precisam ser alinhados ao mesmo egress/IP/redirect policy em uma slice posterior.
+
+
+## Slice P0 de session handling web/mobile — 2026-09-22
+
+O cliente web agentic deixou de ler bearer e organização de `localStorage`: a sessão é mantida somente em memória por `setAgentSession`, pode ser removida por `clearAgentSession` e limpa automaticamente em respostas 401/403, emitindo evento local para a UI reagir. Testes verificam que o header é formado sem acessar localStorage, que token vazio é rejeitado e que sessão expirada é apagada.
+
+No mobile, 401/403 removem o token do Expo SecureStore sem enfileirar mutações não autorizadas; approvals enviam nonce, ficam desabilitados enquanto uma decisão está em andamento e receberam labels de acessibilidade. Logout exige confirmação quando há missão/cache/outbox e, após confirmação, remove sessão, missão, eventos, push marker e ações offline. A validação de armazenamento seguro nativo depende de build/dispositivo real; a UI web ainda requer uma jornada de login que chame `setAgentSession` em vez de persistir credenciais.

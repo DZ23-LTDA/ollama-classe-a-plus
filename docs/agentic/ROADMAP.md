@@ -215,3 +215,8 @@ Connectors agora compartilham bloqueio de proxy/redirect, verificação do IP co
 ## Incremento 2026-09-22 — OAuth redirect URI allowlist
 
 OAuth redirect agora depende de allowlist provider-scoped e canonicalização segura, com loopback HTTP explicitamente opt-in. A próxima etapa é aplicar egress/IP/redirect policy aos endpoints de discovery, JWKS, token e userinfo sem afirmar SSO conectado sem IdP real.
+
+
+## Incremento 2026-09-22 — session handling web/mobile
+
+Bearer web deixou de ser persistido no localStorage e sessões inválidas são limpas; o mobile protege SecureStore, approvals e descarte de outbox. A próxima etapa é ligar a jornada de login web ao setter in-memory e validar secure storage/biometria em builds reais de Android/iOS/desktop, sem afirmar isso no sandbox.

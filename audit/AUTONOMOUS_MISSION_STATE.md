@@ -1125,3 +1125,27 @@ proofs: integrity, Go tests/vet/build, UI Vitest/build, mobile typecheck and OAu
 classification: preview/local RC em hardening
 next_slice: OAuth endpoint egress parity or secure browser token storage; no main merge
 ```
+
+
+## Slice P0 session handling web/mobile validada — aguardando publicação — 2026-09-22
+
+```yaml
+state: RELEASING
+iteration: 16
+base_commit: 74f722f9
+working_tree: session handling changes/tests/docs still uncommitted
+implemented:
+  - web agent token held in memory, no localStorage reads
+  - web 401/403 clears session and emits local event
+  - mobile SecureStore cleared on auth failure
+  - mobile approval nonce, busy lock and accessibility labels
+  - logout confirmation and cache/outbox cleanup
+proofs:
+  - web security Vitest tests: PASS
+  - UI build: PASS; known >500KB warning
+  - mobile typecheck: PASS
+  - integrity/Go full gates pending in this slice
+classification: preview/local RC em hardening
+open_risks: web login wiring, native secure-storage physical builds, backend session cookie/CSRF strategy, strong sandbox
+next_action: run full gates, commit/push, then continue backend OAuth egress or sandbox controls
+```

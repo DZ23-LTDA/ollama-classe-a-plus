@@ -62,16 +62,37 @@ export type CompanyOrder = { id: string; product_id: string; customer_ref: strin
 export type CompanyGrowthReport = { company: AgentCompany; campaigns_total: number; campaigns_active: number; affiliate_programs: number; affiliate_conversions: number; products: number; pending_orders: number; fulfilled_orders: number; revenue_cents: number };
 export type GrokStatus = { provider: string; model: string; state: string; authenticated: boolean; healthy: boolean; last_latency_ms?: number; last_error?: string; checked_at: string };
 
+type AgentSession = { token: string; organization?: string };
+let agentSession: AgentSession | null = null;
+
+export function setAgentSession(token: string, organization?: string): void {
+  const normalizedToken = token.trim();
+  if (!normalizedToken) throw new Error("agent session token is required");
+  agentSession = { token: normalizedToken, ...(organization?.trim() ? { organization: organization.trim() } : {}) };
+}
+
+export function clearAgentSession(): void {
+  agentSession = null;
+  if (typeof window !== "undefined" && typeof window.dispatchEvent === "function") {
+    window.dispatchEvent(new CustomEvent("ollama-agent-session-cleared"));
+  }
+}
+
+export function hasAgentSession(): boolean {
+  return agentSession !== null;
+}
+
 function agentHeaders(): Record<string, string> {
-  if (typeof window === "undefined") return {};
-  const token = window.localStorage.getItem("ollama-agent-token");
-  const organization = window.localStorage.getItem("ollama-agent-organization");
-  return { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(organization ? { "X-Ollama-Organization": organization } : {}) };
+  if (!agentSession) return {};
+  return { Authorization: `Bearer ${agentSession.token}`, ...(agentSession.organization ? { "X-Ollama-Organization": agentSession.organization } : {}) };
 }
 export async function agentFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, { ...init, headers: { "Content-Type": "application/json", ...agentHeaders(), ...(init.headers ?? {}) } });
   const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(typeof body?.error === "string" ? body.error : response.statusText || "Agent API request failed");
+  if (!response.ok) {
+    if (response.status === 401 || response.status === 403) clearAgentSession();
+    throw new Error(typeof body?.error === "string" ? body.error : response.statusText || "Agent API request failed");
+  }
   return body as T;
 }
 export const listProjects = () => agentFetch<{ projects: AgentProject[] }>("/api/agent/v1/projects");

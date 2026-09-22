@@ -3,11 +3,11 @@ import * as Notifications from "expo-notifications";
 import * as SecureStore from "expo-secure-store";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 Notifications.setNotificationHandler({ handleNotification: async () => ({ shouldShowAlert: true, shouldShowBanner: true, shouldShowList: true, shouldPlaySound: true, shouldSetBadge: false }) });
 
-type Mission = { id: string; version?: number; objective: string; state: string; approvals?: Array<{ id: string; step_id: string; status: string }>; last_error?: string };
+type Mission = { id: string; version?: number; objective: string; state: string; approvals?: Array<{ id: string; step_id: string; status: string; nonce?: string }>; last_error?: string };
 type Event = { id: string; type: string; step_id?: string; created_at: string };
 type Session = { access_token: string; user: { email: string }; organization: { name: string } };
 type QueuedAction = { id: string; path: string; method: string; body?: string; headers?: Record<string, string>; created_at: string; attempts: number; next_attempt_at: string; idempotency_key: string; conflict?: string };
@@ -45,8 +45,15 @@ export default function App() {
   const [error, setError] = useState("");
   const [online, setOnline] = useState(true);
   const [queued, setQueued] = useState(0);
-  const [conflicts, setConflicts] = useState(0);
-  const [pushRegistered, setPushRegistered] = useState(false);
+	const [conflicts, setConflicts] = useState(0);
+	const [pushRegistered, setPushRegistered] = useState(false);
+
+	const expireSession = async () => {
+		await SecureStore.deleteItemAsync("dz23.agent.token");
+		setToken("");
+		setDraftToken("");
+		setPushRegistered(false);
+	};
 
   const loadQueue = async () => {
     const raw = await AsyncStorage.getItem(queueKey);
@@ -84,8 +91,9 @@ export default function App() {
         const apiError = cause instanceof ApiError ? cause : undefined;
         if (apiError?.status === 409) {
           remaining.push({ ...item, conflict: "Servidor mudou a missão; revise o estado atual antes de reenviar." });
-        } else if (apiError?.status === 401 || apiError?.status === 403) {
-          remaining.push({ ...item, conflict: "Sessão expirada ou sem permissão; autentique novamente antes de reenviar." });
+		} else if (apiError?.status === 401 || apiError?.status === 403) {
+			await expireSession();
+			remaining.push({ ...item, conflict: "Sessão expirada ou sem permissão; autentique novamente antes de reenviar." });
         } else if (item.attempts >= 4) {
           remaining.push({ ...item, conflict: "Limite de tentativas atingido; revise a ação antes de reenviar." });
         } else {
@@ -110,8 +118,9 @@ export default function App() {
       setMission(nextMission); setEvents(nextEvents.events); setOnline(true);
       await AsyncStorage.setItem(missionKey, JSON.stringify({ mission: nextMission, events: nextEvents.events }));
       void flushQueue();
-    } catch {
-      setOnline(false);
+		} catch (cause) {
+			if (cause instanceof ApiError && (cause.status === 401 || cause.status === 403)) { await expireSession(); setError("Sessão expirada ou sem permissão; autentique novamente."); setOnline(false); return; }
+			setOnline(false);
       const cached = await AsyncStorage.getItem(missionKey);
       if (cached && !mission) { const value = JSON.parse(cached) as { mission: Mission; events: Event[] }; setMission(value.mission); setEvents(value.events); }
     }
@@ -147,9 +156,10 @@ export default function App() {
   const perform = async (path: string, method: string, body: unknown, fallback: string) => {
     const headers = mutationHeaders();
     try { await request(base, path, token, { method, body: JSON.stringify(body), headers }); setOnline(true); await flushQueue(); return true; }
-    catch (cause) {
-      const apiError = cause instanceof ApiError ? cause : undefined;
-      if (apiError?.status === 409) { setError(`${fallback}: o servidor detectou conflito. Atualizando a missão para revisão.`); await refresh(); return false; }
+		catch (cause) {
+			const apiError = cause instanceof ApiError ? cause : undefined;
+			if (apiError?.status === 401 || apiError?.status === 403) { await expireSession(); setOnline(false); setError("Sessão expirada ou sem permissão; autentique novamente."); return false; }
+			if (apiError?.status === 409) { setError(`${fallback}: o servidor detectou conflito. Atualizando a missão para revisão.`); await refresh(); return false; }
       await enqueue(path, method, body, headers); setOnline(false); setError(`${fallback}. A ação foi salva e será sincronizada quando houver conexão.`); return false;
     }
   };
@@ -159,13 +169,22 @@ export default function App() {
     setBusy(true); setError("");
     const payload = { objective, auto_run: false };
     try { const created = await request<Mission>(base, "/api/agent/v1/missions", token, { method: "POST", body: JSON.stringify(payload) }); setMission(created); setOnline(true); await refresh(created.id); }
-    catch { await enqueue("/api/agent/v1/missions", "POST", payload); setOnline(false); setError("Servidor indisponível. A missão foi salva e será sincronizada quando houver conexão."); }
+		catch (cause) { if (cause instanceof ApiError && (cause.status === 401 || cause.status === 403)) { await expireSession(); setOnline(false); setError("Sessão expirada ou sem permissão; autentique novamente."); setBusy(false); return; } await enqueue("/api/agent/v1/missions", "POST", payload); setOnline(false); setError("Servidor indisponível. A missão foi salva e será sincronizada quando houver conexão."); }
     setObjective(""); setBusy(false);
   };
-  const decide = async (approvalId: string, approved: boolean) => { if (!mission) return; setBusy(true); setError(""); await perform(`/api/agent/v1/missions/${mission.id}/approvals/${approvalId}`, "POST", { approved, reason: "Mobile operator" }, "Falha ao decidir approval"); await refresh(); setBusy(false); };
+	const decide = async (approvalId: string, nonce: string | undefined, approved: boolean) => { if (!mission || busy) return; setBusy(true); setError(""); await perform(`/api/agent/v1/missions/${mission.id}/approvals/${approvalId}`, "POST", { approved, nonce, reason: "Mobile operator" }, "Falha ao decidir approval"); await refresh(); setBusy(false); };
   const run = async () => { if (!mission) return; setBusy(true); setError(""); await perform(`/api/agent/v1/missions/${mission.id}/run`, "POST", {}, "Falha ao executar"); await refresh(); setBusy(false); };
   const saveSession = async () => { const nextBase = draftBase.trim(); if (!nextBase) return; await AsyncStorage.setItem("dz23.agent.base", nextBase); if (draftToken.trim()) await SecureStore.setItemAsync("dz23.agent.token", draftToken.trim()); setBase(nextBase); setToken(draftToken.trim()); setPushRegistered(false); await flushQueue(); };
-  const clearSession = async () => { await SecureStore.deleteItemAsync("dz23.agent.token"); await AsyncStorage.removeItem(pushStorageKey(base)); setToken(""); setDraftToken(""); setPushRegistered(false); };
+	const clearSession = async () => {
+		const pending = await loadQueue();
+		if (pending.length > 0 || mission || events.length > 0) {
+			const discard = await new Promise<boolean>((resolve) => Alert.alert("Apagar sessão local?", "Isso remove a missão em cache, eventos e ações offline pendentes.", [{ text: "Cancelar", style: "cancel", onPress: () => resolve(false) }, { text: "Sair e apagar", style: "destructive", onPress: () => resolve(true) }], { cancelable: true, onDismiss: () => resolve(false) }));
+			if (!discard) return;
+		}
+		await expireSession();
+		await AsyncStorage.multiRemove([queueKey, missionKey, pushStorageKey(base)]);
+		setMission(null); setEvents([]); setQueued(0); setConflicts(0);
+	};
   const discardConflicts = async () => { const items = await loadQueue(); await AsyncStorage.setItem(queueKey, JSON.stringify(items.filter((item) => !item.conflict))); await loadQueue(); };
 
   return <SafeAreaView style={styles.safe}><StatusBar style="auto" /><ScrollView contentContainerStyle={styles.container}>
@@ -175,7 +194,7 @@ export default function App() {
     <View style={styles.card}><Text style={styles.label}>Servidor</Text><TextInput value={draftBase} onChangeText={setDraftBase} autoCapitalize="none" autoCorrect={false} style={styles.input} /><Text style={styles.label}>Token Bearer (armazenado no SecureStore)</Text><TextInput value={draftToken} onChangeText={setDraftToken} autoCapitalize="none" autoCorrect={false} secureTextEntry style={styles.input} /><View style={styles.row}><Pressable onPress={() => void saveSession()} style={[styles.secondary, { flex: 1 }]}><Text style={styles.secondaryText}>Salvar sessão</Text></Pressable><Pressable onPress={() => void clearSession()} style={styles.secondary}><Text style={styles.secondaryText}>Sair</Text></Pressable></View></View>
     <View style={styles.card}><Text style={styles.label}>Novo objetivo</Text><TextInput value={objective} onChangeText={setObjective} multiline placeholder="Ex.: verificar os testes do projeto" style={[styles.input, styles.multiline]} /><Pressable disabled={busy || !objective.trim()} onPress={() => void create()} style={[styles.primary, (!objective.trim() || busy) && styles.disabled]}>{busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>Criar missão</Text>}</Pressable></View>
     {error ? <Text style={styles.error}>{error}</Text> : null}
-    {mission ? <View style={styles.card}><View style={styles.row}><View style={{ flex: 1 }}><Text style={styles.muted}>{mission.id} · v{mission.version ?? "?"}</Text><Text style={styles.mission}>{mission.objective}</Text></View><Text style={styles.status}>{mission.state}</Text></View><Pressable onPress={() => void run()} disabled={busy || approvals.length > 0 || mission.state === "COMPLETED"} style={[styles.secondary, (busy || approvals.length > 0) && styles.disabled]}><Text style={styles.secondaryText}>Executar missão</Text></Pressable>{approvals.map((approval) => <View key={approval.id} style={styles.approval}><Text style={styles.label}>Approval: {approval.step_id}</Text><View style={styles.row}><Pressable onPress={() => void decide(approval.id, true)} style={styles.approve}><Text style={styles.primaryText}>Aprovar</Text></Pressable><Pressable onPress={() => void decide(approval.id, false)} style={styles.reject}><Text style={styles.primaryText}>Rejeitar</Text></Pressable></View></View>)}<Text style={styles.label}>Timeline</Text>{events.map((event) => <View key={event.id} style={styles.event}><View style={styles.dot} /><View><Text style={styles.eventType}>{event.type}</Text><Text style={styles.muted}>{event.step_id ?? "mission"} · {new Date(event.created_at).toLocaleString()}</Text></View></View>)}</View> : null}
+	    {mission ? <View style={styles.card}><View style={styles.row}><View style={{ flex: 1 }}><Text style={styles.muted}>{mission.id} · v{mission.version ?? "?"}</Text><Text style={styles.mission}>{mission.objective}</Text></View><Text style={styles.status}>{mission.state}</Text></View><Pressable onPress={() => void run()} disabled={busy || approvals.length > 0 || mission.state === "COMPLETED"} accessibilityRole="button" accessibilityLabel="Executar missão" style={[styles.secondary, (busy || approvals.length > 0) && styles.disabled]}><Text style={styles.secondaryText}>Executar missão</Text></Pressable>{approvals.map((approval) => <View key={approval.id} style={styles.approval}><Text style={styles.label}>Approval: {approval.step_id}</Text><View style={styles.row}><Pressable onPress={() => void decide(approval.id, approval.nonce, true)} disabled={busy} accessibilityRole="button" accessibilityLabel={`Aprovar ${approval.step_id}`} style={[styles.approve, busy && styles.disabled]}><Text style={styles.primaryText}>Aprovar</Text></Pressable><Pressable onPress={() => void decide(approval.id, approval.nonce, false)} disabled={busy} accessibilityRole="button" accessibilityLabel={`Rejeitar ${approval.step_id}`} style={[styles.reject, busy && styles.disabled]}><Text style={styles.primaryText}>Rejeitar</Text></Pressable></View></View>)}<Text style={styles.label}>Timeline</Text>{events.map((event) => <View key={event.id} style={styles.event}><View style={styles.dot} /><View><Text style={styles.eventType}>{event.type}</Text><Text style={styles.muted}>{event.step_id ?? "mission"} · {new Date(event.created_at).toLocaleString()}</Text></View></View>)}</View> : null}
   </ScrollView></SafeAreaView>;
 }
 

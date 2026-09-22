@@ -114,6 +114,9 @@ grep -q 'TestConnectorEgressBlocksRedirectsAndBoundsPayloads' internal/agent/con
 grep -q 'ValidateRedirectURI' internal/agent/auth.go
 grep -q 'RedirectURIs' internal/agent/auth.go
 grep -q 'TestOAuthProviderRedirectAllowlist' internal/agent/auth_test.go
+grep -q 'setAgentSession' app/ui/app/src/lib/agenticClient.ts
+grep -q 'agenticClient.security.test' app/ui/app/src/lib/agenticClient.security.test.ts || grep -q 'keeps the bearer only in memory' app/ui/app/src/lib/agenticClient.security.test.ts
+grep -q 'Apagar sessão local' apps/mobile-agentic/App.tsx
 grep -q 'Capabilities' internal/agent/runtime.go
 grep -q 'Evaluation' internal/agent/evaluation.go
 for route in projects library scheduled skills plugins tasks company; do

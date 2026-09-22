@@ -196,3 +196,8 @@ Connectors passaram a bloquear proxy ambiental e redirects mesmo com client HTTP
 ## 2026-09-22 — OAuth redirect URI allowlist
 
 OAuth start/callback agora exigem allowlist exata por provider, canonicalização, HTTPS e rejeição de fragmentos/userinfo. Loopback HTTP só é permitido com flag explícita e URI allowlisted; o estado PKCE usa a URI canônica.
+
+
+## 2026-09-22 — session handling web/mobile
+
+O cliente web agentic removeu bearer persistido em localStorage e passou a usar sessão em memória com limpeza 401/403. O mobile limpa SecureStore ao expirar, envia nonce de approval, impede dupla ação e exige confirmação antes de apagar cache/outbox no logout.
