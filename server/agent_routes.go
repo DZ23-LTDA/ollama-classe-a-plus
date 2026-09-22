@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -41,8 +42,36 @@ func newAgentAPI(runtime *agent.Runtime) (*agentAPI, error) {
 		return nil, err
 	}
 	runtime.SetAuthStore(auth)
-	required, _ := strconv.ParseBool(strings.TrimSpace(os.Getenv("OLLAMA_AGENT_AUTH_REQUIRED")))
+	required, err := agentAuthRequired()
+	if err != nil {
+		return nil, err
+	}
 	return &agentAPI{runtime: runtime, context: runtime.Context(), auth: auth, authRequired: required, push: runtime.Push(), samlServices: map[string]*agent.SAMLService{}}, nil
+}
+
+func agentAuthRequired() (bool, error) {
+	configured := strings.TrimSpace(os.Getenv("OLLAMA_AGENT_AUTH_REQUIRED"))
+	loopback := agentHostIsLoopback()
+	if configured == "" {
+		return !loopback, nil
+	}
+	required, err := strconv.ParseBool(configured)
+	if err != nil {
+		return false, fmt.Errorf("OLLAMA_AGENT_AUTH_REQUIRED must be true or false: %w", err)
+	}
+	if !required && !loopback {
+		return true, nil
+	}
+	return required, nil
+}
+
+func agentHostIsLoopback() bool {
+	host := strings.TrimSpace(envconfig.Host().Hostname())
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(strings.Trim(host, "[]"))
+	return ip != nil && ip.IsLoopback()
 }
 
 func newDefaultAgentRuntime() (*agent.Runtime, error) {
@@ -198,7 +227,7 @@ func loadAgentMCP() (*agent.MCPManager, error) {
 		return nil, err
 	}
 	var configs []agent.MCPServerConfig
-	if err := json.Unmarshal(data, &configs); err != nil {
+	if err := decodeAgentConfigJSON(data, &configs); err != nil {
 		return nil, err
 	}
 	manager := agent.NewMCPManager()
@@ -220,7 +249,7 @@ func loadAgentRemoteMCP() (*agent.RemoteMCPManager, error) {
 		return nil, err
 	}
 	var configs []agent.RemoteMCPServerConfig
-	if err := json.Unmarshal(data, &configs); err != nil {
+	if err := decodeAgentConfigJSON(data, &configs); err != nil {
 		return nil, err
 	}
 	manager := agent.NewRemoteMCPManager()
@@ -230,6 +259,22 @@ func loadAgentRemoteMCP() (*agent.RemoteMCPManager, error) {
 		}
 	}
 	return manager, nil
+}
+
+func decodeAgentConfigJSON(data []byte, target any) error {
+	decoder := json.NewDecoder(strings.NewReader(string(data)))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(target); err != nil {
+		return err
+	}
+	var extra any
+	if err := decoder.Decode(&extra); err != io.EOF {
+		if err == nil {
+			return errors.New("agent config contains trailing JSON")
+		}
+		return err
+	}
+	return nil
 }
 
 func (a *agentAPI) register(r *gin.Engine) {
@@ -355,7 +400,7 @@ func (a *agentAPI) authMiddleware(c *gin.Context) {
 		c.Next()
 		return
 	}
-	if strings.HasSuffix(c.Request.URL.Path, "/connect") {
+	if isCompanionConnectRoute(c.FullPath()) {
 		c.Next()
 		return
 	}
@@ -401,6 +446,10 @@ func (a *agentAPI) authMiddleware(c *gin.Context) {
 	c.Next()
 }
 
+func isCompanionConnectRoute(fullPath string) bool {
+	return strings.TrimSpace(fullPath) == "/api/agent/v1/devices/:id/connect"
+}
+
 func (a *agentAPI) scopedRuntime(c *gin.Context) *agent.Runtime {
 	if value, ok := c.Get("agent.organization"); ok {
 		if organization, ok := value.(agent.Organization); ok {
@@ -417,6 +466,18 @@ func agentOrganizationID(c *gin.Context) string {
 		}
 	}
 	return ""
+}
+
+func agentActorID(c *gin.Context) string {
+	if value, ok := c.Get("agent.user"); ok {
+		if user, ok := value.(agent.User); ok && strings.TrimSpace(user.ID) != "" {
+			return user.ID
+		}
+	}
+	if value := strings.TrimSpace(c.GetHeader("X-Ollama-User")); value != "" {
+		return value
+	}
+	return "local"
 }
 
 func (a *agentAPI) missionForRequest(c *gin.Context) (agent.Mission, error) {
@@ -1868,7 +1929,7 @@ func (a *agentAPI) decideApproval(c *gin.Context) {
 	if !missionVersionMatches(c, mission) {
 		return
 	}
-	mission, err = a.scopedRuntime(c).DecideApproval(c.Param("id"), c.Param("approval_id"), request.Approved, request.Reason)
+	mission, err = a.scopedRuntime(c).DecideApprovalForActor(c.Param("id"), c.Param("approval_id"), request.Approved, request.Reason, agentActorID(c), agentOrganizationID(c))
 	if err != nil {
 		writeAgentError(c, statusForAgentError(err), err)
 		return

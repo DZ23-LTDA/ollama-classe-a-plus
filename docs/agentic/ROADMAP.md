@@ -109,3 +109,17 @@ O runtime ganhou suporte a headers server-side no Remote MCP e um preset Composi
 O Growth OS agora tem o mapa técnico para sair do sandbox local rumo a social commerce: Instagram/Meta, X/Twitter, YouTube, WhatsApp, TikTok Shop, Shopify e outros marketplaces. O próximo trabalho por canal deve criar contrato de provider, OAuth por tenant, webhooks verificadas, idempotência, rate limits, DLP, approval e smoke em sandbox. No TikTok Shop, seller/creator/partner authorization, escopos por região e a disponibilidade das Affiliate APIs precisam ser tratados por mercado; a documentação consultada informa indisponibilidade atual para Reino Unido e União Europeia.
 
 As integrações externas ainda não são declaradas conectadas. A conclusão desta fase exige contas de teste autorizadas, app reviews, sandbox dos provedores, credenciais provisionadas fora do Git e testes reversíveis de publicação, catálogo, pedido, fulfillment, returns/refunds e reconciliação.
+
+
+## Incremento 2026-09-22 — hardening interno e baseline de release
+
+A auditoria independente encontrou falhas internas em autenticação, filesystem, MCP, approvals, tenant scope, idempotência, UI, mobile e vet. A correção desta rodada tornou o agentic fail-closed por padrão quando o listener não é loopback; manteve o modo local-first apenas para bind local; exigiu allowlists não vazias em MCP stdio e Remote MCP; rejeitou redirects cross-origin e destinos privados; validou correlation IDs; reforçou a contenção de symlinks; validou StepID; adicionou metadata de tenant, policy, nonce, actor e expiração às approvals; aplicou tenant checks nas mutações de Growth; adicionou idempotência a pedidos e fulfillment; tornou o catálogo da Settings resiliente a respostas nulas; e retirou bearer tokens do outbox mobile.
+
+Os gates locais desta etapa passaram com `CGO_ENABLED=1 go test ./... -count=1`, `CGO_ENABLED=1 go vet ./...`, `CGO_ENABLED=0 go test ./internal/agent -count=1`, testes do servidor/multi-provider, build Go, build da UI, 20 arquivos Vitest/199 testes e typecheck Expo mobile. O teste `CGO_ENABLED=0 go test ./...` continua `N/A` para os pacotes que exigem CGO, como SQLite/MLX; os gates oficiais do fork usam a combinação compatível com esses componentes.
+
+Permanecem bloqueadores externos honestos: credenciais e sandbox de Composio, xAI, Desktop Commander, redes sociais, TikTok Shop e marketplaces; PostgreSQL/RLS, Redis e OTLP reais; IdP e app review; GPU/modelos multimídia; runners físicos; assinatura de instaladores; publicação nas lojas; e deploy externo autorizado. Esses itens não podem ser declarados concluídos sem ambiente, autoridade e testes correspondentes.
+
+
+### Policy de capabilities e handshake — 2026-09-22
+
+O Runtime passou a persistir escopos por missão, com default limitado ao workspace local. Tools sensíveis exigem capability explícita e continuam sujeitas a approval. O middleware também restringe o bypass de bearer ao FullPath único do handshake de companion; qualquer rota arbitrária terminada em `connect` permanece protegida.

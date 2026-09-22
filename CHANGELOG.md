@@ -80,3 +80,21 @@ A rodada não publica campanhas, não movimenta dinheiro, não envia pedidos, n�
 - Matriz de paridade atualizada com Composio, xAI/Grok API e Social Commerce/TikTok Shop, separando adapter de conta, scopes, sandbox e operação real.
 
 A rodada não conecta contas externas nem publica posts, anúncios, produtos ou pedidos. Composio, xAI, TikTok Shop, Instagram, Shopify e demais canais exigem credenciais, aprovação de app, scopes mínimos, testes de sandbox, compliance e validação por região.
+
+
+## Unreleased — hardening interno e baseline de release — 2026-09-22
+
+- Autenticação agentic agora exige bearer por padrão fora de loopback e não aceita `OLLAMA_AGENT_AUTH_REQUIRED=false` em bind externo.
+- MCP stdio e Remote MCP exigem métodos allowlisted; Remote MCP usa timeout, bloqueio de destino privado, redirects sem mudança de origem e correlation ID JSON-RPC.
+- Contenção de workspace rejeita componentes symlink e StepID fora do formato seguro antes de executar sandbox ou manipular arquivos.
+- Approvals carregam organização, actor, policy, nonce e expiração; mutações de Growth validam tenant; pedidos usam `Idempotency-Key`; fulfillment repetido não reduz estoque novamente.
+- Control Center e Settings normalizam catálogos nulos; outbox mobile remove bearer persistido, usa idempotency key e backoff com limite de tentativas.
+- Teste obsoleto que rejeitava a CLI agentic foi corrigido para exigir sua disponibilidade, mantendo rejeição dos flags antigos.
+- Gates aprovados: `CGO_ENABLED=1 go test ./... -count=1`, `CGO_ENABLED=1 go vet ./...`, integrity guard, build Go, build UI, Vitest 20/199 e typecheck mobile.
+
+O hardening não transforma adapters externos em contas conectadas. Composio, xAI, Desktop Commander, redes sociais, marketplaces, PostgreSQL/RLS, Redis, OTLP, dispositivos físicos, instaladores assinados e lojas continuam dependências externas a validar.
+
+
+### Incremento final de policy — 2026-09-22
+
+Missões agora persistem `capabilities` e recebem somente `workspace:read`/`workspace:write` por default. Tools com scopes de browser, desktop, terminal, sandbox, MCP, connectors ou deploy são negadas até que o escopo seja concedido explicitamente; approvals e allowlists continuam independentes. O bypass de autenticação foi limitado ao FullPath exato do handshake `/devices/:id/connect`, em vez de liberar qualquer caminho terminado em `/connect`.

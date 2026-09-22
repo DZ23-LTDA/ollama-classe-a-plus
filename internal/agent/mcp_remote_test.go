@@ -67,3 +67,10 @@ func TestRemoteMCPSSEAndURLPolicy(t *testing.T) {
 		t.Fatal("expected external HTTP rejection")
 	}
 }
+
+func TestRemoteMCPRequiresAllowlist(t *testing.T) {
+	manager := NewRemoteMCPManager()
+	if err := manager.Register(RemoteMCPServerConfig{ID: "empty", URL: "https://example.com/mcp"}); err == nil {
+		t.Fatal("expected empty remote MCP allowlist rejection")
+	}
+}

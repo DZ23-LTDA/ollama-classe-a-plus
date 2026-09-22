@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -15,6 +16,26 @@ import (
 
 type Registry struct {
 	tools map[string]Tool
+}
+
+var ErrCapabilityDenied = errors.New("tool capability is not granted to this mission")
+
+func capabilityAllowed(descriptor ToolDescriptor, granted []string) bool {
+	if len(descriptor.Scopes) == 0 {
+		return true
+	}
+	allowed := make(map[string]struct{}, len(granted))
+	for _, scope := range granted {
+		if value := strings.TrimSpace(scope); value != "" {
+			allowed[value] = struct{}{}
+		}
+	}
+	for _, scope := range descriptor.Scopes {
+		if _, ok := allowed[strings.TrimSpace(scope)]; !ok {
+			return false
+		}
+	}
+	return true
 }
 
 func NewRegistry() *Registry {
@@ -61,7 +82,7 @@ func (r *Registry) Descriptors() []ToolDescriptor {
 type workspaceListTool struct{}
 
 func (workspaceListTool) Descriptor() ToolDescriptor {
-	return ToolDescriptor{Name: "workspace.list", Version: "1", Description: "Listar entradas do workspace autorizado", Risk: RiskRead}
+	return ToolDescriptor{Name: "workspace.list", Version: "1", Description: "Listar entradas do workspace autorizado", Risk: RiskRead, Scopes: []string{"workspace:read"}}
 }
 
 func (workspaceListTool) Execute(_ context.Context, toolContext ToolContext, input map[string]any) (ToolResult, error) {
@@ -75,6 +96,9 @@ func (workspaceListTool) Execute(_ context.Context, toolContext ToolContext, inp
 	}
 	if maxEntries > 500 {
 		maxEntries = 500
+	}
+	if err := rejectSymlinkComponents(toolContext.Workspace, path); err != nil {
+		return ToolResult{}, err
 	}
 	entries, err := os.ReadDir(path)
 	if err != nil {
@@ -93,12 +117,15 @@ func (workspaceListTool) Execute(_ context.Context, toolContext ToolContext, inp
 type workspaceReadTool struct{}
 
 func (workspaceReadTool) Descriptor() ToolDescriptor {
-	return ToolDescriptor{Name: "workspace.read", Version: "1", Description: "Ler um arquivo do workspace autorizado", Risk: RiskRead}
+	return ToolDescriptor{Name: "workspace.read", Version: "1", Description: "Ler um arquivo do workspace autorizado", Risk: RiskRead, Scopes: []string{"workspace:read"}}
 }
 
 func (workspaceReadTool) Execute(_ context.Context, toolContext ToolContext, input map[string]any) (ToolResult, error) {
 	path, err := safeWorkspacePath(toolContext.Workspace, stringInput(input, "path", ""))
 	if err != nil {
+		return ToolResult{}, err
+	}
+	if err := rejectSymlinkComponents(toolContext.Workspace, path); err != nil {
 		return ToolResult{}, err
 	}
 	data, err := os.ReadFile(path)
@@ -114,7 +141,7 @@ func (workspaceReadTool) Execute(_ context.Context, toolContext ToolContext, inp
 type workspaceWriteTool struct{}
 
 func (workspaceWriteTool) Descriptor() ToolDescriptor {
-	return ToolDescriptor{Name: "workspace.write", Version: "1", Description: "Escrever arquivo no workspace após aprovação", Risk: RiskWrite, RequiresApproval: true}
+	return ToolDescriptor{Name: "workspace.write", Version: "1", Description: "Escrever arquivo no workspace após aprovação", Risk: RiskWrite, RequiresApproval: true, Scopes: []string{"workspace:write"}}
 }
 
 func (workspaceWriteTool) Execute(_ context.Context, toolContext ToolContext, input map[string]any) (ToolResult, error) {
@@ -126,7 +153,13 @@ func (workspaceWriteTool) Execute(_ context.Context, toolContext ToolContext, in
 	if len(content) > 1<<20 {
 		return ToolResult{}, errors.New("workspace.write limit exceeded")
 	}
+	if err := rejectSymlinkComponents(toolContext.Workspace, filepath.Dir(path)); err != nil {
+		return ToolResult{}, err
+	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return ToolResult{}, err
+	}
+	if err := rejectSymlinkComponents(toolContext.Workspace, path); err != nil {
 		return ToolResult{}, err
 	}
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
@@ -205,7 +238,69 @@ func safeWorkspacePath(workspace, relative string) (string, error) {
 	if !isWithin(root, candidate) {
 		return "", errors.New("tool path escapes workspace")
 	}
+	if err := rejectSymlinkComponents(root, candidate); err != nil {
+		return "", err
+	}
 	return candidate, nil
+}
+
+func rejectSymlinkComponents(root, candidate string) error {
+	root, err := filepath.Abs(root)
+	if err != nil {
+		return err
+	}
+	candidate, err = filepath.Abs(candidate)
+	if err != nil {
+		return err
+	}
+	if !isWithin(root, candidate) {
+		return errors.New("tool path escapes workspace")
+	}
+	realRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return err
+	}
+	relative, err := filepath.Rel(root, candidate)
+	if err != nil {
+		return err
+	}
+	current := root
+	if relative == "." {
+		return nil
+	}
+	for _, component := range strings.Split(relative, string(filepath.Separator)) {
+		if component == "" || component == "." {
+			continue
+		}
+		current = filepath.Join(current, component)
+		info, statErr := os.Lstat(current)
+		if errors.Is(statErr, os.ErrNotExist) {
+			break
+		}
+		if statErr != nil {
+			return statErr
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return errors.New("tool path contains a symlink")
+		}
+		resolved, resolveErr := filepath.EvalSymlinks(current)
+		if resolveErr != nil {
+			return resolveErr
+		}
+		if !isWithin(realRoot, resolved) {
+			return errors.New("tool path resolves outside workspace")
+		}
+	}
+	return nil
+}
+
+var safeStepIDPattern = regexp.MustCompile(`^step_[A-Za-z0-9_-]{1,100}$`)
+
+func validateStepID(stepID string) error {
+	if !safeStepIDPattern.MatchString(strings.TrimSpace(stepID)) {
+		return errors.New("step id is invalid")
+	}
+	return nil
 }
 
 func stringInput(input map[string]any, key, fallback string) string {
@@ -268,6 +363,9 @@ func (sandboxExecTool) Descriptor() ToolDescriptor {
 }
 
 func (sandboxExecTool) Execute(ctx context.Context, toolContext ToolContext, input map[string]any) (ToolResult, error) {
+	if err := validateStepID(toolContext.StepID); err != nil {
+		return ToolResult{}, err
+	}
 	language := strings.ToLower(strings.TrimSpace(stringInput(input, "language", "")))
 	interpreter := map[string]string{"python": "/usr/bin/python3", "python3": "/usr/bin/python3", "node": "/usr/bin/node"}[language]
 	if interpreter == "" {
@@ -284,6 +382,9 @@ func (sandboxExecTool) Execute(ctx context.Context, toolContext ToolContext, inp
 		return ToolResult{}, fmt.Errorf("sandbox interpreter unavailable: %w", err)
 	}
 	sandboxDir := filepath.Join(toolContext.Workspace, ".agent-sandbox")
+	if err := rejectSymlinkComponents(toolContext.Workspace, sandboxDir); err != nil {
+		return ToolResult{}, err
+	}
 	if err := os.MkdirAll(sandboxDir, 0o700); err != nil {
 		return ToolResult{}, err
 	}

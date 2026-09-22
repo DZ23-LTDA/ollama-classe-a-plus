@@ -2895,7 +2895,6 @@ func TestFormerAgentEntryPointsAreRejected(t *testing.T) {
 		{"run", "llama3", "--experimental"},
 		{"run", "llama3", "--experimental-yolo"},
 		{"run", "llama3", "--experimental-websearch"},
-		{"agent"},
 	}
 
 	for _, args := range tests {
@@ -2910,5 +2909,11 @@ func TestFormerAgentEntryPointsAreRejected(t *testing.T) {
 				t.Fatalf("former agent entry point %q returned %v, want unknown command or flag", args, err)
 			}
 		})
+	}
+}
+
+func TestAgentEntryPointIsAvailable(t *testing.T) {
+	if _, _, err := NewCLI().Find([]string{"agent"}); err != nil {
+		t.Fatalf("agent command should be available: %v", err)
 	}
 }

@@ -4,7 +4,7 @@
 
 O **Ollama Classe A+** é a distribuição experimental do Ollama DZ23 que combina execução local de modelos, roteamento multi-provider e um runtime agentic com missões persistentes, ferramentas com aprovação, sandbox, memória, pesquisa, Browser Operator, companions, conectores, builders, observabilidade e publicação controlada. O projeto preserva a compatibilidade da base Ollama sempre que possível e evolui as superfícies agentic em camadas verificáveis.
 
-> **Estado real:** o projeto possui uma base extensa implementada e testada localmente, mas ainda não deve ser descrito como paridade total com todos os produtos do mercado. Recursos dependentes de contas externas, hardware, certificados, lojas, modelos multimodais e ambientes distribuídos precisam de validação adicional.
+> **Estado real:** o projeto possui uma base extensa implementada e endurecida com testes locais. Os gates de backend, vet, UI e mobile desta revisão passaram. Isso ainda não equivale a paridade total com todos os produtos do mercado: recursos dependentes de contas externas, hardware, certificados, lojas, modelos multimodais e ambientes distribuídos precisam de validação adicional.
 
 ## Visão geral
 
@@ -36,6 +36,7 @@ A arquitetura é local-first. Um operador pode começar apenas com o binário e 
 | HarnessRouter | Adapter implementado | Provider OpenAI Responses-compatible com `harness_id` server-side para Codex/Claude Code; exige instância, chave e harness instalados para validação ponta a ponta. |
 | Company OS | Implementado localmente nesta rodada | Empresa/tenant, identidade, 7 departamentos, roadmap, KPIs, backlog, ciclos, relatório, budget, approvals, pausa por limite/anomalia e Growth OS sandbox para campanhas, afiliados, catálogo e pedidos; CRM, social, marketplaces, fulfillment e ads reais ainda dependem de connectors e ambientes externos. |
 | Desktop Commander Remote MCP | Adapter implementado | Stdio local e Streamable HTTP remoto com allowlist, HTTPS, bearer opcional e approval; OAuth PKCE, conta, device pairing e testes físicos dependem do operador. |
+| Hardening e release preview | Verificado localmente | Auth fail-closed fora de loopback, contenção de symlink/StepID, MCP estrito, approvals auditáveis, tenant checks, idempotência, `go test ./...`, `go vet ./...`, build UI e typecheck mobile aprovados. |
 
 ## Instalação rápida
 

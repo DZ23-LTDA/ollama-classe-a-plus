@@ -314,7 +314,7 @@ func cosineSimilarity(a, b []float32) float64 {
 	return dot / (math.Sqrt(normA) * math.Sqrt(normB))
 }
 
-func (s *ContextStore) LoadSkills(dir string, trusted bool) error {
+func (s *ContextStore) LoadSkills(dir string, _ bool) error {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return err
@@ -335,7 +335,10 @@ func (s *ContextStore) LoadSkills(dir string, trusted bool) error {
 		if strings.TrimSpace(manifest.ID) == "" || strings.TrimSpace(manifest.Version) == "" {
 			return fmt.Errorf("skill %s has no id or version", entry.Name())
 		}
-		manifest.Trusted = trusted
+		// A skill manifest is untrusted until a future signed-attestation path
+		// verifies its source, digest and owner. Never accept trust from JSON or
+		// from a caller-controlled boolean.
+		manifest.Trusted = false
 		loaded[manifest.ID] = manifest
 	}
 	s.mu.Lock()

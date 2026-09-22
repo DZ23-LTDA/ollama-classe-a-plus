@@ -138,6 +138,8 @@ vi.mock("@tanstack/react-query", () => ({
 
 vi.mock("@/api", () => ({
   getSettings: vi.fn(),
+  getModels: vi.fn().mockResolvedValue([]),
+  getModelRecommendations: vi.fn().mockResolvedValue([]),
   getInferenceCompute: vi.fn(),
   updateSettings: mocks.updateSettings,
   updateCloudSetting: mocks.updateCloudSetting,

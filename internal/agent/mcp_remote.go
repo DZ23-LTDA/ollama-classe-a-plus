@@ -13,6 +13,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -29,10 +30,32 @@ type RemoteMCPManager struct {
 	mu      sync.RWMutex
 	client  *http.Client
 	servers map[string]RemoteMCPServerConfig
+	nextID  int64
 }
 
 func NewRemoteMCPManager() *RemoteMCPManager {
-	return &RemoteMCPManager{client: &http.Client{}, servers: map[string]RemoteMCPServerConfig{}}
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.DialContext = remoteMCPDialContext
+	return &RemoteMCPManager{
+		client: &http.Client{
+			Timeout:   60 * time.Second,
+			Transport: transport,
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				if len(via) == 0 {
+					return nil
+				}
+				previous := via[len(via)-1].URL
+				if !sameRemoteMCPOrigin(previous, req.URL) {
+					return errors.New("remote MCP redirect changes origin")
+				}
+				if !remoteMCPURLAllowed(req.URL) {
+					return errors.New("remote MCP redirect target is not allowed")
+				}
+				return nil
+			},
+		},
+		servers: map[string]RemoteMCPServerConfig{},
+	}
 }
 
 func (m *RemoteMCPManager) Register(config RemoteMCPServerConfig) error {
@@ -45,8 +68,11 @@ func (m *RemoteMCPManager) Register(config RemoteMCPServerConfig) error {
 	if err != nil || parsed.Scheme == "" || parsed.Host == "" || parsed.User != nil || parsed.Fragment != "" {
 		return errors.New("remote MCP url must be an absolute URL without credentials or fragment")
 	}
-	if parsed.Scheme != "https" && !remoteMCPLoopback(parsed.Hostname()) {
+	if !remoteMCPURLAllowed(parsed) {
 		return errors.New("remote MCP requires HTTPS outside loopback")
+	}
+	if ip := net.ParseIP(parsed.Hostname()); ip != nil && remoteMCPPrivateIP(ip) && !ip.IsLoopback() {
+		return errors.New("remote MCP destination cannot be a private address")
 	}
 	if strings.ContainsAny(config.TokenEnv, "=\x00\r\n") {
 		return errors.New("remote MCP token_env is invalid")
@@ -58,6 +84,9 @@ func (m *RemoteMCPManager) Register(config RemoteMCPServerConfig) error {
 		if strings.TrimSpace(envName) == "" || strings.ContainsAny(envName, "=\x00\r\n") {
 			return errors.New("remote MCP header environment name is invalid")
 		}
+	}
+	if len(config.AllowedMethods) == 0 {
+		return errors.New("remote MCP allowed_methods must contain at least one method")
 	}
 	if config.TimeoutSeconds <= 0 || config.TimeoutSeconds > 300 {
 		config.TimeoutSeconds = 30
@@ -81,6 +110,52 @@ func remoteMCPLoopback(host string) bool {
 	}
 	ip := net.ParseIP(host)
 	return ip != nil && ip.IsLoopback()
+}
+
+type remoteMCPLoopbackContextKey struct{}
+
+func remoteMCPDialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	dialer := &net.Dialer{Timeout: 10 * time.Second}
+	conn, err := dialer.DialContext(ctx, network, address)
+	if err != nil {
+		return nil, err
+	}
+	if remoteMCPLoopbackContext(ctx) {
+		return conn, nil
+	}
+	host, _, err := net.SplitHostPort(address)
+	if err != nil {
+		_ = conn.Close()
+		return nil, errors.New("remote MCP destination is invalid")
+	}
+	if ip := net.ParseIP(host); ip != nil && remoteMCPPrivateIP(ip) {
+		_ = conn.Close()
+		return nil, errors.New("remote MCP destination resolves to a private address")
+	}
+	return conn, nil
+}
+
+func remoteMCPLoopbackContext(ctx context.Context) bool {
+	value, _ := ctx.Value(remoteMCPLoopbackContextKey{}).(bool)
+	return value
+}
+
+func remoteMCPPrivateIP(ip net.IP) bool {
+	return ip.IsLoopback() || ip.IsUnspecified() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsMulticast()
+}
+
+func remoteMCPURLAllowed(parsed *url.URL) bool {
+	if parsed == nil || parsed.User != nil || parsed.Fragment != "" || parsed.Hostname() == "" {
+		return false
+	}
+	return parsed.Scheme == "https" || remoteMCPLoopback(parsed.Hostname())
+}
+
+func sameRemoteMCPOrigin(left, right *url.URL) bool {
+	if left == nil || right == nil {
+		return false
+	}
+	return strings.EqualFold(left.Scheme, right.Scheme) && strings.EqualFold(left.Host, right.Host)
 }
 
 func (m *RemoteMCPManager) List() []RemoteMCPServerConfig {
@@ -109,7 +184,8 @@ func (m *RemoteMCPManager) Call(ctx context.Context, serverID, method string, pa
 	if len(config.AllowedMethods) > 0 && !remoteMCPContains(config.AllowedMethods, method) {
 		return nil, fmt.Errorf("remote MCP method %q is not allowlisted", method)
 	}
-	requestBody, err := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": time.Now().UnixNano(), "method": method, "params": params})
+	requestID := atomic.AddInt64(&m.nextID, 1)
+	requestBody, err := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": requestID, "method": method, "params": params})
 	if err != nil {
 		return nil, err
 	}
@@ -119,6 +195,11 @@ func (m *RemoteMCPManager) Call(ctx context.Context, serverID, method string, pa
 	}
 	requestContext, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
+	parsedURL, err := url.Parse(config.URL)
+	if err != nil {
+		return nil, err
+	}
+	requestContext = context.WithValue(requestContext, remoteMCPLoopbackContextKey{}, remoteMCPLoopback(parsedURL.Hostname()))
 	req, err := http.NewRequestWithContext(requestContext, http.MethodPost, config.URL, bytes.NewReader(requestBody))
 	if err != nil {
 		return nil, err
@@ -153,11 +234,15 @@ func (m *RemoteMCPManager) Call(ctx context.Context, serverID, method string, pa
 		payload = lastSSEData(body)
 	}
 	var envelope struct {
+		ID     json.RawMessage `json:"id"`
 		Result json.RawMessage `json:"result"`
 		Error  *mcpError       `json:"error,omitempty"`
 	}
 	if err := json.Unmarshal(payload, &envelope); err != nil {
 		return nil, fmt.Errorf("decode remote MCP response: %w", err)
+	}
+	if !remoteMCPResponseMatches(envelope.ID, requestID) {
+		return nil, errors.New("remote MCP response id does not match request")
 	}
 	if envelope.Error != nil {
 		return nil, fmt.Errorf("remote MCP error: %s", envelope.Error.Message)
@@ -166,6 +251,21 @@ func (m *RemoteMCPManager) Call(ctx context.Context, serverID, method string, pa
 		return nil, errors.New("remote MCP response has no result")
 	}
 	return envelope.Result, nil
+}
+
+func remoteMCPResponseMatches(raw json.RawMessage, expected int64) bool {
+	if len(raw) == 0 || string(raw) == "null" {
+		return false
+	}
+	var number int64
+	if json.Unmarshal(raw, &number) == nil {
+		return number == expected
+	}
+	var text string
+	if json.Unmarshal(raw, &text) == nil {
+		return text == fmt.Sprintf("%d", expected)
+	}
+	return false
 }
 
 func remoteMCPContains(values []string, wanted string) bool {

@@ -39,6 +39,10 @@ func (a *agentAPI) addCompanyCampaign(c *gin.Context) {
 }
 
 func (a *agentAPI) approveCompanyCampaign(c *gin.Context) {
+	if _, err := a.companyForRequest(c); err != nil {
+		writeAgentError(c, statusForAgentError(err), err)
+		return
+	}
 	company, err := a.runtime.CompanyStore().ApproveCampaign(c.Param("id"), c.Param("campaign_id"))
 	if err != nil {
 		writeAgentError(c, statusForAgentError(err), err)
@@ -48,6 +52,10 @@ func (a *agentAPI) approveCompanyCampaign(c *gin.Context) {
 }
 
 func (a *agentAPI) launchCompanyCampaign(c *gin.Context) {
+	if _, err := a.companyForRequest(c); err != nil {
+		writeAgentError(c, statusForAgentError(err), err)
+		return
+	}
 	company, err := a.runtime.CompanyStore().LaunchCampaign(c.Param("id"), c.Param("campaign_id"))
 	if err != nil {
 		writeAgentError(c, statusForAgentError(err), err)
@@ -57,6 +65,10 @@ func (a *agentAPI) launchCompanyCampaign(c *gin.Context) {
 }
 
 func (a *agentAPI) pauseCompanyCampaign(c *gin.Context) {
+	if _, err := a.companyForRequest(c); err != nil {
+		writeAgentError(c, statusForAgentError(err), err)
+		return
+	}
 	company, err := a.runtime.CompanyStore().PauseCampaign(c.Param("id"), c.Param("campaign_id"))
 	if err != nil {
 		writeAgentError(c, statusForAgentError(err), err)
@@ -84,6 +96,10 @@ func (a *agentAPI) addCompanyAffiliateProgram(c *gin.Context) {
 }
 
 func (a *agentAPI) approveCompanyAffiliateProgram(c *gin.Context) {
+	if _, err := a.companyForRequest(c); err != nil {
+		writeAgentError(c, statusForAgentError(err), err)
+		return
+	}
 	company, err := a.runtime.CompanyStore().ApproveAffiliateProgram(c.Param("id"), c.Param("program_id"))
 	if err != nil {
 		writeAgentError(c, statusForAgentError(err), err)
@@ -111,6 +127,10 @@ func (a *agentAPI) addCompanyAffiliateLink(c *gin.Context) {
 }
 
 func (a *agentAPI) recordCompanyAffiliateConversion(c *gin.Context) {
+	if _, err := a.companyForRequest(c); err != nil {
+		writeAgentError(c, statusForAgentError(err), err)
+		return
+	}
 	var input struct {
 		RevenueCents int64 `json:"revenue_cents"`
 	}
@@ -154,6 +174,9 @@ func (a *agentAPI) createCompanyOrder(c *gin.Context) {
 		writeAgentError(c, http.StatusBadRequest, err)
 		return
 	}
+	if input.IdempotencyKey == "" {
+		input.IdempotencyKey = c.GetHeader("Idempotency-Key")
+	}
 	company, err := a.runtime.CompanyStore().CreateOrder(c.Param("id"), input)
 	if err != nil {
 		writeAgentError(c, statusForAgentError(err), err)
@@ -163,6 +186,10 @@ func (a *agentAPI) createCompanyOrder(c *gin.Context) {
 }
 
 func (a *agentAPI) approveCompanyOrder(c *gin.Context) {
+	if _, err := a.companyForRequest(c); err != nil {
+		writeAgentError(c, statusForAgentError(err), err)
+		return
+	}
 	company, err := a.runtime.CompanyStore().ApproveOrder(c.Param("id"), c.Param("order_id"))
 	if err != nil {
 		writeAgentError(c, statusForAgentError(err), err)
@@ -172,6 +199,10 @@ func (a *agentAPI) approveCompanyOrder(c *gin.Context) {
 }
 
 func (a *agentAPI) fulfillCompanyOrder(c *gin.Context) {
+	if _, err := a.companyForRequest(c); err != nil {
+		writeAgentError(c, statusForAgentError(err), err)
+		return
+	}
 	var input struct {
 		TrackingCode string `json:"tracking_code"`
 	}

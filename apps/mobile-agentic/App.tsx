@@ -2,7 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Notifications from "expo-notifications";
 import * as SecureStore from "expo-secure-store";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 Notifications.setNotificationHandler({ handleNotification: async () => ({ shouldShowAlert: true, shouldShowBanner: true, shouldShowList: true, shouldPlaySound: true, shouldSetBadge: false }) });
@@ -10,11 +10,13 @@ Notifications.setNotificationHandler({ handleNotification: async () => ({ should
 type Mission = { id: string; version?: number; objective: string; state: string; approvals?: Array<{ id: string; step_id: string; status: string }>; last_error?: string };
 type Event = { id: string; type: string; step_id?: string; created_at: string };
 type Session = { access_token: string; user: { email: string }; organization: { name: string } };
-type QueuedAction = { id: string; path: string; method: string; body?: string; token?: string; headers?: Record<string, string>; created_at: string; conflict?: string };
+type QueuedAction = { id: string; path: string; method: string; body?: string; headers?: Record<string, string>; created_at: string; attempts: number; next_attempt_at: string; idempotency_key: string; conflict?: string };
 
 const queueKey = "dz23.agent.offline.queue";
 const missionKey = "dz23.agent.cached.mission";
 const pushKey = "dz23.agent.push.registered";
+
+function pushStorageKey(server: string) { return `${pushKey}.${encodeURIComponent(server)}`; }
 
 class ApiError extends Error {
   status: number;
@@ -48,7 +50,11 @@ export default function App() {
 
   const loadQueue = async () => {
     const raw = await AsyncStorage.getItem(queueKey);
-    const items: QueuedAction[] = raw ? JSON.parse(raw) : [];
+    const parsed = raw ? JSON.parse(raw) : [];
+    const items: QueuedAction[] = Array.isArray(parsed) ? parsed.map((item: Partial<QueuedAction> & { token?: string }) => {
+      const { token: _discardedToken, ...safe } = item;
+      return { ...safe, attempts: item.attempts ?? 0, next_attempt_at: item.next_attempt_at ?? new Date(0).toISOString(), idempotency_key: item.idempotency_key ?? item.id ?? `offline_${Date.now()}` } as QueuedAction;
+    }) : [];
     setQueued(items.length);
     setConflicts(items.filter((item) => item.conflict).length);
     return items;
@@ -56,23 +62,36 @@ export default function App() {
 
   const enqueue = async (path: string, method: string, body?: unknown, headers?: Record<string, string>) => {
     const items = await loadQueue();
-    items.push({ id: `offline_${Date.now()}_${Math.random().toString(36).slice(2)}`, path, method, body: body ? JSON.stringify(body) : undefined, token, headers, created_at: new Date().toISOString() });
+    const id = `offline_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const idempotencyKey = `mobile_${id}`;
+    items.push({ id, path, method, body: body ? JSON.stringify(body) : undefined, headers: { ...headers, "Idempotency-Key": idempotencyKey }, created_at: new Date().toISOString(), attempts: 0, next_attempt_at: new Date().toISOString(), idempotency_key: idempotencyKey });
     await AsyncStorage.setItem(queueKey, JSON.stringify(items));
     await loadQueue();
   };
 
   const flushQueue = async () => {
+    if (!token) return;
     const items = await loadQueue();
     const remaining: QueuedAction[] = [];
     for (const item of items) {
+      if (item.conflict || new Date(item.next_attempt_at).getTime() > Date.now()) {
+        remaining.push(item);
+        continue;
+      }
       try {
-        await request(base, item.path, item.token, { method: item.method, body: item.body, headers: item.headers });
+        await request(base, item.path, token, { method: item.method, body: item.body, headers: item.headers });
       } catch (cause) {
         const apiError = cause instanceof ApiError ? cause : undefined;
         if (apiError?.status === 409) {
           remaining.push({ ...item, conflict: "Servidor mudou a missão; revise o estado atual antes de reenviar." });
+        } else if (apiError?.status === 401 || apiError?.status === 403) {
+          remaining.push({ ...item, conflict: "Sessão expirada ou sem permissão; autentique novamente antes de reenviar." });
+        } else if (item.attempts >= 4) {
+          remaining.push({ ...item, conflict: "Limite de tentativas atingido; revise a ação antes de reenviar." });
         } else {
-          remaining.push(item);
+          const attempts = item.attempts + 1;
+          const delay = Math.min(60_000, 2_000 * 2 ** attempts);
+          remaining.push({ ...item, attempts, next_attempt_at: new Date(Date.now() + delay).toISOString() });
         }
       }
     }
@@ -107,7 +126,7 @@ export default function App() {
       const pushToken = (await Notifications.getExpoPushTokenAsync()).data;
       const platform = Platform.OS === "ios" ? "ios" : "android";
       await request(server, "/api/agent/v1/notifications/register", bearer, { method: "POST", body: JSON.stringify({ token: pushToken, platform }) });
-      await AsyncStorage.setItem(pushKey, "1");
+      await AsyncStorage.setItem(pushStorageKey(server), "1");
       setPushRegistered(true);
     } catch { /* Push is optional; offline mission use must continue. */ }
   };
@@ -115,11 +134,12 @@ export default function App() {
   useEffect(() => {
     void AsyncStorage.getItem("dz23.agent.base").then((value) => { if (value) { setBase(value); setDraftBase(value); } });
     void SecureStore.getItemAsync("dz23.agent.token").then((value) => { if (value) { setToken(value); setDraftToken(value); } });
-    void AsyncStorage.getItem(pushKey).then((value) => setPushRegistered(value === "1"));
+    void AsyncStorage.getItem(pushStorageKey(base)).then((value) => setPushRegistered(value === "1"));
     void loadQueue();
     void AsyncStorage.getItem(missionKey).then((raw) => { if (raw) { const value = JSON.parse(raw) as { mission: Mission; events: Event[] }; setMission(value.mission); setEvents(value.events); } });
   }, []);
-  useEffect(() => { const timer = setInterval(() => void refresh().catch(() => undefined), 3000); return () => clearInterval(timer); }, [mission?.id, base, token]);
+  const pollInFlight = useRef(false);
+  useEffect(() => { const timer = setInterval(async () => { if (pollInFlight.current) return; pollInFlight.current = true; try { await refresh(); } finally { pollInFlight.current = false; } }, 3000); return () => clearInterval(timer); }, [mission?.id, base, token]);
   useEffect(() => { void registerPush(); }, [base, token, pushRegistered]);
 
   const approvals = useMemo(() => mission?.approvals?.filter((approval) => approval.status === "PENDING") ?? [], [mission]);
@@ -145,7 +165,7 @@ export default function App() {
   const decide = async (approvalId: string, approved: boolean) => { if (!mission) return; setBusy(true); setError(""); await perform(`/api/agent/v1/missions/${mission.id}/approvals/${approvalId}`, "POST", { approved, reason: "Mobile operator" }, "Falha ao decidir approval"); await refresh(); setBusy(false); };
   const run = async () => { if (!mission) return; setBusy(true); setError(""); await perform(`/api/agent/v1/missions/${mission.id}/run`, "POST", {}, "Falha ao executar"); await refresh(); setBusy(false); };
   const saveSession = async () => { const nextBase = draftBase.trim(); if (!nextBase) return; await AsyncStorage.setItem("dz23.agent.base", nextBase); if (draftToken.trim()) await SecureStore.setItemAsync("dz23.agent.token", draftToken.trim()); setBase(nextBase); setToken(draftToken.trim()); setPushRegistered(false); await flushQueue(); };
-  const clearSession = async () => { await SecureStore.deleteItemAsync("dz23.agent.token"); await AsyncStorage.removeItem(pushKey); setToken(""); setDraftToken(""); setPushRegistered(false); };
+  const clearSession = async () => { await SecureStore.deleteItemAsync("dz23.agent.token"); await AsyncStorage.removeItem(pushStorageKey(base)); setToken(""); setDraftToken(""); setPushRegistered(false); };
   const discardConflicts = async () => { const items = await loadQueue(); await AsyncStorage.setItem(queueKey, JSON.stringify(items.filter((item) => !item.conflict))); await loadQueue(); };
 
   return <SafeAreaView style={styles.safe}><StatusBar style="auto" /><ScrollView contentContainerStyle={styles.container}>

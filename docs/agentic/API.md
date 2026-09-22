@@ -24,10 +24,12 @@ O modelo não recebe permissão implícita. Ele somente sugere passos; o runtime
 ```bash
 curl -sS http://localhost:11434/api/agent/v1/missions \
   -H 'Content-Type: application/json' \
-  -d '{"objective":"inspecionar o workspace e listar os arquivos","auto_run":true}'
+	-d '{"objective":"inspecionar o workspace e listar os arquivos","capabilities":["workspace:read"],"auto_run":true}'
 ```
 
 A resposta contém `mission_id`, estado, plano, approvals e timestamps. Uma missão de leitura pode entrar em execução automaticamente quando `auto_run` é verdadeiro.
+
+`capabilities` é a lista de escopos concedidos à missão. Quando omitida, o runtime concede apenas `workspace:read` e `workspace:write` para preservar o modo local-first. Browser, desktop, terminal, sandbox, MCP, connectors e deploy exigem os escopos correspondentes de forma explícita. A aprovação continua necessária quando o descriptor da tool exigir.
 
 ## Consultar missão e eventos
 

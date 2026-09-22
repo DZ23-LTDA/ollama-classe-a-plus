@@ -43,10 +43,17 @@ func (m *MCPManager) Register(config MCPServerConfig) error {
 	if err != nil {
 		return fmt.Errorf("MCP command unavailable: %w", err)
 	}
+	if len(config.AllowedMethods) == 0 {
+		return errors.New("MCP allowed_methods must contain at least one method")
+	}
 	config.Command = command
 	allowed := make(map[string]bool, len(config.AllowedMethods))
 	for _, method := range config.AllowedMethods {
-		allowed[strings.TrimSpace(method)] = true
+		method = strings.TrimSpace(method)
+		if method == "" {
+			return errors.New("MCP allowed_methods cannot contain empty methods")
+		}
+		allowed[method] = true
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -173,7 +180,7 @@ func (s *MCPServer) Call(ctx context.Context, method string, params any) (json.R
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if len(s.allowedMethods) > 0 && !s.allowedMethods[method] {
+	if len(s.allowedMethods) == 0 || !s.allowedMethods[method] {
 		return nil, fmt.Errorf("MCP method %q is not allowlisted", method)
 	}
 	if err := s.startLocked(); err != nil {
@@ -219,6 +226,10 @@ func (s *MCPServer) Call(ctx context.Context, method string, params any) (json.R
 		if response.err != nil {
 			_ = s.stopLocked()
 			return nil, response.err
+		}
+		if response.ID != requestID {
+			_ = s.stopLocked()
+			return nil, errors.New("MCP response id does not match request")
 		}
 		if response.Error != nil {
 			return nil, fmt.Errorf("MCP error: %s", response.Error.Message)

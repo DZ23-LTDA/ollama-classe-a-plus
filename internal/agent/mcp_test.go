@@ -50,3 +50,10 @@ func TestMCPHelperProcess(t *testing.T) {
 	}
 	os.Exit(0)
 }
+
+func TestMCPRequiresAllowlist(t *testing.T) {
+	manager := NewMCPManager()
+	if err := manager.Register(MCPServerConfig{ID: "empty", Command: os.Args[0]}); err == nil {
+		t.Fatal("expected empty MCP allowlist rejection")
+	}
+}

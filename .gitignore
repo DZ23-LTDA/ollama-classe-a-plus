@@ -5,6 +5,7 @@
 .swp
 dist
 build
+**/node_modules
 .cache
 .gocache
 *.exe

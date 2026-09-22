@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -37,7 +38,7 @@ type Runtime struct {
 	ingestion     DocumentIngestor
 	push          *PushService
 	deployments   *DeploymentManager
-	mu            sync.Mutex
+	mu            *sync.Mutex
 	running       map[string]bool
 }
 
@@ -145,7 +146,7 @@ func NewRuntime(config RuntimeConfig) (*Runtime, error) {
 			return nil, err
 		}
 	}
-	runtime := &Runtime{store: store, planner: planner, tools: tools, workspaceRoot: root, context: contextStore, company: companyStore, remoteMCP: config.RemoteMCP, metrics: &RuntimeMetrics{}, connectors: config.Connectors, mcp: config.MCP, queue: queue, redisQueue: config.RedisQueue, traces: traces, telemetry: telemetry, media: config.Media, builder: builder, collaboration: collaboration, push: config.Push, deployments: config.Deployments, running: make(map[string]bool)}
+	runtime := &Runtime{store: store, planner: planner, tools: tools, workspaceRoot: root, context: contextStore, company: companyStore, remoteMCP: config.RemoteMCP, metrics: &RuntimeMetrics{}, connectors: config.Connectors, mcp: config.MCP, queue: queue, redisQueue: config.RedisQueue, traces: traces, telemetry: telemetry, media: config.Media, builder: builder, collaboration: collaboration, push: config.Push, deployments: config.Deployments, mu: &sync.Mutex{}, running: make(map[string]bool)}
 	orchestrator, err := NewAgentOrchestrator(filepath.Join(root, ".agent-orchestrator"), runtime.SubagentRunner)
 	if err != nil {
 		return nil, err
@@ -250,8 +251,12 @@ func (r *Runtime) CreateMission(ctx context.Context, request CreateMissionReques
 	if err != nil {
 		return Mission{}, err
 	}
+	capabilities := normalizeMissionCapabilities(request.Capabilities)
+	if len(capabilities) == 0 {
+		capabilities = []string{"workspace:read", "workspace:write"}
+	}
 	now := time.Now().UTC()
-	mission := Mission{ID: "mis_" + uuid.NewString(), Version: 1, Objective: objective, Model: strings.TrimSpace(request.Model), Workspace: workspace, ProjectID: strings.TrimSpace(request.ProjectID), OrganizationID: strings.TrimSpace(request.OrganizationID), AutoRun: request.AutoRun, State: MissionPlanning, CreatedAt: now, UpdatedAt: now}
+	mission := Mission{ID: "mis_" + uuid.NewString(), Version: 1, Objective: objective, Model: strings.TrimSpace(request.Model), Workspace: workspace, ProjectID: strings.TrimSpace(request.ProjectID), OrganizationID: strings.TrimSpace(request.OrganizationID), Capabilities: capabilities, AutoRun: request.AutoRun, State: MissionPlanning, CreatedAt: now, UpdatedAt: now}
 	if err := r.store.PutMission(mission); err != nil {
 		return Mission{}, err
 	}
@@ -278,9 +283,10 @@ func (r *Runtime) CreateMission(ctx context.Context, request CreateMissionReques
 	}
 	mission.Plan = plan
 	mission.State = MissionReady
+	approvalExpiresAt := now.Add(30 * time.Minute)
 	for _, step := range plan {
 		if step.RequiresApproval {
-			mission.Approvals = append(mission.Approvals, Approval{ID: "apr_" + uuid.NewString(), MissionID: mission.ID, StepID: step.ID, Status: ApprovalPending, CreatedAt: now, UpdatedAt: now})
+			mission.Approvals = append(mission.Approvals, Approval{ID: "apr_" + uuid.NewString(), MissionID: mission.ID, StepID: step.ID, OrganizationID: mission.OrganizationID, Policy: "risk:" + string(step.Risk), Nonce: uuid.NewString(), Status: ApprovalPending, ExpiresAt: &approvalExpiresAt, CreatedAt: now, UpdatedAt: now})
 		}
 	}
 	if len(mission.Approvals) > 0 {
@@ -296,6 +302,24 @@ func (r *Runtime) CreateMission(ctx context.Context, request CreateMissionReques
 		_, _ = r.EnqueueMission(mission.ID)
 	}
 	return mission, nil
+}
+
+func normalizeMissionCapabilities(capabilities []string) []string {
+	seen := make(map[string]struct{}, len(capabilities))
+	result := make([]string, 0, len(capabilities))
+	for _, capability := range capabilities {
+		capability = strings.TrimSpace(capability)
+		if capability == "" {
+			continue
+		}
+		if _, ok := seen[capability]; ok {
+			continue
+		}
+		seen[capability] = struct{}{}
+		result = append(result, capability)
+	}
+	sort.Strings(result)
+	return result
 }
 
 func (r *Runtime) GetMission(id string) (Mission, error) {
@@ -437,6 +461,13 @@ func (r *Runtime) Run(ctx context.Context, id string) (runErr error) {
 		if step.State == StepSucceeded {
 			continue
 		}
+		tool, ok := r.tools.Get(step.Kind)
+		if !ok {
+			return r.failStep(mission, step, fmt.Errorf("tool %q is not registered", step.Kind))
+		}
+		if !capabilityAllowed(tool.Descriptor(), mission.Capabilities) {
+			return r.failStep(mission, step, fmt.Errorf("%w: %s", ErrCapabilityDenied, step.Kind))
+		}
 		if step.RequiresApproval && !r.stepApproved(mission, step.ID) {
 			step.State = StepBlocked
 			mission.State = MissionAwaitingApproval
@@ -445,10 +476,6 @@ func (r *Runtime) Run(ctx context.Context, id string) (runErr error) {
 			_ = r.store.PutMission(mission)
 			_ = r.event(mission, "step.awaiting_approval", step.ID, nil)
 			return nil
-		}
-		tool, ok := r.tools.Get(step.Kind)
-		if !ok {
-			return r.failStep(mission, step, fmt.Errorf("tool %q is not registered", step.Kind))
 		}
 		step.State = StepRunning
 		step.Attempts++
@@ -527,6 +554,14 @@ func (r *Runtime) DecideApproval(missionID, approvalID string, approved bool, re
 	if err != nil {
 		return Mission{}, err
 	}
+	return r.DecideApprovalForActor(missionID, approvalID, approved, reason, "local", mission.OrganizationID)
+}
+
+func (r *Runtime) DecideApprovalForActor(missionID, approvalID string, approved bool, reason, actorID, organizationID string) (Mission, error) {
+	mission, err := r.store.GetMission(strings.TrimSpace(missionID))
+	if err != nil {
+		return Mission{}, err
+	}
 	for index := range mission.Approvals {
 		if mission.Approvals[index].ID != approvalID {
 			continue
@@ -534,6 +569,20 @@ func (r *Runtime) DecideApproval(missionID, approvalID string, approved bool, re
 		if mission.Approvals[index].Status != ApprovalPending {
 			continue
 		}
+		if mission.Approvals[index].ExpiresAt != nil && time.Now().UTC().After(*mission.Approvals[index].ExpiresAt) {
+			return Mission{}, errors.New("approval has expired")
+		}
+		if mission.OrganizationID != "" && strings.TrimSpace(organizationID) != mission.OrganizationID {
+			return Mission{}, errors.New("approval organization mismatch")
+		}
+		if strings.TrimSpace(actorID) == "" {
+			return Mission{}, errors.New("approval actor is required")
+		}
+		if strings.TrimSpace(reason) == "" {
+			return Mission{}, errors.New("approval reason is required")
+		}
+		mission.Approvals[index].ActorID = strings.TrimSpace(actorID)
+		mission.Approvals[index].OrganizationID = mission.OrganizationID
 		if approved {
 			mission.Approvals[index].Status = ApprovalApproved
 		} else {

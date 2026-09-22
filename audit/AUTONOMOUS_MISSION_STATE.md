@@ -365,3 +365,93 @@ external_blockers:
   - compliance, idempotency, DLP, approvals, returns/refunds, logistics, payments and reconciliation tests
 next_action: run final gates, commit and push the public PR; do not claim external accounts are connected
 ```
+
+
+## Auditoria independente consolidada — 2026-09-22
+
+```yaml
+mission_id: class-a-plus-final-hardening-2026-09-22
+state: EXECUTING
+iteration: 1
+objective: fechar blockers internos de segurança, wiring, tenant, MCP, QA, UI/mobile e release antes de nova declaração pública
+source_report: audit/FINAL_HARNESS_AUDIT_2026-09-22.md
+findings:
+  critical: 15
+  high: 32
+  medium: 33
+  low: 6
+completed_before_this_phase:
+  - adapters Composio/xAI e documentação pública
+  - Growth OS sandbox, Builder smoke e provider session fixtures
+  - branch pública feat/manus-parity-omniroute em PR #1
+current_priority:
+  - fail-closed auth e WebSocket /connect
+  - containment resistente a symlink/TOCTOU e StepID
+  - MCP loader, allowlist obrigatória, SSRF/redirect e correlation ID
+  - Company/Growth tenant checks e approvals
+  - baseline go test ./..., UI tests e mobile typecheck
+  - CI/release gates e supply-chain pinning
+external_blockers_preserved:
+  - credenciais e OAuth de providers, Composio e Desktop Commander
+  - sandbox/app review de TikTok Shop, Meta, Shopify e demais canais
+  - PostgreSQL/RLS, Redis, OTLP, runners Windows/macOS, GPU e dispositivos móveis
+  - assinatura/provenance de releases com identidade do publisher
+strategy: corrigir somente controles internos reproduzíveis; marcar dependências externas como BLOCKED_BY_EXTERNAL_DEPENDENCY
+next_action: inspecionar contratos P0 e implementar patches pequenos com testes de regressão
+```
+
+
+## Verificação final de hardening — 2026-09-22
+
+```yaml
+mission_id: class-a-plus-final-hardening-2026-09-22
+state: CANDIDATE_COMPLETED
+iteration: 2
+objective: fechar blockers internos de segurança, wiring, tenant, MCP, QA, UI/mobile e release antes da publicação
+completed:
+  - fail_closed_agent_auth_outside_loopback
+  - strict_mcp_and_remote_mcp_config_loading
+  - remote_mcp_ssrf_redirect_timeout_and_correlation_guards
+  - workspace_symlink_and_step_id_containment
+  - auditable_approval_metadata_and_actor_tenant_binding
+  - tenant_safe_growth_mutations_and_idempotent_fulfillment
+  - resilient_settings_control_center_and_mobile_outbox
+  - stale_cli_test_corrected_for_agent_command
+  - vet_mutex_copy_and_context_cancel_fixes
+proofs:
+  - CGO_ENABLED=1 go test ./... -count=1: PASS
+  - CGO_ENABLED=1 go vet ./...: PASS
+  - CGO_ENABLED=0 go test ./internal/agent -count=1: PASS
+  - CGO_ENABLED=1 go test ./server ./cmd/launch ./internal/multillm -count=1: PASS
+  - CGO_ENABLED=1 go build: PASS
+  - UI Vitest: 20 files, 199 tests, PASS
+  - UI npm run build: PASS
+  - mobile npm run typecheck: PASS
+  - class-a-plus-integrity guard: PASS
+  - final review: audit/FINAL_THREE_AGENT_REVIEW.md
+external_blockers:
+  - Composio, xAI, Desktop Commander, social, marketplace and logistics credentials/sandboxes
+  - PostgreSQL/RLS, Redis, OTLP and IdP staging
+  - GPU/local media models and physical desktop/mobile runners
+  - signed installers, app stores and operator deployment accounts
+next_action: commit verified hardening, push feature branch, update PR metadata; do not merge main automatically
+```
+
+
+## Incremento final pós-auditoria — 2026-09-22
+
+```yaml
+state: CANDIDATE_COMPLETED
+completed:
+  - mission_capability_policy_with_local_default_and_explicit_external_scopes
+  - exact_fullpath_companion_handshake_bypass_only
+  - capability_and_auth_regression_tests
+proofs:
+  - CGO_ENABLED=1 go test ./... -count=1: PASS
+  - CGO_ENABLED=1 go vet ./...: PASS
+  - UI 20 files / 199 tests: PASS
+  - UI build: PASS
+  - functional smokes Growth/Builder/Shell: PASS
+  - final Chromium capture: PASS
+next_action: stage, commit and push verified branch; preserve external blockers in release notes
+```

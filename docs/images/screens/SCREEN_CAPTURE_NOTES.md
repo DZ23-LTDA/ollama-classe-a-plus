@@ -9,3 +9,8 @@
 `class-a-plus-projects.png`, `class-a-plus-library.png`, `class-a-plus-scheduled.png`, `class-a-plus-skills.png`, `class-a-plus-plugins.png`, `class-a-plus-tasks.png` e `class-a-plus-company.png` são capturas reais das rotas do shell, com o menu lateral Classe A+ aberto por padrão. Contra o servidor local, Projetos e Agendado foram criados/listados/excluídos por CRUD real; Plugins e MCP exibem catálogo vazio sem crash quando o backend retorna `null`; Skills, Tasks e Biblioteca consultam contratos reais; Company OS mostra uma empresa criada pelo smoke, sete departamentos, um KPI, backlog, ciclo, budget e o painel Growth OS com campanha, programa, produto e pedido sandbox. Os scripts `app/ui/app/scripts/smoke-shell.mjs`, `scripts/smoke-company-os.sh` e `scripts/smoke-company-growth.sh` cobrem essas jornadas por API.
 
 As capturas desta rodada foram produzidas contra Vite e um servidor Ollama local em `127.0.0.1:3001`, sem provider externo e sem modelo instalado. Elas demonstram a implementação e os estados locais, não uma execução de produção, deployment, login enterprise, dispositivo físico ou harness remoto.
+
+
+## Captura final de hardening — 2026-09-22
+
+As telas `class-a-plus-home.png`, `class-a-plus-settings.png`, `class-a-plus-company.png`, `class-a-plus-agentic.png` e `class-a-plus-plugins.png` foram recapturadas com Chromium contra o servidor local final após o hardening de autenticação, MCP, capabilities e Growth OS. A captura confirma navegação, títulos, catálogo e estados de interface; não comprova providers externos, credenciais, dispositivos físicos ou publicação em produção.

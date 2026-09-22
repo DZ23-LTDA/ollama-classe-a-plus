@@ -111,6 +111,32 @@ func TestWorkspaceToolsRejectTraversal(t *testing.T) {
 	}
 }
 
+func TestWorkspaceToolsRejectSymlinkEscape(t *testing.T) {
+	root := t.TempDir()
+	outside := t.TempDir()
+	if err := os.WriteFile(filepath.Join(outside, "secret.txt"), []byte("secret"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(root, "linked")); err != nil {
+		t.Skipf("symlink unavailable on this platform: %v", err)
+	}
+	runtime, err := NewRuntime(RuntimeConfig{Store: NewMemoryStore(), WorkspaceRoot: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mission, err := runtime.CreateMission(context.Background(), CreateMissionRequest{Objective: "ler arquivo"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	tool, ok := runtime.tools.Get("workspace.read")
+	if !ok {
+		t.Fatal("workspace.read not registered")
+	}
+	if _, err := tool.Execute(context.Background(), ToolContext{MissionID: mission.ID, StepID: "step_1", Workspace: mission.Workspace}, map[string]any{"path": "linked/secret.txt"}); err == nil {
+		t.Fatal("expected symlink escape rejection")
+	}
+}
+
 type fixedPlanner struct {
 	steps []Step
 }
@@ -151,7 +177,7 @@ func TestSandboxExecRunsIsolatedPython(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	mission, err := runtime.CreateMission(context.Background(), CreateMissionRequest{Objective: "executar código"})
+	mission, err := runtime.CreateMission(context.Background(), CreateMissionRequest{Objective: "executar código", Capabilities: []string{"sandbox:execute"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -168,6 +194,47 @@ func TestSandboxExecRunsIsolatedPython(t *testing.T) {
 	}
 	if completed.State != MissionCompleted || !strings.Contains(completed.Plan[0].Result.(map[string]any)["stdout"].(string), "4") {
 		t.Fatalf("completed = %+v", completed)
+	}
+}
+
+func TestApprovalBindsActorOrganizationAndReason(t *testing.T) {
+	runtime, err := NewRuntime(RuntimeConfig{Store: NewMemoryStore(), WorkspaceRoot: t.TempDir(), Planner: fixedPlanner{steps: []Step{{ID: "step_1", Kind: "workspace.write", Title: "write", Risk: RiskWrite, RequiresApproval: true, Input: map[string]any{"path": "approval.txt", "content": "ok"}}}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mission, err := runtime.CreateMission(context.Background(), CreateMissionRequest{Objective: "aprovar operação", OrganizationID: "org_a"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runtime.DecideApprovalForActor(mission.ID, mission.Approvals[0].ID, true, "approved", "user_a", "org_b"); err == nil {
+		t.Fatal("expected organization mismatch")
+	}
+	if _, err := runtime.DecideApprovalForActor(mission.ID, mission.Approvals[0].ID, true, "", "user_a", "org_a"); err == nil {
+		t.Fatal("expected empty reason rejection")
+	}
+	mission, err = runtime.DecideApprovalForActor(mission.ID, mission.Approvals[0].ID, true, "approved", "user_a", "org_a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	approval := mission.Approvals[0]
+	if approval.ActorID != "user_a" || approval.OrganizationID != "org_a" || approval.Nonce == "" || approval.Policy == "" || approval.ExpiresAt == nil {
+		t.Fatalf("approval metadata = %+v", approval)
+	}
+}
+
+func TestCapabilityPolicyDefaultsToLocalScopes(t *testing.T) {
+	if !capabilityAllowed(ToolDescriptor{Name: "workspace.read", Scopes: []string{"workspace:read"}}, []string{"workspace:read", "workspace:write"}) {
+		t.Fatal("local workspace read should be allowed by the default policy")
+	}
+	if capabilityAllowed(ToolDescriptor{Name: "browser.operator", Scopes: []string{"browser:navigate"}}, []string{"workspace:read", "workspace:write"}) {
+		t.Fatal("browser capability must require explicit grant")
+	}
+	if !capabilityAllowed(ToolDescriptor{Name: "browser.operator", Scopes: []string{"browser:navigate"}}, []string{"browser:navigate"}) {
+		t.Fatal("explicit browser capability should be accepted")
+	}
+	got := normalizeMissionCapabilities([]string{" browser:navigate ", "workspace:read", "browser:navigate"})
+	if strings.Join(got, ",") != "browser:navigate,workspace:read" {
+		t.Fatalf("normalized capabilities = %v", got)
 	}
 }
 

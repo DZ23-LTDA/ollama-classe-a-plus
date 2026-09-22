@@ -48,12 +48,13 @@ const (
 )
 
 type CreateMissionRequest struct {
-	Objective      string `json:"objective"`
-	Model          string `json:"model,omitempty"`
-	Workspace      string `json:"workspace,omitempty"`
-	ProjectID      string `json:"project_id,omitempty"`
-	OrganizationID string `json:"organization_id,omitempty"`
-	AutoRun        bool   `json:"auto_run,omitempty"`
+	Objective      string   `json:"objective"`
+	Model          string   `json:"model,omitempty"`
+	Workspace      string   `json:"workspace,omitempty"`
+	ProjectID      string   `json:"project_id,omitempty"`
+	OrganizationID string   `json:"organization_id,omitempty"`
+	Capabilities   []string `json:"capabilities,omitempty"`
+	AutoRun        bool     `json:"auto_run,omitempty"`
 }
 
 type Mission struct {
@@ -64,6 +65,7 @@ type Mission struct {
 	Workspace      string             `json:"workspace,omitempty"`
 	ProjectID      string             `json:"project_id,omitempty"`
 	OrganizationID string             `json:"organization_id,omitempty"`
+	Capabilities   []string           `json:"capabilities,omitempty"`
 	AutoRun        bool               `json:"auto_run,omitempty"`
 	State          MissionState       `json:"state"`
 	Plan           []Step             `json:"plan"`
@@ -89,13 +91,18 @@ type Step struct {
 }
 
 type Approval struct {
-	ID        string         `json:"id"`
-	MissionID string         `json:"mission_id"`
-	StepID    string         `json:"step_id"`
-	Status    ApprovalStatus `json:"status"`
-	Reason    string         `json:"reason,omitempty"`
-	CreatedAt time.Time      `json:"created_at"`
-	UpdatedAt time.Time      `json:"updated_at"`
+	ID             string         `json:"id"`
+	MissionID      string         `json:"mission_id"`
+	StepID         string         `json:"step_id"`
+	OrganizationID string         `json:"organization_id,omitempty"`
+	ActorID        string         `json:"actor_id,omitempty"`
+	Policy         string         `json:"policy,omitempty"`
+	Nonce          string         `json:"nonce,omitempty"`
+	Status         ApprovalStatus `json:"status"`
+	Reason         string         `json:"reason,omitempty"`
+	ExpiresAt      *time.Time     `json:"expires_at,omitempty"`
+	CreatedAt      time.Time      `json:"created_at"`
+	UpdatedAt      time.Time      `json:"updated_at"`
 }
 
 type Event struct {

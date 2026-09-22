@@ -20,7 +20,7 @@ Este repositório público reúne a base Ollama DZ23 e a evolução agentic do p
 
 ![Company OS](docs/images/screens/class-a-plus-company.png)
 
-As imagens acima são capturas reais das rotas `/`, `/agentic`, `/settings` e `/company`, produzidas contra um servidor Ollama local sem provider externo. A Settings mostra o Control Center sanitizado e o Company OS mostra dados gerados pelo smoke test local. Para conhecer a árvore completa, as telas planejadas de builder/mobile e os limites de cada integração, veja a [árvore de produto](docs/agentic/PRODUCT_TREE.md), a [matriz de paridade](docs/agentic/PARITY_MATRIX.md), a [integração HarnessRouter](docs/agentic/HARNESSROUTER.md), a [documentação Company OS](docs/agentic/COMPANY_OS.md) e a [galeria visual](docs/CLASS_A_PLUS_GUIDE.md#telas-e-estado-visual). Mockups conceituais são identificados como conceito dentro da própria imagem; eles não são apresentados como funcionalidades concluídas.
+As imagens acima são capturas reais das rotas `/`, `/agentic`, `/settings` e `/company`, produzidas contra um servidor Ollama local sem provider externo. A Settings mostra o Control Center sanitizado e o Company OS mostra dados gerados pelo smoke test local. Para conhecer a árvore completa, as telas planejadas de builder/mobile e os limites de cada integração, veja a [árvore de produto](docs/agentic/PRODUCT_TREE.md), a [matriz de paridade](docs/agentic/PARITY_MATRIX.md), a [integração HarnessRouter](docs/agentic/HARNESSROUTER.md), a [documentação Company OS](docs/agentic/COMPANY_OS.md) e a [galeria visual](docs/CLASS_A_PLUS_GUIDE.md#telas-e-estado-visual). Mockups conceituais são identificados como conceito dentro da própria imagem; eles não são apresentados como funcionalidades concluídas. A rodada mais recente também reforçou autenticação fail-closed, allowlists MCP, contenção de symlink, approvals auditáveis, idempotência e outbox mobile sem bearer persistido.
 
 | Recurso | Documento |
 |---|---|
@@ -38,6 +38,7 @@ As imagens acima são capturas reais das rotas `/`, `/agentic`, `/settings` e `/
 | Árvore Manus observável + Classe A+ unificado | [`agentic/PRODUCT_TREE.md`](docs/agentic/PRODUCT_TREE.md) |
 | Matriz de paridade e evidências | [`agentic/PARITY_MATRIX.md`](docs/agentic/PARITY_MATRIX.md) |
 | Proteção contra regressões upstream | [`UPSTREAM_POLICY.md`](UPSTREAM_POLICY.md) + [`check-class-a-plus-integrity.sh`](scripts/check-class-a-plus-integrity.sh) |
+| Hardening, findings e gates de release | [`FINAL_THREE_AGENT_REVIEW.md`](audit/FINAL_THREE_AGENT_REVIEW.md) |
 
 Start building with open models.
 

@@ -69,6 +69,12 @@ func TestCompanyGrowthLifecycleAndApprovals(t *testing.T) {
 	if err != nil || created.Orders[0].Status != "fulfilled" || created.Products[0].Inventory != 1 {
 		t.Fatalf("fulfillment failed: %v", err)
 	}
+	if _, err := store.FulfillOrder(company.ID, orderID, "TRACK-001"); err != nil {
+		t.Fatalf("fulfillment should be idempotent: %v", err)
+	}
+	if _, err := store.AddProduct(company.ID, CompanyProduct{SKU: "sku-001", Name: "Duplicado", PriceCents: 1200, Inventory: 1}); err == nil {
+		t.Fatal("expected duplicate SKU rejection")
+	}
 
 	report, err := store.GrowthReport(company.ID)
 	if err != nil {

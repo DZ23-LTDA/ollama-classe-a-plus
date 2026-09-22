@@ -66,16 +66,17 @@ type CompanyProduct struct {
 }
 
 type CompanyOrder struct {
-	ID           string    `json:"id"`
-	ProductID    string    `json:"product_id"`
-	CustomerRef  string    `json:"customer_ref"`
-	Quantity     int64     `json:"quantity"`
-	TotalCents   int64     `json:"total_cents"`
-	Status       string    `json:"status"`
-	Approved     bool      `json:"approved"`
-	TrackingCode string    `json:"tracking_code,omitempty"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	ID             string    `json:"id"`
+	IdempotencyKey string    `json:"idempotency_key,omitempty"`
+	ProductID      string    `json:"product_id"`
+	CustomerRef    string    `json:"customer_ref"`
+	Quantity       int64     `json:"quantity"`
+	TotalCents     int64     `json:"total_cents"`
+	Status         string    `json:"status"`
+	Approved       bool      `json:"approved"`
+	TrackingCode   string    `json:"tracking_code,omitempty"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
 }
 
 type CompanyGrowthReport struct {
@@ -270,11 +271,19 @@ func (s *CompanyStore) AddProduct(id string, product CompanyProduct) (Company, e
 	if product.CostCents < 0 || product.PriceCents <= 0 || product.Inventory < 0 {
 		return Company{}, errors.New("product cost, price or inventory is invalid")
 	}
-	product.ID = "prod_" + uuid.NewString()
-	product.Status = "active"
-	product.CreatedAt = time.Now().UTC()
-	product.UpdatedAt = product.CreatedAt
-	return s.mutate(id, func(company *Company) error { company.Products = append(company.Products, product); return nil })
+	return s.mutate(id, func(company *Company) error {
+		for _, existing := range company.Products {
+			if strings.EqualFold(existing.SKU, product.SKU) {
+				return errors.New("product sku already exists")
+			}
+		}
+		product.ID = "prod_" + uuid.NewString()
+		product.Status = "active"
+		product.CreatedAt = time.Now().UTC()
+		product.UpdatedAt = product.CreatedAt
+		company.Products = append(company.Products, product)
+		return nil
+	})
 }
 
 func (s *CompanyStore) CreateOrder(id string, order CompanyOrder) (Company, error) {
@@ -283,10 +292,20 @@ func (s *CompanyStore) CreateOrder(id string, order CompanyOrder) (Company, erro
 		return Company{}, errors.New("order product, customer and positive quantity are required")
 	}
 	return s.mutate(id, func(company *Company) error {
+		if order.IdempotencyKey != "" {
+			for _, existing := range company.Orders {
+				if existing.IdempotencyKey == order.IdempotencyKey {
+					return nil
+				}
+			}
+		}
 		for _, product := range company.Products {
 			if product.ID == order.ProductID {
 				if product.Status != "active" || product.Inventory < order.Quantity {
 					return errors.New("product is unavailable for requested quantity")
+				}
+				if product.PriceCents > 0 && order.Quantity > int64(^uint64(0)>>1)/product.PriceCents {
+					return errors.New("order total exceeds supported amount")
 				}
 				order.ID = "ord_" + uuid.NewString()
 				order.TotalCents = product.PriceCents * order.Quantity
@@ -325,6 +344,9 @@ func (s *CompanyStore) FulfillOrder(id, orderID, trackingCode string) (Company, 
 		for orderIndex := range company.Orders {
 			order := &company.Orders[orderIndex]
 			if order.ID == orderID {
+				if order.Status == "fulfilled" {
+					return nil
+				}
 				if !order.Approved {
 					return ErrCompanyApprovalRequiredForExternal
 				}

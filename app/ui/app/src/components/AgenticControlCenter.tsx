@@ -10,7 +10,7 @@ import {
   WrenchScrewdriverIcon,
 } from "@heroicons/react/24/outline";
 import { agentFetch, listCLIStatus, listConnectors, listMCPServers, listSkills } from "@/lib/agenticClient";
-import { useModels } from "@/hooks/useModels";
+import { getModels } from "@/api";
 
 type SafeConfig = {
   runtime?: string;
@@ -51,7 +51,8 @@ function ResourceList({ title, count, children }: { title: string; count: number
 }
 
 export function AgenticControlCenter() {
-  const { data: models = [], isLoading: modelsLoading } = useModels();
+  const { data: rawModels, isLoading: modelsLoading } = useQuery({ queryKey: ["agent-models"], queryFn: () => getModels(""), retry: false });
+  const models = Array.isArray(rawModels) ? rawModels : [];
   const { data: safeConfig, isLoading: configLoading } = useQuery<SafeConfig>({
     queryKey: ["agent-safe-config"],
     queryFn: () => agentFetch<SafeConfig>("/api/agent/v1/config/safe"),
@@ -61,6 +62,9 @@ export function AgenticControlCenter() {
   const { data: mcpData, isLoading: mcpLoading } = useQuery({ queryKey: ["agent-mcp"], queryFn: listMCPServers, retry: false });
   const { data: skillData, isLoading: skillsLoading } = useQuery({ queryKey: ["agent-skills"], queryFn: listSkills, retry: false });
   const { data: cliData, isLoading: cliLoading } = useQuery({ queryKey: ["agent-cli-catalog"], queryFn: listCLIStatus, retry: false });
+  const connectors = Array.isArray(connectorData?.connectors) ? connectorData.connectors : [];
+  const mcpServers = Array.isArray(mcpData?.servers) ? mcpData.servers : [];
+  const skills = Array.isArray(skillData?.skills) ? skillData.skills : [];
 
   const providers = useMemo(() => {
     const values = new Set<string>();
@@ -68,7 +72,7 @@ export function AgenticControlCenter() {
     return [...values].sort();
   }, [models]);
 
-  const installedCLIs = cliData?.tools.filter((item) => item.installed) ?? [];
+  const installedCLIs = Array.isArray(cliData?.tools) ? cliData.tools.filter((item) => item.installed) : [];
   const runtimeReady = Boolean(safeConfig?.runtime);
   const statusRows = [
     { label: "Planner", enabled: safeConfig?.planner_model_configured ?? false },
@@ -98,9 +102,9 @@ export function AgenticControlCenter() {
           <div className="mt-4 flex flex-wrap gap-2"><StatusPill ok={Boolean(safeConfig?.approval_gated_tools)}>Approvals server-side</StatusPill><StatusPill ok={Boolean(safeConfig?.workspace_isolation)}>Workspace isolado</StatusPill><StatusPill ok={safeConfig?.auth_required ?? false}>{safeConfig?.auth_required ? "Auth obrigatória" : "Auth local"}</StatusPill></div>
 
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
-            <ResourceList title="Connectors allowlisted" count={connectorData?.connectors.length ?? 0}>{connectorsLoading ? <span className="text-xs text-neutral-400">Carregando…</span> : connectorData?.connectors.length ? connectorData.connectors.map((connector) => <div key={connector.id} className="rounded-lg bg-neutral-50 p-2.5 text-xs dark:bg-neutral-900"><div className="font-medium text-neutral-800 dark:text-neutral-200">{connector.provider} <span className="text-neutral-400">· {connector.id}</span></div><div className="mt-1 truncate text-[10px] text-neutral-500">{connector.base_url}</div><div className="mt-1 text-[10px] text-neutral-400">{connector.operations?.length ?? 0} operações · token por ambiente{connector.oauth_provider ? ` · OAuth ${connector.oauth_provider}` : ""}</div></div>) : <span className="text-xs text-neutral-400">Nenhum connector carregado.</span>}</ResourceList>
-            <ResourceList title="MCP stdio" count={mcpData?.servers.length ?? 0}>{mcpLoading ? <span className="text-xs text-neutral-400">Carregando…</span> : mcpData?.servers.length ? mcpData.servers.map((server) => <div key={server.id} className="rounded-lg bg-neutral-50 p-2.5 text-xs dark:bg-neutral-900"><div className="font-medium text-neutral-800 dark:text-neutral-200">{server.id}</div><div className="mt-1 truncate font-mono text-[10px] text-neutral-500">{server.command} {(server.args ?? []).join(" ")}</div><div className="mt-1 text-[10px] text-neutral-400">{server.allowed_methods?.length ?? 0} métodos allowlisted · {server.environment_vars?.length ?? 0} nomes de ambiente</div></div>) : <span className="text-xs text-neutral-400">Nenhum servidor MCP carregado.</span>}</ResourceList>
-            <ResourceList title="Skills" count={skillData?.skills.length ?? 0}>{skillsLoading ? <span className="text-xs text-neutral-400">Carregando…</span> : skillData?.skills.length ? skillData.skills.map((skill) => <div key={skill.id} className="rounded-lg bg-neutral-50 p-2.5 text-xs dark:bg-neutral-900"><div className="flex items-center justify-between gap-2 font-medium text-neutral-800 dark:text-neutral-200"><span>{skill.id}</span><StatusPill ok={skill.trusted}>{skill.trusted ? "trusted" : "review"}</StatusPill></div><div className="mt-1 line-clamp-2 text-[10px] text-neutral-500">{skill.description}</div><div className="mt-1 text-[10px] text-neutral-400">v{skill.version} · {skill.tools?.length ?? 0} tools</div></div>) : <span className="text-xs text-neutral-400">Nenhuma skill carregada.</span>}</ResourceList>
+            <ResourceList title="Connectors allowlisted" count={connectors.length}>{connectorsLoading ? <span className="text-xs text-neutral-400">Carregando…</span> : connectors.length ? connectors.map((connector) => <div key={connector.id} className="rounded-lg bg-neutral-50 p-2.5 text-xs dark:bg-neutral-900"><div className="font-medium text-neutral-800 dark:text-neutral-200">{connector.provider} <span className="text-neutral-400">· {connector.id}</span></div><div className="mt-1 truncate text-[10px] text-neutral-500">{connector.base_url}</div><div className="mt-1 text-[10px] text-neutral-400">{connector.operations?.length ?? 0} operações · token por ambiente{connector.oauth_provider ? ` · OAuth ${connector.oauth_provider}` : ""}</div></div>) : <span className="text-xs text-neutral-400">Nenhum connector carregado.</span>}</ResourceList>
+            <ResourceList title="MCP stdio" count={mcpServers.length}>{mcpLoading ? <span className="text-xs text-neutral-400">Carregando…</span> : mcpServers.length ? mcpServers.map((server) => <div key={server.id} className="rounded-lg bg-neutral-50 p-2.5 text-xs dark:bg-neutral-900"><div className="font-medium text-neutral-800 dark:text-neutral-200">{server.id}</div><div className="mt-1 truncate font-mono text-[10px] text-neutral-500">{server.command} {(server.args ?? []).join(" ")}</div><div className="mt-1 text-[10px] text-neutral-400">{server.allowed_methods?.length ?? 0} métodos allowlisted · {server.environment_vars?.length ?? 0} nomes de ambiente</div></div>) : <span className="text-xs text-neutral-400">Nenhum servidor MCP carregado.</span>}</ResourceList>
+            <ResourceList title="Skills" count={skills.length}>{skillsLoading ? <span className="text-xs text-neutral-400">Carregando…</span> : skills.length ? skills.map((skill) => <div key={skill.id} className="rounded-lg bg-neutral-50 p-2.5 text-xs dark:bg-neutral-900"><div className="flex items-center justify-between gap-2 font-medium text-neutral-800 dark:text-neutral-200"><span>{skill.id}</span><StatusPill ok={skill.trusted}>{skill.trusted ? "trusted" : "review"}</StatusPill></div><div className="mt-1 line-clamp-2 text-[10px] text-neutral-500">{skill.description}</div><div className="mt-1 text-[10px] text-neutral-400">v{skill.version} · {skill.tools?.length ?? 0} tools</div></div>) : <span className="text-xs text-neutral-400">Nenhuma skill carregada.</span>}</ResourceList>
             <ResourceList title="CLIs detectadas" count={installedCLIs.length}>{cliLoading ? <span className="text-xs text-neutral-400">Detectando…</span> : installedCLIs.length ? installedCLIs.map((cli) => <div key={cli.id} className="flex items-center justify-between rounded-lg bg-neutral-50 p-2.5 text-xs dark:bg-neutral-900"><span className="font-medium text-neutral-800 dark:text-neutral-200">{cli.name}</span><StatusPill ok>{cli.executable ?? "instalado"}</StatusPill></div>) : <span className="text-xs text-neutral-400">Nenhum CLI compatível detectado no ambiente.</span>}</ResourceList>
           </div>
         </div>
