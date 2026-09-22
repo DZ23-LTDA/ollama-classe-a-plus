@@ -14,6 +14,10 @@ type Planner interface {
 	Plan(ctx context.Context, mission Mission) ([]Step, error)
 }
 
+type plannerChatClient interface {
+	Chat(ctx context.Context, request *api.ChatRequest, callback func(api.ChatResponse) error) error
+}
+
 type RulePlanner struct{}
 
 func (RulePlanner) Plan(_ context.Context, mission Mission) ([]Step, error) {
@@ -40,19 +44,23 @@ func (RulePlanner) Plan(_ context.Context, mission Mission) ([]Step, error) {
 }
 
 type OllamaPlanner struct {
-	Client   *api.Client
+	Client   plannerChatClient
 	Model    string
 	Fallback Planner
 }
 
 func (p OllamaPlanner) Plan(ctx context.Context, mission Mission) ([]Step, error) {
-	if p.Client == nil || strings.TrimSpace(p.Model) == "" {
+	model := strings.TrimSpace(mission.Model)
+	if model == "" {
+		model = strings.TrimSpace(p.Model)
+	}
+	if p.Client == nil || model == "" {
 		return p.fallback().Plan(ctx, mission)
 	}
 	stream := false
 	format := json.RawMessage(`"json"`)
 	request := &api.ChatRequest{
-		Model:  p.Model,
+		Model:  model,
 		Stream: &stream,
 		Format: format,
 		Messages: []api.Message{
@@ -66,11 +74,11 @@ func (p OllamaPlanner) Plan(ctx context.Context, mission Mission) ([]Step, error
 		return nil
 	})
 	if err != nil {
-		return p.fallback().Plan(ctx, mission)
+		return nil, fmt.Errorf("planner provider request failed: %w", err)
 	}
 	steps, err := parsePlan(response)
 	if err != nil {
-		return p.fallback().Plan(ctx, mission)
+		return nil, fmt.Errorf("planner returned invalid plan: %w", err)
 	}
 	return normalizeSteps(steps)
 }
