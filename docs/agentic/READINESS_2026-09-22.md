@@ -89,3 +89,12 @@ O primeiro slice P0 após a auditoria ampliada fechou uma fronteira específica,
 A evidência reproduzível desta slice é o teste HTTP `server/builder_scope_test.go` com duas organizações, que confirma listagem vazia e `403` sem mutação para o tenant errado; testes de Builder para entry ausente, nome com XSS, symlink e organização; e testes Company para create privilegiado e gasto atômico. Os gates completos passaram: integrity guard, `CGO_ENABLED=1 go test ./... -count=1`, `go vet`, build Go, Vitest (20 arquivos/199 testes), build UI e typecheck mobile.
 
 Ainda não é produção-ready. Permanecem P0 em orchestration/traces/devices/pairing e demais objetos, approvals com separação forte de aprovador, sandbox/MCP process isolation, SSRF/DNS rebinding e DLP, lifecycle pausado de todas as mutações Growth/Social, bearer/redirect/session handling, CI/release e validações distribuídas/externas. A classificação continua **preview/local RC em hardening**.
+
+
+## Slice P0 de orchestration, traces e devices — 2026-09-22
+
+A segunda slice pós-auditoria adicionou `organization_id` aos orchestration jobs e propagou o tenant aos spans de missão e ferramenta. As rotas de criar, ler, executar e cancelar orchestration, bem como listagem global de traces, agora usam o tenant da requisição. Devices e pairing passaram a filtrar listagem, heartbeat e revoke por organização; o código de pairing fica vinculado à organização que o criou e não pode ser sobrescrito por outro tenant. Regressões negativas confirmam `403` e ausência de mutação para reads, cancelamento, revoke e heartbeat cross-tenant.
+
+A evidência inclui `server/p0_scope_test.go`, testes de Orchestrator, TraceStore e DeviceStore, além dos gates completos: integrity guard, `CGO_ENABLED=1 go test ./... -count=1`, `go vet`, build Go, Vitest 20/199, build UI e typecheck mobile. O handshake WebSocket continua autenticado pelo device token; mTLS/TLS, pairing físico e testes em companions reais permanecem dependências externas.
+
+Esta slice não encerra a auditoria. Continuam P0 em plugins/MCP/skills/artifacts, approvals com separação forte de aprovador, sandbox/process isolation, SSRF/DNS rebinding e DLP, lifecycle pausado de todas as mutações Growth/Social, sessão segura no renderer e release supply chain. A classificação permanece **preview/local RC em hardening**.

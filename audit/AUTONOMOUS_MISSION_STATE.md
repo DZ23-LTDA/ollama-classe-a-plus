@@ -661,3 +661,47 @@ remaining_p0:
   - paused state coverage for all Company/Growth/Social mutations
 next_action: review secret diff, commit and push slice; then continue with orchestration/traces/devices tenant tests
 ```
+
+
+## Publicação do slice P0 Builder/Company — 2026-09-22
+
+```yaml
+state: FIXING
+iteration: 5
+commit: 4344b24b
+branch: feat/manus-parity-omniroute
+remote: https://github.com/DZ23-LTDA/ollama-classe-a-plus.git
+pull_request: https://github.com/DZ23-LTDA/ollama-classe-a-plus/pull/1
+working_tree: clean
+published: true
+proofs: integrity, go test ./..., go vet, go build, UI Vitest/build, mobile typecheck and HTTP cross-tenant Builder regression all PASS
+classification: preview/local RC em hardening; P0s remain open
+next_slice: organization-scoped orchestration/traces/devices/pairing with negative tests and no-mutation assertions
+```
+
+
+## Slice P0 orchestration/traces/devices validada — aguardando publicação — 2026-09-22
+
+```yaml
+state: RELEASING
+iteration: 6
+base_commit: 4344b24b
+working_tree: alterações da slice ainda não commitadas
+implemented:
+  - organization_id em OrchestrationJob e Plan/Get/Run/Cancel scoped
+  - organization_id em TraceSpan e criação/listagem scoped
+  - device List/Get/Heartbeat/Revoke scoped
+  - pairing code vinculado à organização de origem e override cross-tenant rejeitado
+  - HTTP negative tests para orchestration, traces, devices e no-mutation
+proofs:
+  - focused store/handler tests: PASS
+  - integrity guard: PASS
+  - CGO_ENABLED=1 go test ./... -count=1: PASS
+  - CGO_ENABLED=1 go vet ./...: PASS
+  - CGO_ENABLED=1 go build: PASS
+  - UI Vitest 20/199: PASS
+  - UI build: PASS; known >500KB warning
+  - mobile typecheck: PASS
+classification: preview/local RC em hardening; P0s restantes não resolvidos
+next_action: commit/push slice e depois plugins/MCP/skills/artifacts ou approval policy, sem mergear main
+```

@@ -98,3 +98,10 @@ O próximo incremento deve começar por testes negativos cross-tenant e por DTOs
 O primeiro slice pós-auditoria ampliada adicionou `OrganizationID` aos projetos Builder e aplicou ownership server-side a todas as operações de projeto expostas pelos handlers, incluindo deploy e preview de arquivo. Também adicionou entry validation, recusa de symlink no preview/export e escaping de nomes em templates. No Company OS, o create usa DTO allowlisted e reseta campos server-managed; gasto de agente pausado ou acima do budget falha sem mutação do valor gasto.
 
 A prova inclui `server/builder_scope_test.go`, que cria um projeto em `org-a` e demonstra listagem vazia e `403` sem mutação em `org-b`, além dos testes de entry/XSS/symlink e Company create/budget. Os gates completos do slice passaram. Isso encerra somente esta fronteira; orchestration, traces, devices/pairing, approvals fortes, sandbox/MCP isolation, egress/DLP e release supply chain continuam abertos.
+
+
+## Slice P0 validada — orchestration, traces e devices — 2026-09-22
+
+A segunda slice pós-auditoria adicionou `organization_id` aos orchestration jobs e aos spans de missão/ferramenta; os handlers de plan/get/run/cancel e traces globais passaram a filtrar pelo tenant. Devices e pairing aplicam ownership em listagem, heartbeat e revoke, e pairing codes não aceitam override de organização. O teste HTTP `server/p0_scope_test.go` cobre duas organizações e verifica `403` sem mutação para orchestration, traces e devices; testes de domínio cobrem pairing cross-tenant.
+
+Os gates completos desta slice passaram. Isso não encerra os P0 da auditoria ampliada: plugins/MCP/skills/artifacts, approvals fortes, sandbox/process isolation, egress/DLP, Company Growth pausado, renderer session e release supply chain continuam abertos.

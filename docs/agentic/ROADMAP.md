@@ -159,3 +159,10 @@ O resultado fecha riscos internos de baixo nível sem afirmar produção univers
 A primeira correção pós-auditoria ampliada protegeu Builder por organização e fechou invariantes server-managed do Company create e do gasto de agentes. O slice inclui testes negativos para duas organizações, entry inexistente, XSS em template, symlink e excesso de budget. O próximo trabalho deve levar o mesmo padrão a orchestration, traces, devices/pairing, plugins/MCP/skills e artifacts, seguido da política de approvals separada de execute.
 
 O resultado permanece **preview/local RC em hardening**. A existência de teste local não comprova RLS distribuído, sandbox forte, providers externos, dispositivos, assinatura ou deploy de produção.
+
+
+## Incremento 2026-09-22 — orchestration, traces e devices scoped
+
+A segunda slice pós-auditoria adicionou ownership de organização a orchestration jobs, spans de missão/ferramenta e devices/pairing. Os handlers de plan/get/run/cancel/list/heartbeat/revoke aplicam o tenant da requisição, e testes negativos confirmam `403`/no-mutation entre duas organizações. O próximo foco é fechar plugins/MCP/skills/artifacts e a policy de approvals, sem tratar os testes em memória como prova de RLS ou operação distribuída.
+
+O resultado permanece **preview/local RC em hardening**; TLS/mTLS, companions físicos, Redis/PostgreSQL/OTLP reais e os P0 de sandbox/egress/DLP ainda dependem de ambientes apropriados.

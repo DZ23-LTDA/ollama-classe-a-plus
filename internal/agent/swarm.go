@@ -87,18 +87,19 @@ type AgentResult struct {
 }
 
 type OrchestrationJob struct {
-	ID          string             `json:"id"`
-	Objective   string             `json:"objective"`
-	Workspace   string             `json:"workspace,omitempty"`
-	ProjectID   string             `json:"project_id,omitempty"`
-	State       OrchestrationState `json:"state"`
-	Budget      AgentBudget        `json:"budget"`
-	Tasks       []AgentTask        `json:"tasks"`
-	Summary     string             `json:"summary,omitempty"`
-	Conflicts   []string           `json:"conflicts,omitempty"`
-	CreatedAt   time.Time          `json:"created_at"`
-	UpdatedAt   time.Time          `json:"updated_at"`
-	CompletedAt *time.Time         `json:"completed_at,omitempty"`
+	ID             string             `json:"id"`
+	OrganizationID string             `json:"organization_id,omitempty"`
+	Objective      string             `json:"objective"`
+	Workspace      string             `json:"workspace,omitempty"`
+	ProjectID      string             `json:"project_id,omitempty"`
+	State          OrchestrationState `json:"state"`
+	Budget         AgentBudget        `json:"budget"`
+	Tasks          []AgentTask        `json:"tasks"`
+	Summary        string             `json:"summary,omitempty"`
+	Conflicts      []string           `json:"conflicts,omitempty"`
+	CreatedAt      time.Time          `json:"created_at"`
+	UpdatedAt      time.Time          `json:"updated_at"`
+	CompletedAt    *time.Time         `json:"completed_at,omitempty"`
 }
 
 type SubagentRunner func(context.Context, AgentTask) (AgentResult, error)
@@ -111,6 +112,8 @@ type AgentOrchestrator struct {
 	reducer ResultReducer
 	jobs    map[string]OrchestrationJob
 }
+
+var ErrOrchestrationForbidden = errors.New("orchestration job is outside the active organization")
 
 func NewAgentOrchestrator(root string, runner SubagentRunner) (*AgentOrchestrator, error) {
 	if strings.TrimSpace(root) == "" {
@@ -157,13 +160,17 @@ func PlanAgentTasks(objective, workspace, projectID string, roles []AgentRole) (
 }
 
 func (o *AgentOrchestrator) Plan(objective, workspace, projectID string, roles []AgentRole, budget AgentBudget) (OrchestrationJob, error) {
+	return o.PlanForOrganization("local", objective, workspace, projectID, roles, budget)
+}
+
+func (o *AgentOrchestrator) PlanForOrganization(organizationID, objective, workspace, projectID string, roles []AgentRole, budget AgentBudget) (OrchestrationJob, error) {
 	tasks, err := PlanAgentTasks(objective, workspace, projectID, roles)
 	if err != nil {
 		return OrchestrationJob{}, err
 	}
 	budget = normalizeAgentBudget(budget, len(tasks))
 	now := time.Now().UTC()
-	job := OrchestrationJob{ID: "orch_" + uuid.NewString(), Objective: strings.TrimSpace(objective), Workspace: workspace, ProjectID: projectID, State: OrchestrationPlanned, Budget: budget, Tasks: tasks, CreatedAt: now, UpdatedAt: now}
+	job := OrchestrationJob{ID: "orch_" + uuid.NewString(), OrganizationID: normalizedOrganizationID(organizationID), Objective: strings.TrimSpace(objective), Workspace: workspace, ProjectID: projectID, State: OrchestrationPlanned, Budget: budget, Tasks: tasks, CreatedAt: now, UpdatedAt: now}
 	o.mu.Lock()
 	o.jobs[job.ID] = job
 	err = o.persistLocked()
@@ -177,6 +184,17 @@ func (o *AgentOrchestrator) Get(id string) (OrchestrationJob, error) {
 	job, ok := o.jobs[strings.TrimSpace(id)]
 	if !ok {
 		return OrchestrationJob{}, os.ErrNotExist
+	}
+	return job, nil
+}
+
+func (o *AgentOrchestrator) GetForOrganization(id, organizationID string) (OrchestrationJob, error) {
+	job, err := o.Get(id)
+	if err != nil {
+		return OrchestrationJob{}, err
+	}
+	if normalizedOrganizationID(job.OrganizationID) != normalizedOrganizationID(organizationID) {
+		return OrchestrationJob{}, ErrOrchestrationForbidden
 	}
 	return job, nil
 }
@@ -299,6 +317,13 @@ func (o *AgentOrchestrator) Run(ctx context.Context, id string) (OrchestrationJo
 	return job, err
 }
 
+func (o *AgentOrchestrator) RunForOrganization(ctx context.Context, id, organizationID string) (OrchestrationJob, error) {
+	if _, err := o.GetForOrganization(id, organizationID); err != nil {
+		return OrchestrationJob{}, err
+	}
+	return o.Run(ctx, id)
+}
+
 func (o *AgentOrchestrator) Cancel(id string) (OrchestrationJob, error) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
@@ -313,6 +338,20 @@ func (o *AgentOrchestrator) Cancel(id string) (OrchestrationJob, error) {
 		return job, o.persistLocked()
 	}
 	return job, errors.New("running cancellation requires the request context")
+}
+
+func (o *AgentOrchestrator) CancelForOrganization(id, organizationID string) (OrchestrationJob, error) {
+	if _, err := o.GetForOrganization(id, organizationID); err != nil {
+		return OrchestrationJob{}, err
+	}
+	return o.Cancel(id)
+}
+
+func normalizedOrganizationID(organizationID string) string {
+	if strings.TrimSpace(organizationID) == "" {
+		return "local"
+	}
+	return strings.TrimSpace(organizationID)
 }
 
 func (o *AgentOrchestrator) persistLocked() error {

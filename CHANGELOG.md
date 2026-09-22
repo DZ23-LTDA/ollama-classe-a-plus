@@ -140,3 +140,11 @@ A classificação permanece release candidate local-first. Integrações externa
 - Builder agora exige entry presente, rejeita symlink no preview/export e escapa nomes inseridos nos templates HTML.
 - Company create passou a usar DTO allowlisted e a resetar campos server-managed; gasto de agente pausado ou acima do budget falha atomicamente.
 - Gates locais do slice passaram; isso não encerra os P0 restantes nem transforma adapters externos em integrações conectadas.
+
+
+## 2026-09-22 — P0 tenant isolation em orchestration, traces e devices
+
+- Orchestration jobs receberam `organization_id`; plan/get/run/cancel server-side passaram a usar métodos scoped.
+- Spans de missão e ferramenta carregam organização e a API de traces filtra por tenant.
+- Devices e pairing passaram a aplicar ownership em listagem, heartbeat, revoke e consumo de código de pairing, com regressões HTTP cross-tenant `403` e sem mutação.
+- Gates completos da slice passaram; companion físico, mTLS e os demais P0 continuam sem prova de produção.

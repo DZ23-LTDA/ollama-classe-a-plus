@@ -277,6 +277,10 @@ func (r *Runtime) Traces(traceID string) []TraceSpan {
 	return r.traces.List(traceID, 500)
 }
 
+func (r *Runtime) TracesForOrganization(organizationID, traceID string) []TraceSpan {
+	return r.traces.ListForOrganization(organizationID, traceID, 500)
+}
+
 func (r *Runtime) Media() *MediaManager { return r.media }
 
 func (r *Runtime) Builder() *BuilderService { return r.builder }
@@ -473,8 +477,6 @@ func (r *Runtime) Run(ctx context.Context, id string) (runErr error) {
 	ctx, otelSpan := r.telemetry.Start(ctx, "agent.mission.run", map[string]string{"mission.id": id})
 	defer otelSpan.End()
 	id = strings.TrimSpace(id)
-	missionSpan := r.traces.Start("tr_"+id, "", "mission.run", map[string]any{"mission_id": id})
-	defer func() { missionSpan.End("ok", runErr) }()
 	if id == "" {
 		return errors.New("mission id is required")
 	}
@@ -495,6 +497,8 @@ func (r *Runtime) Run(ctx context.Context, id string) (runErr error) {
 	if err != nil {
 		return err
 	}
+	missionSpan := r.traces.StartForOrganization(mission.OrganizationID, "tr_"+id, "", "mission.run", map[string]any{"mission_id": id})
+	defer func() { missionSpan.End("ok", runErr) }()
 	if mission.State == MissionCompleted || mission.State == MissionCancelled {
 		return nil
 	}
@@ -544,7 +548,7 @@ func (r *Runtime) Run(ctx context.Context, id string) (runErr error) {
 			return err
 		}
 		_ = r.event(mission, "step.started", step.ID, map[string]any{"tool": step.Kind, "attempt": step.Attempts})
-		toolSpan := r.traces.Start("tr_"+mission.ID, missionSpan.ID(), "tool."+step.Kind, map[string]any{"mission_id": mission.ID, "step_id": step.ID, "tool": step.Kind})
+		toolSpan := r.traces.StartForOrganization(mission.OrganizationID, "tr_"+mission.ID, missionSpan.ID(), "tool."+step.Kind, map[string]any{"mission_id": mission.ID, "step_id": step.ID, "tool": step.Kind})
 		result, executeErr := tool.Execute(ctx, ToolContext{MissionID: mission.ID, StepID: step.ID, Workspace: mission.Workspace, OrganizationID: mission.OrganizationID}, step.Input)
 		toolSpan.End("ok", executeErr)
 		if executeErr != nil {

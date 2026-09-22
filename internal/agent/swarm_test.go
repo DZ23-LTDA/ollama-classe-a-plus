@@ -77,3 +77,24 @@ func TestAgentOrchestratorPersistsAndCancelsPlannedJob(t *testing.T) {
 		t.Fatalf("stored=%+v err=%v", stored, err)
 	}
 }
+
+func TestAgentOrchestratorOrganizationScope(t *testing.T) {
+	orchestrator, err := NewAgentOrchestrator(t.TempDir(), func(context.Context, AgentTask) (AgentResult, error) { return AgentResult{}, nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+	job, err := orchestrator.PlanForOrganization("org-a", "tenant A", t.TempDir(), "", []AgentRole{RoleTesting}, AgentBudget{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := orchestrator.GetForOrganization(job.ID, "org-b"); !errors.Is(err, ErrOrchestrationForbidden) {
+		t.Fatalf("cross-tenant orchestration read err=%v", err)
+	}
+	if _, err := orchestrator.CancelForOrganization(job.ID, "org-b"); !errors.Is(err, ErrOrchestrationForbidden) {
+		t.Fatalf("cross-tenant orchestration cancel err=%v", err)
+	}
+	stored, err := orchestrator.GetForOrganization(job.ID, "org-a")
+	if err != nil || stored.State != OrchestrationPlanned {
+		t.Fatalf("cross-tenant cancel mutated job=%+v err=%v", stored, err)
+	}
+}

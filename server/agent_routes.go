@@ -1364,11 +1364,11 @@ func (a *agentAPI) traces(c *gin.Context) {
 		writeAgentError(c, statusForAgentError(err), err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"mission_id": c.Param("id"), "spans": a.runtime.Traces("tr_" + c.Param("id"))})
+	c.JSON(http.StatusOK, gin.H{"mission_id": c.Param("id"), "spans": a.runtime.TracesForOrganization(agentOrganizationID(c), "tr_"+c.Param("id"))})
 }
 
 func (a *agentAPI) allTraces(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"spans": a.runtime.Traces(c.Query("trace_id"))})
+	c.JSON(http.StatusOK, gin.H{"spans": a.runtime.TracesForOrganization(agentOrganizationID(c), c.Query("trace_id"))})
 }
 
 func (a *agentAPI) createOrchestration(c *gin.Context) {
@@ -1384,13 +1384,16 @@ func (a *agentAPI) createOrchestration(c *gin.Context) {
 		writeAgentError(c, http.StatusBadRequest, err)
 		return
 	}
-	job, err := a.runtime.Orchestrator().Plan(request.Objective, request.Workspace, request.ProjectID, request.Roles, request.Budget)
+	organizationID := agentOrganizationID(c)
+	job, err := a.runtime.Orchestrator().PlanForOrganization(organizationID, request.Objective, request.Workspace, request.ProjectID, request.Roles, request.Budget)
 	if err != nil {
 		writeAgentError(c, http.StatusBadRequest, err)
 		return
 	}
 	if request.AutoRun {
-		go func(id string) { _, _ = a.runtime.Orchestrator().Run(context.Background(), id) }(job.ID)
+		go func(id, organizationID string) {
+			_, _ = a.runtime.Orchestrator().RunForOrganization(context.Background(), id, organizationID)
+		}(job.ID, organizationID)
 		c.JSON(http.StatusAccepted, job)
 		return
 	}
@@ -1398,7 +1401,7 @@ func (a *agentAPI) createOrchestration(c *gin.Context) {
 }
 
 func (a *agentAPI) getOrchestration(c *gin.Context) {
-	job, err := a.runtime.Orchestrator().Get(c.Param("id"))
+	job, err := a.runtime.Orchestrator().GetForOrganization(c.Param("id"), agentOrganizationID(c))
 	if err != nil {
 		writeAgentError(c, statusForAgentError(err), err)
 		return
@@ -1407,17 +1410,20 @@ func (a *agentAPI) getOrchestration(c *gin.Context) {
 }
 
 func (a *agentAPI) runOrchestration(c *gin.Context) {
-	job, err := a.runtime.Orchestrator().Get(c.Param("id"))
+	organizationID := agentOrganizationID(c)
+	job, err := a.runtime.Orchestrator().GetForOrganization(c.Param("id"), organizationID)
 	if err != nil {
 		writeAgentError(c, statusForAgentError(err), err)
 		return
 	}
-	go func(id string) { _, _ = a.runtime.Orchestrator().Run(context.Background(), id) }(job.ID)
+	go func(id, organizationID string) {
+		_, _ = a.runtime.Orchestrator().RunForOrganization(context.Background(), id, organizationID)
+	}(job.ID, organizationID)
 	c.JSON(http.StatusAccepted, gin.H{"id": job.ID, "state": agent.OrchestrationRunning})
 }
 
 func (a *agentAPI) cancelOrchestration(c *gin.Context) {
-	job, err := a.runtime.Orchestrator().Cancel(c.Param("id"))
+	job, err := a.runtime.Orchestrator().CancelForOrganization(c.Param("id"), agentOrganizationID(c))
 	if err != nil {
 		writeAgentError(c, statusForAgentError(err), err)
 		return
@@ -1440,16 +1446,11 @@ func (a *agentAPI) research(c *gin.Context) {
 }
 
 func (a *agentAPI) actorIdentity(c *gin.Context) (string, string) {
-	if value, ok := c.Get("agent.user"); ok {
-		if user, ok := value.(agent.User); ok {
-			return user.ID, ""
-		}
-	}
-	return strings.TrimSpace(c.GetHeader("X-Ollama-User")), strings.TrimSpace(c.GetHeader("X-Ollama-Organization"))
+	return agentActorID(c), agentOrganizationID(c)
 }
 
 func (a *agentAPI) devices(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"devices": a.runtime.Devices().List()})
+	c.JSON(http.StatusOK, gin.H{"devices": a.runtime.Devices().ListForOrganization(agentOrganizationID(c))})
 }
 
 func (a *agentAPI) startDevicePairing(c *gin.Context) {
@@ -1494,16 +1495,20 @@ func (a *agentAPI) deviceHeartbeat(c *gin.Context) {
 	if token == "" {
 		token = strings.TrimSpace(c.GetHeader("X-Device-Token"))
 	}
-	device, err := a.runtime.Devices().Heartbeat(c.Param("id"), token, request.Capabilities)
+	device, err := a.runtime.Devices().HeartbeatForOrganization(c.Param("id"), token, request.Capabilities, agentOrganizationID(c))
 	if err != nil {
-		writeAgentError(c, http.StatusUnauthorized, err)
+		status := http.StatusUnauthorized
+		if errors.Is(err, agent.ErrDeviceForbidden) {
+			status = http.StatusForbidden
+		}
+		writeAgentError(c, status, err)
 		return
 	}
 	c.JSON(http.StatusOK, device)
 }
 
 func (a *agentAPI) revokeDevice(c *gin.Context) {
-	device, err := a.runtime.Devices().Revoke(c.Param("id"))
+	device, err := a.runtime.Devices().RevokeForOrganization(c.Param("id"), agentOrganizationID(c))
 	if err != nil {
 		writeAgentError(c, statusForAgentError(err), err)
 		return
@@ -2058,7 +2063,7 @@ func statusForAgentError(err error) int {
 	if status := companyErrorStatus(err); status != 0 {
 		return status
 	}
-	if errors.Is(err, errAgentForbidden) || errors.Is(err, agent.ErrBuilderForbidden) {
+	if errors.Is(err, errAgentForbidden) || errors.Is(err, agent.ErrBuilderForbidden) || errors.Is(err, agent.ErrOrchestrationForbidden) || errors.Is(err, agent.ErrDeviceForbidden) {
 		return http.StatusForbidden
 	}
 	if errors.Is(err, os.ErrNotExist) {

@@ -12,16 +12,17 @@ import (
 )
 
 type TraceSpan struct {
-	TraceID    string         `json:"trace_id"`
-	SpanID     string         `json:"span_id"`
-	ParentID   string         `json:"parent_id,omitempty"`
-	Name       string         `json:"name"`
-	Status     string         `json:"status"`
-	StartAt    time.Time      `json:"start_at"`
-	EndAt      *time.Time     `json:"end_at,omitempty"`
-	Duration   time.Duration  `json:"duration_ns,omitempty"`
-	Attributes map[string]any `json:"attributes,omitempty"`
-	Error      string         `json:"error,omitempty"`
+	TraceID        string         `json:"trace_id"`
+	OrganizationID string         `json:"organization_id,omitempty"`
+	SpanID         string         `json:"span_id"`
+	ParentID       string         `json:"parent_id,omitempty"`
+	Name           string         `json:"name"`
+	Status         string         `json:"status"`
+	StartAt        time.Time      `json:"start_at"`
+	EndAt          *time.Time     `json:"end_at,omitempty"`
+	Duration       time.Duration  `json:"duration_ns,omitempty"`
+	Attributes     map[string]any `json:"attributes,omitempty"`
+	Error          string         `json:"error,omitempty"`
 }
 
 type TraceStore struct {
@@ -66,10 +67,14 @@ func (h *SpanHandle) ID() string {
 }
 
 func (s *TraceStore) Start(traceID, parentID, name string, attributes map[string]any) *SpanHandle {
+	return s.StartForOrganization("local", traceID, parentID, name, attributes)
+}
+
+func (s *TraceStore) StartForOrganization(organizationID, traceID, parentID, name string, attributes map[string]any) *SpanHandle {
 	if traceID == "" {
 		traceID = "tr_" + uuid.NewString()
 	}
-	span := TraceSpan{TraceID: traceID, SpanID: "sp_" + uuid.NewString(), ParentID: parentID, Name: name, Status: "running", StartAt: time.Now().UTC(), Attributes: attributes}
+	span := TraceSpan{TraceID: traceID, OrganizationID: normalizedOrganizationID(organizationID), SpanID: "sp_" + uuid.NewString(), ParentID: parentID, Name: name, Status: "running", StartAt: time.Now().UTC(), Attributes: attributes}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.spans = append(s.spans, span)
@@ -99,6 +104,10 @@ func (h *SpanHandle) End(status string, runErr error) {
 }
 
 func (s *TraceStore) List(traceID string, limit int) []TraceSpan {
+	return s.ListForOrganization("local", traceID, limit)
+}
+
+func (s *TraceStore) ListForOrganization(organizationID, traceID string, limit int) []TraceSpan {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	if limit <= 0 || limit > 1000 {
@@ -106,7 +115,7 @@ func (s *TraceStore) List(traceID string, limit int) []TraceSpan {
 	}
 	result := make([]TraceSpan, 0, len(s.spans))
 	for _, span := range s.spans {
-		if traceID == "" || span.TraceID == traceID {
+		if normalizedOrganizationID(span.OrganizationID) == normalizedOrganizationID(organizationID) && (traceID == "" || span.TraceID == traceID) {
 			result = append(result, span)
 		}
 	}
