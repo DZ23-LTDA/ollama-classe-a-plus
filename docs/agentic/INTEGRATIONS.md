@@ -72,3 +72,45 @@ O protocolo inicial é `dz23-companion.v1` e suporta `hello`, `heartbeat`, `ping
 ## Publicação de builders
 
 Configure `OLLAMA_AGENT_DEPLOYMENTS` apontando para um JSON como [`examples/agent-deployments.json`](../../examples/agent-deployments.json). Os adapters `vercel` e `netlify` usam as APIs oficiais; `generic` envia um payload de arquivos base64 para `/deploy`, permitindo integrar AWS, Cloudflare, um pipeline interno ou outro hosting sem colocar SDKs e credenciais no binário. Os tokens são lidos de `token_env`, e uma publicação exige approval no endpoint. O código cria a requisição de publicação e valida o workspace, mas credenciais de conta, domínio, projeto, DNS, billing e permissões de hosting continuam responsabilidade do operador.
+
+
+## Composio Connect e plugin Composio
+
+O Classe A+ pode registrar o [Composio Connect](https://docs.composio.dev/docs/composio-connect) como Remote MCP através de [`examples/dz23-composio-connect.json`](../../examples/dz23-composio-connect.json). O preset usa `https://connect.composio.dev/mcp`, permite somente os métodos JSON-RPC necessários (`initialize`, `notifications/initialized`, `tools/list` e `tools/call`) e injeta `x-consumer-api-key` apenas no servidor por meio de `COMPOSIO_CONSUMER_API_KEY`. O valor nunca é retornado pela API de capabilities, browser ou logs.
+
+```bash
+export OLLAMA_AGENT_REMOTE_MCP="$PWD/examples/dz23-composio-connect.json"
+export COMPOSIO_CONSUMER_API_KEY='valor-fora-do-repositorio'
+```
+
+O Composio Connect expõe meta-tools para descobrir tools, obter schemas, iniciar conexões OAuth e executar tools. Por isso, “ter o plugin” significa ter o adapter MCP e o fluxo de aprovação no Classe A+; ainda é necessário autorizar cada conta upstream no navegador do operador. A integração não cria uma conta Composio, não completa OAuth automaticamente e não declara que Instagram, TikTok Shop, Shopify ou qualquer outro toolkit está conectado. Para multiusuário, a próxima evolução deve usar uma sessão Composio por `organization_id`/usuário, persistir somente referências cifradas e aplicar scopes mínimos por departamento.
+
+## xAI / Grok por API
+
+A API oficial da [xAI](https://docs.x.ai/overview) é OpenAI-compatible na Responses API. O preset [`examples/dz23-xai.json`](../../examples/dz23-xai.json) encaminha `/v1/responses` e `/v1/chat/completions` para `https://api.x.ai/v1`, usando `XAI_API_KEY` somente no processo do servidor:
+
+```bash
+export OLLAMA_DZ23_CONFIG="$PWD/examples/dz23-xai.json"
+export OLLAMA_DZ23_GATEWAY_KEY='chave-do-cliente-fora-do-repositorio'
+export XAI_API_KEY='chave-xai-fora-do-repositorio'
+```
+
+No cliente compatível com Responses API, use o modelo `xai/grok-4.7` e envie `input`, `tools` e as opções suportadas pela versão da API. O proxy Classe A+ preserva o corpo Responses, reescreve apenas o identificador lógico para o modelo upstream e aplica autenticação server-side. Isso integra a **API xAI**, não o produto hospedado Grok Bot. Browser, computador cloud persistente, bots coordenados, skills e rotinas continuam sendo implementados pelo runtime próprio do Classe A+ ou pelos adapters aprovados, sem copiar internals proprietários.
+
+## Redes sociais, afiliados e marketplaces
+
+A base atual tem Growth OS sandbox, conectores HTTP allowlisted, OAuth tenant-aware, MCP e approvals. Ela consegue planejar campanhas, criar rascunhos, manter catálogo/pedidos locais, registrar atribuição e simular fulfillment; não publica nem vende em uma plataforma externa sem um connector específico e credenciais autorizadas.
+
+| Canal | Estado atual | Próximo adapter operacional |
+|---|---|---|
+| Instagram/Meta | Adapter genérico e catálogo Composio possível; publicação não validada no Classe A+ | Meta Login/OAuth, `instagram_business_content_publish`, mídia pública, webhooks, rate limit, approval e teste em conta profissional |
+| X/Twitter | Toolkit Composio listado; não há conexão validada no projeto | OAuth, publicação/leitura permitida, rate limits, políticas de automação e approval |
+| YouTube | Toolkit/API pública disponível; não há upload validado no projeto | OAuth Google, upload/resumable, metadata, quota, copyright e approval |
+| WhatsApp | Connector HTTP/MCP possível; não há fluxo Cloud API validado | Meta Business, templates, opt-in, webhooks, proteção contra spam e approval |
+| TikTok Shop | Growth sandbox; APIs oficiais cobrem catálogo, pedidos, fulfillment, promoções, finanças, webhooks e Affiliate Seller/Creator/Partner | App Partner Center, seller/creator authorization, scopes por região, sandbox, webhooks assinados, idempotência, returns/refunds, compliance e testes por mercado |
+| Shopify | Pode ser conectado por Composio ou connector dedicado; não há OAuth/Admin GraphQL validado | App OAuth, scopes mínimos, produtos/pedidos, webhooks, rate limits e approval para mutações |
+| Outros marketplaces | Connector genérico/MCP permite integração futura; nenhum marketplace é declarado conectado | Adapter específico por marketplace, catálogo, estoque, pedidos, logística, devoluções, pagamentos e reconciliação |
+
+A documentação oficial consultada informa que as Affiliate APIs do TikTok Shop não estão disponíveis no Reino Unido e União Europeia e que o onboarding de creators não pode ser totalmente moderado por parceiros via API. Logo, a jornada “como TikTok Shop” é viável **arquiteturalmente** e pode ser implementada com autorização de seller/creator/partner, mas não pode ser marcada como operação real universal antes da aprovação do app, da região, dos escopos e da sandbox correspondente.
+
+Nenhum connector deve publicar posts, iniciar anúncios, enviar mensagens, criar produtos, alterar preço/estoque, aprovar pedidos, solicitar fulfillment, cobrar ou movimentar dinheiro sem approval explícito, idempotency key, trilha de auditoria, limites de orçamento e política de pausa automática.

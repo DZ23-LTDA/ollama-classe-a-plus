@@ -8,8 +8,12 @@ required_files=(
   "UPSTREAM_BASE_COMMIT"
   "docs/agentic/PRODUCT_TREE.md"
   "docs/agentic/PARITY_MATRIX.md"
-  "docs/agentic/COMPANY_OS.md"
-  "docs/agentic/DESKTOP_COMMANDER_REMOTE.md"
+	  "docs/agentic/COMPANY_OS.md"
+	  "docs/agentic/DESKTOP_COMMANDER_REMOTE.md"
+	  "docs/agentic/COMPOSIO.md"
+	  "docs/agentic/XAI_GROK.md"
+	  "examples/dz23-composio-connect.json"
+	  "examples/dz23-xai.json"
   "internal/agent/runtime.go"
   "internal/agent/company.go"
   "internal/agent/company_growth.go"
@@ -44,6 +48,8 @@ grep -q 'Nova tarefa' app/ui/app/src/components/AppSidebar.tsx
 grep -q 'Agentic Control Center' app/ui/app/src/components/AgenticControlCenter.tsx
 grep -q 'RemoteMCP' internal/agent/runtime.go
 grep -q 'mcp.remote.call' internal/agent/mcp_remote.go
+grep -q 'HeadersEnv' internal/agent/mcp_remote.go
+grep -q 'api.x.ai/v1' examples/dz23-xai.json
 grep -q 'Growth OS' app/ui/app/src/components/CompanyGrowthPanel.tsx
 grep -q 'addCompanyCampaign' server/company_growth_routes.go
 for route in projects library scheduled skills plugins tasks company; do

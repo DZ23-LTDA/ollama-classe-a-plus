@@ -100,3 +100,12 @@ O Company OS ganhou um **Growth OS local** com campanhas, aprovação, pausa, pr
 O Builder foi exercitado por API com criação de site, atualização visual, preview com hash de artifact, exportação, publicação local e bloqueio de deploy externo sem `approved:true` em `scripts/smoke-builder.sh`. O gateway multi-provider ganhou cobertura de uma sessão OpenAI-compatible streaming, autenticação de entrada e bearer server-side, incluindo tradução dos chunks para o protocolo nativo.
 
 Estas jornadas são operacionais no ambiente local. O Growth OS não publica anúncios, envia mensagens, compra produtos, cobra clientes ou chama marketplaces; o Builder não foi promovido a deploy externo validado; provider sessions externas continuam dependendo de credenciais, instâncias e harnesses instalados. O próximo passo é conectar cada adapter externo a um sandbox autorizado com idempotência, scopes mínimos, logs, DLP, approval e rollback.
+
+
+## Incremento 2026-09-22 — Composio, xAI/Grok e social commerce
+
+O runtime ganhou suporte a headers server-side no Remote MCP e um preset Composio Connect com allowlist de JSON-RPC e approval. Isso torna possível usar os toolkits Composio por MCP, mas a conexão de cada app continua dependente de OAuth, connected account, scopes e políticas do upstream. A API xAI também recebeu preset HTTPS para Responses/chat; o proxy comprovadamente preserva `input` e `tools` e aplica a chave no servidor, sem afirmar disponibilidade de quota, modelo ou Grok Bot hospedado.
+
+O Growth OS agora tem o mapa técnico para sair do sandbox local rumo a social commerce: Instagram/Meta, X/Twitter, YouTube, WhatsApp, TikTok Shop, Shopify e outros marketplaces. O próximo trabalho por canal deve criar contrato de provider, OAuth por tenant, webhooks verificadas, idempotência, rate limits, DLP, approval e smoke em sandbox. No TikTok Shop, seller/creator/partner authorization, escopos por região e a disponibilidade das Affiliate APIs precisam ser tratados por mercado; a documentação consultada informa indisponibilidade atual para Reino Unido e União Europeia.
+
+As integrações externas ainda não são declaradas conectadas. A conclusão desta fase exige contas de teste autorizadas, app reviews, sandbox dos provedores, credenciais provisionadas fora do Git e testes reversíveis de publicação, catálogo, pedido, fulfillment, returns/refunds e reconciliação.

@@ -69,3 +69,14 @@ Os gates comprovados desta revisão incluem testes focados do runtime/server, bu
 - Teste do adapter Desktop Commander Remote MCP e registro da evidência oficial de setup; OAuth, conta, pareamento, agente físico e revogação continuam pendentes por falta de credenciais/dispositivo autorizados.
 
 A rodada não publica campanhas, não movimenta dinheiro, não envia pedidos, não conecta contas sociais/CRM/marketplaces e não declara providers externos como conectados. Os fluxos comprovados são locais e reversíveis.
+
+
+## Unreleased — Composio, xAI/Grok e social commerce — 2026-09-22
+
+- Remote MCP agora aceita `headers_env` server-side com validação de nomes, permitindo o preset oficial Composio Connect sem expor `x-consumer-api-key` na UI, memória ou logs.
+- Preset [`examples/dz23-composio-connect.json`](examples/dz23-composio-connect.json) com endpoint HTTPS, métodos JSON-RPC allowlisted e approval via `mcp.remote.call`.
+- Preset [`examples/dz23-xai.json`](examples/dz23-xai.json) para xAI Responses/chat com bearer server-side, e teste de passthrough de `input`/`tools` para `/v1/responses`.
+- Runbooks [`COMPOSIO.md`](docs/agentic/COMPOSIO.md) e [`XAI_GROK.md`](docs/agentic/XAI_GROK.md), além de fontes oficiais registradas em [`audit/COMMERCIAL_INTEGRATIONS_SOURCES_2026-09-22.md`](audit/COMMERCIAL_INTEGRATIONS_SOURCES_2026-09-22.md).
+- Matriz de paridade atualizada com Composio, xAI/Grok API e Social Commerce/TikTok Shop, separando adapter de conta, scopes, sandbox e operação real.
+
+A rodada não conecta contas externas nem publica posts, anúncios, produtos ou pedidos. Composio, xAI, TikTok Shop, Instagram, Shopify e demais canais exigem credenciais, aprovação de app, scopes mínimos, testes de sandbox, compliance e validação por região.

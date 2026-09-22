@@ -340,3 +340,28 @@ external_blockers:
   - distributed PostgreSQL/Redis/OTLP, IdP, deployment accounts and physical desktop/mobile tests
 next_action: run full integrity/backend/UI gates, stage the complete diff, commit and update the public PR
 ```
+
+
+## Verificação adicional — Composio, xAI/Grok e social commerce — 2026-09-22
+
+```yaml
+state: CANDIDATE_COMPLETED
+branch: feat/manus-parity-omniroute
+completed:
+  - composio_remote_mcp_preset: headers_env server-side, JSON-RPC allowlist, approval and local regression test
+  - xai_responses_preset: HTTPS OpenAI-compatible provider, bearer server-side and local passthrough test
+  - commercial_source_audit: official Composio, xAI, TikTok Shop, Instagram and Shopify sources recorded
+  - parity_docs: README, integrations, parity matrix, changelog and roadmap updated
+proofs:
+  - gofmt and focused Remote MCP tests: PENDING_FINAL_GATE
+  - focused multi-provider xAI Responses test: PENDING_FINAL_GATE
+  - JSON preset validation: PENDING_FINAL_GATE
+  - integrity/backend/UI gates: PENDING_FINAL_GATE
+external_blockers:
+  - Composio API key, OAuth connected accounts and per-tenant session provisioning
+  - xAI API key/quota and provider tool validation; Grok Bot cloud product is not embedded
+  - TikTok Shop Partner Center app, seller/creator/partner authorization, scopes and region-specific sandbox
+  - Meta/Instagram, YouTube, WhatsApp, Shopify and other marketplace credentials, app review and webhooks
+  - compliance, idempotency, DLP, approvals, returns/refunds, logistics, payments and reconciliation tests
+next_action: run final gates, commit and push the public PR; do not claim external accounts are connected
+```

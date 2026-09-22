@@ -185,6 +185,41 @@ func TestProxyInjectsHarnessRouterMetadata(t *testing.T) {
 	}
 }
 
+func TestProxyPassesThroughResponsesProvider(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	var gotModel, gotAuthorization string
+	upstream := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotModel = ""
+		gotAuthorization = r.Header.Get("Authorization")
+		if r.URL.Path != "/v1/responses" {
+			t.Fatalf("path = %q", r.URL.Path)
+		}
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		gotModel, _ = body["model"].(string)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"resp-xai-test","object":"response","status":"completed","output":[]}`))
+	}))
+	defer upstream.Close()
+	t.Setenv("XAI_TEST_KEY", "xai-secret")
+	r := &Registry{
+		providers: map[string]Provider{"xai": {Name: "xai", Type: ProviderTypeOpenAICompatible, BaseURL: upstream.URL + "/v1", APIKeyEnv: "XAI_TEST_KEY", Paths: []string{"/v1/responses"}, AllowPrivate: true}},
+		models:    map[string]Model{"xai/grok-4.7": {ID: "xai/grok-4.7", UpstreamID: "grok-4.7", Provider: "xai", Available: true}},
+	}
+	router := gin.New()
+	router.Use(NewGateway(r, upstream.Client()).Middleware())
+	router.POST("/v1/responses", func(c *gin.Context) { t.Fatal("request was not proxied") })
+	request := httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(`{"model":"xai/grok-4.7","input":"hello","tools":[{"type":"web_search"}]}`))
+	request.RemoteAddr = "127.0.0.1:12345"
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusOK || gotModel != "grok-4.7" || gotAuthorization != "Bearer xai-secret" {
+		t.Fatalf("status=%d model=%q authorization=%q body=%s", recorder.Code, gotModel, gotAuthorization, recorder.Body.String())
+	}
+}
+
 func TestCLIProviderRequiresExplicitExecutionAndReturnsCompletion(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	t.Setenv("DZ23_CLI_HELPER", "1")

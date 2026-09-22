@@ -18,6 +18,8 @@ A arquitetura é local-first. Um operador pode começar apenas com o binário e 
 |---|---|---|
 | Chat e API Ollama | Implementado na base herdada | Preserva os comandos e contratos principais do Ollama. |
 | Multi-provider DZ23 | Implementado | Provedores explicitamente configurados e endpoints compatíveis. |
+| xAI/Grok API | Adapter implementado | Preset Responses/chat com bearer server-side; a validação externa depende de chave, quota e modelo xAI. Não é o Grok Bot hospedado. |
+| Composio Connect | Adapter implementado | Remote MCP com headers server-side, allowlist e approval; connected accounts e OAuth por app/tenant dependem do operador. |
 | OmniRoute | Adapter OpenAI-compatible com preset local | Exige instância OmniRoute, chave e smoke test do operador; auto-routing externo não é inventado pelo Classe A+. |
 | Missões agentic | Implementado | Plano validado, execução, eventos, recovery e artefatos. |
 | Approvals e sandbox | Implementado | Tools classificadas e execução protegida por políticas do servidor. |
@@ -42,7 +44,7 @@ A arquitetura é local-first. Um operador pode começar apenas com o binário e 
 Use o método de instalação correspondente à versão do Ollama que você pretende operar ou compile a revisão do repositório para desenvolvimento. Para executar uma revisão local a partir do código-fonte:
 
 ```bash
-git clone https://github.com/LMPrado-DZ23/ollama-classe-a-plus.git
+git clone https://github.com/DZ23-LTDA/ollama-classe-a-plus.git
 cd ollama-classe-a-plus
 
 # Conferir a revisão pública

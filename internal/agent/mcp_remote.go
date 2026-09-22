@@ -17,11 +17,12 @@ import (
 )
 
 type RemoteMCPServerConfig struct {
-	ID             string   `json:"id"`
-	URL            string   `json:"url"`
-	TokenEnv       string   `json:"token_env,omitempty"`
-	AllowedMethods []string `json:"allowed_methods,omitempty"`
-	TimeoutSeconds int      `json:"timeout_seconds,omitempty"`
+	ID             string            `json:"id"`
+	URL            string            `json:"url"`
+	TokenEnv       string            `json:"token_env,omitempty"`
+	HeadersEnv     map[string]string `json:"headers_env,omitempty"`
+	AllowedMethods []string          `json:"allowed_methods,omitempty"`
+	TimeoutSeconds int               `json:"timeout_seconds,omitempty"`
 }
 
 type RemoteMCPManager struct {
@@ -49,6 +50,14 @@ func (m *RemoteMCPManager) Register(config RemoteMCPServerConfig) error {
 	}
 	if strings.ContainsAny(config.TokenEnv, "=\x00\r\n") {
 		return errors.New("remote MCP token_env is invalid")
+	}
+	for header, envName := range config.HeadersEnv {
+		if strings.TrimSpace(header) == "" || strings.ContainsAny(header, "\x00\r\n") {
+			return errors.New("remote MCP header name is invalid")
+		}
+		if strings.TrimSpace(envName) == "" || strings.ContainsAny(envName, "=\x00\r\n") {
+			return errors.New("remote MCP header environment name is invalid")
+		}
 	}
 	if config.TimeoutSeconds <= 0 || config.TimeoutSeconds > 300 {
 		config.TimeoutSeconds = 30
@@ -119,6 +128,11 @@ func (m *RemoteMCPManager) Call(ctx context.Context, serverID, method string, pa
 	if config.TokenEnv != "" {
 		if token, ok := os.LookupEnv(config.TokenEnv); ok && strings.TrimSpace(token) != "" {
 			req.Header.Set("Authorization", "Bearer "+token)
+		}
+	}
+	for header, envName := range config.HeadersEnv {
+		if value, ok := os.LookupEnv(envName); ok && strings.TrimSpace(value) != "" {
+			req.Header.Set(header, value)
 		}
 	}
 	response, err := client.Do(req)

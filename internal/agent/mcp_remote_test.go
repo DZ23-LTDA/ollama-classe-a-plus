@@ -14,6 +14,9 @@ func TestRemoteMCPCallJSONAndBearer(t *testing.T) {
 		if r.Header.Get("Authorization") != "Bearer test-token" {
 			t.Fatalf("authorization = %q", r.Header.Get("Authorization"))
 		}
+		if r.Header.Get("x-consumer-api-key") != "composio-consumer" {
+			t.Fatalf("x-consumer-api-key = %q", r.Header.Get("x-consumer-api-key"))
+		}
 		var request map[string]any
 		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 			t.Fatal(err)
@@ -26,8 +29,9 @@ func TestRemoteMCPCallJSONAndBearer(t *testing.T) {
 	}))
 	defer server.Close()
 	t.Setenv("TEST_REMOTE_MCP_TOKEN", "test-token")
+	t.Setenv("COMPOSIO_CONSUMER_KEY", "composio-consumer")
 	manager := NewRemoteMCPManager()
-	if err := manager.Register(RemoteMCPServerConfig{ID: "desktop", URL: server.URL, TokenEnv: "TEST_REMOTE_MCP_TOKEN", AllowedMethods: []string{"tools/list"}, TimeoutSeconds: 5}); err != nil {
+	if err := manager.Register(RemoteMCPServerConfig{ID: "desktop", URL: server.URL, TokenEnv: "TEST_REMOTE_MCP_TOKEN", HeadersEnv: map[string]string{"x-consumer-api-key": "COMPOSIO_CONSUMER_KEY"}, AllowedMethods: []string{"tools/list"}, TimeoutSeconds: 5}); err != nil {
 		t.Fatal(err)
 	}
 	result, err := manager.Call(context.Background(), "desktop", "tools/list", map[string]any{})

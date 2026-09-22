@@ -209,3 +209,27 @@ Before selecting a model in either client, verify:
 The gateway never forwards a client `Authorization` header to a provider. If
 the listener is accessed off-host, configure `gateway_api_key_env`, use the
 gateway bearer token, and protect the connection with TLS/firewall rules.
+
+
+## xAI / Grok Responses API
+
+A API xAI pode ser configurada como provider OpenAI-compatible com o preset [`examples/dz23-xai.json`](../examples/dz23-xai.json):
+
+```bash
+export OLLAMA_DZ23_CONFIG=/absolute/path/to/examples/dz23-xai.json
+export OLLAMA_DZ23_GATEWAY_KEY='chave-do-gateway-fora-do-repositorio'
+export XAI_API_KEY='chave-xai-fora-do-repositorio'
+```
+
+O modelo lógico é `xai/grok-4.7`. O preset permite `/v1/responses` e `/v1/chat/completions`; o proxy não converte o corpo Responses, apenas reescreve o model id e adiciona autenticação server-side. Tools, web search, structured outputs, quota, billing e versões aceitas dependem da API xAI. A integração não transforma o servidor local no Grok Bot hospedado e não inclui o computador cloud, bots persistentes ou aplicativos proprietários desse serviço.
+
+## Composio via Remote MCP
+
+Para disponibilizar toolkits Composio pelo runtime agentic, use [`examples/dz23-composio-connect.json`](../examples/dz23-composio-connect.json):
+
+```bash
+export OLLAMA_AGENT_REMOTE_MCP=/absolute/path/to/examples/dz23-composio-connect.json
+export COMPOSIO_CONSUMER_API_KEY='chave-fora-do-repositorio'
+```
+
+A autorização das contas upstream ocorre por OAuth do Composio e deve ser concluída pelo operador. O runtime exige approval para `mcp.remote.call`, mantém a chave no servidor e permite somente os métodos MCP do preset. Para uso com múltiplas organizações, substitua a chave global por sessões Composio por tenant e credential store cifrado.

@@ -29,6 +29,8 @@ As imagens acima são capturas reais das rotas `/`, `/agentic`, `/settings` e `/
 | API e endpoints | [`agentic/API.md`](docs/agentic/API.md) |
 | Integrações, OAuth, SAML, MCP e deploy | [`agentic/INTEGRATIONS.md`](docs/agentic/INTEGRATIONS.md) |
 | HarnessRouter, UHP, Codex/Claude Code plugáveis | [`agentic/HARNESSROUTER.md`](docs/agentic/HARNESSROUTER.md) + [`dz23-harnessrouter.json`](examples/dz23-harnessrouter.json) |
+| Composio Connect MCP e toolkits OAuth | [`agentic/COMPOSIO.md`](docs/agentic/COMPOSIO.md) + [`dz23-composio-connect.json`](examples/dz23-composio-connect.json) |
+| xAI/Grok API e Responses | [`agentic/XAI_GROK.md`](docs/agentic/XAI_GROK.md) + [`dz23-xai.json`](examples/dz23-xai.json) |
 | Company OS: empresa, KPIs, Growth OS, afiliados, catálogo, pedidos e guardrails | [`agentic/COMPANY_OS.md`](docs/agentic/COMPANY_OS.md) |
 | Smoke operacional de Growth OS e Builder | [`smoke-company-growth.sh`](scripts/smoke-company-growth.sh) + [`smoke-builder.sh`](scripts/smoke-builder.sh) |
 | Desktop Commander local e Remote MCP | [`agentic/DESKTOP_COMMANDER_REMOTE.md`](docs/agentic/DESKTOP_COMMANDER_REMOTE.md) + [`dz23-desktop-commander-remote.json`](examples/dz23-desktop-commander-remote.json) |
