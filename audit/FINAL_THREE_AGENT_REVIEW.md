@@ -248,3 +248,8 @@ A regressão foi coberta por testes de grant desconhecido, descriptor sem scopes
 A falha upstream no head anterior foi reproduzida localmente. O `go test -race ./...` apontou o contador não atômico de `TestResearchEngineFetchesSourcesWithCitationsAndCache` e o uso concorrente do `bytes.Buffer` promovido por `mcpStderrBuffer.ReadFrom`. O contador foi tornado atômico e o buffer MCP recebeu sincronização explícita e `ReadFrom` próprio.
 
 Após a correção, os gates locais de teste normal, race, vet, build e integrity passaram. A confirmação remota do workflow upstream continua necessária; portanto o PR não é tratado como globalmente verde até o novo run terminar.
+
+
+## Quality workflow remoto confirmado — 2026-09-22
+
+O run `35749351291` no SHA `428a99bd` passou Go/server, PostgreSQL RLS + Redis DLQ + OTLP, Web/Mobile e SBOM. O resultado é válido para o workflow agentic do fork. A matriz upstream `test` ainda deve ser observada no head corrente antes de classificar o PR como totalmente validado.

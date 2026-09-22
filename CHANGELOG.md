@@ -286,3 +286,8 @@ Foi adicionada `audit/HARNESS_CAPABILITY_MATRIX.md`, com decisões rastreáveis 
 ## 2026-09-22 — correção de races em pesquisa e MCP
 
 O fixture concorrente de pesquisa passou a usar contador atômico. O buffer stderr de MCP passou a proteger `Write`, `String` e `ReadFrom`, evitando que `io.Copy` contorne o limite/mutex durante cancelamento e `Stop`. `go test -race ./...` agora passa localmente.
+
+
+## 2026-09-22 — quality workflow agentic verde no SHA 428a99bd
+
+O run GitHub Actions `35749351291` passou os quatro jobs do workflow agentic: Go/server, PostgreSQL RLS + Redis DLQ + OTLP, Web/Mobile e SBOM. O teste upstream de matriz permanece separado e será confirmado no head corrente.

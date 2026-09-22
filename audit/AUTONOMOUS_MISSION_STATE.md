@@ -1783,3 +1783,18 @@ root_causes_fixed: research fixture counter; MCP stderr promoted ReadFrom race
 next_action: confirm upstream test/race and agentic quality workflows on this SHA
 classification: preview/local RC em hardening; NÃO final; NÃO production-ready
 ```
+
+
+## Quality agentic verde; upstream test pendente — aguardando publicação — 2026-09-22
+
+```yaml
+state: RELEASING
+iteration: 33
+quality_run: 35749351291
+quality_sha: 428a99bd9d98dc4dad5b9310b8cc1689f21bac0f
+quality_result: PASS
+quality_jobs: Go/server; PostgreSQL RLS+Redis DLQ+OTLP; Web/Mobile; SBOM
+upstream_test_current_head: NOT_RUN
+classification: preview/local RC em hardening; NÃO final; NÃO production-ready
+next_action: publish this evidence-only commit, then verify test.yaml on the current PR head
+```

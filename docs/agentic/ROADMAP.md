@@ -302,3 +302,8 @@ A matriz não converte triagem documental em integração operacional. Os gates 
 ## Remediação 2026-09-22 — upstream Go race
 
 O workflow upstream revelou duas corridas que não apareciam nos gates agentic específicos: contador do fixture HTTP de pesquisa e `ReadFrom` promovido no buffer stderr do MCP. Ambas foram corrigidas sem relaxar o teste ou ocultar o race detector. O próximo gate é a execução remota do workflow `test` no novo SHA.
+
+
+## Validação remota 2026-09-22 — agentic quality verde
+
+O SHA `428a99bd` passou o workflow agentic completo no run `35749351291`. A próxima prova específica é o workflow upstream `test` no head corrente do PR, incluindo a matriz de plataformas aplicável.

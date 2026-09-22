@@ -301,3 +301,8 @@ A reprodução local confirmou que o `go test` normal passava e que o `go test -
 Evidências após a correção: `go test ./... -count=1`, `go test -race ./... -count=1`, `go vet ./...`, build Go e integrity guard — PASS. A nova execução upstream no head publicado ainda é necessária; o CI agentic anterior havia passado, mas o teste upstream falhou antes desta correção.
 
 A classificação permanece **preview/local RC em hardening**. Esta slice corrige races de teste/lifecycle, mas não fecha sandbox forte, integração externa, device testing ou os demais P0/P1.
+
+
+## Quality workflow remoto verde — 2026-09-22
+
+O workflow `dz23-agentic-quality` passou no SHA `428a99bd` no run `35749351291`. Os jobs de Go/server, PostgreSQL RLS + Redis DLQ + OTLP, Web/Mobile e SBOM passaram. Esta evidência cobre o workflow agentic do fork; o workflow upstream `test` ainda precisa concluir no head corrente do PR.
