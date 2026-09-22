@@ -1699,3 +1699,17 @@ evidence:
 classification: preview/local RC em hardening; NÃO final; NÃO production-ready
 next_action: commit/push da slice e confirmação do quality workflow no novo SHA
 ```
+
+
+## Publicação da slice P1 central CapabilityPolicy — 2026-09-22
+
+```yaml
+state: FIXING
+iteration: 30
+commit: 705074d5
+branch: feat/manus-parity-omniroute
+remote: class-a-plus/feat/manus-parity-omniroute
+local_evidence: integrity, go test ./..., go vet ./..., go build, web vitest/build, mobile typecheck = PASS
+classification: preview/local RC em hardening; NÃO final; NÃO production-ready
+next_slice: observar quality workflow remoto e continuar P0/P1s restantes; sem merge automático em main
+```
