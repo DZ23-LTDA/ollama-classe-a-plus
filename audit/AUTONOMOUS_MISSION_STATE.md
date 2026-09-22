@@ -1878,3 +1878,18 @@ remote_evidence: pending
 classification: preview/local RC em hardening; NÃO final; NÃO production-ready
 next_action: full gates, commit/push, remote verification, then continue MCP audit trail/session work
 ```
+
+
+## Publicação da slice P1 MCP correlation — 2026-09-22
+
+```yaml
+state: VALIDATING_RELEASE
+iteration: 35
+commit: 9eb7a4c9
+branch: feat/manus-parity-omniroute
+remote: class-a-plus/feat/manus-parity-omniroute
+local_evidence: focused normal/race; integrity; go test ./...; vet; build = PASS
+remote_evidence: pending for this SHA
+classification: preview/local RC em hardening; NÃO final; NÃO production-ready
+next_action: verify integrity/quality remote, then continue audit trail and Remote MCP session work
+```
