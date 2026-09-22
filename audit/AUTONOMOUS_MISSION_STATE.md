@@ -1318,3 +1318,20 @@ external_not_proven: GitHub Actions, Docker distributed integration, physical ru
 classification: preview/local RC em hardening
 next_action: commit/push, then continue remaining P0s; no main merge
 ```
+
+
+## Publicação da slice P0 CI/release quality gates — 2026-09-22
+
+```yaml
+state: FIXING
+iteration: 20
+commit: 66258da7
+branch: feat/manus-parity-omniroute
+remote: https://github.com/DZ23-LTDA/ollama-classe-a-plus.git
+pull_request: https://github.com/DZ23-LTDA/ollama-classe-a-plus/pull/1
+working_tree: checkpoint pending commit
+published: true
+proofs: YAML parser, integrity guard and diff check PASS; CI now declares full Go/UI/mobile gates
+classification: preview/local RC em hardening
+next_slice: continue remaining P0s, especially runtime/provider contracts and release evidence; no main merge
+```
