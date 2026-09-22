@@ -1020,3 +1020,20 @@ classification: preview/local RC em hardening
 open_risks: Connector/upload egress parity, distributed DNS/TLS tests, strong sandbox/process isolation
 next_action: commit/push, then continue Connector egress or platform isolation
 ```
+
+
+## Publicação da slice P0 Media egress/download — 2026-09-22
+
+```yaml
+state: FIXING
+iteration: 13
+commit: b84ac97c
+branch: feat/manus-parity-omniroute
+remote: https://github.com/DZ23-LTDA/ollama-classe-a-plus.git
+pull_request: https://github.com/DZ23-LTDA/ollama-classe-a-plus/pull/1
+working_tree: checkpoint pending commit
+published: true
+proofs: integrity, Go tests/vet/build, UI Vitest/build, mobile typecheck and Media egress negative tests all PASS
+classification: preview/local RC em hardening
+next_slice: Connector/upload egress parity or platform sandbox primitives; no main merge
+```
