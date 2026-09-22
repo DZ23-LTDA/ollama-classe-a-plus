@@ -2127,6 +2127,10 @@ func Serve(ln net.Listener) error {
 		// way.
 		Handler: nil,
 	}
+	secureAgentServer, err := configureAgentTLS(srvr)
+	if err != nil {
+		return err
+	}
 
 	// listen for a ctrl+c and stop any loaded llm
 	signals := make(chan os.Signal, 1)
@@ -2167,7 +2171,11 @@ func Serve(ln net.Listener) error {
 	}
 	slog.Info("vram-based default context", "total_vram", format.HumanBytes2(totalVRAM), "default_num_ctx", s.defaultNumCtx)
 
-	err = srvr.Serve(ln)
+	if secureAgentServer {
+		err = srvr.ServeTLS(ln, "", "")
+	} else {
+		err = srvr.Serve(ln)
+	}
 	// If server is closed from the signal handler, wait for the ctx to be done
 	// otherwise error out quickly
 	if !errors.Is(err, http.ErrServerClosed) {

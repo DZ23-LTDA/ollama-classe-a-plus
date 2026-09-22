@@ -63,12 +63,14 @@ func (s *PostgresStore) Migrate(ctx context.Context) error {
 		`ALTER TABLE agent_events ADD COLUMN IF NOT EXISTS organization_id TEXT NOT NULL DEFAULT ''`,
 		`CREATE INDEX IF NOT EXISTS agent_events_mission_created_idx ON agent_events (mission_id, created_at, id)`,
 		`CREATE INDEX IF NOT EXISTS agent_missions_organization_updated_idx ON agent_missions (organization_id, updated_at, id)`,
+		`ALTER TABLE agent_missions FORCE ROW LEVEL SECURITY`,
+		`ALTER TABLE agent_events FORCE ROW LEVEL SECURITY`,
 		`DROP POLICY IF EXISTS agent_missions_tenant_policy ON agent_missions`,
 		`DROP POLICY IF EXISTS agent_events_tenant_policy ON agent_events`,
 		`ALTER TABLE agent_missions ENABLE ROW LEVEL SECURITY`,
 		`ALTER TABLE agent_events ENABLE ROW LEVEL SECURITY`,
-		`CREATE POLICY agent_missions_tenant_policy ON agent_missions USING (organization_id = '' OR current_setting('app.system_access', true) = '1' OR organization_id = current_setting('app.current_organization_id', true)) WITH CHECK (organization_id = '' OR current_setting('app.system_access', true) = '1' OR organization_id = current_setting('app.current_organization_id', true))`,
-		`CREATE POLICY agent_events_tenant_policy ON agent_events USING (organization_id = '' OR current_setting('app.system_access', true) = '1' OR organization_id = current_setting('app.current_organization_id', true)) WITH CHECK (organization_id = '' OR current_setting('app.system_access', true) = '1' OR organization_id = current_setting('app.current_organization_id', true))`,
+		`CREATE POLICY agent_missions_tenant_policy ON agent_missions USING (current_setting('app.system_access', true) = '1' OR (organization_id <> '' AND organization_id = current_setting('app.current_organization_id', true))) WITH CHECK (current_setting('app.system_access', true) = '1' OR (organization_id <> '' AND organization_id = current_setting('app.current_organization_id', true)))`,
+		`CREATE POLICY agent_events_tenant_policy ON agent_events USING (current_setting('app.system_access', true) = '1' OR (organization_id <> '' AND organization_id = current_setting('app.current_organization_id', true))) WITH CHECK (current_setting('app.system_access', true) = '1' OR (organization_id <> '' AND organization_id = current_setting('app.current_organization_id', true)))`,
 	}
 	for _, statement := range statements {
 		if _, err := s.db.ExecContext(ctx, statement); err != nil {

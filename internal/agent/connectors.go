@@ -21,6 +21,7 @@ type ConnectorConfig struct {
 	Provider       string               `json:"provider"`
 	BaseURL        string               `json:"base_url"`
 	TokenEnv       string               `json:"token_env,omitempty"`
+	OAuthProvider  string               `json:"oauth_provider,omitempty"`
 	AllowedOrigins []string             `json:"allowed_origins,omitempty"`
 	Operations     []ConnectorOperation `json:"operations"`
 	TimeoutSeconds int                  `json:"timeout_seconds,omitempty"`
@@ -36,10 +37,20 @@ type ConnectorManager struct {
 	mu         sync.RWMutex
 	connectors map[string]ConnectorConfig
 	client     *http.Client
+	auth       *AuthStore
 }
 
 func NewConnectorManager() *ConnectorManager {
 	return &ConnectorManager{connectors: make(map[string]ConnectorConfig), client: &http.Client{CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return errors.New("connector redirects are disabled") }}}
+}
+
+func (m *ConnectorManager) SetOAuthStore(store *AuthStore) {
+	if m == nil {
+		return
+	}
+	m.mu.Lock()
+	m.auth = store
+	m.mu.Unlock()
 }
 
 func (m *ConnectorManager) Register(config ConnectorConfig) error {
@@ -92,6 +103,29 @@ func (m *ConnectorManager) List() []ConnectorConfig {
 }
 
 func (m *ConnectorManager) Call(ctx context.Context, connectorID, operationName, method, requestPath string, body []byte) (int, string, error) {
+	return m.call(ctx, connectorID, operationName, method, requestPath, body, "")
+}
+
+func (m *ConnectorManager) CallForOrganization(ctx context.Context, organizationID, connectorID, operationName, method, requestPath string, body []byte) (int, string, error) {
+	m.mu.RLock()
+	config, ok := m.connectors[strings.TrimSpace(connectorID)]
+	auth := m.auth
+	m.mu.RUnlock()
+	if !ok {
+		return 0, "", fmt.Errorf("connector %q is not registered", connectorID)
+	}
+	token := ""
+	if auth != nil && strings.TrimSpace(config.OAuthProvider) != "" {
+		var err error
+		token, _, err = auth.OAuthAccessTokenForOrganization(organizationID, config.OAuthProvider)
+		if err != nil {
+			return 0, "", fmt.Errorf("resolve OAuth credential for connector %q: %w", connectorID, err)
+		}
+	}
+	return m.call(ctx, connectorID, operationName, method, requestPath, body, token)
+}
+
+func (m *ConnectorManager) call(ctx context.Context, connectorID, operationName, method, requestPath string, body []byte, tokenOverride string) (int, string, error) {
 	m.mu.RLock()
 	config, ok := m.connectors[strings.TrimSpace(connectorID)]
 	m.mu.RUnlock()
@@ -118,10 +152,12 @@ func (m *ConnectorManager) Call(ctx context.Context, connectorID, operationName,
 	if len(body) > 0 {
 		request.Header.Set("Content-Type", "application/json")
 	}
-	if config.TokenEnv != "" {
-		if token := os.Getenv(config.TokenEnv); token != "" {
-			request.Header.Set("Authorization", "Bearer "+token)
-		}
+	token := tokenOverride
+	if token == "" && config.TokenEnv != "" {
+		token = os.Getenv(config.TokenEnv)
+	}
+	if token != "" {
+		request.Header.Set("Authorization", "Bearer "+token)
 	}
 	client := *m.client
 	client.Timeout = time.Duration(config.TimeoutSeconds) * time.Second
@@ -184,7 +220,7 @@ func (t connectorTool) Descriptor() ToolDescriptor {
 	return ToolDescriptor{Name: "connector.http", Version: "1", Description: "Chamar operação allowlisted de um conector externo", Risk: RiskExternalSideEffect, RequiresApproval: true, Scopes: []string{"connector:external"}}
 }
 
-func (t connectorTool) Execute(ctx context.Context, _ ToolContext, input map[string]any) (ToolResult, error) {
+func (t connectorTool) Execute(ctx context.Context, toolContext ToolContext, input map[string]any) (ToolResult, error) {
 	if t.manager == nil {
 		return ToolResult{}, errors.New("connector manager is unavailable")
 	}
@@ -192,7 +228,7 @@ func (t connectorTool) Execute(ctx context.Context, _ ToolContext, input map[str
 	if len(body) > 1<<20 {
 		return ToolResult{}, errors.New("connector body limit exceeded")
 	}
-	status, response, err := t.manager.Call(ctx, stringInput(input, "connector_id", ""), stringInput(input, "operation", ""), stringInput(input, "method", "GET"), stringInput(input, "path", "/"), body)
+	status, response, err := t.manager.CallForOrganization(ctx, toolContext.OrganizationID, stringInput(input, "connector_id", ""), stringInput(input, "operation", ""), stringInput(input, "method", "GET"), stringInput(input, "path", "/"), body)
 	if err != nil {
 		return ToolResult{}, err
 	}

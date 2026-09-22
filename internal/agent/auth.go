@@ -2,12 +2,15 @@ package agent
 
 import (
 	"context"
+	"crypto"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/hmac"
 	"crypto/rand"
+	"crypto/rsa"
 	"crypto/sha1"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/base32"
 	"encoding/base64"
 	"encoding/binary"
@@ -16,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/big"
 	"net/http"
 	"net/url"
 	"os"
@@ -29,16 +33,18 @@ import (
 )
 
 type User struct {
-	ID                  string    `json:"id"`
-	Email               string    `json:"email"`
-	Name                string    `json:"name"`
-	MFAEnabled          bool      `json:"mfa_enabled,omitempty"`
-	MFASecretCiphertext string    `json:"mfa_secret_ciphertext,omitempty"`
-	CreatedAt           time.Time `json:"created_at"`
+	ID                      string    `json:"id"`
+	Email                   string    `json:"email"`
+	Name                    string    `json:"name"`
+	MFAEnabled              bool      `json:"mfa_enabled,omitempty"`
+	MFASecretCiphertext     string    `json:"mfa_secret_ciphertext,omitempty"`
+	RecoveryCodesCiphertext string    `json:"recovery_codes_ciphertext,omitempty"`
+	CreatedAt               time.Time `json:"created_at"`
 }
 
 func (u User) Public() User {
 	u.MFASecretCiphertext = ""
+	u.RecoveryCodesCiphertext = ""
 	return u
 }
 
@@ -79,6 +85,7 @@ type OAuthState struct {
 	Provider     string     `json:"provider"`
 	RedirectURI  string     `json:"redirect_uri"`
 	CodeVerifier string     `json:"code_verifier"`
+	Nonce        string     `json:"nonce,omitempty"`
 	UserID       string     `json:"user_id,omitempty"`
 	ExpiresAt    time.Time  `json:"expires_at"`
 	ConsumedAt   *time.Time `json:"consumed_at,omitempty"`
@@ -289,6 +296,83 @@ func (s *AuthStore) VerifyMFA(userID, code string, now time.Time) error {
 	return errors.New("invalid mfa code")
 }
 
+func (s *AuthStore) GenerateRecoveryCodes(userID string) (User, []string, error) {
+	codes := make([]string, 10)
+	for index := range codes {
+		raw, err := randomSecret(6)
+		if err != nil {
+			return User{}, nil, err
+		}
+		codes[index] = strings.ToUpper(raw[:4] + "-" + raw[4:])
+	}
+	ciphertext, err := encryptCredential(strings.Join(codes, "\n"))
+	if err != nil {
+		return User{}, nil, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	user, ok := s.users[userID]
+	if !ok {
+		return User{}, nil, os.ErrNotExist
+	}
+	if !user.MFAEnabled {
+		return User{}, nil, errors.New("mfa must be enabled before generating recovery codes")
+	}
+	user.RecoveryCodesCiphertext = ciphertext
+	s.users[userID] = user
+	if err := s.persistLocked(); err != nil {
+		return User{}, nil, err
+	}
+	return user.Public(), codes, nil
+}
+
+func (s *AuthStore) VerifyRecoveryCode(userID, code string) error {
+	code = normalizeRecoveryCode(code)
+	if code == "" {
+		return errors.New("recovery code is required")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	user, ok := s.users[userID]
+	if !ok {
+		return os.ErrNotExist
+	}
+	plain, err := decryptCredential(user.RecoveryCodesCiphertext)
+	if err != nil {
+		return errors.New("recovery code is unavailable")
+	}
+	remaining := make([]string, 0, 10)
+	matched := false
+	for _, candidate := range strings.Split(plain, "\n") {
+		candidate = normalizeRecoveryCode(candidate)
+		if candidate == "" {
+			continue
+		}
+		if subtle.ConstantTimeCompare([]byte(candidate), []byte(code)) == 1 && !matched {
+			matched = true
+			continue
+		}
+		remaining = append(remaining, candidate)
+	}
+	if !matched {
+		return errors.New("invalid recovery code")
+	}
+	if len(remaining) == 0 {
+		user.RecoveryCodesCiphertext = ""
+	} else {
+		user.RecoveryCodesCiphertext, err = encryptCredential(strings.Join(remaining, "\n"))
+		if err != nil {
+			return err
+		}
+	}
+	s.users[userID] = user
+	return s.persistLocked()
+}
+
+func normalizeRecoveryCode(value string) string {
+	return strings.ToUpper(strings.ReplaceAll(strings.TrimSpace(value), "-", ""))
+}
+
 func totpCode(secret string, counter int64) string {
 	decoded, _ := base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(strings.TrimRight(strings.ToUpper(strings.TrimSpace(secret)), "="))
 	var message [8]byte
@@ -329,6 +413,10 @@ func (s *AuthStore) Authorize(userID, organizationID, action string) (Membership
 }
 
 func (s *AuthStore) CreateOAuthState(provider, redirectURI, codeVerifier, userID string, ttl time.Duration) (string, OAuthState, error) {
+	return s.CreateOAuthStateWithNonce(provider, redirectURI, codeVerifier, "", userID, ttl)
+}
+
+func (s *AuthStore) CreateOAuthStateWithNonce(provider, redirectURI, codeVerifier, nonce, userID string, ttl time.Duration) (string, OAuthState, error) {
 	provider = strings.TrimSpace(provider)
 	parsed, err := url.Parse(strings.TrimSpace(redirectURI))
 	if err != nil || parsed.Scheme == "" || parsed.Host == "" || parsed.User != nil {
@@ -344,7 +432,7 @@ func (s *AuthStore) CreateOAuthState(provider, redirectURI, codeVerifier, userID
 	if err != nil {
 		return "", OAuthState{}, err
 	}
-	state := OAuthState{Hash: hashSecret(raw), Provider: provider, RedirectURI: redirectURI, CodeVerifier: codeVerifier, UserID: userID, ExpiresAt: time.Now().UTC().Add(ttl)}
+	state := OAuthState{Hash: hashSecret(raw), Provider: provider, RedirectURI: redirectURI, CodeVerifier: codeVerifier, Nonce: strings.TrimSpace(nonce), UserID: userID, ExpiresAt: time.Now().UTC().Add(ttl)}
 	s.mu.Lock()
 	s.oauthStates[state.Hash] = state
 	err = s.persistLocked()
@@ -398,6 +486,36 @@ func (s *AuthStore) StoreOAuthCredential(provider, userID, organizationID string
 	defer s.mu.Unlock()
 	s.credentials[credential.ID] = credential
 	return credential, s.persistLocked()
+}
+
+// OAuthAccessTokenForOrganization decrypts a currently valid credential only for
+// the requested tenant and provider. The plaintext token never enters a public
+// response or is persisted back to disk.
+func (s *AuthStore) OAuthAccessTokenForOrganization(organizationID, provider string) (string, OAuthCredential, error) {
+	organizationID = strings.TrimSpace(organizationID)
+	provider = strings.TrimSpace(provider)
+	if organizationID == "" || provider == "" {
+		return "", OAuthCredential{}, errors.New("organization and provider are required")
+	}
+	s.mu.RLock()
+	var selected OAuthCredential
+	for _, credential := range s.credentials {
+		if credential.OrganizationID == organizationID && credential.Provider == provider && credential.UpdatedAt.After(selected.UpdatedAt) {
+			selected = credential
+		}
+	}
+	s.mu.RUnlock()
+	if selected.ID == "" {
+		return "", OAuthCredential{}, os.ErrNotExist
+	}
+	if !selected.ExpiresAt.IsZero() && time.Now().UTC().Add(30*time.Second).After(selected.ExpiresAt) {
+		return "", selected, errors.New("oauth credential is expired or near expiry")
+	}
+	token, err := decryptCredential(selected.AccessTokenCiphertext)
+	if err != nil {
+		return "", OAuthCredential{}, err
+	}
+	return token, selected, nil
 }
 
 func (s *AuthStore) RefreshOAuthCredential(ctx context.Context, provider OAuthProvider, credentialID string, client *http.Client) (OAuthCredential, error) {
@@ -643,16 +761,30 @@ type OAuthProvider struct {
 	AuthorizeURL string `json:"authorize_url"`
 	TokenURL     string `json:"token_url"`
 	UserInfoURL  string `json:"userinfo_url,omitempty"`
+	IssuerURL    string `json:"issuer_url,omitempty"`
+	Audience     string `json:"audience,omitempty"`
 	ClientIDEnv  string `json:"client_id_env"`
 	SecretEnv    string `json:"secret_env"`
 }
 
 func (p OAuthProvider) Validate() error {
 	for _, raw := range []string{p.AuthorizeURL, p.TokenURL} {
+		if strings.TrimSpace(raw) == "" {
+			continue
+		}
 		u, err := url.Parse(raw)
 		if err != nil || u.Scheme != "https" || u.Host == "" {
 			return errors.New("oauth endpoints must use https")
 		}
+	}
+	if strings.TrimSpace(p.IssuerURL) != "" {
+		u, err := url.Parse(p.IssuerURL)
+		if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil {
+			return errors.New("oauth issuer endpoint must use https")
+		}
+	}
+	if strings.TrimSpace(p.IssuerURL) == "" && (strings.TrimSpace(p.AuthorizeURL) == "" || strings.TrimSpace(p.TokenURL) == "") {
+		return errors.New("oauth authorize and token endpoints or an issuer are required")
 	}
 	if p.UserInfoURL != "" {
 		u, err := url.Parse(p.UserInfoURL)
@@ -666,14 +798,179 @@ func (p OAuthProvider) Validate() error {
 	return nil
 }
 
+type OIDCDiscovery struct {
+	Issuer                string `json:"issuer"`
+	AuthorizationEndpoint string `json:"authorization_endpoint"`
+	TokenEndpoint         string `json:"token_endpoint"`
+	UserInfoEndpoint      string `json:"userinfo_endpoint"`
+	JWKSURI               string `json:"jwks_uri"`
+}
+
+func (p OAuthProvider) Discover(ctx context.Context, client *http.Client) (OIDCDiscovery, error) {
+	issuer := strings.TrimRight(strings.TrimSpace(p.IssuerURL), "/")
+	if issuer == "" {
+		return OIDCDiscovery{}, errors.New("oidc issuer is not configured")
+	}
+	if client == nil {
+		client = http.DefaultClient
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, issuer+"/.well-known/openid-configuration", nil)
+	if err != nil {
+		return OIDCDiscovery{}, err
+	}
+	response, err := client.Do(request)
+	if err != nil {
+		return OIDCDiscovery{}, err
+	}
+	defer response.Body.Close()
+	if response.StatusCode/100 != 2 {
+		return OIDCDiscovery{}, fmt.Errorf("oidc discovery failed with status %d", response.StatusCode)
+	}
+	var discovery OIDCDiscovery
+	if err := json.NewDecoder(io.LimitReader(response.Body, 1<<20)).Decode(&discovery); err != nil {
+		return OIDCDiscovery{}, err
+	}
+	if strings.TrimRight(discovery.Issuer, "/") != issuer || discovery.AuthorizationEndpoint == "" || discovery.TokenEndpoint == "" || discovery.JWKSURI == "" {
+		return OIDCDiscovery{}, errors.New("oidc discovery issuer or required endpoints are invalid")
+	}
+	return discovery, nil
+}
+
+func (p OAuthProvider) ValidateIDToken(ctx context.Context, client *http.Client, rawToken, expectedNonce string) (map[string]any, error) {
+	parts := strings.Split(strings.TrimSpace(rawToken), ".")
+	if len(parts) != 3 {
+		return nil, errors.New("id_token must be a compact JWT")
+	}
+	decode := func(value string, target any) error {
+		data, err := base64.RawURLEncoding.DecodeString(value)
+		if err != nil {
+			return err
+		}
+		return json.Unmarshal(data, target)
+	}
+	var header struct {
+		Alg string `json:"alg"`
+		Kid string `json:"kid"`
+	}
+	if err := decode(parts[0], &header); err != nil || header.Alg != "RS256" || header.Kid == "" {
+		return nil, errors.New("unsupported or incomplete id_token header")
+	}
+	var claims map[string]any
+	if err := decode(parts[1], &claims); err != nil {
+		return nil, err
+	}
+	discovery, err := p.Discover(ctx, client)
+	if err != nil {
+		return nil, err
+	}
+	if client == nil {
+		client = http.DefaultClient
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, discovery.JWKSURI, nil)
+	if err != nil {
+		return nil, err
+	}
+	response, err := client.Do(request)
+	if err != nil {
+		return nil, err
+	}
+	defer response.Body.Close()
+	if response.StatusCode/100 != 2 {
+		return nil, fmt.Errorf("oidc jwks failed with status %d", response.StatusCode)
+	}
+	var jwks struct {
+		Keys []struct {
+			KID string `json:"kid"`
+			Kty string `json:"kty"`
+			N   string `json:"n"`
+			E   string `json:"e"`
+		} `json:"keys"`
+	}
+	if err := json.NewDecoder(io.LimitReader(response.Body, 2<<20)).Decode(&jwks); err != nil {
+		return nil, err
+	}
+	var publicKey *rsa.PublicKey
+	for _, key := range jwks.Keys {
+		if key.KID != header.Kid || key.Kty != "RSA" {
+			continue
+		}
+		nBytes, nErr := base64.RawURLEncoding.DecodeString(key.N)
+		eBytes, eErr := base64.RawURLEncoding.DecodeString(key.E)
+		if nErr != nil || eErr != nil || len(eBytes) == 0 {
+			continue
+		}
+		exponent := 0
+		for _, value := range eBytes {
+			exponent = exponent<<8 | int(value)
+		}
+		publicKey = &rsa.PublicKey{N: new(big.Int).SetBytes(nBytes), E: exponent}
+		break
+	}
+	if publicKey == nil || publicKey.N.Sign() <= 0 || publicKey.E < 2 {
+		return nil, errors.New("oidc signing key was not found")
+	}
+	signature, err := base64.RawURLEncoding.DecodeString(parts[2])
+	if err != nil {
+		return nil, err
+	}
+	digest := sha256.Sum256([]byte(parts[0] + "." + parts[1]))
+	if err := rsa.VerifyPKCS1v15(publicKey, crypto.SHA256, digest[:], signature); err != nil {
+		return nil, errors.New("invalid id_token signature")
+	}
+	issuer, _ := claims["iss"].(string)
+	if strings.TrimRight(issuer, "/") != strings.TrimRight(discovery.Issuer, "/") {
+		return nil, errors.New("id_token issuer mismatch")
+	}
+	expectedAudience := strings.TrimSpace(p.Audience)
+	if expectedAudience == "" {
+		expectedAudience = strings.TrimSpace(os.Getenv(p.ClientIDEnv))
+	}
+	if !jwtAudienceContains(claims["aud"], expectedAudience) {
+		return nil, errors.New("id_token audience mismatch")
+	}
+	if strings.TrimSpace(expectedNonce) == "" || claims["nonce"] != expectedNonce {
+		return nil, errors.New("id_token nonce mismatch")
+	}
+	exp, ok := claims["exp"].(float64)
+	if !ok || time.Now().UTC().Unix() >= int64(exp) {
+		return nil, errors.New("id_token is expired")
+	}
+	return claims, nil
+}
+
+func jwtAudienceContains(value any, expected string) bool {
+	if expected == "" {
+		return false
+	}
+	if single, ok := value.(string); ok {
+		return single == expected
+	}
+	if multiple, ok := value.([]any); ok {
+		for _, item := range multiple {
+			if item == expected {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func (p OAuthProvider) FetchUserInfo(ctx context.Context, client *http.Client, accessToken string) (map[string]any, error) {
-	if strings.TrimSpace(p.UserInfoURL) == "" {
+	endpoint := strings.TrimSpace(p.UserInfoURL)
+	if endpoint == "" && strings.TrimSpace(p.IssuerURL) != "" {
+		discovery, err := p.Discover(ctx, client)
+		if err != nil {
+			return nil, err
+		}
+		endpoint = discovery.UserInfoEndpoint
+	}
+	if endpoint == "" {
 		return nil, errors.New("oauth userinfo endpoint is not configured")
 	}
 	if client == nil {
 		client = http.DefaultClient
 	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, p.UserInfoURL, nil)
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -695,6 +992,10 @@ func (p OAuthProvider) FetchUserInfo(ctx context.Context, client *http.Client, a
 }
 
 func (p OAuthProvider) AuthorizationURL(state string, scopes []string) (string, error) {
+	return p.AuthorizationURLWithNonce(state, "", scopes)
+}
+
+func (p OAuthProvider) AuthorizationURLWithNonce(state, nonce string, scopes []string) (string, error) {
 	if err := p.Validate(); err != nil {
 		return "", err
 	}
@@ -706,6 +1007,9 @@ func (p OAuthProvider) AuthorizationURL(state string, scopes []string) (string, 
 	query.Set("client_id", os.Getenv(p.ClientIDEnv))
 	query.Set("response_type", "code")
 	query.Set("state", state)
+	if strings.TrimSpace(nonce) != "" {
+		query.Set("nonce", nonce)
+	}
 	query.Set("scope", strings.Join(scopes, " "))
 	u.RawQuery = query.Encode()
 	return u.String(), nil

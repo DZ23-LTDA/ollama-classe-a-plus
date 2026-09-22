@@ -130,9 +130,10 @@ type ToolDescriptor struct {
 }
 
 type ToolContext struct {
-	MissionID string
-	StepID    string
-	Workspace string
+	MissionID      string
+	StepID         string
+	Workspace      string
+	OrganizationID string
 }
 
 type ToolResult struct {

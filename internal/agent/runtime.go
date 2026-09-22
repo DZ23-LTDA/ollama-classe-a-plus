@@ -176,6 +176,12 @@ func (r *Runtime) Connectors() []ConnectorConfig {
 	return r.connectors.List()
 }
 
+func (r *Runtime) SetAuthStore(store *AuthStore) {
+	if r != nil && r.connectors != nil {
+		r.connectors.SetOAuthStore(store)
+	}
+}
+
 func (r *Runtime) MCPServers() []MCPServerConfig {
 	if r.mcp == nil {
 		return nil
@@ -409,7 +415,7 @@ func (r *Runtime) Run(ctx context.Context, id string) (runErr error) {
 		}
 		_ = r.event(mission, "step.started", step.ID, map[string]any{"tool": step.Kind, "attempt": step.Attempts})
 		toolSpan := r.traces.Start("tr_"+mission.ID, missionSpan.ID(), "tool."+step.Kind, map[string]any{"mission_id": mission.ID, "step_id": step.ID, "tool": step.Kind})
-		result, executeErr := tool.Execute(ctx, ToolContext{MissionID: mission.ID, StepID: step.ID, Workspace: mission.Workspace}, step.Input)
+		result, executeErr := tool.Execute(ctx, ToolContext{MissionID: mission.ID, StepID: step.ID, Workspace: mission.Workspace, OrganizationID: mission.OrganizationID}, step.Input)
 		toolSpan.End("ok", executeErr)
 		if executeErr != nil {
 			if step.Attempts < 2 {

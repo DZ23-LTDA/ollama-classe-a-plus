@@ -21,6 +21,7 @@ require (
 	github.com/agnivade/levenshtein v1.1.1
 	github.com/charmbracelet/bubbletea v1.3.10
 	github.com/charmbracelet/lipgloss v1.1.0
+	github.com/crewjam/saml v0.4.14
 	github.com/emirpasic/gods/v2 v2.0.0-alpha
 	github.com/gorilla/websocket v1.5.3
 	github.com/jackc/pgx/v5 v5.7.0
@@ -43,6 +44,7 @@ require (
 require (
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
+	github.com/beevik/etree v1.1.0 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
 	github.com/bytedance/sonic/loader v0.1.1 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.2 // indirect
@@ -52,23 +54,29 @@ require (
 	github.com/charmbracelet/x/term v0.2.1 // indirect
 	github.com/cloudwego/base64x v0.1.4 // indirect
 	github.com/cloudwego/iasm v0.2.0 // indirect
+	github.com/crewjam/httperr v0.2.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/erikgeiser/coninput v0.0.0-20211004153227-1c3628e74d0f // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
+	github.com/golang-jwt/jwt/v4 v4.4.3 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.1 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/puddle/v2 v2.2.1 // indirect
+	github.com/jonboulle/clockwork v0.2.2 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
+	github.com/mattermost/xml-roundtrip-validator v0.1.0 // indirect
 	github.com/mattn/go-localereader v0.0.2-0.20220822084737-6bae6c923850 // indirect
 	github.com/mattn/go-pointer v0.0.1 // indirect
 	github.com/muesli/ansi v0.0.0-20230316100256-276c6243b2f6 // indirect
 	github.com/muesli/cancelreader v0.2.2 // indirect
 	github.com/muesli/termenv v0.16.0 // indirect
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
+	github.com/russellhaering/goxmldsig v1.3.0 // indirect
 	github.com/tkrajina/go-reflector v0.5.5 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect

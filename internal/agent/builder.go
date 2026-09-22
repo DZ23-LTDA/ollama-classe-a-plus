@@ -28,24 +28,29 @@ const (
 )
 
 type BuilderProject struct {
-	ID            string            `json:"id"`
-	Name          string            `json:"name"`
-	Kind          BuilderKind       `json:"kind"`
-	Entry         string            `json:"entry"`
-	Version       int               `json:"version"`
-	Status        string            `json:"status"`
-	Root          string            `json:"root"`
-	PreviewPath   string            `json:"preview_path,omitempty"`
-	PublishedPath string            `json:"published_path,omitempty"`
-	CreatedAt     time.Time         `json:"created_at"`
-	UpdatedAt     time.Time         `json:"updated_at"`
-	Components    []VisualComponent `json:"components,omitempty"`
+	ID            string              `json:"id"`
+	Name          string              `json:"name"`
+	Kind          BuilderKind         `json:"kind"`
+	Entry         string              `json:"entry"`
+	Version       int                 `json:"version"`
+	Status        string              `json:"status"`
+	Root          string              `json:"root"`
+	PreviewPath   string              `json:"preview_path,omitempty"`
+	PublishedPath string              `json:"published_path,omitempty"`
+	CreatedAt     time.Time           `json:"created_at"`
+	UpdatedAt     time.Time           `json:"updated_at"`
+	Components    []VisualComponent   `json:"components,omitempty"`
+	UndoStack     [][]VisualComponent `json:"undo_stack,omitempty"`
+	RedoStack     [][]VisualComponent `json:"redo_stack,omitempty"`
 }
 
 type VisualComponent struct {
 	ID       string            `json:"id"`
 	Type     string            `json:"type"`
 	Props    map[string]string `json:"props,omitempty"`
+	Style    map[string]string `json:"style,omitempty"`
+	Bindings map[string]string `json:"bindings,omitempty"`
+	Events   map[string]string `json:"events,omitempty"`
 	Children []VisualComponent `json:"children,omitempty"`
 	X        int               `json:"x,omitempty"`
 	Y        int               `json:"y,omitempty"`
@@ -103,6 +108,9 @@ func (b *BuilderService) Create(ctx context.Context, spec BuilderSpec) (BuilderP
 	if len(spec.Components) > 200 {
 		return BuilderProject{}, errors.New("too many visual components")
 	}
+	if err := validateVisualComponents(spec.Components, 0); err != nil {
+		return BuilderProject{}, err
+	}
 	if len(spec.Components) > 0 && len(spec.Files) == 0 {
 		spec.Files = map[string]string{"index.html": renderVisualHTML(name, spec.Components), "visual.json": mustJSON(spec.Components)}
 	}
@@ -147,6 +155,9 @@ func (b *BuilderService) ApplyVisualComponents(ctx context.Context, id string, c
 	if len(components) > 200 {
 		return BuilderProject{}, errors.New("too many visual components")
 	}
+	if err := validateVisualComponents(components, 0); err != nil {
+		return BuilderProject{}, err
+	}
 	project, err := b.Get(id)
 	if err != nil {
 		return BuilderProject{}, err
@@ -158,7 +169,12 @@ func (b *BuilderService) ApplyVisualComponents(ctx context.Context, id string, c
 	if err := os.WriteFile(filepath.Join(project.Root, "visual.json"), []byte(mustJSON(components)), 0o600); err != nil {
 		return BuilderProject{}, err
 	}
-	project.Components = components
+	project.UndoStack = append(project.UndoStack, cloneComponents(project.Components))
+	if len(project.UndoStack) > 50 {
+		project.UndoStack = project.UndoStack[len(project.UndoStack)-50:]
+	}
+	project.RedoStack = nil
+	project.Components = cloneComponents(components)
 	project.Version++
 	project.Status = "draft"
 	project.UpdatedAt = time.Now().UTC()
@@ -167,6 +183,68 @@ func (b *BuilderService) ApplyVisualComponents(ctx context.Context, id string, c
 	err = b.persistLocked()
 	b.mu.Unlock()
 	return project, err
+}
+
+func (b *BuilderService) Undo(ctx context.Context, id string) (BuilderProject, error) {
+	if err := ctx.Err(); err != nil {
+		return BuilderProject{}, err
+	}
+	project, err := b.Get(id)
+	if err != nil {
+		return BuilderProject{}, err
+	}
+	if len(project.UndoStack) == 0 {
+		return project, errors.New("builder has no undo history")
+	}
+	previous := cloneComponents(project.UndoStack[len(project.UndoStack)-1])
+	project.UndoStack = project.UndoStack[:len(project.UndoStack)-1]
+	project.RedoStack = append(project.RedoStack, cloneComponents(project.Components))
+	project.Components = previous
+	if err := b.writeVisualProject(project); err != nil {
+		return BuilderProject{}, err
+	}
+	project.Version++
+	project.UpdatedAt = time.Now().UTC()
+	b.mu.Lock()
+	b.projects[id] = project
+	err = b.persistLocked()
+	b.mu.Unlock()
+	return project, err
+}
+
+func (b *BuilderService) Redo(ctx context.Context, id string) (BuilderProject, error) {
+	if err := ctx.Err(); err != nil {
+		return BuilderProject{}, err
+	}
+	project, err := b.Get(id)
+	if err != nil {
+		return BuilderProject{}, err
+	}
+	if len(project.RedoStack) == 0 {
+		return project, errors.New("builder has no redo history")
+	}
+	next := cloneComponents(project.RedoStack[len(project.RedoStack)-1])
+	project.RedoStack = project.RedoStack[:len(project.RedoStack)-1]
+	project.UndoStack = append(project.UndoStack, cloneComponents(project.Components))
+	project.Components = next
+	if err := b.writeVisualProject(project); err != nil {
+		return BuilderProject{}, err
+	}
+	project.Version++
+	project.UpdatedAt = time.Now().UTC()
+	b.mu.Lock()
+	b.projects[id] = project
+	err = b.persistLocked()
+	b.mu.Unlock()
+	return project, err
+}
+
+func (b *BuilderService) writeVisualProject(project BuilderProject) error {
+	indexPath := filepath.Join(project.Root, filepath.FromSlash(project.Entry))
+	if err := os.WriteFile(indexPath, []byte(renderVisualHTML(project.Name, project.Components)), 0o600); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(project.Root, "visual.json"), []byte(mustJSON(project.Components)), 0o600)
 }
 
 func (b *BuilderService) Get(id string) (BuilderProject, error) {
@@ -337,6 +415,51 @@ func mustJSON(value any) string {
 func renderVisualHTML(name string, components []VisualComponent) string {
 	data := mustJSON(components)
 	return "<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>" + htmlEscape(name) + "</title><style>body{font-family:system-ui;margin:0;padding:24px} [data-dz23-component]{border:1px dashed #bbb;padding:12px;margin:8px;border-radius:8px}</style></head><body><main id=\"dz23-canvas\"></main><script type=\"application/json\" id=\"dz23-visual\">" + scriptEscape(data) + "</script><script>const tree=JSON.parse(document.querySelector('#dz23-visual').textContent); const render=(nodes,parent)=>nodes.forEach(n=>{const el=document.createElement('section');el.dataset.dz23Component=n.type;el.textContent=(n.props&&n.props.text)||n.type;Object.assign(el.style,{position:n.x||n.y?'absolute':'static',left:(n.x||0)+'px',top:(n.y||0)+'px',width:n.width?(n.width+'px'):'auto',height:n.height?(n.height+'px'):'auto'});parent.appendChild(el);render(n.children||[],el)});render(tree,document.querySelector('#dz23-canvas'));</script></body></html>"
+}
+
+func validateVisualComponents(components []VisualComponent, depth int) error {
+	if depth > 12 {
+		return errors.New("visual component tree is too deep")
+	}
+	for _, component := range components {
+		if strings.TrimSpace(component.ID) == "" || strings.TrimSpace(component.Type) == "" {
+			return errors.New("visual components require id and type")
+		}
+		if len(component.Props)+len(component.Style)+len(component.Bindings)+len(component.Events) > 100 {
+			return fmt.Errorf("visual component %q has too many properties", component.ID)
+		}
+		if err := validateVisualComponents(component.Children, depth+1); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func cloneComponents(input []VisualComponent) []VisualComponent {
+	if input == nil {
+		return nil
+	}
+	output := make([]VisualComponent, len(input))
+	for index, component := range input {
+		output[index] = component
+		output[index].Props = cloneStringMap(component.Props)
+		output[index].Style = cloneStringMap(component.Style)
+		output[index].Bindings = cloneStringMap(component.Bindings)
+		output[index].Events = cloneStringMap(component.Events)
+		output[index].Children = cloneComponents(component.Children)
+	}
+	return output
+}
+
+func cloneStringMap(input map[string]string) map[string]string {
+	if input == nil {
+		return nil
+	}
+	output := make(map[string]string, len(input))
+	for key, value := range input {
+		output[key] = value
+	}
+	return output
 }
 
 func htmlEscape(value string) string {

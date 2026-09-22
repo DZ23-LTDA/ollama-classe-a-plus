@@ -163,3 +163,28 @@ remaining:
   - real PostgreSQL/Redis/OTLP integration tests, certificate rotation, RLS, remote push, physical devices, public deploy adapters, OCR/model providers and signed releases
 next_action: proceed to the production-adapter phase only after external credentials, certificates and test infrastructure are available.
 ```
+
+
+## Fechamento da fase 7 — 2026-09-21
+
+```yaml
+state: CANDIDATE_COMPLETED
+features:
+  - saml_sp: crewjam metadata validation, signed AuthnRequest, one-time RelayState, ACS claims and tenant provisioning
+  - oauth_connectors: tenant-aware encrypted credential resolution for connector.http
+  - builder_history: rich component fields, validation, persistent undo/redo and API endpoints
+  - postgres_rls: FORCE ROW LEVEL SECURITY and tenant policies excluding blank organization records
+  - companion_tls: TLS 1.3/mTLS listener configuration with per-handshake certificate reload
+proofs:
+  - CGO_ENABLED=0 go test ./internal/agent -count=1: PASS
+  - CGO_ENABLED=1 go test ./server ./cmd/launch ./internal/multillm -count=1: PASS
+  - CGO_ENABLED=1 go build -o ollama-dz23-phase7-bin .: PASS
+  - apps/mobile-agentic npm ci && npm run typecheck: PASS
+  - JSON manifests and git diff --check: PASS
+remaining_external:
+  - SAML end-to-end IdP and certificate fixtures
+  - real PostgreSQL/Redis/OTLP execution outside CI and production RLS migration review
+  - physical companion/mobile tests, push credentials, signed installers, app-store distribution and public cloud deploy credentials
+  - full editorial exporters, CRDT collaboration, local generative media models and complete hosting adapters
+next_action: commit phase 7, create reproducible archive, then continue with deploy adapters and physical/infrastructure gates without publishing main.
+```

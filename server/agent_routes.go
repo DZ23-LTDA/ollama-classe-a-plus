@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -27,6 +28,8 @@ type agentAPI struct {
 	auth         *agent.AuthStore
 	authRequired bool
 	push         *agent.PushService
+	samlMu       sync.Mutex
+	samlServices map[string]*agent.SAMLService
 }
 
 func newAgentAPI(runtime *agent.Runtime) (*agentAPI, error) {
@@ -35,8 +38,9 @@ func newAgentAPI(runtime *agent.Runtime) (*agentAPI, error) {
 	if err != nil {
 		return nil, err
 	}
+	runtime.SetAuthStore(auth)
 	required, _ := strconv.ParseBool(strings.TrimSpace(os.Getenv("OLLAMA_AGENT_AUTH_REQUIRED")))
-	return &agentAPI{runtime: runtime, context: runtime.Context(), auth: auth, authRequired: required, push: runtime.Push()}, nil
+	return &agentAPI{runtime: runtime, context: runtime.Context(), auth: auth, authRequired: required, push: runtime.Push(), samlServices: map[string]*agent.SAMLService{}}, nil
 }
 
 func newDefaultAgentRuntime() (*agent.Runtime, error) {
@@ -178,8 +182,12 @@ func (a *agentAPI) register(r *gin.Engine) {
 	group.POST("/auth/dev/token", a.devToken)
 	group.POST("/auth/mfa/enable", a.enableMFA)
 	group.POST("/auth/mfa/disable", a.disableMFA)
+	group.POST("/auth/mfa/recovery/generate", a.generateRecoveryCodes)
 	group.GET("/auth/oauth/:provider/start", a.oauthStart)
 	group.GET("/auth/oauth/:provider/callback", a.oauthCallback)
+	group.GET("/auth/saml/:provider/start", a.samlStart)
+	group.GET("/auth/saml/:provider/metadata", a.samlMetadata)
+	group.POST("/auth/saml/:provider/acs", a.samlACS)
 	group.POST("/notifications/register", a.registerPush)
 	group.GET("/traces", a.allTraces)
 	group.POST("/media/image", a.mediaImage)
@@ -204,6 +212,8 @@ func (a *agentAPI) register(r *gin.Engine) {
 	group.GET("/builders", a.builders)
 	group.POST("/builders", a.createBuilder)
 	group.POST("/builders/:id/visual", a.updateBuilderVisual)
+	group.POST("/builders/:id/undo", a.undoBuilder)
+	group.POST("/builders/:id/redo", a.redoBuilder)
 	group.POST("/builders/:id/preview", a.previewBuilder)
 	group.POST("/builders/:id/export", a.exportBuilder)
 	group.POST("/builders/:id/export/:format", a.exportProfessionalBuilder)
@@ -247,7 +257,7 @@ func (a *agentAPI) authMiddleware(c *gin.Context) {
 		c.Next()
 		return
 	}
-	if (strings.HasSuffix(c.Request.URL.Path, "/auth/oauth/") || strings.Contains(c.Request.URL.Path, "/auth/oauth/")) && strings.EqualFold(strings.TrimSpace(os.Getenv("OLLAMA_AGENT_AUTH_SSO_PUBLIC")), "true") {
+	if (strings.Contains(c.Request.URL.Path, "/auth/oauth/") || strings.Contains(c.Request.URL.Path, "/auth/saml/")) && strings.EqualFold(strings.TrimSpace(os.Getenv("OLLAMA_AGENT_AUTH_SSO_PUBLIC")), "true") {
 		c.Next()
 		return
 	}
@@ -270,7 +280,15 @@ func (a *agentAPI) authMiddleware(c *gin.Context) {
 		return
 	}
 	if user.MFAEnabled {
-		if err := a.auth.VerifyMFA(user.ID, c.GetHeader("X-Ollama-MFA-Code"), time.Now().UTC()); err != nil {
+		mfaCode := strings.TrimSpace(c.GetHeader("X-Ollama-MFA-Code"))
+		recoveryCode := strings.TrimSpace(c.GetHeader("X-Ollama-MFA-Recovery-Code"))
+		var mfaErr error
+		if recoveryCode != "" {
+			mfaErr = a.auth.VerifyRecoveryCode(user.ID, recoveryCode)
+		} else {
+			mfaErr = a.auth.VerifyMFA(user.ID, mfaCode, time.Now().UTC())
+		}
+		if mfaErr != nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "mfa verification required"})
 			return
 		}
@@ -387,6 +405,21 @@ func (a *agentAPI) disableMFA(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"enabled": updated.MFAEnabled})
 }
 
+func (a *agentAPI) generateRecoveryCodes(c *gin.Context) {
+	value, ok := c.Get("agent.user")
+	user, userOK := value.(agent.User)
+	if !ok || !userOK {
+		writeAgentError(c, http.StatusUnauthorized, errors.New("authenticated user is required"))
+		return
+	}
+	updated, codes, err := a.auth.GenerateRecoveryCodes(user.ID)
+	if err != nil {
+		writeAgentError(c, http.StatusBadRequest, err)
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"user": updated.Public(), "recovery_codes": codes, "warning": "store these codes securely; they are shown only once"})
+}
+
 func (a *agentAPI) registerPush(c *gin.Context) {
 	if a.push == nil {
 		c.JSON(http.StatusNotImplemented, gin.H{"error": "push service is not configured"})
@@ -451,12 +484,68 @@ func (a *agentAPI) devToken(c *gin.Context) {
 
 func oauthProviderFromEnv(name string) agent.OAuthProvider {
 	key := strings.ToUpper(strings.NewReplacer("-", "_", " ", "_").Replace(strings.TrimSpace(name)))
-	return agent.OAuthProvider{Name: name, AuthorizeURL: os.Getenv("OLLAMA_AGENT_OAUTH_" + key + "_AUTHORIZE_URL"), TokenURL: os.Getenv("OLLAMA_AGENT_OAUTH_" + key + "_TOKEN_URL"), UserInfoURL: os.Getenv("OLLAMA_AGENT_OAUTH_" + key + "_USERINFO_URL"), ClientIDEnv: os.Getenv("OLLAMA_AGENT_OAUTH_" + key + "_CLIENT_ID_ENV"), SecretEnv: os.Getenv("OLLAMA_AGENT_OAUTH_" + key + "_CLIENT_SECRET_ENV")}
+	prefix := "OLLAMA_AGENT_OAUTH_" + key
+	return agent.OAuthProvider{Name: name, AuthorizeURL: os.Getenv(prefix + "_AUTHORIZE_URL"), TokenURL: os.Getenv(prefix + "_TOKEN_URL"), UserInfoURL: os.Getenv(prefix + "_USERINFO_URL"), IssuerURL: os.Getenv(prefix + "_ISSUER_URL"), Audience: os.Getenv(prefix + "_AUDIENCE"), ClientIDEnv: os.Getenv(prefix + "_CLIENT_ID_ENV"), SecretEnv: os.Getenv(prefix + "_CLIENT_SECRET_ENV")}
+}
+
+func prepareOIDCProvider(ctx context.Context, provider agent.OAuthProvider) (agent.OAuthProvider, error) {
+	if strings.TrimSpace(provider.IssuerURL) == "" {
+		return provider, provider.Validate()
+	}
+	discovery, err := provider.Discover(ctx, http.DefaultClient)
+	if err != nil {
+		return agent.OAuthProvider{}, err
+	}
+	if provider.AuthorizeURL == "" {
+		provider.AuthorizeURL = discovery.AuthorizationEndpoint
+	}
+	if provider.TokenURL == "" {
+		provider.TokenURL = discovery.TokenEndpoint
+	}
+	if provider.UserInfoURL == "" {
+		provider.UserInfoURL = discovery.UserInfoEndpoint
+	}
+	return provider, provider.Validate()
+}
+
+func samlProviderFromEnv(name string) agent.SAMLProviderConfig {
+	key := strings.ToUpper(strings.NewReplacer("-", "_", " ", "_").Replace(strings.TrimSpace(name)))
+	prefix := "OLLAMA_AGENT_SAML_" + key
+	return agent.SAMLProviderConfig{
+		Name:               name,
+		EntityID:           os.Getenv(prefix + "_ENTITY_ID"),
+		IDPMetadataURL:     os.Getenv(prefix + "_IDP_METADATA_URL"),
+		MetadataURL:        os.Getenv(prefix + "_METADATA_URL"),
+		ACSURL:             os.Getenv(prefix + "_ACS_URL"),
+		SPPrivateKeyFile:   os.Getenv(prefix + "_SP_PRIVATE_KEY_FILE"),
+		SPCertificateFile:  os.Getenv(prefix + "_SP_CERTIFICATE_FILE"),
+		DefaultRedirectURI: os.Getenv(prefix + "_DEFAULT_REDIRECT_URI"),
+		AllowIDPInitiated:  strings.EqualFold(os.Getenv(prefix+"_ALLOW_IDP_INITIATED"), "true"),
+	}
+}
+
+func loadSAMLService(ctx context.Context, name string) (*agent.SAMLService, error) {
+	config := samlProviderFromEnv(name)
+	return agent.NewSAMLService(ctx, config, http.DefaultClient)
+}
+
+func (a *agentAPI) samlService(ctx context.Context, name string) (*agent.SAMLService, error) {
+	a.samlMu.Lock()
+	defer a.samlMu.Unlock()
+	if service, ok := a.samlServices[name]; ok {
+		return service, nil
+	}
+	service, err := loadSAMLService(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+	a.samlServices[name] = service
+	return service, nil
 }
 
 func (a *agentAPI) oauthStart(c *gin.Context) {
-	provider := oauthProviderFromEnv(c.Param("provider"))
-	if err := provider.Validate(); err != nil {
+	provider, err := prepareOIDCProvider(c.Request.Context(), oauthProviderFromEnv(c.Param("provider")))
+	if err != nil {
 		writeAgentError(c, http.StatusBadRequest, err)
 		return
 	}
@@ -472,7 +561,8 @@ func (a *agentAPI) oauthStart(c *gin.Context) {
 			userID = user.ID
 		}
 	}
-	state, _, err := a.auth.CreateOAuthState(provider.Name, redirectURI, verifier, userID, 5*time.Minute)
+	nonce := fmt.Sprintf("%x", sha256.Sum256([]byte(provider.Name+"|"+redirectURI+"|"+verifier+"|"+time.Now().UTC().String())))
+	state, _, err := a.auth.CreateOAuthStateWithNonce(provider.Name, redirectURI, verifier, nonce, userID, 5*time.Minute)
 	if err != nil {
 		writeAgentError(c, http.StatusBadRequest, err)
 		return
@@ -481,7 +571,7 @@ func (a *agentAPI) oauthStart(c *gin.Context) {
 	if len(scopes) == 0 {
 		scopes = []string{"openid", "email"}
 	}
-	authorizationURL, err := provider.AuthorizationURL(state, scopes)
+	authorizationURL, err := provider.AuthorizationURLWithNonce(state, nonce, scopes)
 	if err != nil {
 		writeAgentError(c, http.StatusBadRequest, err)
 		return
@@ -490,7 +580,11 @@ func (a *agentAPI) oauthStart(c *gin.Context) {
 }
 
 func (a *agentAPI) oauthCallback(c *gin.Context) {
-	provider := oauthProviderFromEnv(c.Param("provider"))
+	provider, err := prepareOIDCProvider(c.Request.Context(), oauthProviderFromEnv(c.Param("provider")))
+	if err != nil {
+		writeAgentError(c, http.StatusBadRequest, err)
+		return
+	}
 	redirectURI := strings.TrimSpace(c.Query("redirect_uri"))
 	code := strings.TrimSpace(c.Query("code"))
 	stateValue := strings.TrimSpace(c.Query("state"))
@@ -508,8 +602,21 @@ func (a *agentAPI) oauthCallback(c *gin.Context) {
 		writeAgentError(c, http.StatusBadGateway, err)
 		return
 	}
+	if provider.IssuerURL != "" {
+		idToken, _ := payload["id_token"].(string)
+		if idToken == "" {
+			writeAgentError(c, http.StatusBadGateway, errors.New("oidc token response has no id_token"))
+			return
+		}
+		claims, validationErr := provider.ValidateIDToken(c.Request.Context(), http.DefaultClient, idToken, state.Nonce)
+		if validationErr != nil {
+			writeAgentError(c, http.StatusBadGateway, validationErr)
+			return
+		}
+		payload["id_token_claims"] = claims
+	}
 	userID := state.UserID
-	if userID == "" && provider.UserInfoURL != "" {
+	if userID == "" && (provider.UserInfoURL != "" || provider.IssuerURL != "") {
 		accessToken, _ := payload["access_token"].(string)
 		userinfo, userinfoErr := provider.FetchUserInfo(c.Request.Context(), http.DefaultClient, accessToken)
 		if userinfoErr != nil {
@@ -542,6 +649,53 @@ func (a *agentAPI) oauthCallback(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"access_token": localToken, "token": session, "credential_id": credential.ID, "provider": provider.Name, "organization": organization, "expires_at": credential.ExpiresAt})
+}
+
+func (a *agentAPI) samlStart(c *gin.Context) {
+	service, err := a.samlService(c.Request.Context(), c.Param("provider"))
+	if err != nil {
+		writeAgentError(c, http.StatusBadRequest, err)
+		return
+	}
+	redirect, relay, err := service.Start(c.Query("redirect_uri"))
+	if err != nil {
+		writeAgentError(c, http.StatusBadRequest, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"provider": service.Provider.Name, "authorization_url": redirect, "relay_state": relay, "expires_in": 300})
+}
+
+func (a *agentAPI) samlMetadata(c *gin.Context) {
+	service, err := a.samlService(c.Request.Context(), c.Param("provider"))
+	if err != nil {
+		writeAgentError(c, http.StatusBadRequest, err)
+		return
+	}
+	service.Metadata(c.Writer, c.Request)
+}
+
+func (a *agentAPI) samlACS(c *gin.Context) {
+	service, err := a.samlService(c.Request.Context(), c.Param("provider"))
+	if err != nil {
+		writeAgentError(c, http.StatusBadRequest, err)
+		return
+	}
+	claims, err := service.ParseACS(c.Request)
+	if err != nil {
+		writeAgentError(c, http.StatusUnauthorized, err)
+		return
+	}
+	user, organization, _, err := a.auth.ProvisionOAuthUser(claims, service.Provider.Name)
+	if err != nil {
+		writeAgentError(c, http.StatusBadRequest, err)
+		return
+	}
+	localToken, session, err := a.auth.IssueToken(user.ID, organization.ID, 24*time.Hour)
+	if err != nil {
+		writeAgentError(c, http.StatusInternalServerError, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"access_token": localToken, "token": session, "provider": service.Provider.Name, "organization": organization, "user": user.Public()})
 }
 
 func (a *agentAPI) metrics(c *gin.Context) {
@@ -1256,6 +1410,24 @@ func (a *agentAPI) updateBuilderVisual(c *gin.Context) {
 		return
 	}
 	project, err := a.runtime.Builder().ApplyVisualComponents(c.Request.Context(), c.Param("id"), request.Components)
+	if err != nil {
+		writeAgentError(c, statusForAgentError(err), err)
+		return
+	}
+	c.JSON(http.StatusOK, project)
+}
+
+func (a *agentAPI) undoBuilder(c *gin.Context) {
+	project, err := a.runtime.Builder().Undo(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		writeAgentError(c, statusForAgentError(err), err)
+		return
+	}
+	c.JSON(http.StatusOK, project)
+}
+
+func (a *agentAPI) redoBuilder(c *gin.Context) {
+	project, err := a.runtime.Builder().Redo(c.Request.Context(), c.Param("id"))
 	if err != nil {
 		writeAgentError(c, statusForAgentError(err), err)
 		return

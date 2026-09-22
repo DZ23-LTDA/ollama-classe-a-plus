@@ -2,7 +2,7 @@
 
 ## Conectores HTTP
 
-O runtime aceita um arquivo JSON apontado por `OLLAMA_AGENT_CONNECTORS`. O arquivo contém apenas metadados, URLs HTTPS, operações permitidas e o nome da variável de ambiente que contém o token. O valor do token nunca entra no repositório, missão, memória, evento ou resposta de capabilities.
+O runtime aceita um arquivo JSON apontado por `OLLAMA_AGENT_CONNECTORS`. O arquivo contém apenas metadados, URLs HTTPS, operações permitidas e o nome da variável de ambiente que contém o token. Para tenants autenticados, uma operação pode declarar `oauth_provider` e o runtime resolve o access token cifrado da organização; nesse modo o token não é aceito pelo input da tool. O valor do token nunca entra no repositório, missão, memória, evento ou resposta de capabilities.
 
 ```bash
 export OLLAMA_AGENT_CONNECTORS=/etc/ollama-dz23/agent-connectors.json
@@ -15,7 +15,11 @@ export DZ23_WHATSAPP_TOKEN='...'
 
 O exemplo [agent-connectors.json](../../examples/agent-connectors.json) cobre GitHub, Google Workspace, Slack, Discord e WhatsApp Cloud. Cada chamada exige uma operação declarada, método permitido e prefixo de caminho permitido. Redirects são desativados, o timeout é limitado e a resposta é limitada a 2 MiB. Operações de escrita são tools de efeito externo e exigem approval do runtime.
 
-O fluxo de autenticação OAuth, renovação de refresh token e consentimento por usuário/organização deve ser adicionado à superfície de configuração antes de uso multiusuário. Tokens pessoais podem ser usados localmente apenas para desenvolvimento.
+O fluxo de autenticação OAuth usa PKCE, state one-time, armazenamento AES-GCM e refresh server-side. Configure os endpoints do provider e `OLLAMA_AGENT_CREDENTIAL_KEY` fora do repositório. Tokens pessoais por `token_env` continuam disponíveis apenas para desenvolvimento ou conectores explicitamente não multiusuário.
+
+## SAML enterprise
+
+O SP SAML é configurado por `OLLAMA_AGENT_SAML_<PROVIDER>_IDP_METADATA_URL`, `_METADATA_URL`, `_ACS_URL`, `_ENTITY_ID`, `_SP_PRIVATE_KEY_FILE`, `_SP_CERTIFICATE_FILE` e `_DEFAULT_REDIRECT_URI`. O metadata do IdP é validado pelo pacote `crewjam/saml`; o runtime assina AuthnRequests, usa RelayState one-time e valida o ACS antes de provisionar usuário e organização. O fluxo de primeiro login só fica público com `OLLAMA_AGENT_AUTH_SSO_PUBLIC=true`. Certificados, chaves e URLs devem ser provisionados pelo operador, e o teste ponta a ponta depende de um IdP real.
 
 ## MCP stdio
 
@@ -47,6 +51,6 @@ Para traces distribuídos, defina `OLLAMA_AGENT_OTLP_ENDPOINT` com uma URL HTTPS
 
 ## Companion WebSocket e mTLS
 
-O endpoint `GET /api/agent/v1/devices/:id/connect` aceita WebSocket somente sobre TLS, salvo `OLLAMA_AGENT_ALLOW_INSECURE_COMPANION=1` para loopback local. O primeiro frame precisa ser `hello` com `device_id`, `token` e capabilities. Quando `OLLAMA_AGENT_REQUIRE_MTLS=1`, o handshake também precisa apresentar certificado de cliente na conexão TLS. `OLLAMA_AGENT_COMPANION_ORIGINS` limita Origins explícitas; a lista não deve ser `*` em produção.
+O endpoint `GET /api/agent/v1/devices/:id/connect` aceita WebSocket somente sobre TLS, salvo `OLLAMA_AGENT_ALLOW_INSECURE_COMPANION=1` para loopback local. `OLLAMA_AGENT_TLS_CERT_FILE` e `OLLAMA_AGENT_TLS_KEY_FILE` ativam TLS 1.3 no listener e recarregam o certificado por handshake; `OLLAMA_AGENT_REQUIRE_MTLS=1` exige também `OLLAMA_AGENT_TLS_CLIENT_CA_FILE`. O primeiro frame precisa ser `hello` com `device_id`, `token` e capabilities. `OLLAMA_AGENT_COMPANION_ORIGINS` limita Origins explícitas; a lista não deve ser `*` em produção.
 
 O protocolo inicial é `dz23-companion.v1` e suporta `hello`, `heartbeat`, `ping` e respostas de rejeição para tipos ainda não habilitados. A camada de transporte não executa comandos arbitrários: ações de tela, teclado, processos e arquivos continuam sujeitas ao registry de tools, scopes e approvals do runtime.

@@ -53,3 +53,8 @@ Foi implementado um AgentOrchestrator com sete papéis especializados, concorrê
 ## Incremento 2026-09-21 — Infraestrutura distribuída e transporte seguro
 
 A fase adicionou adapters opcionais de PostgreSQL, Redis e OpenTelemetry, WebSocket de companion com TLS/mTLS policy, stack Docker Compose de desenvolvimento, workflow de qualidade/SBOM e fila offline no mobile. A próxima etapa de produção deve validar Redis/PostgreSQL reais em CI, configurar RLS/tenant isolation, rotação mTLS, push remoto, resolução de conflitos mobile, exporters persistentes e assinatura/rollback das releases.
+
+
+## Incremento 2026-09-21 — SSO enterprise, credenciais por tenant e histórico visual
+
+A fase adicionou adapter SAML baseado em `crewjam/saml`, incluindo metadata, AuthnRequest assinado, RelayState one-time, ACS e provisionamento de claims; conectores com resolução de access token OAuth cifrado por organização; RLS PostgreSQL forçado para impedir bypass pelo dono da tabela; TLS 1.3/mTLS opcional com recarga de certificado por handshake; e canvas visual com bindings, eventos, histórico persistente, undo e redo. Permanecem pendentes os testes ponta a ponta com IdP, serviços distribuídos reais fora do CI, providers multimídia/deploy, testes físicos de companions e distribuição assinada.

@@ -118,6 +118,16 @@ curl -sS -X POST http://localhost:11434/api/agent/v1/webhooks/SCHEDULE_ID \
 
 Com `OLLAMA_AGENT_AUTH_REQUIRED=true`, a API valida sessão, organização e RBAC antes de permitir ações. O fluxo `GET /auth/oauth/:provider/start` exige `redirect_uri` e `code_verifier` PKCE; o callback consome `state` uma única vez, troca o código no servidor e cifra access/refresh tokens com AES-GCM usando `OLLAMA_AGENT_CREDENTIAL_KEY`. Configure URLs e nomes das variáveis de segredo por provider sem colocar valores no repositório.
 
+### SAML enterprise
+
+`GET /auth/saml/:provider/start` cria AuthnRequest assinado e retorna `authorization_url` e RelayState one-time. `GET /auth/saml/:provider/metadata` publica o metadata do SP. `POST /auth/saml/:provider/acs` valida assinatura, audiência, destination, condições e `InResponseTo` pelo adapter `crewjam/saml`, extrai claims e cria sessão local tenant-aware. O fluxo exige `OLLAMA_AGENT_AUTH_SSO_PUBLIC=true` quando usado como primeiro login público.
+
+As variáveis são `OLLAMA_AGENT_SAML_<PROVIDER>_IDP_METADATA_URL`, `_METADATA_URL`, `_ACS_URL`, `_SP_PRIVATE_KEY_FILE`, `_SP_CERTIFICATE_FILE`, `_ENTITY_ID` e `_DEFAULT_REDIRECT_URI`. URLs de metadata, SP e ACS devem ser HTTPS; certificados e chaves devem ser montados fora do repositório.
+
+### TLS, mTLS e RLS
+
+`OLLAMA_AGENT_TLS_CERT_FILE` e `OLLAMA_AGENT_TLS_KEY_FILE` ativam TLS 1.3 para o listener. `OLLAMA_AGENT_REQUIRE_MTLS=1` exige também `OLLAMA_AGENT_TLS_CLIENT_CA_FILE` e valida certificado de cliente. O certificado do servidor é recarregado a cada handshake, permitindo rotação sem reiniciar o processo. Quando o store PostgreSQL é usado, `FORCE ROW LEVEL SECURITY` e o contexto transacional `app.current_organization_id` impedem acesso entre organizações, inclusive para o dono da tabela.
+
 ## Mídia
 
 Com um provider HTTPS compatível, use `POST /media/image`, `/media/video`, `/media/speech` e `/media/transcribe`, sempre com `mission_id`; os resultados são salvos em `.agent-media` e devolvem manifesto com hash. `POST /media/tone` gera um WAV determinístico local para smoke tests e não deve ser confundido com geração musical neural.
@@ -125,6 +135,8 @@ Com um provider HTTPS compatível, use `POST /media/image`, `/media/video`, `/me
 ## Builders e preview
 
 `POST /builders` cria `website`, `app`, `game`, `slides` ou `dashboard` a partir de arquivos controlados ou template. `POST /builders/:id/preview` valida a entrada e retorna manifesto; `GET /builders/:id/preview/*path` serve preview local com containment; `POST /builders/:id/export` cria ZIP; `POST /builders/:id/publish` publica uma cópia versionada localmente. Deploy público exige um adapter de hosting configurado e não é alegado por essa publicação local.
+
+`POST /builders/:id/visual` atualiza componentes, bindings, estilos e eventos do canvas. `POST /builders/:id/undo` e `POST /builders/:id/redo` alteram o histórico persistido, incrementam a versão e regeneram o preview. O histórico é limitado às últimas 50 alterações para impedir crescimento sem limite.
 
 ## Colaboração
 

@@ -83,3 +83,33 @@ func TestBuilderVisualCanvasPersistsAndRenders(t *testing.T) {
 		t.Fatalf("visual preview invalid: err=%v", err)
 	}
 }
+
+func TestBuilderVisualUndoRedo(t *testing.T) {
+	root := t.TempDir()
+	service, err := NewBuilderService(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	project, err := service.Create(context.Background(), BuilderSpec{Name: "History", Kind: BuilderWebsite, Components: []VisualComponent{{ID: "one", Type: "text"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.ApplyVisualComponents(context.Background(), project.ID, []VisualComponent{{ID: "two", Type: "button"}}); err != nil {
+		t.Fatal(err)
+	}
+	undone, err := service.Undo(context.Background(), project.ID)
+	if err != nil || undone.Components[0].ID != "one" {
+		t.Fatalf("undo=%+v err=%v", undone, err)
+	}
+	redone, err := service.Redo(context.Background(), project.ID)
+	if err != nil || redone.Components[0].ID != "two" {
+		t.Fatalf("redo=%+v err=%v", redone, err)
+	}
+	reloaded, err := NewBuilderService(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, err := reloaded.Get(project.ID); err != nil || got.Components[0].ID != "two" {
+		t.Fatalf("reloaded=%+v err=%v", got, err)
+	}
+}

@@ -2,6 +2,7 @@ package agent
 
 import (
 	"encoding/base32"
+	"os"
 	"testing"
 	"time"
 )
@@ -124,5 +125,46 @@ func TestAuthStoreMFAUsesTOTPAndPersistsEncryptedSecret(t *testing.T) {
 	}
 	if err := store.VerifyMFA(user.ID, "000000", now); err == nil {
 		t.Fatal("invalid MFA code accepted")
+	}
+}
+
+func TestRecoveryCodesAreOneTimeAndEncrypted(t *testing.T) {
+	t.Setenv("OLLAMA_AGENT_CREDENTIAL_KEY", "recovery-test-key-long-enough")
+	root := t.TempDir()
+	store, err := NewAuthStore(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	user, err := store.CreateUser("recovery@example.com", "Recovery User")
+	if err != nil {
+		t.Fatal(err)
+	}
+	secret := base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString([]byte("0123456789012345"))
+	if _, err := store.EnableMFA(user.ID, secret); err != nil {
+		t.Fatal(err)
+	}
+	_, codes, err := store.GenerateRecoveryCodes(user.ID)
+	if err != nil || len(codes) != 10 {
+		t.Fatalf("generate recovery codes = %v, count=%d", err, len(codes))
+	}
+	if err := store.VerifyRecoveryCode(user.ID, codes[0]); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.VerifyRecoveryCode(user.ID, codes[0]); err == nil {
+		t.Fatal("recovery code was reusable")
+	}
+	reloaded, err := NewAuthStore(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := reloaded.VerifyRecoveryCode(user.ID, codes[1]); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(root + "/users.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) == "" || string(data) == codes[0] {
+		t.Fatal("recovery data was not persisted as a structured record")
 	}
 }
