@@ -141,3 +141,8 @@ O transporte Remote MCP desabilita proxy ambiental, limita redirects ao mesmo or
 ## Slice P0 validada — MCP stdio lifecycle — 2026-09-22
 
 MCP stdio agora aplica allowlist de executável absoluto não-symlink, cwd privado, ambiente mínimo, limites de payload e stderr, redaction e encerramento seguro de grupo com restart após cancelamento. Os testes negativos cobrem symlink, comando relativo, cleanup, timeout e payload excedente. A auditoria não considera isso sandbox forte: seccomp, cgroups, rlimits, PID/memória/CPU e validação em plataformas reais permanecem abertos.
+
+
+## Slice P0 validada — Media egress/download — 2026-09-22
+
+Downloads remotos de mídia passaram a bloquear redirects, proxy ambiental e destinos privados efetivamente conectados; respostas são bounded e só viram artefato após MIME/magic validation. Regressões cobrem redirect, MIME incompatível, magic inválido, overflow e IP privado. A paridade de egress para upload/Connectors, assim como testes distribuídos de DNS/TLS, ainda permanece aberta.

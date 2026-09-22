@@ -992,3 +992,31 @@ proofs: integrity, Go tests/vet/build, UI Vitest/build, mobile typecheck and MCP
 classification: preview/local RC; stdio containment best-effort, not strong sandbox
 next_slice: Media/Connector egress parity or platform sandbox primitives; no main merge
 ```
+
+
+## Slice P0 Media egress/download validada — aguardando publicação — 2026-09-22
+
+```yaml
+state: RELEASING
+iteration: 13
+base_commit: dbc325b5
+working_tree: Media egress changes/tests/docs still uncommitted
+implemented:
+  - media proxy disabled and redirects rejected
+  - actual connected IP private-range rejection
+  - bounded response reads with overflow detection
+  - MIME and magic validation for PNG/JPEG/WebP/MP4/WAV
+  - loopback HTTP allowed only for explicit local providers
+proofs:
+  - focused Media tests: PASS
+  - integrity guard: PASS
+  - CGO_ENABLED=1 go test ./... -count=1: PASS
+  - CGO_ENABLED=1 go vet ./...: PASS
+  - CGO_ENABLED=1 go build: PASS
+  - UI Vitest 20/199: PASS
+  - UI build: PASS; known >500KB warning
+  - mobile typecheck: PASS
+classification: preview/local RC em hardening
+open_risks: Connector/upload egress parity, distributed DNS/TLS tests, strong sandbox/process isolation
+next_action: commit/push, then continue Connector egress or platform isolation
+```

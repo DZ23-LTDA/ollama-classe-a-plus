@@ -106,6 +106,9 @@ grep -q 'TestRemoteMCPDialRejectsPrivateActualAddress' internal/agent/mcp_remote
 grep -q 'MCP command must be an absolute executable path' internal/agent/mcp.go
 grep -q 'TestMCPPayloadLimitAndCancellationRestart' internal/agent/mcp_test.go
 grep -q 'configureMCPProcess' internal/agent/mcp_process_unix.go
+grep -q 'media destination connected to a private address' internal/agent/media.go
+grep -q 'validateMediaMagic' internal/agent/media.go
+grep -q 'TestMediaMaterializeRejectsRedirectAndInvalidMagic' internal/agent/media_test.go
 grep -q 'Capabilities' internal/agent/runtime.go
 grep -q 'Evaluation' internal/agent/evaluation.go
 for route in projects library scheduled skills plugins tasks company; do

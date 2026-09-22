@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -17,7 +19,8 @@ func TestMediaManagerGeneratesArtifactsThroughHTTPSProvider(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
 		case "/images/generations":
-			_ = json.NewEncoder(w).Encode(map[string]any{"data": []any{map[string]any{"b64_json": base64.StdEncoding.EncodeToString([]byte("png-bytes"))}}})
+			png := []byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n', 'p', 'n', 'g'}
+			_ = json.NewEncoder(w).Encode(map[string]any{"data": []any{map[string]any{"b64_json": base64.StdEncoding.EncodeToString(png)}}})
 		case "/audio/transcriptions":
 			_ = json.NewEncoder(w).Encode(map[string]any{"text": "transcrição aprovada"})
 		case "/chat/completions":
@@ -69,5 +72,54 @@ func TestGenerateToneProducesWAVArtifact(t *testing.T) {
 	}
 	if len(data) < 44 || string(data[:4]) != "RIFF" || result.MediaType != "audio/wav" {
 		t.Fatalf("invalid wav: len=%d type=%s", len(data), result.MediaType)
+	}
+}
+
+func TestMediaMaterializeRejectsRedirectAndInvalidMagic(t *testing.T) {
+	if err := validateMediaContentType(".png", "text/html"); err == nil {
+		t.Fatal("expected MIME mismatch rejection")
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/redirect" {
+			http.Redirect(w, r, "/final", http.StatusFound)
+			return
+		}
+		w.Header().Set("Content-Type", "image/png")
+		_, _ = w.Write([]byte("not-a-png"))
+	}))
+	defer server.Close()
+	manager, err := NewMediaManager(MediaProvider{Name: "local", BaseURL: server.URL})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := manager.materializeEntry(context.Background(), t.TempDir(), "image", ".png", map[string]any{"url": server.URL + "/redirect"}); err == nil || !strings.Contains(err.Error(), "redirect") {
+		t.Fatalf("expected redirect rejection, got %v", err)
+	}
+	if _, _, err := manager.materializeEntry(context.Background(), t.TempDir(), "image", ".png", map[string]any{"b64_json": base64.StdEncoding.EncodeToString([]byte("not-a-png"))}); err == nil || !strings.Contains(err.Error(), "PNG") {
+		t.Fatalf("expected magic rejection, got %v", err)
+	}
+}
+
+func TestMediaDownloadLimitsAndRejectsPrivateActualAddress(t *testing.T) {
+	if _, err := readLimitedMediaBody(strings.NewReader("1234"), 3); err == nil {
+		t.Fatal("expected media body limit rejection")
+	}
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	accepted := make(chan struct{})
+	go func() {
+		conn, acceptErr := listener.Accept()
+		if acceptErr == nil {
+			_ = conn.Close()
+		}
+		close(accepted)
+	}()
+	_, err = mediaDialContext(context.Background(), "tcp", listener.Addr().String())
+	<-accepted
+	if err == nil || !strings.Contains(err.Error(), "private") {
+		t.Fatalf("expected private media dial rejection, got %v", err)
 	}
 }

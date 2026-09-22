@@ -181,3 +181,8 @@ O cliente Remote MCP deixou de usar proxy ambiental, limita redirects ao mesmo o
 ## 2026-09-22 — MCP stdio lifecycle hardening
 
 MCP stdio passou a usar executável absoluto não-symlink, cwd privado, ambiente mínimo, limites de argumentos/request/response/stderr, redaction de stderr, grupo de processo e restart/cleanup verificáveis. A implementação é explicitamente best-effort; seccomp/cgroups/rlimits e limites fortes de recursos continuam fora desta slice.
+
+
+## 2026-09-22 — Media egress/download hardening
+
+Downloads de mídia agora bloqueiam redirects e proxy ambiental, verificam o IP conectado, aplicam limites bounded e validam MIME/magic antes de materializar PNG/JPEG/WebP/MP4/WAV. Testes negativos cobrem redirects, MIME incompatível, conteúdo falso, overflow e destinos privados.

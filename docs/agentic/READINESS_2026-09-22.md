@@ -144,3 +144,10 @@ MCP stdio agora exige caminho absoluto para um executável regular não-symlink,
 Em Unix, o processo é iniciado em grupo próprio e o stop tenta encerrar apenas esse grupo, com fallback seguro ao processo individual; Windows usa o kill nativo. Testes cobrem comando relativo, symlink, workspace cleanup, payload limit, cancelamento e restart. Os gates completos passaram: integrity guard, Go tests/vet/build, Vitest 20/199, UI build e mobile typecheck.
 
 A classificação permanece **contenção best-effort**, não sandbox forte. Ainda faltam seccomp, cgroups, rlimits, limites de PID/memória/CPU e validação física multi-plataforma para afirmar isolamento forte.
+
+
+## Slice P0 de Media egress/download — 2026-09-22
+
+O MediaManager passou a usar transport sem proxy ambiental, dialer com verificação do IP efetivamente conectado e redirects desabilitados. Downloads de provider aceitam HTTPS ou HTTP explícito em loopback, rejeitam userinfo/fragments, fazem leitura bounded com detecção de overflow e validam `Content-Type` contra a extensão e magic bytes de PNG, JPEG, WebP, MP4 e WAV antes de materializar o artefato. Respostas JSON e áudio também têm limites explícitos.
+
+Regressões locais cobrem redirect, MIME mismatch, magic inválido, payload acima do limite e socket privado. Os gates completos passaram: integrity guard, Go tests/vet/build, Vitest 20/199, UI build e mobile typecheck. O upload de transcrição ainda é limitado por tamanho de entrada, e testes de rede distribuída/TLS real continuam necessários.

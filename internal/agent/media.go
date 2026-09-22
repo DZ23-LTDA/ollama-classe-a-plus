@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"mime/multipart"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -63,7 +64,58 @@ func NewMediaManager(provider MediaProvider) (*MediaManager, error) {
 	if err := provider.Validate(); err != nil {
 		return nil, err
 	}
-	return &MediaManager{Provider: provider, Client: &http.Client{Timeout: 3 * time.Minute}}, nil
+	return &MediaManager{Provider: provider, Client: newMediaHTTPClient(3 * time.Minute)}, nil
+}
+
+type mediaLoopbackContextKey struct{}
+
+func newMediaHTTPClient(timeout time.Duration) *http.Client {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.Proxy = nil
+	transport.DialContext = mediaDialContext
+	return &http.Client{Timeout: timeout, Transport: transport, CheckRedirect: rejectMediaRedirect}
+}
+
+func rejectMediaRedirect(_ *http.Request, _ []*http.Request) error {
+	return errors.New("media redirects are disabled")
+}
+
+func mediaDialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	dialer := &net.Dialer{Timeout: 15 * time.Second}
+	conn, err := dialer.DialContext(ctx, network, address)
+	if err != nil {
+		return nil, err
+	}
+	if mediaLoopbackContext(ctx) {
+		return conn, nil
+	}
+	remote, _, splitErr := net.SplitHostPort(conn.RemoteAddr().String())
+	if splitErr != nil {
+		_ = conn.Close()
+		return nil, errors.New("media connected address is invalid")
+	}
+	if ip := net.ParseIP(strings.Trim(remote, "[]")); ip != nil && mediaPrivateIP(ip) {
+		_ = conn.Close()
+		return nil, errors.New("media destination connected to a private address")
+	}
+	return conn, nil
+}
+
+func mediaPrivateIP(ip net.IP) bool {
+	return ip.IsLoopback() || ip.IsUnspecified() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsMulticast()
+}
+
+func mediaLoopbackContext(ctx context.Context) bool {
+	value, _ := ctx.Value(mediaLoopbackContextKey{}).(bool)
+	return value
+}
+
+func mediaRequestContext(ctx context.Context, rawURL string) (context.Context, error) {
+	parsed, err := url.Parse(rawURL)
+	if err != nil || parsed.Hostname() == "" {
+		return nil, errors.New("media URL is invalid")
+	}
+	return context.WithValue(ctx, mediaLoopbackContextKey{}, isLoopbackHost(parsed.Hostname())), nil
 }
 
 func (m *MediaManager) GenerateImage(ctx context.Context, workspace, prompt, model string) (MediaResult, error) {
@@ -165,7 +217,7 @@ func (m *MediaManager) Transcribe(ctx context.Context, workspace, inputPath, mod
 	if err := writer.Close(); err != nil {
 		return MediaResult{}, err
 	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, m.endpoint("/audio/transcriptions"), &body)
+	request, err := m.newRequest(ctx, http.MethodPost, m.endpoint("/audio/transcriptions"), &body)
 	if err != nil {
 		return MediaResult{}, err
 	}
@@ -298,7 +350,7 @@ func (m *MediaManager) postJSON(ctx context.Context, path string, value any) (ma
 	if err != nil {
 		return nil, err
 	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, m.endpoint(path), bytes.NewReader(data))
+	request, err := m.newRequest(ctx, http.MethodPost, m.endpoint(path), bytes.NewReader(data))
 	if err != nil {
 		return nil, err
 	}
@@ -317,7 +369,7 @@ func (m *MediaManager) postBytes(ctx context.Context, path string, value any) ([
 	if err != nil {
 		return nil, err
 	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, m.endpoint(path), bytes.NewReader(data))
+	request, err := m.newRequest(ctx, http.MethodPost, m.endpoint(path), bytes.NewReader(data))
 	if err != nil {
 		return nil, err
 	}
@@ -332,7 +384,17 @@ func (m *MediaManager) postBytes(ctx context.Context, path string, value any) ([
 		payload, _ := io.ReadAll(io.LimitReader(response.Body, 1<<20))
 		return nil, fmt.Errorf("media request failed with status %d: %s", response.StatusCode, limitError(string(payload), 1000))
 	}
-	return io.ReadAll(io.LimitReader(response.Body, 100<<20))
+	data, err = readLimitedMediaBody(response.Body, 100<<20)
+	if err != nil {
+		return nil, err
+	}
+	if err := validateMediaContentType(".wav", response.Header.Get("Content-Type")); err != nil {
+		return nil, err
+	}
+	if err := validateMediaMagic(".wav", data); err != nil {
+		return nil, err
+	}
+	return data, nil
 }
 
 func (m *MediaManager) materializeEntry(ctx context.Context, workspace, prefix, extension string, entry map[string]any) (string, string, error) {
@@ -344,13 +406,16 @@ func (m *MediaManager) materializeEntry(ctx context.Context, workspace, prefix, 
 		if err != nil {
 			return "", "", err
 		}
+		if declared, ok := entry["mime_type"].(string); ok && strings.TrimSpace(declared) != "" {
+			mediaType = strings.TrimSpace(strings.Split(declared, ";")[0])
+		}
 	}
 	if rawURL, ok := entry["url"].(string); ok && rawURL != "" {
 		parsed, err := url.Parse(rawURL)
-		if err != nil || parsed.Scheme != "https" {
-			return "", "", errors.New("media URL must use HTTPS")
+		if err != nil || parsed.Host == "" || parsed.User != nil || parsed.Fragment != "" || (parsed.Scheme != "https" && !(parsed.Scheme == "http" && isLoopbackHost(parsed.Hostname()))) {
+			return "", "", errors.New("media URL must use HTTPS or loopback HTTP")
 		}
-		request, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
+		request, err := m.newRequest(ctx, http.MethodGet, rawURL, nil)
 		if err != nil {
 			return "", "", err
 		}
@@ -362,14 +427,23 @@ func (m *MediaManager) materializeEntry(ctx context.Context, workspace, prefix, 
 		if response.StatusCode/100 != 2 {
 			return "", "", fmt.Errorf("media download failed with status %d", response.StatusCode)
 		}
-		data, err = io.ReadAll(io.LimitReader(response.Body, 100<<20))
+		data, err = readLimitedMediaBody(response.Body, 100<<20)
 		if err != nil {
 			return "", "", err
 		}
-		mediaType = response.Header.Get("Content-Type")
+		mediaType = strings.TrimSpace(strings.Split(response.Header.Get("Content-Type"), ";")[0])
 	}
 	if len(data) == 0 {
 		return "", "", errors.New("media provider returned no data")
+	}
+	if err := validateMediaContentType(extension, mediaType); err != nil {
+		return "", "", err
+	}
+	if err := validateMediaMagic(extension, data); err != nil {
+		return "", "", err
+	}
+	if mediaType == "" || mediaType == "application/octet-stream" {
+		mediaType = mediaTypeForExtension(extension)
 	}
 	path := filepath.Join(workspace, ".agent-media", prefix+"-"+strconv.FormatInt(time.Now().UnixNano(), 10)+extension)
 	if err := writeLimitedFile(path, data, 100<<20); err != nil {
@@ -384,11 +458,34 @@ func (m *MediaManager) materializeEntry(ctx context.Context, workspace, prefix, 
 func (m *MediaManager) endpoint(path string) string {
 	return strings.TrimRight(m.Provider.BaseURL, "/") + "/" + strings.TrimLeft(path, "/")
 }
-func (m *MediaManager) client() *http.Client {
-	if m.Client != nil {
-		return m.Client
+
+func (m *MediaManager) newRequest(ctx context.Context, method, rawURL string, body io.Reader) (*http.Request, error) {
+	requestContext, err := mediaRequestContext(ctx, rawURL)
+	if err != nil {
+		return nil, err
 	}
-	return http.DefaultClient
+	return http.NewRequestWithContext(requestContext, method, rawURL, body)
+}
+
+func (m *MediaManager) client() *http.Client {
+	base := m.Client
+	if base == nil {
+		return newMediaHTTPClient(3 * time.Minute)
+	}
+	client := *base
+	client.CheckRedirect = rejectMediaRedirect
+	switch transport := base.Transport.(type) {
+	case nil:
+		client.Transport = newMediaHTTPClient(client.Timeout).Transport
+	case *http.Transport:
+		safeTransport := transport.Clone()
+		safeTransport.Proxy = nil
+		safeTransport.DialContext = mediaDialContext
+		client.Transport = safeTransport
+	default:
+		client.Transport = newMediaHTTPClient(client.Timeout).Transport
+	}
+	return &client
 }
 func (m *MediaManager) headers(request *http.Request) {
 	if strings.TrimSpace(m.Provider.APIKey) != "" {
@@ -408,7 +505,7 @@ func firstData(payload map[string]any) (map[string]any, error) {
 	return entry, nil
 }
 func decodeResponse(response *http.Response) (map[string]any, error) {
-	body, err := io.ReadAll(io.LimitReader(response.Body, 8<<20))
+	body, err := readLimitedMediaBody(response.Body, 8<<20)
 	if err != nil {
 		return nil, err
 	}
@@ -430,6 +527,79 @@ func writeLimitedFile(path string, data []byte, limit int64) error {
 	}
 	return os.WriteFile(path, data, 0o600)
 }
+
+func readLimitedMediaBody(reader io.Reader, limit int64) ([]byte, error) {
+	if limit <= 0 {
+		return nil, errors.New("media payload limit is invalid")
+	}
+	data, err := io.ReadAll(io.LimitReader(reader, limit+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(data)) > limit {
+		return nil, errors.New("media payload exceeds limit")
+	}
+	return data, nil
+}
+
+func mediaTypeForExtension(extension string) string {
+	switch strings.ToLower(filepath.Ext(extension)) {
+	case ".png":
+		return "image/png"
+	case ".jpg", ".jpeg":
+		return "image/jpeg"
+	case ".webp":
+		return "image/webp"
+	case ".mp4":
+		return "video/mp4"
+	case ".wav":
+		return "audio/wav"
+	default:
+		return "application/octet-stream"
+	}
+}
+
+func validateMediaContentType(extension, declared string) error {
+	declared = strings.TrimSpace(strings.Split(declared, ";")[0])
+	if declared == "" || declared == "application/octet-stream" {
+		return nil
+	}
+	expected := mediaTypeForExtension(extension)
+	if expected != "application/octet-stream" && declared != expected {
+		return fmt.Errorf("media content type %q does not match %s", declared, expected)
+	}
+	return nil
+}
+
+func validateMediaMagic(extension string, data []byte) error {
+	if len(data) == 0 {
+		return errors.New("media provider returned no data")
+	}
+	switch strings.ToLower(filepath.Ext(extension)) {
+	case ".png":
+		if !bytes.HasPrefix(data, []byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'}) {
+			return errors.New("media payload is not a PNG")
+		}
+	case ".jpg", ".jpeg":
+		if len(data) < 3 || data[0] != 0xff || data[1] != 0xd8 || data[2] != 0xff {
+			return errors.New("media payload is not a JPEG")
+		}
+	case ".webp":
+		if len(data) < 12 || string(data[:4]) != "RIFF" || string(data[8:12]) != "WEBP" {
+			return errors.New("media payload is not a WebP")
+		}
+	case ".mp4":
+		if len(data) < 12 || string(data[4:8]) != "ftyp" {
+			return errors.New("media payload is not an MP4")
+		}
+	case ".wav":
+		if len(data) < 12 || string(data[:4]) != "RIFF" || string(data[8:12]) != "WAVE" {
+			return errors.New("media payload is not a WAV")
+		}
+	}
+	return nil
+}
+
 func sin(value float64) float64 {
 	x := value
 	for x > 3.141592653589793 {

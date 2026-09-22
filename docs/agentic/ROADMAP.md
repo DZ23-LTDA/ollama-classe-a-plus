@@ -200,3 +200,8 @@ Remote MCP agora tem proxy nil, redirect same-origin e validação do IP conecta
 ## Incremento 2026-09-22 — MCP stdio lifecycle
 
 A contenção de processo MCP stdio ganhou cwd privado, ambiente mínimo, allowlist de executável, limites de payload, stderr redigido e lifecycle de grupo/restart. O próximo nível requer implementação por plataforma de seccomp/cgroups/rlimits/PID/memória/CPU e testes em runners reais; até lá, a documentação deve tratar stdio como best-effort.
+
+
+## Incremento 2026-09-22 — Media egress/download
+
+Downloads de mídia agora compartilham a postura de proxy nil, redirect bloqueado, IP conectado, limite bounded e MIME/magic validation. O próximo trabalho deve alinhar upload/Connector egress à mesma política sem redigir credenciais operacionais autorizadas, além de executar testes distribuídos com DNS/TLS controlados.
