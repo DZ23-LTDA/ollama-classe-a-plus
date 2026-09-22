@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -28,6 +29,18 @@ func TestMCPManagerCallsAllowlistedMethod(t *testing.T) {
 	}
 	if _, err := manager.Call(context.Background(), "echo", "tools/list", nil); err == nil || !strings.Contains(err.Error(), "not allowlisted") {
 		t.Fatalf("unexpected allowlist result: %v", err)
+	}
+}
+
+func TestMCPManagerCallRejectsCrossOrganizationServer(t *testing.T) {
+	t.Setenv("GO_WANT_MCP_HELPER_PROCESS", "1")
+	manager := NewMCPManager()
+	if err := manager.Register(MCPServerConfig{ID: "org-b", OrganizationID: "org_b", Command: os.Args[0], Args: []string{"-test.run=TestMCPHelperProcess"}, AllowedMethods: []string{"echo"}, EnvironmentVars: []string{"GO_WANT_MCP_HELPER_PROCESS"}, TimeoutSeconds: 5}); err != nil {
+		t.Fatal(err)
+	}
+	defer manager.StopAll()
+	if _, err := manager.CallForOrganization(context.Background(), "org_a", "org-b", "echo", map[string]any{"value": "blocked"}); !errors.Is(err, ErrPluginOrganizationScope) {
+		t.Fatalf("cross-organization error = %v", err)
 	}
 }
 

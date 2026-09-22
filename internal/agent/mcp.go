@@ -193,6 +193,10 @@ func (m *MCPManager) RemoveForOrganization(organizationID, id string) error {
 }
 
 func (m *MCPManager) Call(ctx context.Context, serverID, method string, params any) (json.RawMessage, error) {
+	return m.CallForOrganization(ctx, "", serverID, method, params)
+}
+
+func (m *MCPManager) CallForOrganization(ctx context.Context, organizationID, serverID, method string, params any) (json.RawMessage, error) {
 	m.mu.RLock()
 	server := m.servers[serverID]
 	m.mu.RUnlock()
@@ -201,7 +205,11 @@ func (m *MCPManager) Call(ctx context.Context, serverID, method string, params a
 	}
 	server.mu.Lock()
 	disabled := server.config.Disabled
+	serverOrganizationID := server.config.OrganizationID
 	server.mu.Unlock()
+	if !pluginAccessibleByOrganization(serverOrganizationID, strings.TrimSpace(organizationID)) {
+		return nil, ErrPluginOrganizationScope
+	}
 	if disabled {
 		return nil, errors.New("MCP server is disabled")
 	}
@@ -470,11 +478,11 @@ func (t mcpCallTool) Descriptor() ToolDescriptor {
 	return ToolDescriptor{Name: "mcp.call", Version: "1", Description: "Chamar método allowlisted de servidor MCP stdio", Risk: RiskExternalSideEffect, RequiresApproval: true, Scopes: []string{"mcp:call"}}
 }
 
-func (t mcpCallTool) Execute(ctx context.Context, _ ToolContext, input map[string]any) (ToolResult, error) {
+func (t mcpCallTool) Execute(ctx context.Context, toolContext ToolContext, input map[string]any) (ToolResult, error) {
 	if t.manager == nil {
 		return ToolResult{}, errors.New("MCP manager is unavailable")
 	}
-	result, err := t.manager.Call(ctx, stringInput(input, "server_id", ""), stringInput(input, "method", ""), input["params"])
+	result, err := t.manager.CallForOrganization(ctx, toolContext.OrganizationID, stringInput(input, "server_id", ""), stringInput(input, "method", ""), input["params"])
 	if err != nil {
 		return ToolResult{}, err
 	}

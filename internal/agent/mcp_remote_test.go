@@ -3,11 +3,13 @@ package agent
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestRemoteMCPCallJSONAndBearer(t *testing.T) {
@@ -47,6 +49,21 @@ func TestRemoteMCPCallJSONAndBearer(t *testing.T) {
 	}
 }
 
+func TestRemoteMCPCallRejectsCrossOrganizationServer(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"jsonrpc":"2.0","id":1,"result":{"ok":true}}`))
+	}))
+	defer server.Close()
+	manager := NewRemoteMCPManager()
+	if err := manager.Register(RemoteMCPServerConfig{ID: "org-b", OrganizationID: "org_b", URL: server.URL, AllowedMethods: []string{"ping"}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := manager.CallForOrganization(context.Background(), "org_a", "org-b", "ping", nil); !errors.Is(err, ErrPluginOrganizationScope) {
+		t.Fatalf("cross-organization error = %v", err)
+	}
+}
+
 func TestRemoteMCPSSEAndURLPolicy(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
@@ -73,6 +90,56 @@ func TestRemoteMCPRequiresAllowlist(t *testing.T) {
 	manager := NewRemoteMCPManager()
 	if err := manager.Register(RemoteMCPServerConfig{ID: "empty", URL: "https://example.com/mcp"}); err == nil {
 		t.Fatal("expected empty remote MCP allowlist rejection")
+	}
+	if err := manager.Register(RemoteMCPServerConfig{ID: "blank", URL: "https://example.com/mcp", AllowedMethods: []string{" ", "\t"}}); err == nil {
+		t.Fatal("expected blank remote MCP allowlist rejection")
+	}
+}
+
+func TestRemoteMCPSSESupportsMultilineDataAndNotifications(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte("event: notification\ndata: {\"jsonrpc\":\"2.0\",\"method\":\"progress\",\"params\":{}}\n\n"))
+		_, _ = w.Write([]byte("event: response\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\ndata: \"result\":{\"ok\":true}}\n\n"))
+		if flusher, ok := w.(http.Flusher); ok {
+			flusher.Flush()
+		}
+	}))
+	defer server.Close()
+	manager := NewRemoteMCPManager()
+	if err := manager.Register(RemoteMCPServerConfig{ID: "multiline", URL: server.URL, AllowedMethods: []string{"ping"}, TimeoutSeconds: 3}); err != nil {
+		t.Fatal(err)
+	}
+	result, err := manager.Call(context.Background(), "multiline", "ping", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(result) != `{"ok":true}` {
+		t.Fatalf("result = %s", result)
+	}
+}
+
+func TestRemoteMCPSSEReturnsCorrelatedErrorBeforeEOF(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte("data: {\"jsonrpc\":\"2.0\",\"id\":1,\"error\":{\"code\":-32000,\"message\":\"denied\"}}\n\n"))
+		if flusher, ok := w.(http.Flusher); ok {
+			flusher.Flush()
+		}
+		<-time.After(2 * time.Second)
+	}))
+	defer server.Close()
+	manager := NewRemoteMCPManager()
+	if err := manager.Register(RemoteMCPServerConfig{ID: "error", URL: server.URL, AllowedMethods: []string{"ping"}, TimeoutSeconds: 5}); err != nil {
+		t.Fatal(err)
+	}
+	started := time.Now()
+	_, err := manager.Call(context.Background(), "error", "ping", nil)
+	if err == nil || !strings.Contains(err.Error(), "denied") {
+		t.Fatalf("err = %v, want correlated MCP error", err)
+	}
+	if elapsed := time.Since(started); elapsed > time.Second {
+		t.Fatalf("correlated error waited for EOF: %s", elapsed)
 	}
 }
 
@@ -119,21 +186,25 @@ func TestRemoteMCPDialRejectsPrivateActualAddress(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer listener.Close()
-	accepted := make(chan struct{})
+	accepted := make(chan error, 1)
 	go func() {
 		conn, acceptErr := listener.Accept()
 		if acceptErr == nil {
 			_ = conn.Close()
 		}
-		close(accepted)
+		accepted <- acceptErr
 	}()
 	conn, err := remoteMCPDialContext(context.Background(), "tcp", listener.Addr().String())
 	if err == nil {
 		_ = conn.Close()
 		t.Fatal("expected private connected address rejection")
 	}
-	<-accepted
 	if !strings.Contains(err.Error(), "private") {
 		t.Fatalf("unexpected dial error: %v", err)
+	}
+	select {
+	case acceptErr := <-accepted:
+		t.Fatalf("private destination was contacted: %v", acceptErr)
+	case <-time.After(100 * time.Millisecond):
 	}
 }

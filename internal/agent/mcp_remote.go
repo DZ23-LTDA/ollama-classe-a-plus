@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -16,6 +17,8 @@ import (
 	"sync/atomic"
 	"time"
 )
+
+var errRemoteMCPIDMismatch = errors.New("remote MCP response id does not match request")
 
 type RemoteMCPServerConfig struct {
 	ID             string            `json:"id"`
@@ -85,17 +88,24 @@ func (m *RemoteMCPManager) Register(config RemoteMCPServerConfig) error {
 			return errors.New("remote MCP header name is invalid")
 		}
 	}
-	if len(config.AllowedMethods) == 0 {
-		return errors.New("remote MCP allowed_methods must contain at least one method")
-	}
 	if config.TimeoutSeconds <= 0 || config.TimeoutSeconds > 300 {
 		config.TimeoutSeconds = 30
 	}
 	allowed := make([]string, 0, len(config.AllowedMethods))
+	seenMethods := make(map[string]struct{}, len(config.AllowedMethods))
 	for _, method := range config.AllowedMethods {
-		if method = strings.TrimSpace(method); method != "" {
-			allowed = append(allowed, method)
+		method = strings.TrimSpace(method)
+		if method == "" {
+			continue
 		}
+		if _, exists := seenMethods[method]; exists {
+			continue
+		}
+		seenMethods[method] = struct{}{}
+		allowed = append(allowed, method)
+	}
+	if len(allowed) == 0 {
+		return errors.New("remote MCP allowed_methods must contain at least one non-empty method")
 	}
 	config.AllowedMethods = allowed
 	m.mu.Lock()
@@ -116,17 +126,30 @@ type remoteMCPLoopbackContextKey struct{}
 
 func remoteMCPDialContext(ctx context.Context, network, address string) (net.Conn, error) {
 	dialer := &net.Dialer{Timeout: 10 * time.Second}
-	conn, err := dialer.DialContext(ctx, network, address)
+	host, port, err := net.SplitHostPort(address)
+	if err != nil {
+		return nil, errors.New("remote MCP destination is invalid")
+	}
+	if !remoteMCPLoopbackContext(ctx) {
+		addresses, err := net.DefaultResolver.LookupIP(ctx, "ip", host)
+		if err != nil {
+			return nil, err
+		}
+		if len(addresses) == 0 {
+			return nil, errors.New("remote MCP destination has no addresses")
+		}
+		for _, ip := range addresses {
+			if remoteMCPPrivateIP(ip) {
+				return nil, errors.New("remote MCP destination resolves to a private address")
+			}
+		}
+	}
+	conn, err := dialer.DialContext(ctx, network, net.JoinHostPort(host, port))
 	if err != nil {
 		return nil, err
 	}
 	if remoteMCPLoopbackContext(ctx) {
 		return conn, nil
-	}
-	_, _, err = net.SplitHostPort(address)
-	if err != nil {
-		_ = conn.Close()
-		return nil, errors.New("remote MCP destination is invalid")
 	}
 	remote, _, splitErr := net.SplitHostPort(conn.RemoteAddr().String())
 	if splitErr != nil {
@@ -258,12 +281,19 @@ func (m *RemoteMCPManager) RemoveForOrganization(organizationID, id string) erro
 }
 
 func (m *RemoteMCPManager) Call(ctx context.Context, serverID, method string, params any) (json.RawMessage, error) {
+	return m.CallForOrganization(ctx, "", serverID, method, params)
+}
+
+func (m *RemoteMCPManager) CallForOrganization(ctx context.Context, organizationID, serverID, method string, params any) (json.RawMessage, error) {
 	m.mu.RLock()
 	config, ok := m.servers[strings.TrimSpace(serverID)]
 	client := m.client
 	m.mu.RUnlock()
 	if !ok {
 		return nil, fmt.Errorf("remote MCP server %q is not registered", serverID)
+	}
+	if !pluginAccessibleByOrganization(config.OrganizationID, strings.TrimSpace(organizationID)) {
+		return nil, ErrPluginOrganizationScope
 	}
 	if config.Disabled {
 		return nil, errors.New("remote MCP server is disabled")
@@ -316,14 +346,73 @@ func (m *RemoteMCPManager) Call(ctx context.Context, serverID, method string, pa
 		body, _ := io.ReadAll(io.LimitReader(response.Body, 16<<10))
 		return nil, fmt.Errorf("remote MCP returned %s: %s", response.Status, strings.TrimSpace(string(body)))
 	}
-	body, err := io.ReadAll(io.LimitReader(response.Body, 4<<20))
+	stream := strings.Contains(strings.ToLower(response.Header.Get("Content-Type")), "text/event-stream")
+	payload, err := readRemoteMCPResponse(response.Body, stream, requestID)
 	if err != nil {
 		return nil, err
 	}
-	payload := body
-	if strings.Contains(strings.ToLower(response.Header.Get("Content-Type")), "text/event-stream") {
-		payload = lastSSEData(body)
+	return payload, nil
+}
+
+func readRemoteMCPResponse(body io.Reader, stream bool, requestID int64) (json.RawMessage, error) {
+	const maxPayload = 4 << 20
+	if !stream {
+		payload, err := io.ReadAll(io.LimitReader(body, maxPayload+1))
+		if err != nil {
+			return nil, err
+		}
+		if len(payload) > maxPayload {
+			return nil, errors.New("remote MCP response exceeded limit")
+		}
+		return decodeRemoteMCPEnvelope(payload, requestID)
 	}
+
+	scanner := bufio.NewScanner(body)
+	scanner.Buffer(make([]byte, 4096), 1<<20)
+	var data strings.Builder
+	for scanner.Scan() {
+		line := scanner.Text()
+		if line == "" {
+			if data.Len() == 0 {
+				continue
+			}
+			payload, err := decodeRemoteMCPEnvelope([]byte(data.String()), requestID)
+			if err == nil {
+				return payload, nil
+			}
+			if !errors.Is(err, errRemoteMCPIDMismatch) {
+				return nil, err
+			}
+			data.Reset()
+			continue
+		}
+		if strings.HasPrefix(line, ":") {
+			continue
+		}
+		if strings.HasPrefix(line, "data:") {
+			if data.Len() > 0 {
+				data.WriteByte('\n')
+			}
+			value := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+			if value == "[DONE]" {
+				continue
+			}
+			data.WriteString(value)
+		}
+		if data.Len() > maxPayload {
+			return nil, errors.New("remote MCP SSE response exceeded limit")
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+	if data.Len() > 0 {
+		return decodeRemoteMCPEnvelope([]byte(data.String()), requestID)
+	}
+	return nil, errors.New("remote MCP SSE response has no correlated result")
+}
+
+func decodeRemoteMCPEnvelope(payload []byte, requestID int64) (json.RawMessage, error) {
 	var envelope struct {
 		ID     json.RawMessage `json:"id"`
 		Result json.RawMessage `json:"result"`
@@ -333,7 +422,7 @@ func (m *RemoteMCPManager) Call(ctx context.Context, serverID, method string, pa
 		return nil, fmt.Errorf("decode remote MCP response: %w", err)
 	}
 	if !remoteMCPResponseMatches(envelope.ID, requestID) {
-		return nil, errors.New("remote MCP response id does not match request")
+		return nil, errRemoteMCPIDMismatch
 	}
 	if envelope.Error != nil {
 		return nil, fmt.Errorf("remote MCP error: %s", envelope.Error.Message)
@@ -386,31 +475,17 @@ func validRemoteMCPHeaderName(value string) bool {
 	}
 }
 
-func lastSSEData(body []byte) []byte {
-	var last []byte
-	for _, line := range bytes.Split(body, []byte("\n")) {
-		line = bytes.TrimSpace(line)
-		if bytes.HasPrefix(line, []byte("data:")) {
-			value := bytes.TrimSpace(bytes.TrimPrefix(line, []byte("data:")))
-			if len(value) > 0 && !bytes.Equal(value, []byte("[DONE]")) {
-				last = value
-			}
-		}
-	}
-	return last
-}
-
 type remoteMCPCallTool struct{ manager *RemoteMCPManager }
 
 func (t remoteMCPCallTool) Descriptor() ToolDescriptor {
 	return ToolDescriptor{Name: "mcp.remote.call", Version: "1", Description: "Chamar método allowlisted de um Remote MCP Streamable HTTP", Risk: RiskExternalSideEffect, RequiresApproval: true, Scopes: []string{"mcp:remote:call"}}
 }
 
-func (t remoteMCPCallTool) Execute(ctx context.Context, _ ToolContext, input map[string]any) (ToolResult, error) {
+func (t remoteMCPCallTool) Execute(ctx context.Context, toolContext ToolContext, input map[string]any) (ToolResult, error) {
 	if t.manager == nil {
 		return ToolResult{}, errors.New("remote MCP manager is unavailable")
 	}
-	result, err := t.manager.Call(ctx, stringInput(input, "server_id", ""), stringInput(input, "method", ""), input["params"])
+	result, err := t.manager.CallForOrganization(ctx, toolContext.OrganizationID, stringInput(input, "server_id", ""), stringInput(input, "method", ""), input["params"])
 	if err != nil {
 		return ToolResult{}, err
 	}
