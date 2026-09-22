@@ -1193,3 +1193,20 @@ classification: preview/local RC em hardening
 open_risks: real IdP/staging and refresh/revocation, web login wiring, strong sandbox
 next_action: commit/push, then continue secure session/CSRF contract or sandbox resource controls
 ```
+
+
+## Publicação da slice P0 OAuth endpoint egress — 2026-09-22
+
+```yaml
+state: FIXING
+iteration: 17
+commit: 7e72d9d9
+branch: feat/manus-parity-omniroute
+remote: https://github.com/DZ23-LTDA/ollama-classe-a-plus.git
+pull_request: https://github.com/DZ23-LTDA/ollama-classe-a-plus/pull/1
+working_tree: checkpoint pending commit
+published: true
+proofs: integrity, Go tests/vet/build, UI Vitest/build, mobile typecheck and OAuth egress negative tests all PASS
+classification: preview/local RC em hardening
+next_slice: secure session/CSRF contract or sandbox resource controls; no main merge
+```
