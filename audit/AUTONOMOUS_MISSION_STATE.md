@@ -188,3 +188,23 @@ remaining_external:
   - full editorial exporters, CRDT collaboration, local generative media models and complete hosting adapters
 next_action: commit phase 7, create reproducible archive, then continue with deploy adapters and physical/infrastructure gates without publishing main.
 ```
+
+
+## Fechamento da fase 8 — 2026-09-21
+
+```yaml
+state: CANDIDATE_COMPLETED
+features:
+  - deployments: Vercel, Netlify and generic hosting adapters
+  - publish_security: workspace containment, symlink rejection, file/size limits, no redirects, HTTPS outside loopback
+  - publish_approval: external deployment endpoint requires approved=true
+proofs:
+  - CGO_ENABLED=0 go test ./internal/agent -count=1: PASS
+  - CGO_ENABLED=1 go test ./server ./cmd/launch ./internal/multillm -count=1: PASS
+  - CGO_ENABLED=1 go build -o ollama-dz23-phase8-bin .: PASS
+  - generic HTTPS deployment smoke and external HTTP rejection: PASS
+remaining_external:
+  - real Vercel/Netlify/AWS/Cloudflare accounts, project IDs and permissions
+  - signed installers, physical devices, store distribution and full local media models
+next_action: commit phase 8, package a reproducible archive and continue provider-specific production smoke tests only with operator credentials.
+```

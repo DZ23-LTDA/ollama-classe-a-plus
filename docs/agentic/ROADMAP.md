@@ -58,3 +58,8 @@ A fase adicionou adapters opcionais de PostgreSQL, Redis e OpenTelemetry, WebSoc
 ## Incremento 2026-09-21 — SSO enterprise, credenciais por tenant e histórico visual
 
 A fase adicionou adapter SAML baseado em `crewjam/saml`, incluindo metadata, AuthnRequest assinado, RelayState one-time, ACS e provisionamento de claims; conectores com resolução de access token OAuth cifrado por organização; RLS PostgreSQL forçado para impedir bypass pelo dono da tabela; TLS 1.3/mTLS opcional com recarga de certificado por handshake; e canvas visual com bindings, eventos, histórico persistente, undo e redo. Permanecem pendentes os testes ponta a ponta com IdP, serviços distribuídos reais fora do CI, providers multimídia/deploy, testes físicos de companions e distribuição assinada.
+
+
+## Incremento 2026-09-21 — Publicação real de builders
+
+Foi adicionado o DeploymentManager com adapters Vercel, Netlify e generic, coleta segura de arquivos, limites, redirects bloqueados, token server-side e approval explícito. O próximo gate é executar smoke contra contas reais e completar adapters de AWS/Cloudflare conforme credenciais e requisitos de cada ambiente; a publicação externa nunca é simulada como concluída apenas por existir um preview local.

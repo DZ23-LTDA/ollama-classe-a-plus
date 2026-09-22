@@ -34,6 +34,7 @@ type Runtime struct {
 	devices       *DeviceStore
 	ingestion     DocumentIngestor
 	push          *PushService
+	deployments   *DeploymentManager
 	mu            sync.Mutex
 	running       map[string]bool
 }
@@ -55,6 +56,7 @@ type RuntimeConfig struct {
 	Collaboration *CollaborationStore
 	Devices       *DeviceStore
 	Push          *PushService
+	Deployments   *DeploymentManager
 }
 
 func NewRuntime(config RuntimeConfig) (*Runtime, error) {
@@ -129,7 +131,7 @@ func NewRuntime(config RuntimeConfig) (*Runtime, error) {
 			return nil, err
 		}
 	}
-	runtime := &Runtime{store: store, planner: planner, tools: tools, workspaceRoot: root, context: contextStore, metrics: &RuntimeMetrics{}, connectors: config.Connectors, mcp: config.MCP, queue: queue, redisQueue: config.RedisQueue, traces: traces, telemetry: telemetry, media: config.Media, builder: builder, collaboration: collaboration, push: config.Push, running: make(map[string]bool)}
+	runtime := &Runtime{store: store, planner: planner, tools: tools, workspaceRoot: root, context: contextStore, metrics: &RuntimeMetrics{}, connectors: config.Connectors, mcp: config.MCP, queue: queue, redisQueue: config.RedisQueue, traces: traces, telemetry: telemetry, media: config.Media, builder: builder, collaboration: collaboration, push: config.Push, deployments: config.Deployments, running: make(map[string]bool)}
 	orchestrator, err := NewAgentOrchestrator(filepath.Join(root, ".agent-orchestrator"), runtime.SubagentRunner)
 	if err != nil {
 		return nil, err
@@ -208,6 +210,8 @@ func (r *Runtime) Devices() *DeviceStore { return r.devices }
 func (r *Runtime) Ingestion() DocumentIngestor { return r.ingestion }
 
 func (r *Runtime) Push() *PushService { return r.push }
+
+func (r *Runtime) Deployments() *DeploymentManager { return r.deployments }
 
 func (r *Runtime) CreateMission(ctx context.Context, request CreateMissionRequest) (Mission, error) {
 	objective := strings.TrimSpace(request.Objective)

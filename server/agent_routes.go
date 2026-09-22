@@ -85,6 +85,10 @@ func newDefaultAgentRuntime() (*agent.Runtime, error) {
 	if err != nil {
 		return nil, err
 	}
+	deployments, err := loadAgentDeployments()
+	if err != nil {
+		return nil, err
+	}
 	push, err := agent.NewPushService(filepath.Join(storeRoot, "push"), os.Getenv("OLLAMA_AGENT_PUSH_ENDPOINT"))
 	if err != nil {
 		return nil, fmt.Errorf("initialize push service: %w", err)
@@ -108,7 +112,7 @@ func newDefaultAgentRuntime() (*agent.Runtime, error) {
 			Fallback: agent.RulePlanner{},
 		}
 	}
-	return agent.NewRuntime(agent.RuntimeConfig{Store: store, Context: contextStore, Planner: planner, WorkspaceRoot: workspaceRoot, Connectors: connectors, MCP: mcp, Media: media, RedisQueue: redisQueue, Telemetry: telemetry, Push: push})
+	return agent.NewRuntime(agent.RuntimeConfig{Store: store, Context: contextStore, Planner: planner, WorkspaceRoot: workspaceRoot, Connectors: connectors, MCP: mcp, Media: media, RedisQueue: redisQueue, Telemetry: telemetry, Push: push, Deployments: deployments})
 }
 
 func loadAgentConnectors() (*agent.ConnectorManager, error) {
@@ -125,6 +129,28 @@ func loadAgentConnectors() (*agent.ConnectorManager, error) {
 		return nil, err
 	}
 	manager := agent.NewConnectorManager()
+	for _, config := range configs {
+		if err := manager.Register(config); err != nil {
+			return nil, err
+		}
+	}
+	return manager, nil
+}
+
+func loadAgentDeployments() (*agent.DeploymentManager, error) {
+	configPath := strings.TrimSpace(os.Getenv("OLLAMA_AGENT_DEPLOYMENTS"))
+	if configPath == "" {
+		return nil, nil
+	}
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return nil, err
+	}
+	var configs []agent.DeployConfig
+	if err := json.Unmarshal(data, &configs); err != nil {
+		return nil, err
+	}
+	manager := agent.NewDeploymentManager()
 	for _, config := range configs {
 		if err := manager.Register(config); err != nil {
 			return nil, err
@@ -218,6 +244,8 @@ func (a *agentAPI) register(r *gin.Engine) {
 	group.POST("/builders/:id/export", a.exportBuilder)
 	group.POST("/builders/:id/export/:format", a.exportProfessionalBuilder)
 	group.POST("/builders/:id/publish", a.publishBuilder)
+	group.GET("/deployments", a.deployments)
+	group.POST("/builders/:id/deploy/:provider", a.deployBuilder)
 	group.GET("/builders/:id/preview/*path", a.builderPreviewFile)
 	group.GET("/metrics/prometheus", a.prometheus)
 	group.GET("/tools", a.tools)
@@ -1460,6 +1488,46 @@ func (a *agentAPI) publishBuilder(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusAccepted, gin.H{"project": project, "published_path": publishedPath})
+}
+
+func (a *agentAPI) deployments(c *gin.Context) {
+	manager := a.runtime.Deployments()
+	if manager == nil {
+		c.JSON(http.StatusOK, gin.H{"providers": []agent.DeployConfig{}})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"providers": manager.List()})
+}
+
+func (a *agentAPI) deployBuilder(c *gin.Context) {
+	manager := a.runtime.Deployments()
+	if manager == nil {
+		writeAgentError(c, http.StatusNotImplemented, errors.New("no deployment providers are configured"))
+		return
+	}
+	var request struct {
+		Target   string `json:"target,omitempty"`
+		Approved bool   `json:"approved"`
+	}
+	if err := decodeJSON(c, &request); err != nil {
+		writeAgentError(c, http.StatusBadRequest, err)
+		return
+	}
+	if !request.Approved {
+		writeAgentError(c, http.StatusPreconditionRequired, errors.New("external deployment requires explicit approval"))
+		return
+	}
+	project, err := a.runtime.Builder().Get(c.Param("id"))
+	if err != nil {
+		writeAgentError(c, statusForAgentError(err), err)
+		return
+	}
+	result, err := manager.Deploy(c.Request.Context(), c.Param("provider"), agent.DeploymentRequest{Name: project.Name, Root: project.Root, Target: request.Target})
+	if err != nil {
+		writeAgentError(c, statusForAgentError(err), err)
+		return
+	}
+	c.JSON(http.StatusAccepted, gin.H{"project": project, "deployment": result})
 }
 
 func (a *agentAPI) builderPreviewFile(c *gin.Context) {
