@@ -290,3 +290,10 @@ O run `35737772235` no commit `15e8ae60` passou todos os jobs de qualidade, incl
 ## Incremento 2026-09-22 — central capability enforcement
 
 A policy de capabilities agora é central e deny-by-default no Runtime, com grants desconhecidos rejeitados, scopes obrigatórios em tools e aprovação vinculada aos scopes. O próximo trabalho de segurança permanece: sandbox forte com isolamento por worker/container, auditoria por chamada MCP/tool, capability policy por skill/projeto/tenant e prova distribuída de recovery/concurrency.
+
+
+## Complemento Master V3 — matriz de referências — 2026-09-22
+
+O complemento recebido foi incorporado como `audit/HARNESS_CAPABILITY_MATRIX.md`. Ele cataloga as 44 referências de produto e os 13 repositórios fornecidos, agrupando capacidades em engenharia, edição/contexto, builders, pesquisa, Company OS, memória/automação, providers, colaboração/dispositivos e execução. A decisão é preservar Ollama e o Runtime como núcleo, usar implementação nativa quando suficiente e adotar integrações substituíveis somente quando houver contrato, licença, isolamento e teste de aceite.
+
+A matriz não converte triagem documental em integração operacional. Os gates externos permanecem abertos para sessões reais de harness, contas OAuth, hardware, deploy, lojas, sandbox forte, colaboradores/dispositivos e homologação distribuída.

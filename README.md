@@ -38,6 +38,7 @@ As imagens acima foram recapturadas com Chromium contra o Vite dev e o servidor 
 | Roadmap e status por fase | [`agentic/ROADMAP.md`](docs/agentic/ROADMAP.md) |
 | Árvore Manus observável + Classe A+ unificado | [`agentic/PRODUCT_TREE.md`](docs/agentic/PRODUCT_TREE.md) |
 | Matriz de paridade e evidências | [`agentic/PARITY_MATRIX.md`](docs/agentic/PARITY_MATRIX.md) |
+| Referências de harnesses, capacidades e decisões de integração | [`HARNESS_CAPABILITY_MATRIX.md`](audit/HARNESS_CAPABILITY_MATRIX.md) |
 | Proteção contra regressões upstream | [`UPSTREAM_POLICY.md`](UPSTREAM_POLICY.md) + [`check-class-a-plus-integrity.sh`](scripts/check-class-a-plus-integrity.sh) |
 | Hardening, findings e gates de release | [`FINAL_THREE_AGENT_REVIEW.md`](audit/FINAL_THREE_AGENT_REVIEW.md) |
 | Prontidão, smoke de APIs e pendências externas | [`READINESS_2026-09-22.md`](docs/agentic/READINESS_2026-09-22.md) |

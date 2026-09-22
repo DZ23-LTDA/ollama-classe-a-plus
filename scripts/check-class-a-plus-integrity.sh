@@ -6,9 +6,10 @@ cd "$ROOT"
 
 required_files=(
   "UPSTREAM_BASE_COMMIT"
-  "docs/agentic/PRODUCT_TREE.md"
-  "docs/agentic/PARITY_MATRIX.md"
-	  "docs/agentic/COMPANY_OS.md"
+	  "docs/agentic/PRODUCT_TREE.md"
+	  "docs/agentic/PARITY_MATRIX.md"
+	  "audit/HARNESS_CAPABILITY_MATRIX.md"
+		  "docs/agentic/COMPANY_OS.md"
 	  "docs/agentic/DESKTOP_COMMANDER_REMOTE.md"
 	  "docs/agentic/COMPOSIO.md"
 	  "docs/agentic/XAI_GROK.md"
@@ -170,6 +171,8 @@ grep -q 'TestBuildArtifactManifestRejectsSymlinkOutsideWorkspace' internal/agent
 	grep -q 'ValidateToolDescriptor' internal/agent/capability_policy.go
 	grep -q 'capabilities = \[\]string{"workspace:read"\}' internal/agent/runtime.go
 	grep -q 'Permitir escrita' app/ui/app/src/components/AgenticConsole.tsx
+	grep -q 'R44' audit/HARNESS_CAPABILITY_MATRIX.md
+	grep -q 'G13' audit/HARNESS_CAPABILITY_MATRIX.md
 	grep -q 'Evaluation' internal/agent/evaluation.go
 for route in projects library scheduled skills plugins tasks company; do
   grep -q "routes/${route}" app/ui/app/src/routeTree.gen.ts || {

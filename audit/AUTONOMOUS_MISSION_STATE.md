@@ -1713,3 +1713,18 @@ local_evidence: integrity, go test ./..., go vet ./..., go build, web vitest/bui
 classification: preview/local RC em hardening; NÃO final; NÃO production-ready
 next_slice: observar quality workflow remoto e continuar P0/P1s restantes; sem merge automático em main
 ```
+
+
+## Complemento Master V3 incorporado — aguardando publicação — 2026-09-22
+
+```yaml
+state: RELEASING
+iteration: 31
+input: /home/ubuntu/upload/pasted_content_6.txt
+artifact: audit/HARNESS_CAPABILITY_MATRIX.md
+references_cataloged: R01-R44 plus G01-G13
+mode: documentary triage and architecture decision; no third-party repo executed
+invariants: Ollama local-first, existing Runtime, canonical mission contract, deny-by-default capabilities, LOCAL_ONLY egress boundary
+classification: preview/local RC em hardening; NÃO final; NÃO production-ready
+next_action: validate document links/diff, commit/push matrix, then continue internal P0/P1 remediation
+```

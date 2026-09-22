@@ -276,3 +276,8 @@ O run GitHub Actions `35737772235`, no commit `15e8ae60`, passou integralmente: 
 ## 2026-09-22 — CapabilityPolicy deny-by-default
 
 Missões agora validam grants contra uma policy central e scopes declarados por tool na criação, no planejamento e antes do efeito. Descritores sem capability conhecida são rejeitados; o default passou a ser `workspace:read`. O Agentic Console expõe escrita como opt-in explícito, e approvals carregam os scopes efetivos da ação.
+
+
+## 2026-09-22 — matriz de referências e capacidades
+
+Foi adicionada `audit/HARNESS_CAPABILITY_MATRIX.md`, com decisões rastreáveis para as referências nomeadas e os 13 repositórios fornecidos. A matriz separa produto, coordenação, inferência, execução especializada e evidências; preserva Ollama como motor padrão; e mantém providers, harnesses e serviços externos substituíveis e opt-in.
