@@ -4,7 +4,25 @@
   </a>
 </p>
 
-# Ollama
+# Ollama Classe A+
+
+> **Uma distribuição agentic local-first para modelos, automações, pesquisa, builders e operação segura.**
+
+Este repositório público reúne a base Ollama DZ23 e a evolução agentic do projeto. O manual completo, os contratos, a configuração e a política de atualização estão em [`docs/CLASS_A_PLUS_GUIDE.md`](docs/CLASS_A_PLUS_GUIDE.md).
+
+### Visão rápida
+
+![Mission Console atual](docs/images/screens/agentic-console.png)
+
+O Mission Console acima é uma captura real da rota `/agentic` com dados demonstrativos controlados. Para conhecer as telas planejadas de configuração, builder e mobile, veja a [galeria visual](docs/CLASS_A_PLUS_GUIDE.md#telas-e-estado-visual). Mockups conceituais são identificados como conceito dentro da própria imagem; eles não são apresentados como funcionalidades concluídas.
+
+| Recurso | Documento |
+|---|---|
+| Instalação, configuração, telas e contribuição | [`CLASS_A_PLUS_GUIDE.md`](docs/CLASS_A_PLUS_GUIDE.md) |
+| Arquitetura do runtime | [`agentic/ARCHITECTURE.md`](docs/agentic/ARCHITECTURE.md) |
+| API e endpoints | [`agentic/API.md`](docs/agentic/API.md) |
+| Integrações, OAuth, SAML, MCP e deploy | [`agentic/INTEGRATIONS.md`](docs/agentic/INTEGRATIONS.md) |
+| Roadmap e status por fase | [`agentic/ROADMAP.md`](docs/agentic/ROADMAP.md) |
 
 Start building with open models.
 
