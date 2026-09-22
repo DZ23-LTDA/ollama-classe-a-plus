@@ -234,3 +234,10 @@ A nova execução remota é obrigatória antes de marcar o gate distribuído com
 Após duas correções incrementais, o run GitHub Actions `35737772235` no commit `15e8ae60` passou integralmente. PostgreSQL RLS, Redis DLQ e OTLP foram executados no runner real; Go/server, Browser Operator, SBOM e Web/Mobile também passaram. O workflow não depende mais de variáveis shell entre steps para cleanup e o teste usa role tenant-scoped não-superusuária.
 
 O gate distribuído está fechado para esta slice. Isso não elimina os demais achados P0/P1 da auditoria nem autoriza declarar produção-ready.
+
+
+## Slice P1 validada — central CapabilityPolicy — 2026-09-22
+
+A policy de capabilities foi centralizada no Runtime. Tools precisam declarar scopes conhecidos; grants desconhecidos ou descritores sem scopes falham; a verificação ocorre na inicialização, durante o planejamento e imediatamente antes da execução. O approval registra scopes e risco, enquanto o default de missão é somente leitura e a UI torna escrita um opt-in explícito.
+
+A regressão foi coberta por testes de grant desconhecido, descriptor sem scopes, grant parcial, policy determinística, policy de approval e execução completa do runtime. Esta correção reduz overgrant, mas não converte o sandbox best-effort em isolamento forte e não fecha os blockers externos ou os demais P0/P1.

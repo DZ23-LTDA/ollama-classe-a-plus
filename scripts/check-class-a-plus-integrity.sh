@@ -15,8 +15,10 @@ required_files=(
 	  "docs/agentic/EVALUATION.md"
 	  "examples/dz23-composio-connect.json"
 	  "examples/dz23-xai.json"
-  "internal/agent/runtime.go"
-  "internal/agent/company.go"
+	  "internal/agent/runtime.go"
+	  "internal/agent/capability_policy.go"
+	  "internal/agent/capability_policy_test.go"
+	  "internal/agent/company.go"
 	  "internal/agent/company_growth.go"
 	  "internal/agent/company_social.go"
 	  "internal/agent/company_agents.go"
@@ -163,8 +165,12 @@ grep -q 'TestRuntimeQueueJobsOrganizationScope' internal/agent/runtime_test.go
 grep -q 'cross-tenant job replay' server/p0_scope_test.go
 grep -q 'rejectSymlinkComponents(root, candidate)' internal/agent/artifacts.go
 grep -q 'TestBuildArtifactManifestRejectsSymlinkOutsideWorkspace' internal/agent/artifacts_test.go
-grep -q 'Capabilities' internal/agent/runtime.go
-grep -q 'Evaluation' internal/agent/evaluation.go
+	grep -q 'Capabilities' internal/agent/runtime.go
+	grep -q 'ErrUnknownCapability' internal/agent/capability_policy.go
+	grep -q 'ValidateToolDescriptor' internal/agent/capability_policy.go
+	grep -q 'capabilities = \[\]string{"workspace:read"\}' internal/agent/runtime.go
+	grep -q 'Permitir escrita' app/ui/app/src/components/AgenticConsole.tsx
+	grep -q 'Evaluation' internal/agent/evaluation.go
 for route in projects library scheduled skills plugins tasks company; do
   grep -q "routes/${route}" app/ui/app/src/routeTree.gen.ts || {
     echo "route tree is missing /${route}" >&2

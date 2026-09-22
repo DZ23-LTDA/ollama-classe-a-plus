@@ -285,3 +285,8 @@ O segundo run público encontrou uma falha de sintaxe no bootstrap condicional d
 ## Validação remota 2026-09-22 — distributed quality workflow verde
 
 O run `35737772235` no commit `15e8ae60` passou todos os jobs de qualidade, incluindo PostgreSQL RLS, Redis DLQ e OTLP reais no runner GitHub. O próximo trabalho volta aos P0 internos ainda abertos: capability enforcement completo, sandbox/process isolation forte, egress/DLP residual, storage/IdP e contratos externos.
+
+
+## Incremento 2026-09-22 — central capability enforcement
+
+A policy de capabilities agora é central e deny-by-default no Runtime, com grants desconhecidos rejeitados, scopes obrigatórios em tools e aprovação vinculada aos scopes. O próximo trabalho de segurança permanece: sandbox forte com isolamento por worker/container, auditoria por chamada MCP/tool, capability policy por skill/projeto/tenant e prova distribuída de recovery/concurrency.

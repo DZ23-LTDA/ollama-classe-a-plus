@@ -1670,3 +1670,32 @@ local_result: PASS
 classification: preview/local RC em hardening; NÃO final; NÃO production-ready
 next_action: selecionar o próximo P0 interno; manter PR aberto e sem merge automático em main
 ```
+
+
+## Slice P1 central CapabilityPolicy — aguardando publicação — 2026-09-22
+
+```yaml
+state: RELEASING
+iteration: 30
+base_commit: 0f4409e090aa27d39ff9a5af58c7483c0fdccaef
+scope: deny-by-default capability enforcement
+files:
+  - internal/agent/capability_policy.go
+  - internal/agent/capability_policy_test.go
+  - internal/agent/runtime.go
+  - internal/agent/tools.go
+  - internal/agent/runtime_test.go
+  - app/ui/app/src/lib/agenticClient.ts
+  - app/ui/app/src/components/AgenticConsole.tsx
+  - scripts/check-class-a-plus-integrity.sh
+evidence:
+  integrity: PASS
+  go_test_all: PASS
+  go_vet: PASS
+  go_build: PASS
+  web_vitest: PASS
+  web_build: PASS
+  mobile_typecheck: PASS
+classification: preview/local RC em hardening; NÃO final; NÃO production-ready
+next_action: commit/push da slice e confirmação do quality workflow no novo SHA
+```

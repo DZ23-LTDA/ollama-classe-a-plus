@@ -114,7 +114,7 @@ func TestRuntimeRequiresApprovalBeforeWritingAndBuildsArtifact(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	mission, err := runtime.CreateMission(context.Background(), CreateMissionRequest{Objective: "escrever resultado"})
+	mission, err := runtime.CreateMission(context.Background(), CreateMissionRequest{Objective: "escrever resultado", Capabilities: []string{"workspace:read", "workspace:write"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -203,7 +203,7 @@ func (p fixedPlanner) Plan(_ context.Context, _ Mission) ([]Step, error) {
 type dlpResultTool struct{}
 
 func (dlpResultTool) Descriptor() ToolDescriptor {
-	return ToolDescriptor{Name: "workspace.read", Version: "test", Description: "test tool", Risk: RiskRead}
+	return ToolDescriptor{Name: "workspace.read", Version: "test", Description: "test tool", Risk: RiskRead, Scopes: []string{"workspace:read"}}
 }
 
 func (dlpResultTool) Execute(context.Context, ToolContext, map[string]any) (ToolResult, error) {
@@ -357,7 +357,7 @@ func TestApprovalBindsActorOrganizationAndReason(t *testing.T) {
 		t.Fatal(err)
 	}
 	approval := mission.Approvals[0]
-	if approval.ActorID != "user_a" || approval.OrganizationID != "org_a" || approval.Nonce == "" || approval.Policy == "" || approval.ExpiresAt == nil {
+	if approval.ActorID != "user_a" || approval.OrganizationID != "org_a" || approval.Nonce == "" || approval.Policy != "capabilities:workspace:write;risk:write" || approval.ExpiresAt == nil {
 		t.Fatalf("approval metadata = %+v", approval)
 	}
 }
@@ -400,6 +400,16 @@ func TestCapabilityPolicyDefaultsToLocalScopes(t *testing.T) {
 	got := normalizeMissionCapabilities([]string{" browser:navigate ", "workspace:read", "browser:navigate"})
 	if strings.Join(got, ",") != "browser:navigate,workspace:read" {
 		t.Fatalf("normalized capabilities = %v", got)
+	}
+}
+
+func TestRuntimeRejectsUnknownMissionCapability(t *testing.T) {
+	runtime, err := NewRuntime(RuntimeConfig{Store: NewMemoryStore(), WorkspaceRoot: t.TempDir()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runtime.CreateMission(context.Background(), CreateMissionRequest{Objective: "invalid grant", Capabilities: []string{"workspace:read", "payments:charge"}}); !errors.Is(err, ErrUnknownCapability) {
+		t.Fatalf("err=%v, want unknown capability", err)
 	}
 }
 

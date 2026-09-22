@@ -283,3 +283,12 @@ Esta segunda correção ainda aguarda nova execução remota. A validação loca
 O commit `15e8ae60` foi validado pelo GitHub Actions no run `35737772235`. Todos os jobs passaram: Go agentic/server com Browser Operator, SBOM, Web/Mobile e integração PostgreSQL RLS + Redis DLQ + OTLP. O teste RLS executou com role não-superusuária dedicada; a limpeza Docker terminou sem depender dos secrets do passo de start.
 
 Esta evidência fecha o gate distribuído desta slice, mas não a classificação global do produto. Permanecem P0/P1 internos e dependências externas descritos na matriz e na auditoria; a classificação segue **preview/local RC em hardening**.
+
+
+## Slice P1 de CapabilityPolicy central — 2026-09-22
+
+A execução de missões passou a usar uma `CapabilityPolicy` central, deny-by-default para descritores sem scopes, grants desconhecidos e scopes não declarados. O runtime valida a policy na inicialização, no planejamento e imediatamente antes da execução de cada tool; approvals agora registram os scopes efetivos junto do risco. O grant padrão foi reduzido a `workspace:read`; a UI oferece `Permitir escrita` como opt-in explícito, mantendo a approval obrigatória para efeitos de escrita.
+
+Evidências locais: `scripts/check-class-a-plus-integrity.sh`, `CGO_ENABLED=1 go test ./... -count=1`, `CGO_ENABLED=1 go vet ./...`, build Go, Vitest completo, build Vite e typecheck mobile — todos PASS. Isso reduz capability overgrant no runtime, mas não substitui sandbox forte, autorização externa por endpoint nem testes físicos/distribuídos.
+
+A classificação permanece **preview/local RC em hardening**; a slice não fecha os P0/P1 restantes nem valida credenciais ou adapters externos.

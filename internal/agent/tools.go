@@ -21,21 +21,7 @@ type Registry struct {
 var ErrCapabilityDenied = errors.New("tool capability is not granted to this mission")
 
 func capabilityAllowed(descriptor ToolDescriptor, granted []string) bool {
-	if len(descriptor.Scopes) == 0 {
-		return true
-	}
-	allowed := make(map[string]struct{}, len(granted))
-	for _, scope := range granted {
-		if value := strings.TrimSpace(scope); value != "" {
-			allowed[value] = struct{}{}
-		}
-	}
-	for _, scope := range descriptor.Scopes {
-		if _, ok := allowed[strings.TrimSpace(scope)]; !ok {
-			return false
-		}
-	}
-	return true
+	return DefaultCapabilityPolicy().Allows(descriptor, granted)
 }
 
 func NewRegistry() *Registry {

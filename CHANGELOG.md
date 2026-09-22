@@ -271,3 +271,8 @@ O run remoto `35737050056` revelou que a primeira correção do smoke ainda usav
 ## 2026-09-22 — quality workflow distribuído verde
 
 O run GitHub Actions `35737772235`, no commit `15e8ae60`, passou integralmente: Go/server, Browser Operator, SBOM, Web/Mobile e PostgreSQL RLS + Redis DLQ + OTLP. O smoke agora possui prova remota real com role tenant-scoped não-superusuária e cleanup independente dos secrets do passo anterior.
+
+
+## 2026-09-22 — CapabilityPolicy deny-by-default
+
+Missões agora validam grants contra uma policy central e scopes declarados por tool na criação, no planejamento e antes do efeito. Descritores sem capability conhecida são rejeitados; o default passou a ser `workspace:read`. O Agentic Console expõe escrita como opt-in explícito, e approvals carregam os scopes efetivos da ação.

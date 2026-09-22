@@ -82,3 +82,8 @@ A meta não é declarar “igual ao Manus” por nomes de menus. A meta é compl
 - repetir a jornada sem cross-tenant, SSRF, path traversal, vazamento de segredo ou bypass de approval.
 
 A matriz deve ser atualizada a cada rodada junto com testes, screenshots e `CHANGELOG.md`. Uma linha só pode avançar de estado com evidência reproduzível.
+
+
+## Evidência adicional — CapabilityPolicy — 2026-09-22
+
+O runtime local agora aplica policy deny-by-default para capabilities: scopes de tools são obrigatórios e conhecidos, grants desconhecidos falham, o default é read-only e escrita exige opt-in e approval. O estado observado é **VALIDADA LOCALMENTE para enforcement de grant no Runtime**; sandbox forte, isolamento por worker/container, auditoria completa por chamada MCP e homologação distribuída continuam fora desta prova.

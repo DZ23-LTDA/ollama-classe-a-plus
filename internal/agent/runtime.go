@@ -15,31 +15,32 @@ import (
 )
 
 type Runtime struct {
-	store         Store
-	planner       Planner
-	tools         *Registry
-	workspaceRoot string
-	context       *ContextStore
-	company       *CompanyStore
-	remoteMCP     *RemoteMCPManager
-	metrics       *RuntimeMetrics
-	connectors    *ConnectorManager
-	mcp           *MCPManager
-	queue         *JobQueue
-	redisQueue    *RedisQueue
-	traces        *TraceStore
-	telemetry     *Telemetry
-	media         *MediaManager
-	builder       *BuilderService
-	collaboration *CollaborationStore
-	orchestrator  *AgentOrchestrator
-	research      *ResearchEngine
-	devices       *DeviceStore
-	ingestion     DocumentIngestor
-	push          *PushService
-	deployments   *DeploymentManager
-	mu            *sync.Mutex
-	running       map[string]bool
+	store            Store
+	planner          Planner
+	tools            *Registry
+	capabilityPolicy CapabilityPolicy
+	workspaceRoot    string
+	context          *ContextStore
+	company          *CompanyStore
+	remoteMCP        *RemoteMCPManager
+	metrics          *RuntimeMetrics
+	connectors       *ConnectorManager
+	mcp              *MCPManager
+	queue            *JobQueue
+	redisQueue       *RedisQueue
+	traces           *TraceStore
+	telemetry        *Telemetry
+	media            *MediaManager
+	builder          *BuilderService
+	collaboration    *CollaborationStore
+	orchestrator     *AgentOrchestrator
+	research         *ResearchEngine
+	devices          *DeviceStore
+	ingestion        DocumentIngestor
+	push             *PushService
+	deployments      *DeploymentManager
+	mu               *sync.Mutex
+	running          map[string]bool
 }
 
 type RuntimeConfig struct {
@@ -83,6 +84,7 @@ func NewRuntime(config RuntimeConfig) (*Runtime, error) {
 	if tools == nil {
 		tools = NewRegistry()
 	}
+	capabilityPolicy := DefaultCapabilityPolicy()
 	if config.Connectors != nil {
 		tools.Register(connectorTool{manager: config.Connectors})
 	}
@@ -91,6 +93,11 @@ func NewRuntime(config RuntimeConfig) (*Runtime, error) {
 	}
 	if config.RemoteMCP != nil {
 		tools.Register(remoteMCPCallTool{manager: config.RemoteMCP})
+	}
+	for _, descriptor := range tools.Descriptors() {
+		if err := capabilityPolicy.ValidateToolDescriptor(descriptor); err != nil {
+			return nil, err
+		}
 	}
 	root := config.WorkspaceRoot
 	if strings.TrimSpace(root) == "" {
@@ -152,7 +159,7 @@ func NewRuntime(config RuntimeConfig) (*Runtime, error) {
 			return nil, err
 		}
 	}
-	runtime := &Runtime{store: store, planner: planner, tools: tools, workspaceRoot: root, context: contextStore, company: companyStore, remoteMCP: config.RemoteMCP, metrics: &RuntimeMetrics{}, connectors: config.Connectors, mcp: config.MCP, queue: queue, redisQueue: config.RedisQueue, traces: traces, telemetry: telemetry, media: config.Media, builder: builder, collaboration: collaboration, push: config.Push, deployments: config.Deployments, mu: &sync.Mutex{}, running: make(map[string]bool)}
+	runtime := &Runtime{store: store, planner: planner, tools: tools, capabilityPolicy: capabilityPolicy, workspaceRoot: root, context: contextStore, company: companyStore, remoteMCP: config.RemoteMCP, metrics: &RuntimeMetrics{}, connectors: config.Connectors, mcp: config.MCP, queue: queue, redisQueue: config.RedisQueue, traces: traces, telemetry: telemetry, media: config.Media, builder: builder, collaboration: collaboration, push: config.Push, deployments: config.Deployments, mu: &sync.Mutex{}, running: make(map[string]bool)}
 	orchestrator, err := NewAgentOrchestrator(filepath.Join(root, ".agent-orchestrator"), runtime.SubagentRunner)
 	if err != nil {
 		return nil, err
@@ -326,7 +333,11 @@ func (r *Runtime) CreateMission(ctx context.Context, request CreateMissionReques
 	}
 	capabilities := normalizeMissionCapabilities(request.Capabilities)
 	if len(capabilities) == 0 {
-		capabilities = []string{"workspace:read", "workspace:write"}
+		capabilities = []string{"workspace:read"}
+	}
+	capabilities, err = r.capabilityPolicy.ValidateMissionCapabilities(capabilities)
+	if err != nil {
+		return Mission{}, err
 	}
 	now := time.Now().UTC()
 	mission := Mission{ID: "mis_" + uuid.NewString(), Version: 1, Objective: objective, Provider: provider, Model: strings.TrimSpace(request.Model), Workspace: workspace, ProjectID: strings.TrimSpace(request.ProjectID), OrganizationID: strings.TrimSpace(request.OrganizationID), Capabilities: capabilities, AutoRun: request.AutoRun, State: MissionPlanning, CreatedAt: now, UpdatedAt: now}
@@ -349,6 +360,9 @@ func (r *Runtime) CreateMission(ctx context.Context, request CreateMissionReques
 			return r.failMission(mission, fmt.Errorf("planner returned unregistered tool %q", plan[index].Kind))
 		}
 		descriptor := tool.Descriptor()
+		if err := r.capabilityPolicy.ValidateToolDescriptor(descriptor); err != nil {
+			return r.failMission(mission, err)
+		}
 		plan[index].RequiresApproval = plan[index].RequiresApproval || descriptor.RequiresApproval
 		if riskRank(descriptor.Risk) > riskRank(plan[index].Risk) {
 			plan[index].Risk = descriptor.Risk
@@ -359,7 +373,8 @@ func (r *Runtime) CreateMission(ctx context.Context, request CreateMissionReques
 	approvalExpiresAt := now.Add(30 * time.Minute)
 	for _, step := range plan {
 		if step.RequiresApproval {
-			mission.Approvals = append(mission.Approvals, Approval{ID: "apr_" + uuid.NewString(), MissionID: mission.ID, StepID: step.ID, OrganizationID: mission.OrganizationID, Policy: "risk:" + string(step.Risk), Nonce: uuid.NewString(), Status: ApprovalPending, ExpiresAt: &approvalExpiresAt, CreatedAt: now, UpdatedAt: now})
+			descriptor, _ := r.tools.Get(step.Kind)
+			mission.Approvals = append(mission.Approvals, Approval{ID: "apr_" + uuid.NewString(), MissionID: mission.ID, StepID: step.ID, OrganizationID: mission.OrganizationID, Policy: toolApprovalPolicy(descriptor.Descriptor(), step.Risk), Nonce: uuid.NewString(), Status: ApprovalPending, ExpiresAt: &approvalExpiresAt, CreatedAt: now, UpdatedAt: now})
 		}
 	}
 	if len(mission.Approvals) > 0 {
@@ -578,7 +593,10 @@ func (r *Runtime) Run(ctx context.Context, id string) (runErr error) {
 		if !ok {
 			return r.failStep(mission, step, fmt.Errorf("tool %q is not registered", step.Kind))
 		}
-		if !capabilityAllowed(tool.Descriptor(), mission.Capabilities) {
+		if err := r.capabilityPolicy.ValidateToolDescriptor(tool.Descriptor()); err != nil {
+			return r.failStep(mission, step, err)
+		}
+		if !r.capabilityPolicy.Allows(tool.Descriptor(), mission.Capabilities) {
 			return r.failStep(mission, step, fmt.Errorf("%w: %s", ErrCapabilityDenied, step.Kind))
 		}
 		if step.RequiresApproval && !r.stepApproved(mission, step.ID) {
