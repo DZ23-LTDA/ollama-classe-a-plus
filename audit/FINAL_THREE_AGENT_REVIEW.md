@@ -186,3 +186,8 @@ Quality CI corrigiu indentação do Browser Operator e adicionou Go full/vet/bui
 ## Slice P1 validada — Grok/provider contract — 2026-09-22
 
 Modelos Grok agora são allowlisted e o health probe valida catálogo. O endpoint HTTP rejeita stream antes do upstream com `501`, mantendo a capacidade interna de streaming separada de uma promessa pública. Credenciais xAI e streaming real continuam não comprovados externamente.
+
+
+## Slice P0 validada — Compose/infrastructure defaults — 2026-09-22
+
+Compose agora usa loopback-only, passwords de ambiente e Redis autenticado; CI injeta secrets efêmeros. A composição foi validada estaticamente/integrity, mas Docker/Compose e os serviços distribuídos não executaram nesta sandbox.

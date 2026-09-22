@@ -1377,3 +1377,26 @@ proofs: integrity, Go tests/vet/build, UI Vitest/build, mobile typecheck and Gro
 classification: preview/local RC em hardening
 next_slice: continue remaining P0/P1s, especially provider/runtime UI contracts and release evidence; no main merge
 ```
+
+
+## Slice P0 Compose/infrastructure defaults validada — aguardando publicação — 2026-09-22
+
+```yaml
+state: RELEASING
+iteration: 22
+base_commit: 6cb644f2
+working_tree: Compose/init/docs/CI changes still uncommitted
+implemented:
+  - loopback-only Postgres/Redis/OTLP ports
+  - env-required Postgres/Redis secrets
+  - Redis requirepass and authenticated CI URL
+  - removed fixed init SQL password
+proofs:
+  - integrity guard: PASS
+  - git diff --check: PASS
+  - docker compose config: NOT_RUN_DOCKER_UNAVAILABLE
+  - distributed service integration: NOT_RUN_DOCKER_UNAVAILABLE
+classification: preview/local RC em hardening
+open_risks: distributed RLS/DLQ/OTLP proof, production TLS/secrets manager
+next_action: commit/push, then continue remaining P0/P1s; no main merge
+```

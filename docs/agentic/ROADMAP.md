@@ -245,3 +245,8 @@ CI agora cobre Go/UI/mobile de forma explícita e o release depende desse qualit
 ## Incremento 2026-09-22 — Grok/provider contract
 
 O contrato Grok agora rejeita modelo arbitrário, valida catálogo no health e não promete streaming HTTP ainda. A próxima etapa de paridade é expor uma rota SSE com backpressure/cancelamento e testes reais contra o provider, sem esconder falhas de credencial.
+
+
+## Incremento 2026-09-22 — Compose secure defaults
+
+A stack local agora exige secrets e loopback binding. Falta executar e inspecionar a integração PostgreSQL/RLS, Redis/DLQ e OTLP em runner Docker real; essa prova não pode ser substituída por YAML estático.

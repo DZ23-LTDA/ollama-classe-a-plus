@@ -75,12 +75,14 @@ Em instalações do sistema, substitua o nome do binário pelo caminho instalado
 
 ### Docker e infraestrutura distribuída
 
-A composição de desenvolvimento está em `deploy/docker-compose.agentic.yml`. Ela fornece os serviços auxiliares usados para testar PostgreSQL, Redis e OpenTelemetry Collector. Não trate o compose de desenvolvimento como configuração de produção: troque senhas, restrinja rede, use TLS e faça backup antes de expor qualquer serviço.
+A composição de desenvolvimento está em `deploy/docker-compose.agentic.yml`. Ela fornece os serviços auxiliares usados para testar PostgreSQL, Redis e OpenTelemetry Collector, prende as portas em loopback por padrão e exige senhas fornecidas pelo ambiente. Não trate o compose de desenvolvimento como configuração de produção: use secrets manager, TLS, backups e rede privada antes de qualquer exposição.
 
 ```bash
-docker compose -f deploy/docker-compose.agentic.yml up -d
-export OLLAMA_AGENT_DATABASE_URL='postgres://usuario:senha@127.0.0.1:5432/ollama_agent?sslmode=disable'
-export OLLAMA_AGENT_REDIS_URL='redis://127.0.0.1:6379/0'
+export OLLAMA_AGENT_POSTGRES_PASSWORD="$(openssl rand -hex 24)"
+export OLLAMA_AGENT_REDIS_PASSWORD="$(openssl rand -hex 24)"
+docker compose -f deploy/docker-compose.agentic.yml up -d --wait
+export OLLAMA_AGENT_DATABASE_URL="postgres://ollama_agent:${OLLAMA_AGENT_POSTGRES_PASSWORD}@127.0.0.1:5432/ollama_agent?sslmode=disable"
+export OLLAMA_AGENT_REDIS_URL="redis://:${OLLAMA_AGENT_REDIS_PASSWORD}@127.0.0.1:6379/0"
 export OLLAMA_AGENT_OTLP_ENDPOINT='http://127.0.0.1:4318'
 ./ollama-classe-a-plus serve
 ```

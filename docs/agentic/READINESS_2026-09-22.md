@@ -207,3 +207,10 @@ A validação local confirmou parser YAML, integrity guard e `git diff --check`.
 O cliente Grok agora rejeita modelos fora de uma allowlist server-configured (`OLLAMA_AGENT_GROK_MODELS`, com o modelo padrão como fallback), e `Probe` só marca o provider como saudável quando o catálogo remoto contém pelo menos um modelo configurado. A rota HTTP `/api/agent/v1/grok/responses` rejeita `stream:true` com `501 Not Implemented` antes de chamar o upstream, evitando declarar streaming de produção quando o handler não expõe SSE; a API interna `StreamResponses` permanece testada para uma futura rota dedicada.
 
 Testes cobrem modelo arbitrário, stream rejeitado, catálogo compatível/incompatível, allowlist por ambiente e não chamada ao upstream. Gates completos Go/integrity/build/UI/mobile passaram. Nenhuma credencial xAI foi usada ou declarada conectada; health real contra xAI continua dependente de credencial válida e ambiente autorizado.
+
+
+## Slice P0 de Compose/infrastructure defaults — 2026-09-22
+
+A composição agentic passou a exigir `OLLAMA_AGENT_POSTGRES_PASSWORD` e `OLLAMA_AGENT_REDIS_PASSWORD`, usar role PostgreSQL não-superuser, Redis com `requirepass` e portas PostgreSQL/Redis/OTLP ligadas a `127.0.0.1` por padrão. O init SQL não contém mais credencial fixa. O workflow distribuído cria passwords efêmeras por execução e injeta URLs autenticadas nos testes.
+
+O integrity guard e `git diff --check` passaram. Docker/Compose não está instalado nesta sandbox; `docker compose config` e o teste real PostgreSQL/Redis/OTLP ficaram `NOT_RUN_DOCKER_UNAVAILABLE`, não sendo tratados como prova local. O GitHub Actions continua sendo a prova autoritativa dessa integração.

@@ -62,15 +62,19 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+      - name: Generate ephemeral integration secrets
+        run: |
+          echo "OLLAMA_AGENT_POSTGRES_PASSWORD=$(openssl rand -hex 24)" >> "$GITHUB_ENV"
+          echo "OLLAMA_AGENT_REDIS_PASSWORD=$(openssl rand -hex 24)" >> "$GITHUB_ENV"
       - name: Start distributed dependencies
         run: docker compose -f deploy/docker-compose.agentic.yml up -d --wait
       - name: Run integration tests
-        env:
-          OLLAMA_AGENT_TEST_POSTGRES_URL: postgres://ollama_agent:change-me-local-only@127.0.0.1:5432/ollama_agent?sslmode=disable
-          OLLAMA_AGENT_TEST_REDIS_URL: redis://127.0.0.1:6379/0
-          OLLAMA_AGENT_TEST_OTLP_ENDPOINT: http://127.0.0.1:4318/v1/traces
-          OLLAMA_AGENT_OTLP_ALLOW_INSECURE: '1'
-        run: CGO_ENABLED=0 go test -tags integration ./internal/agent -run TestDistributed -count=1 -v
+        run: |
+          export OLLAMA_AGENT_TEST_POSTGRES_URL="postgres://ollama_agent:${OLLAMA_AGENT_POSTGRES_PASSWORD}@127.0.0.1:5432/ollama_agent?sslmode=disable"
+          export OLLAMA_AGENT_TEST_REDIS_URL="redis://:${OLLAMA_AGENT_REDIS_PASSWORD}@127.0.0.1:6379/0"
+          export OLLAMA_AGENT_TEST_OTLP_ENDPOINT="http://127.0.0.1:4318/v1/traces"
+          export OLLAMA_AGENT_OTLP_ALLOW_INSECURE=1
+          CGO_ENABLED=0 go test -tags integration ./internal/agent -run TestDistributed -count=1 -v
       - name: Dump dependency logs on failure
         if: failure()
         run: docker compose -f deploy/docker-compose.agentic.yml logs --no-color

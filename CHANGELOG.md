@@ -226,3 +226,8 @@ O workflow agentic passou a verificar suíte Go completa, vet, build, UI tests/b
 ## 2026-09-22 — Grok provider contract
 
 Grok passou a validar modelo contra allowlist e catálogo no health probe; a rota HTTP rejeita `stream:true` explicitamente até existir endpoint SSE de produção.
+
+
+## 2026-09-22 — Compose secure defaults
+
+PostgreSQL/Redis/OTLP foram limitados a loopback por padrão; PostgreSQL/Redis exigem secrets de ambiente e CI usa credenciais efêmeras. O sandbox local não possui Docker, então a integração distribuída permanece dependente do Actions.
