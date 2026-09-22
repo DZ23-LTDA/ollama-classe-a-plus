@@ -886,3 +886,20 @@ open_risks: connector/MCP outbound payload classification, SSRF/DNS rebinding, r
 classification: preview/local RC em hardening
 next_action: commit/push, then address egress classification or MCP stdio isolation
 ```
+
+
+## Publicação da slice P0 DLP — 2026-09-22
+
+```yaml
+state: FIXING
+iteration: 10
+commit: 157e7012
+branch: feat/manus-parity-omniroute
+remote: https://github.com/DZ23-LTDA/ollama-classe-a-plus.git
+pull_request: https://github.com/DZ23-LTDA/ollama-classe-a-plus/pull/1
+working_tree: checkpoint pending commit
+published: true
+proofs: integrity, Go tests/vet/build, UI Vitest/build, mobile typecheck and DLP token-injection regressions all PASS
+classification: preview/local RC em hardening
+next_slice: egress classification/SSRF or MCP stdio process isolation; no main merge
+```
