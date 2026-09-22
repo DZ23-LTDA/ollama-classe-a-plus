@@ -43,3 +43,22 @@ func TestRunToolCommandKillsProcessGroupOnCancellation(t *testing.T) {
 		t.Fatalf("cancellation took too long: %s", elapsed)
 	}
 }
+
+func TestTerminalArgumentPolicyRejectsEscapeAndUnsupportedFlags(t *testing.T) {
+	workspace := t.TempDir()
+	if err := validateTerminalArguments("ls", []string{"."}, workspace); err != nil {
+		t.Fatal(err)
+	}
+	if err := validateTerminalArguments("ls", []string{"../"}, workspace); err == nil {
+		t.Fatal("expected ls path escape rejection")
+	}
+	if err := validateTerminalArguments("ls", []string{"--color=always"}, workspace); err == nil {
+		t.Fatal("expected unsupported ls flag rejection")
+	}
+	if err := validateTerminalArguments("pwd", []string{"."}, workspace); err == nil {
+		t.Fatal("expected pwd argument rejection")
+	}
+	if err := validateTerminalArguments("git", []string{"status", "--short"}, workspace); err == nil {
+		t.Fatal("expected git argument rejection")
+	}
+}

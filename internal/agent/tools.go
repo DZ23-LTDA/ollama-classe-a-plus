@@ -177,8 +177,8 @@ func (t terminalExecTool) Execute(ctx context.Context, toolContext ToolContext, 
 			return ToolResult{}, errors.New("terminal argument contains a control character")
 		}
 	}
-	if executable == "git" && (len(args) == 0 || args[0] != "status") {
-		return ToolResult{}, errors.New("only git status is allowlisted in the default terminal policy")
+	if err := validateTerminalArguments(executable, args, toolContext.Workspace); err != nil {
+		return ToolResult{}, err
 	}
 	deadline, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
@@ -193,6 +193,33 @@ func (t terminalExecTool) Execute(ctx context.Context, toolContext ToolContext, 
 		return ToolResult{Value: map[string]any{"stdout": RedactDLP(stdout.String()), "stderr": RedactDLP(stderr.String()), "execution_isolation": "best-effort-process-group", "resource_limits": "context-timeout-and-output-bounded"}}, err
 	}
 	return ToolResult{Value: map[string]any{"stdout": RedactDLP(stdout.String()), "stderr": RedactDLP(stderr.String()), "exit_code": 0, "execution_isolation": "best-effort-process-group", "resource_limits": "context-timeout-and-output-bounded"}}, nil
+}
+
+func validateTerminalArguments(executable string, args []string, workspace string) error {
+	switch executable {
+	case "pwd":
+		if len(args) != 0 {
+			return errors.New("pwd does not accept arguments in the default terminal policy")
+		}
+	case "git":
+		if len(args) != 1 || args[0] != "status" {
+			return errors.New("only git status is allowlisted in the default terminal policy")
+		}
+	case "ls":
+		allowedFlags := map[string]bool{"-a": true, "-A": true, "-l": true, "-la": true, "-al": true, "--all": true, "--almost-all": true, "--format=long": true}
+		for _, arg := range args {
+			if strings.HasPrefix(arg, "-") {
+				if !allowedFlags[arg] {
+					return fmt.Errorf("ls flag %q is not allowlisted", arg)
+				}
+				continue
+			}
+			if _, err := safeWorkspacePath(workspace, arg); err != nil {
+				return fmt.Errorf("ls path is not inside the workspace: %w", err)
+			}
+		}
+	}
+	return nil
 }
 
 type limitedBuffer struct {
