@@ -815,3 +815,31 @@ proofs: integrity, Go tests/vet/build, UI Vitest/build, mobile typecheck and Com
 classification: preview/local RC em hardening
 next_slice: migrate RecordSpend approved boolean or sandbox/MCP process isolation; no main merge
 ```
+
+
+## Slice P0 spend approvals validada — aguardando publicação — 2026-09-22
+
+```yaml
+state: RELEASING
+iteration: 9
+base_commit: f87f95fa
+working_tree: spend approval/domain/UI/docs ainda não commitados
+implemented:
+  - HTTP spend route no longer accepts approved as caller authority
+  - pending spend approval returns 202 without budget debit
+  - generic approval decision endpoint with owner/admin, nonce and CAS
+  - atomic budget debit only after approved decision
+  - CompanyApprovalQueue UI for pending spend actions
+proofs:
+  - focused Go/domain/HTTP tests: PASS
+  - integrity guard: PASS
+  - CGO_ENABLED=1 go test ./... -count=1: PASS
+  - CGO_ENABLED=1 go vet ./...: PASS
+  - CGO_ENABLED=1 go build: PASS
+  - UI Vitest 20/199: PASS
+  - UI build: PASS; known >500KB warning
+  - mobile typecheck: PASS
+classification: preview/local RC em hardening
+open_risks: strong sandbox/MCP isolation, SSRF/DNS rebinding/DLP, plugin ownership and external credentials/deploys
+next_action: commit/push this slice, then select sandbox/MCP process isolation or egress/DLP as next P0
+```

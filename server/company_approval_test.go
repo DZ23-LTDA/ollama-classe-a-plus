@@ -62,3 +62,47 @@ func TestCompanyCampaignApprovalHTTPUsesNonceAndOrganization(t *testing.T) {
 		t.Fatalf("replay status=%d body=%s", replayRecorder.Code, replayRecorder.Body.String())
 	}
 }
+
+func TestCompanySpendHTTPRequiresDecisionBeforeDebit(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	companies, err := agent.NewCompanyStore("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	company, err := companies.Create(agent.Company{OrganizationID: "org-a", Name: "Spend HTTP", Budget: agent.CompanyBudget{MonthlyLimitCents: 10000, ApprovalThresholdCents: 1000}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	runtime, err := agent.NewRuntime(agent.RuntimeConfig{Company: companies, WorkspaceRoot: t.TempDir()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	api := &agentAPI{runtime: runtime, authRequired: true}
+	spend, spendRecorder := orgContext(t, http.MethodPost, "/companies/"+company.ID+"/spend", "org-a")
+	spend.Params = gin.Params{{Key: "id", Value: company.ID}}
+	spend.Set("agent.membership", agent.Membership{Role: agent.RoleOperator, OrganizationID: "org-a"})
+	spend.Set("agent.user", agent.User{ID: "operator-a"})
+	spend.Request = httptest.NewRequest(http.MethodPost, "/companies/"+company.ID+"/spend", bytes.NewBufferString(`{"category":"ads","amount_cents":2500}`))
+	api.recordCompanySpend(spend)
+	if spendRecorder.Code != http.StatusAccepted {
+		t.Fatalf("spend status=%d body=%s", spendRecorder.Code, spendRecorder.Body.String())
+	}
+	created, err := companies.Get(company.ID)
+	if err != nil || created.Budget.SpentCents != 0 || len(created.Approvals) != 1 {
+		t.Fatalf("spend was not pending: company=%+v err=%v", created, err)
+	}
+	approval := created.Approvals[0]
+	decide, decideRecorder := orgContext(t, http.MethodPost, "/companies/"+company.ID+"/approvals/"+approval.ID+"/decide", "org-a")
+	decide.Params = gin.Params{{Key: "id", Value: company.ID}, {Key: "approval_id", Value: approval.ID}}
+	decide.Set("agent.membership", agent.Membership{Role: agent.RoleAdmin, OrganizationID: "org-a"})
+	decide.Set("agent.user", agent.User{ID: "admin-a"})
+	decide.Request = httptest.NewRequest(http.MethodPost, "/companies/"+company.ID+"/approvals/"+approval.ID+"/decide", bytes.NewBufferString(`{"approved":true,"nonce":"`+approval.Nonce+`","reason":"approved by policy"}`))
+	api.decideCompanyApprovalByID(decide)
+	if decideRecorder.Code != http.StatusOK {
+		t.Fatalf("decide status=%d body=%s", decideRecorder.Code, decideRecorder.Body.String())
+	}
+	final, err := companies.Get(company.ID)
+	if err != nil || final.Budget.SpentCents != 2500 {
+		t.Fatalf("approved spend not debited atomically: company=%+v err=%v", final, err)
+	}
+}

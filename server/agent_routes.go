@@ -398,6 +398,7 @@ func (a *agentAPI) register(r *gin.Engine) {
 	group.POST("/companies/:id/resume", a.resumeCompany)
 	group.POST("/companies/:id/anomalies", a.recordCompanyAnomaly)
 	group.POST("/companies/:id/spend", a.recordCompanySpend)
+	group.POST("/companies/:id/approvals/:approval_id/decide", a.decideCompanyApprovalByID)
 	group.POST("/companies/:id/agents/:agent_id/pause", a.pauseCompanyAgent)
 	group.POST("/companies/:id/agents/:agent_id/resume", a.resumeCompanyAgent)
 	group.POST("/companies/:id/agents/:agent_id/spend", a.recordCompanyAgentSpend)

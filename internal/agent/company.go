@@ -110,6 +110,8 @@ type CompanyApproval struct {
 	ResourceType   string                `json:"resource_type"`
 	ResourceID     string                `json:"resource_id"`
 	Policy         string                `json:"policy"`
+	Category       string                `json:"category,omitempty"`
+	AmountCents    int64                 `json:"amount_cents,omitempty"`
 	Nonce          string                `json:"nonce"`
 	ActorID        string                `json:"actor_id,omitempty"`
 	Status         CompanyApprovalStatus `json:"status"`
@@ -211,13 +213,14 @@ type CompanyCreateRequest struct {
 }
 
 var (
-	ErrCompanyNotFound         = errors.New("company not found")
-	ErrCompanyBudgetExceeded   = errors.New("company budget limit exceeded; company paused")
-	ErrCompanyApprovalRequired = errors.New("approval is required for this company action")
-	ErrCompanyPaused           = errors.New("company is paused")
-	ErrCompanyApprovalConflict = errors.New("company approval version conflict")
-	ErrCompanyApprovalNonce    = errors.New("company approval nonce mismatch")
-	ErrCompanyApprovalNotFound = errors.New("company approval not found or already decided")
+	ErrCompanyNotFound             = errors.New("company not found")
+	ErrCompanyBudgetExceeded       = errors.New("company budget limit exceeded; company paused")
+	ErrCompanyApprovalRequired     = errors.New("approval is required for this company action")
+	ErrCompanyPaused               = errors.New("company is paused")
+	ErrCompanyApprovalConflict     = errors.New("company approval version conflict")
+	ErrCompanyApprovalNonce        = errors.New("company approval nonce mismatch")
+	ErrCompanyApprovalNotFound     = errors.New("company approval not found or already decided")
+	ErrCompanySpendApprovalPending = errors.New("company spend approval is pending")
 )
 
 type CompanyStore struct {
@@ -383,6 +386,42 @@ func queueCompanyApproval(company *Company, resourceType, resourceID, policy str
 	})
 }
 
+func (s *CompanyStore) RecordSpendRequest(id, category string, amountCents int64) (Company, error) {
+	if amountCents <= 0 {
+		return Company{}, errors.New("spend amount must be positive")
+	}
+	category = strings.TrimSpace(category)
+	return s.mutate(id, func(company *Company) error {
+		if company.Status == CompanyPaused || company.Risk.Paused {
+			return ErrCompanyPaused
+		}
+		requiresApproval := (company.Budget.ApprovalThresholdCents > 0 && amountCents >= company.Budget.ApprovalThresholdCents) || category == "ads" || category == "contract"
+		if !requiresApproval {
+			if company.Budget.MonthlyLimitCents > 0 && company.Budget.SpentCents+amountCents > company.Budget.MonthlyLimitCents {
+				company.Status = CompanyPaused
+				company.Risk.Paused = true
+				company.Risk.PauseReason = "limite de orçamento excedido"
+				company.Risk.UpdatedAt = time.Now().UTC()
+				return ErrCompanyBudgetExceeded
+			}
+			company.Budget.SpentCents += amountCents
+			return nil
+		}
+		for _, approval := range company.Approvals {
+			if approval.ResourceType == "spend" && approval.Status == CompanyApprovalPending && approval.Category == category && approval.AmountCents == amountCents {
+				return ErrCompanySpendApprovalPending
+			}
+		}
+		resourceID := "spend_" + uuid.NewString()
+		now := time.Now().UTC()
+		queueCompanyApproval(company, "spend", resourceID, "spend:"+category, now)
+		approval := &company.Approvals[len(company.Approvals)-1]
+		approval.Category = category
+		approval.AmountCents = amountCents
+		return ErrCompanySpendApprovalPending
+	})
+}
+
 func (s *CompanyStore) PendingApproval(id, resourceType, resourceID string) (CompanyApproval, error) {
 	company, err := s.Get(id)
 	if err != nil {
@@ -456,6 +495,27 @@ func applyCompanyApproval(company *Company, resourceType, resourceID string, app
 				return nil
 			}
 		}
+	case "spend":
+		for _, approval := range company.Approvals {
+			if approval.ResourceType != resourceType || approval.ResourceID != resourceID {
+				continue
+			}
+			if approval.AmountCents <= 0 {
+				return ErrCompanyApprovalRequired
+			}
+			if company.Status == CompanyPaused || company.Risk.Paused {
+				return ErrCompanyPaused
+			}
+			if company.Budget.MonthlyLimitCents > 0 && company.Budget.SpentCents+approval.AmountCents > company.Budget.MonthlyLimitCents {
+				company.Status = CompanyPaused
+				company.Risk.Paused = true
+				company.Risk.PauseReason = "limite de orçamento excedido"
+				company.Risk.UpdatedAt = time.Now().UTC()
+				return ErrCompanyBudgetExceeded
+			}
+			company.Budget.SpentCents += approval.AmountCents
+			return nil
+		}
 	}
 	return ErrCompanyApprovalNotFound
 }
@@ -482,11 +542,11 @@ func (s *CompanyStore) DecideApproval(id, approvalID string, approved bool, reas
 			if strings.TrimSpace(nonce) == "" || strings.TrimSpace(nonce) != approval.Nonce {
 				return ErrCompanyApprovalNonce
 			}
-			if !markCompanyApproval(company, approval.ResourceType, approval.ResourceID, approved, actorID, reason) {
-				return ErrCompanyApprovalNotFound
-			}
 			if err := applyCompanyApproval(company, approval.ResourceType, approval.ResourceID, approved); err != nil {
 				return err
+			}
+			if !markCompanyApproval(company, approval.ResourceType, approval.ResourceID, approved, actorID, reason) {
+				return ErrCompanyApprovalNotFound
 			}
 			return nil
 		}
@@ -768,7 +828,7 @@ func (s *CompanyStore) mutate(id string, fn func(*Company) error) (Company, erro
 		return Company{}, ErrCompanyNotFound
 	}
 	if err := fn(&company); err != nil {
-		if errors.Is(err, ErrCompanyBudgetExceeded) {
+		if errors.Is(err, ErrCompanyBudgetExceeded) || errors.Is(err, ErrCompanySpendApprovalPending) {
 			if company.Version <= 0 {
 				company.Version = 1
 			}

@@ -43,7 +43,7 @@ export type CompanyCycle = { id: string; name: string; objective: string; freque
 export type CompanyAgent = { id: string; department_id: string; name: string; objective: string; budget_cents: number; spent_cents: number; allowed_tools?: string[]; memory_scope: string; metrics?: Record<string, number>; sla?: string; supervisor_id?: string; autonomy: string; pause_condition?: string; approval_required?: string[]; status: string; paused_reason?: string };
 export type CompanySocialAccount = { id: string; provider: string; name: string; status: string; oauth_required: boolean };
 export type CompanySocialDraft = { id: string; provider: string; account_id?: string; title: string; body: string; status: string; approval_required: boolean; approved: boolean; mode: string; published_at?: string };
-export type CompanyApproval = { id: string; company_id: string; organization_id: string; resource_type: string; resource_id: string; policy: string; nonce: string; actor_id?: string; status: string; reason?: string; expires_at?: string };
+export type CompanyApproval = { id: string; company_id: string; organization_id: string; resource_type: string; resource_id: string; policy: string; category?: string; amount_cents?: number; nonce: string; actor_id?: string; status: string; reason?: string; expires_at?: string };
 export type CompanySocialReport = { company: AgentCompany; connected_accounts: number; pending_oauth: number; drafts: number; approved_drafts: number; published_sandbox: number; impressions: number; clicks: number; conversions: number };
 export type AgentCompany = {
   id: string; version: number; organization_id: string; name: string; mission?: string; positioning?: string; business_model?: string;
@@ -107,7 +107,8 @@ export const addCompanyCycle = (id: string, payload: Record<string, unknown>) =>
 export const pauseCompany = (id: string, reason: string) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/pause`, { method: "POST", body: JSON.stringify({ reason }) });
 export const resumeCompany = (id: string) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/resume`, { method: "POST", body: "{}" });
 export const recordCompanyAnomaly = (id: string, severity: string, reason: string) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/anomalies`, { method: "POST", body: JSON.stringify({ severity, reason }) });
-export const recordCompanySpend = (id: string, category: string, amount_cents: number, approved: boolean) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/spend`, { method: "POST", body: JSON.stringify({ category, amount_cents, approved }) });
+export const recordCompanySpend = (id: string, category: string, amount_cents: number) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/spend`, { method: "POST", body: JSON.stringify({ category, amount_cents }) });
+export const decideCompanyApproval = (id: string, approvalID: string, approved: boolean, nonce: string) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/approvals/${encodeURIComponent(approvalID)}/decide`, { method: "POST", body: JSON.stringify({ approved, nonce, reason: approved ? "Aprovado no Company OS" : "Rejeitado no Company OS" }) });
 export const getCompanyGrowthReport = (id: string) => agentFetch<CompanyGrowthReport>(`/api/agent/v1/companies/${encodeURIComponent(id)}/growth/report`);
 export const getGrokStatus = () => agentFetch<GrokStatus>("/api/agent/v1/grok/status");
 export const listCompanyAgents = (id: string) => agentFetch<{ agents: CompanyAgent[] }>(`/api/agent/v1/companies/${encodeURIComponent(id)}/agents`);

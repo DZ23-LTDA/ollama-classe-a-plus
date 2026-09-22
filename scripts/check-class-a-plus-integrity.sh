@@ -95,6 +95,9 @@ grep -q 'type CompanyApproval struct' internal/agent/company.go
 grep -q 'DecideApproval' server/company_approval_routes.go
 grep -q 'PendingApproval' internal/agent/company.go
 grep -q 'CompanyCampaignApprovalHTTPUsesNonceAndOrganization' server/company_approval_test.go
+grep -q 'RecordSpendRequest' internal/agent/company.go
+grep -q 'decideCompanyApprovalByID' server/company_approval_routes.go
+grep -q 'CompanyApprovalQueue' app/ui/app/src/components/CompanyApprovalQueue.tsx
 grep -q 'Capabilities' internal/agent/runtime.go
 grep -q 'Evaluation' internal/agent/evaluation.go
 for route in projects library scheduled skills plugins tasks company; do

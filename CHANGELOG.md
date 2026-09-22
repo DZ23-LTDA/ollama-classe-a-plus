@@ -161,3 +161,8 @@ A classificação permanece release candidate local-first. Integrações externa
 ## 2026-09-22 — Company OS approvals auditáveis
 
 Campanhas, afiliados, pedidos e drafts sociais passaram a emitir `CompanyApproval` server-side com policy, nonce, expiração, actor, organização, razão e versão CAS. Os endpoints de aprovação não aceitam mais `{}` como autorização: localizam a decisão pendente e só projetam o recurso aprovado após validação. A rota de gasto com `approved` booleano permanece aberta para a próxima slice.
+
+
+## 2026-09-22 — spend approvals e budget atômico
+
+A rota HTTP de gasto deixou de aceitar `approved` do cliente. Solicitações que atravessam a política de budget viram approvals pendentes com nonce, expiração, actor, organização e CAS; a nova fila do Company OS decide e só então contabiliza o valor. O limite mensal continua pausando a Company sem débito parcial.

@@ -137,3 +137,29 @@ func TestCompanyApprovalBindsActorNonceAndVersion(t *testing.T) {
 		t.Fatalf("expected single-use approval, got %v", err)
 	}
 }
+
+func TestCompanySpendRequiresApprovalBeforeBudgetMutation(t *testing.T) {
+	store, err := NewCompanyStore("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	company, err := store.Create(Company{OrganizationID: "org_a", Name: "Spend Company", Budget: CompanyBudget{MonthlyLimitCents: 10000, ApprovalThresholdCents: 1000}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	pending, err := store.RecordSpendRequest(company.ID, "ads", 2500)
+	if !errors.Is(err, ErrCompanySpendApprovalPending) {
+		t.Fatalf("spend request err=%v", err)
+	}
+	if pending.Budget.SpentCents != 0 || len(pending.Approvals) != 1 {
+		t.Fatalf("spend mutated before approval: %+v", pending)
+	}
+	approval := pending.Approvals[0]
+	approved, err := store.DecideApproval(company.ID, approval.ID, true, "campaign budget approved", "admin_a", "org_a", pending.Version, approval.Nonce)
+	if err != nil || approved.Budget.SpentCents != 2500 {
+		t.Fatalf("approved spend=%+v err=%v", approved, err)
+	}
+	if approved.Approvals[0].Status != CompanyApprovalApproved {
+		t.Fatalf("approval=%+v", approved.Approvals[0])
+	}
+}

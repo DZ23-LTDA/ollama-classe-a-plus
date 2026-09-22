@@ -114,3 +114,10 @@ Esta slice cobre approvals de missão, não todas as decisões do Company/Growth
 Campanhas, programas de afiliados, pedidos de dropshipping e drafts sociais agora criam uma decisão server-side `CompanyApproval` com organização, recurso, policy, nonce, expiração, actor, razão e status. Os endpoints de approve localizam o approval pendente no servidor, exigem owner/admin quando auth está ativa, validam nonce e versão da Company e só então projetam `approved=true`/estado do recurso. Regressões cobrem nonce incorreto, replay, actor/org e HTTP.
 
 Os gates completos passaram: integrity guard, `CGO_ENABLED=1 go test ./... -count=1`, `go vet`, build Go, Vitest 20/199, build UI e typecheck mobile. O campo booleano `approved` continua no schema apenas como projeção legada; o cliente não é mais a autoridade para aprovar. `RecordSpend`/gasto da Company ainda aceita uma rota distinta com booleano e permanece P0 aberto para migrar ao mesmo approval ledger.
+
+
+## Slice P0 final de approvals de gasto — 2026-09-22
+
+A rota de gasto foi migrada para `RecordSpendRequest`: quando a política exige aprovação, a solicitação cria um approval `spend` pendente e retorna `202 Accepted` sem debitar o budget. A fila `CompanyApprovalQueue` permite owner/admin decidir com nonce e CAS por endpoint genérico; somente após decisão aprovada o valor é contabilizado. Rejeição, replay, organização incorreta, versão conflitante e excesso de budget não produzem débito parcial.
+
+Os gates completos após a correção de contrato TypeScript passaram: integrity guard, `CGO_ENABLED=1 go test ./... -count=1`, `go vet`, build Go, Vitest 20/199, build UI e typecheck mobile. O método interno legado `RecordSpend(..., approved bool)` permanece apenas para compatibilidade de domínio/testes; a rota HTTP e a UI não o utilizam mais nem aceitam essa autoridade do cliente.

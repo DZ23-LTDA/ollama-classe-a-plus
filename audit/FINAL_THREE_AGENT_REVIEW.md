@@ -119,3 +119,10 @@ A correção não cobre ainda os booleans `approved` de Company/Growth/Social, q
 Campanhas, programas de afiliados, pedidos e drafts sociais passaram a usar approvals server-side com `resource_type/resource_id`, organization, policy, nonce, expiração, actor, razão e CAS de Company version. Os endpoints de aprovação não confiam mais no booleano ou no estado enviado pelo cliente; o campo `approved` é apenas uma projeção após decisão válida. A UI passa a enviar o nonce da decisão pendente.
 
 A rota de gasto ainda possui `approved` booleano e não foi incluída nesta slice; orçamento, anúncios, contratos e mensagens externas exigem a continuação do approval ledger. A auditoria geral continua aberta.
+
+
+## Slice P0 validada — spend approval e budget atômico — 2026-09-22
+
+A rota HTTP de gasto não aceita mais `approved` como autoridade. Solicitações sujeitas à política criam uma decisão `spend` pendente e retornam `202` sem mutar `SpentCents`; a fila Company OS usa o endpoint genérico de decisão com owner/admin, nonce e CAS. A aprovação aplicada verifica pausa e limite antes do débito, e o teste HTTP/domínio cobre ausência de mutação antes da decisão e débito único depois dela.
+
+O método interno legado com booleano continua somente para compatibilidade de domínio/testes e não é utilizado pela rota pública. A auditoria maior continua aberta para sandbox/MCP, egress/DLP, plugins e demais superfícies.

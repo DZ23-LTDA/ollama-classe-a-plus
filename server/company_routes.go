@@ -247,14 +247,17 @@ func (a *agentAPI) recordCompanySpend(c *gin.Context) {
 	var input struct {
 		Category    string `json:"category"`
 		AmountCents int64  `json:"amount_cents"`
-		Approved    bool   `json:"approved"`
 	}
 	if err := decodeJSON(c, &input); err != nil {
 		writeAgentError(c, http.StatusBadRequest, err)
 		return
 	}
-	company, err := a.runtime.CompanyStore().RecordSpend(c.Param("id"), input.Category, input.AmountCents, input.Approved)
+	company, err := a.runtime.CompanyStore().RecordSpendRequest(c.Param("id"), input.Category, input.AmountCents)
 	if err != nil {
+		if errors.Is(err, agent.ErrCompanySpendApprovalPending) {
+			c.JSON(http.StatusAccepted, company)
+			return
+		}
 		writeAgentError(c, statusForAgentError(err), err)
 		return
 	}
@@ -265,7 +268,7 @@ func companyErrorStatus(err error) int {
 	switch {
 	case errors.Is(err, agent.ErrCompanyNotFound):
 		return http.StatusNotFound
-	case errors.Is(err, agent.ErrCompanyBudgetExceeded), errors.Is(err, agent.ErrCompanyAgentBudgetExceeded), errors.Is(err, agent.ErrCompanyApprovalRequired), errors.Is(err, agent.ErrCompanyApprovalConflict), errors.Is(err, agent.ErrCompanyApprovalNonce):
+	case errors.Is(err, agent.ErrCompanyBudgetExceeded), errors.Is(err, agent.ErrCompanyAgentBudgetExceeded), errors.Is(err, agent.ErrCompanyApprovalRequired), errors.Is(err, agent.ErrCompanyApprovalConflict), errors.Is(err, agent.ErrCompanyApprovalNonce), errors.Is(err, agent.ErrCompanySpendApprovalPending):
 		return http.StatusConflict
 	case errors.Is(err, agent.ErrCompanyCampaignNotFound), errors.Is(err, agent.ErrCompanyAffiliateNotFound), errors.Is(err, agent.ErrCompanyProductNotFound), errors.Is(err, agent.ErrCompanyOrderNotFound), errors.Is(err, agent.ErrCompanyApprovalNotFound):
 		return http.StatusNotFound
