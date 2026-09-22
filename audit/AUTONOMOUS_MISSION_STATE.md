@@ -843,3 +843,20 @@ classification: preview/local RC em hardening
 open_risks: strong sandbox/MCP isolation, SSRF/DNS rebinding/DLP, plugin ownership and external credentials/deploys
 next_action: commit/push this slice, then select sandbox/MCP process isolation or egress/DLP as next P0
 ```
+
+
+## Publicação da slice P0 spend approvals — 2026-09-22
+
+```yaml
+state: FIXING
+iteration: 9
+commit: 99ea0b01
+branch: feat/manus-parity-omniroute
+remote: https://github.com/DZ23-LTDA/ollama-classe-a-plus.git
+pull_request: https://github.com/DZ23-LTDA/ollama-classe-a-plus/pull/1
+working_tree: checkpoint pending commit
+published: true
+proofs: integrity, Go tests/vet/build, UI Vitest/build, mobile typecheck and spend HTTP/domain regressions all PASS
+classification: preview/local RC em hardening
+next_slice: sandbox/MCP process isolation or egress/DLP; no main merge
+```
