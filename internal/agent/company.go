@@ -1,11 +1,14 @@
 package agent
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -121,6 +124,13 @@ type CompanyApproval struct {
 	UpdatedAt      time.Time             `json:"updated_at"`
 }
 
+type CompanyIdempotencyRecord struct {
+	Digest      string    `json:"digest"`
+	Operation   string    `json:"operation"`
+	Fingerprint string    `json:"fingerprint"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
 type CompanyCycle struct {
 	ID              string     `json:"id"`
 	Name            string     `json:"name"`
@@ -137,38 +147,39 @@ type CompanyCycle struct {
 }
 
 type Company struct {
-	ID                string                    `json:"id"`
-	Version           int64                     `json:"version"`
-	OrganizationID    string                    `json:"organization_id"`
-	Name              string                    `json:"name"`
-	Mission           string                    `json:"mission,omitempty"`
-	Positioning       string                    `json:"positioning,omitempty"`
-	BusinessModel     string                    `json:"business_model,omitempty"`
-	TargetAudience    string                    `json:"target_audience,omitempty"`
-	Offer             string                    `json:"offer,omitempty"`
-	Website           string                    `json:"website,omitempty"`
-	Currency          string                    `json:"currency"`
-	Status            CompanyStatus             `json:"status"`
-	Departments       []CompanyDepartment       `json:"departments"`
-	Agents            []CompanyAgent            `json:"agents,omitempty"`
-	Channels          []CompanyChannel          `json:"channels,omitempty"`
-	Roadmap           []CompanyRoadmapItem      `json:"roadmap,omitempty"`
-	Goals             []CompanyGoal             `json:"goals,omitempty"`
-	Backlog           []CompanyBacklogItem      `json:"backlog,omitempty"`
-	Cycles            []CompanyCycle            `json:"cycles,omitempty"`
-	Campaigns         []CompanyCampaign         `json:"campaigns,omitempty"`
-	AffiliatePrograms []CompanyAffiliateProgram `json:"affiliate_programs,omitempty"`
-	AffiliateLinks    []CompanyAffiliateLink    `json:"affiliate_links,omitempty"`
-	Products          []CompanyProduct          `json:"products,omitempty"`
-	Orders            []CompanyOrder            `json:"orders,omitempty"`
-	SocialAccounts    []CompanySocialAccount    `json:"social_accounts,omitempty"`
-	SocialDrafts      []CompanySocialDraft      `json:"social_drafts,omitempty"`
-	SocialMetrics     []CompanySocialMetric     `json:"social_metrics,omitempty"`
-	Budget            CompanyBudget             `json:"budget"`
-	Risk              CompanyRisk               `json:"risk"`
-	Approvals         []CompanyApproval         `json:"approvals,omitempty"`
-	CreatedAt         time.Time                 `json:"created_at"`
-	UpdatedAt         time.Time                 `json:"updated_at"`
+	ID                string                     `json:"id"`
+	Version           int64                      `json:"version"`
+	OrganizationID    string                     `json:"organization_id"`
+	Name              string                     `json:"name"`
+	Mission           string                     `json:"mission,omitempty"`
+	Positioning       string                     `json:"positioning,omitempty"`
+	BusinessModel     string                     `json:"business_model,omitempty"`
+	TargetAudience    string                     `json:"target_audience,omitempty"`
+	Offer             string                     `json:"offer,omitempty"`
+	Website           string                     `json:"website,omitempty"`
+	Currency          string                     `json:"currency"`
+	Status            CompanyStatus              `json:"status"`
+	Departments       []CompanyDepartment        `json:"departments"`
+	Agents            []CompanyAgent             `json:"agents,omitempty"`
+	Channels          []CompanyChannel           `json:"channels,omitempty"`
+	Roadmap           []CompanyRoadmapItem       `json:"roadmap,omitempty"`
+	Goals             []CompanyGoal              `json:"goals,omitempty"`
+	Backlog           []CompanyBacklogItem       `json:"backlog,omitempty"`
+	Cycles            []CompanyCycle             `json:"cycles,omitempty"`
+	Campaigns         []CompanyCampaign          `json:"campaigns,omitempty"`
+	AffiliatePrograms []CompanyAffiliateProgram  `json:"affiliate_programs,omitempty"`
+	AffiliateLinks    []CompanyAffiliateLink     `json:"affiliate_links,omitempty"`
+	Products          []CompanyProduct           `json:"products,omitempty"`
+	Orders            []CompanyOrder             `json:"orders,omitempty"`
+	SocialAccounts    []CompanySocialAccount     `json:"social_accounts,omitempty"`
+	SocialDrafts      []CompanySocialDraft       `json:"social_drafts,omitempty"`
+	SocialMetrics     []CompanySocialMetric      `json:"social_metrics,omitempty"`
+	Budget            CompanyBudget              `json:"budget"`
+	Risk              CompanyRisk                `json:"risk"`
+	Approvals         []CompanyApproval          `json:"approvals,omitempty"`
+	Idempotency       []CompanyIdempotencyRecord `json:"idempotency,omitempty"`
+	CreatedAt         time.Time                  `json:"created_at"`
+	UpdatedAt         time.Time                  `json:"updated_at"`
 }
 
 type CompanyReport struct {
@@ -221,6 +232,8 @@ var (
 	ErrCompanyApprovalNonce        = errors.New("company approval nonce mismatch")
 	ErrCompanyApprovalNotFound     = errors.New("company approval not found or already decided")
 	ErrCompanySpendApprovalPending = errors.New("company spend approval is pending")
+	ErrCompanyIdempotentReplay     = errors.New("company idempotent replay")
+	ErrCompanyIdempotencyConflict  = errors.New("company idempotency key was reused with different input")
 )
 
 type CompanyStore struct {
@@ -299,6 +312,7 @@ func (s *CompanyStore) Create(company Company) (Company, error) {
 	company.SocialDrafts = nil
 	company.SocialMetrics = nil
 	company.Approvals = nil
+	company.Idempotency = nil
 	company.Version = 1
 	company.Budget.SpentCents = 0
 	company.Risk = CompanyRisk{}
@@ -386,12 +400,54 @@ func queueCompanyApproval(company *Company, resourceType, resourceID, policy str
 	})
 }
 
+func companyIdempotencyDigest(operation, key string) string {
+	sum := sha256.Sum256([]byte(operation + "\x00" + key))
+	return hex.EncodeToString(sum[:])
+}
+
+func checkCompanyIdempotency(company *Company, operation, key, fingerprint string) error {
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return nil
+	}
+	digest := companyIdempotencyDigest(operation, key)
+	for _, record := range company.Idempotency {
+		if record.Operation != operation || record.Digest != digest {
+			continue
+		}
+		if record.Fingerprint != fingerprint {
+			return ErrCompanyIdempotencyConflict
+		}
+		return ErrCompanyIdempotentReplay
+	}
+	return nil
+}
+
+func rememberCompanyIdempotency(company *Company, operation, key, fingerprint string) {
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return
+	}
+	company.Idempotency = append(company.Idempotency, CompanyIdempotencyRecord{Digest: companyIdempotencyDigest(operation, key), Operation: operation, Fingerprint: fingerprint, CreatedAt: time.Now().UTC()})
+	if len(company.Idempotency) > 1024 {
+		company.Idempotency = append([]CompanyIdempotencyRecord(nil), company.Idempotency[len(company.Idempotency)-1024:]...)
+	}
+}
+
 func (s *CompanyStore) RecordSpendRequest(id, category string, amountCents int64) (Company, error) {
+	return s.RecordSpendRequestWithIdempotency(id, category, amountCents, "")
+}
+
+func (s *CompanyStore) RecordSpendRequestWithIdempotency(id, category string, amountCents int64, idempotencyKey string) (Company, error) {
 	if amountCents <= 0 {
 		return Company{}, errors.New("spend amount must be positive")
 	}
 	category = strings.TrimSpace(category)
+	fingerprint := category + ":" + strconv.FormatInt(amountCents, 10)
 	return s.mutate(id, func(company *Company) error {
+		if err := checkCompanyIdempotency(company, "company.spend.request", idempotencyKey, fingerprint); err != nil {
+			return err
+		}
 		if company.Status == CompanyPaused || company.Risk.Paused {
 			return ErrCompanyPaused
 		}
@@ -405,6 +461,7 @@ func (s *CompanyStore) RecordSpendRequest(id, category string, amountCents int64
 				return ErrCompanyBudgetExceeded
 			}
 			company.Budget.SpentCents += amountCents
+			rememberCompanyIdempotency(company, "company.spend.request", idempotencyKey, fingerprint)
 			return nil
 		}
 		for _, approval := range company.Approvals {
@@ -418,6 +475,7 @@ func (s *CompanyStore) RecordSpendRequest(id, category string, amountCents int64
 		approval := &company.Approvals[len(company.Approvals)-1]
 		approval.Category = category
 		approval.AmountCents = amountCents
+		rememberCompanyIdempotency(company, "company.spend.request", idempotencyKey, fingerprint)
 		return ErrCompanySpendApprovalPending
 	})
 }

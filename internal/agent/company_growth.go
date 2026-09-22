@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/url"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -239,15 +240,24 @@ func (s *CompanyStore) AddAffiliateLink(id string, link CompanyAffiliateLink) (C
 }
 
 func (s *CompanyStore) RecordAffiliateConversion(id, linkID string, revenueCents int64) (Company, error) {
+	return s.RecordAffiliateConversionWithIdempotency(id, linkID, revenueCents, "")
+}
+
+func (s *CompanyStore) RecordAffiliateConversionWithIdempotency(id, linkID string, revenueCents int64, idempotencyKey string) (Company, error) {
 	if revenueCents < 0 {
 		return Company{}, errors.New("affiliate revenue cannot be negative")
 	}
+	fingerprint := strings.TrimSpace(linkID) + ":" + strconv.FormatInt(revenueCents, 10)
 	return s.mutate(id, func(company *Company) error {
+		if err := checkCompanyIdempotency(company, "company.affiliate.conversion", idempotencyKey, fingerprint); err != nil {
+			return err
+		}
 		for index := range company.AffiliateLinks {
 			if company.AffiliateLinks[index].ID == linkID {
 				company.AffiliateLinks[index].Conversions++
 				company.AffiliateLinks[index].RevenueCents += revenueCents
 				company.AffiliateLinks[index].UpdatedAt = time.Now().UTC()
+				rememberCompanyIdempotency(company, "company.affiliate.conversion", idempotencyKey, fingerprint)
 				return nil
 			}
 		}

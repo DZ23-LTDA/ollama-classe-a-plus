@@ -1,6 +1,7 @@
 package server
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -120,8 +121,12 @@ func (a *agentAPI) recordCompanyAffiliateConversion(c *gin.Context) {
 		writeAgentError(c, http.StatusBadRequest, err)
 		return
 	}
-	company, err := a.runtime.CompanyStore().RecordAffiliateConversion(c.Param("id"), c.Param("link_id"), input.RevenueCents)
+	company, err := a.runtime.CompanyStore().RecordAffiliateConversionWithIdempotency(c.Param("id"), c.Param("link_id"), input.RevenueCents, c.GetHeader("Idempotency-Key"))
 	if err != nil {
+		if errors.Is(err, agent.ErrCompanyIdempotentReplay) {
+			c.JSON(http.StatusOK, company)
+			return
+		}
 		writeAgentError(c, statusForAgentError(err), err)
 		return
 	}

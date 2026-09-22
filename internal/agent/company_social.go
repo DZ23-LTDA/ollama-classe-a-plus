@@ -2,6 +2,7 @@ package agent
 
 import (
 	"errors"
+	"strconv"
 	"strings"
 	"time"
 
@@ -179,6 +180,10 @@ func (s *CompanyStore) PublishSocialDraft(id, draftID string) (Company, error) {
 }
 
 func (s *CompanyStore) RecordSocialMetric(id string, metric CompanySocialMetric) (Company, error) {
+	return s.RecordSocialMetricWithIdempotency(id, metric, "")
+}
+
+func (s *CompanyStore) RecordSocialMetricWithIdempotency(id string, metric CompanySocialMetric, idempotencyKey string) (Company, error) {
 	if metric.DraftID == "" || metric.Impressions < 0 || metric.Clicks < 0 || metric.Conversions < 0 {
 		return Company{}, errors.New("social metric draft and non-negative counters are required")
 	}
@@ -186,9 +191,13 @@ func (s *CompanyStore) RecordSocialMetric(id string, metric CompanySocialMetric)
 	if metric.Provider == "" {
 		return Company{}, ErrCompanySocialProviderUnsupported
 	}
+	fingerprint := metric.DraftID + ":" + metric.Provider + ":" + strconv.FormatInt(metric.Impressions, 10) + ":" + strconv.FormatInt(metric.Clicks, 10) + ":" + strconv.FormatInt(metric.Conversions, 10)
 	metric.ID = "smetric_" + uuid.NewString()
 	metric.RecordedAt = time.Now().UTC()
 	return s.mutate(id, func(company *Company) error {
+		if err := checkCompanyIdempotency(company, "company.social.metric", idempotencyKey, fingerprint); err != nil {
+			return err
+		}
 		found := false
 		for _, draft := range company.SocialDrafts {
 			if draft.ID == metric.DraftID {
@@ -200,6 +209,7 @@ func (s *CompanyStore) RecordSocialMetric(id string, metric CompanySocialMetric)
 			return ErrCompanySocialNotFound
 		}
 		company.SocialMetrics = append(company.SocialMetrics, metric)
+		rememberCompanyIdempotency(company, "company.social.metric", idempotencyKey, fingerprint)
 		return nil
 	})
 }

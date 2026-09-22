@@ -252,8 +252,12 @@ func (a *agentAPI) recordCompanySpend(c *gin.Context) {
 		writeAgentError(c, http.StatusBadRequest, err)
 		return
 	}
-	company, err := a.runtime.CompanyStore().RecordSpendRequest(c.Param("id"), input.Category, input.AmountCents)
+	company, err := a.runtime.CompanyStore().RecordSpendRequestWithIdempotency(c.Param("id"), input.Category, input.AmountCents, c.GetHeader("Idempotency-Key"))
 	if err != nil {
+		if errors.Is(err, agent.ErrCompanyIdempotentReplay) {
+			c.JSON(http.StatusOK, company)
+			return
+		}
 		if errors.Is(err, agent.ErrCompanySpendApprovalPending) {
 			c.JSON(http.StatusAccepted, company)
 			return
@@ -268,7 +272,7 @@ func companyErrorStatus(err error) int {
 	switch {
 	case errors.Is(err, agent.ErrCompanyNotFound):
 		return http.StatusNotFound
-	case errors.Is(err, agent.ErrCompanyBudgetExceeded), errors.Is(err, agent.ErrCompanyAgentBudgetExceeded), errors.Is(err, agent.ErrCompanyApprovalRequired), errors.Is(err, agent.ErrCompanyApprovalConflict), errors.Is(err, agent.ErrCompanyApprovalNonce), errors.Is(err, agent.ErrCompanySpendApprovalPending):
+	case errors.Is(err, agent.ErrCompanyBudgetExceeded), errors.Is(err, agent.ErrCompanyAgentBudgetExceeded), errors.Is(err, agent.ErrCompanyApprovalRequired), errors.Is(err, agent.ErrCompanyApprovalConflict), errors.Is(err, agent.ErrCompanyApprovalNonce), errors.Is(err, agent.ErrCompanySpendApprovalPending), errors.Is(err, agent.ErrCompanyIdempotencyConflict):
 		return http.StatusConflict
 	case errors.Is(err, agent.ErrCompanyCampaignNotFound), errors.Is(err, agent.ErrCompanyAffiliateNotFound), errors.Is(err, agent.ErrCompanyProductNotFound), errors.Is(err, agent.ErrCompanyOrderNotFound), errors.Is(err, agent.ErrCompanyApprovalNotFound):
 		return http.StatusNotFound

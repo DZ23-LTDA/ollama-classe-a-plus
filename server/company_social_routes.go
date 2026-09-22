@@ -1,6 +1,7 @@
 package server
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -83,8 +84,12 @@ func (a *agentAPI) recordCompanySocialMetric(c *gin.Context) {
 		writeAgentError(c, http.StatusBadRequest, err)
 		return
 	}
-	company, err := a.runtime.CompanyStore().RecordSocialMetric(c.Param("id"), input)
+	company, err := a.runtime.CompanyStore().RecordSocialMetricWithIdempotency(c.Param("id"), input, c.GetHeader("Idempotency-Key"))
 	if err != nil {
+		if errors.Is(err, agent.ErrCompanyIdempotentReplay) {
+			c.JSON(http.StatusOK, company)
+			return
+		}
 		writeAgentError(c, statusForAgentError(err), err)
 		return
 	}
