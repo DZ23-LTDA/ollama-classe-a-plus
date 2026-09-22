@@ -176,6 +176,13 @@ O endpoint `GET /companies/COMPANY_ID/growth/report` resume campanhas ativas, co
 
 Com `OLLAMA_AGENT_AUTH_REQUIRED=true`, a API valida sessão, organização e RBAC antes de permitir ações. O fluxo `GET /auth/oauth/:provider/start` exige `redirect_uri` e `code_verifier` PKCE; o callback consome `state` uma única vez, troca o código no servidor e cifra access/refresh tokens com AES-GCM usando `OLLAMA_AGENT_CREDENTIAL_KEY`. Configure URLs e nomes das variáveis de segredo por provider sem colocar valores no repositório.
 
+Para encerrar uma sessão local, envie o bearer atual a `POST /api/agent/v1/auth/logout`. O servidor revoga o token e responde `204`; o cliente deve limpar sua cópia em memória mesmo se a chamada falhar. `403` indica escopo/RBAC recusado e não deve ser tratado como expiração automática da sessão.
+
+```bash
+curl -i -X POST http://localhost:11434/api/agent/v1/auth/logout \
+  -H "Authorization: Bearer $OLLAMA_AGENT_ACCESS_TOKEN"
+```
+
 ### SAML enterprise
 
 `GET /auth/saml/:provider/start` cria AuthnRequest assinado e retorna `authorization_url` e RelayState one-time. `GET /auth/saml/:provider/metadata` publica o metadata do SP. `POST /auth/saml/:provider/acs` valida assinatura, audiência, destination, condições e `InResponseTo` pelo adapter `crewjam/saml`, extrai claims e cria sessão local tenant-aware. O fluxo exige `OLLAMA_AGENT_AUTH_SSO_PUBLIC=true` quando usado como primeiro login público.

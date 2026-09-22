@@ -345,3 +345,12 @@ No head `de0e86772e96372789c10d924eb5738f8808821b`, o GitHub Actions confirmou `
 Os skips correspondem a jobs condicionais do workflow upstream e não são tratados como aprovação de hardware. A matriz GPU/nativa continua fora do caminho automático e exige `workflow_dispatch` com `run_native_matrix=true` e runners compatíveis configurados pelo operador. Avisos de migração de Node 20 e `ubuntu-latest` são não bloqueantes.
 
 Esta evidência fecha o caminho normal de CI desta slice, mas não altera a classificação global. O produto permanece **preview/local RC em hardening**, e não production-ready. Ainda faltam sandbox forte e isolamento de processos, autenticação/session/CSRF/IdP end-to-end, revogação OAuth, contratos externos reais de providers/deploy/media, validação física de desktop/mobile, signing/provenance e homologação de lojas ou app review.
+
+
+## Hardening pós-CI: sessão, Company e terminal — 2026-09-22
+
+Foram publicadas cinco slices coesas no head `935fb273`: o cliente agentic agora diferencia `401 Unauthorized` de `403 Forbidden`, preservando uma sessão válida quando a organização ou a ação é recusada; o contrato do planner foi alinhado ao callback nomeado do cliente Ollama; as mutações críticas de Company passaram a aceitar `Idempotency-Key` com digest sem persistir a chave bruta e rejeitam replays/conflicts; `terminal.exec` restringe argumentos e caminhos ao workspace; e `POST /api/agent/v1/auth/logout` revoga o bearer no `AuthStore` antes de a UI limpar a sessão local.
+
+As regressões locais de agent/server, Company, autenticação, terminal/sandbox e UI passaram. O workflow `class-a-plus-integrity` passou no push `35784205466` e no PR `35784211426`; `dz23-agentic-quality` passou no push `35784205382` e no PR `35784211429`, incluindo Go/server, PostgreSQL RLS + Redis DLQ + OTLP, Web/Mobile e SBOM; `dz23-multi-provider` passou no PR `35784211481`; e o upstream `test` passou no PR `35784211483`, com testes em Linux, macOS e Windows, race em Linux/macOS, patches e `go_mod_tidy`.
+
+Essa evidência fecha os workflows normais observados para o head, não a matriz nativa/GPU. A matriz nativa permanece manual e opt-in, requer runners compatíveis do operador e não foi executada. A classificação continua **preview/local RC em hardening**, não production-ready. Permanecem sandbox forte/seccomp/cgroups enforceable, auth/session/CSRF/IdP distribuído, OAuth lifecycle/revocation externo, providers/deploy/media reais, validação física desktop/mobile, signing/provenance, stores/app review e homologação externa.

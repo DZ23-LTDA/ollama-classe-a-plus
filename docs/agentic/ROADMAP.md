@@ -334,3 +334,10 @@ A matriz nativa herdada foi retirada do caminho automático de pull request porq
 O head `de0e86772e96372789c10d924eb5738f8808821b` passou o caminho normal do PR: `test` (`35769597404`), `dz23-agentic-quality` (`35769597363`), `dz23-multi-provider` (`35769597578`) e `class-a-plus-integrity` (`35769597628`). Os jobs upstream de teste passaram em Linux, macOS e Windows, e os jobs race passaram em Linux e macOS. O Browser Operator foi validado no fluxo remoto após a instalação pinada do Playwright e a descoberta portável do executável.
 
 A matriz GPU/nativa continua manual e opt-in (`workflow_dispatch` + `run_native_matrix=true`), porque depende de runners compatíveis do operador. O próximo trabalho permanece nos P0/P1 internos e externos: sandbox forte, autorização/session/CSRF/IdP, OAuth lifecycle, egress residual, adapters reais, device validation, signing/provenance e homologação. A classificação não muda: preview/local RC em hardening.
+
+
+## Hardening 2026-09-22 — Company idempotente, sessão revogável e terminal restrito
+
+As operações críticas de Company agora possuem ledger de idempotência por digest: spend imediato ou pendente, conversão de afiliado e métrica social não duplicam efeitos em retry e rejeitam reuso de chave com fingerprint diferente. O ciclo de sessão ganhou logout server-side com revogação do bearer; o cliente preserva tokens em memória e diferencia 401 de 403. `terminal.exec` continua deliberadamente allowlisted e agora valida flags, argumentos e paths do workspace antes de iniciar o processo.
+
+Os workflows do head `935fb273` passaram: integrity `35784211426`/`35784205466`, agentic quality `35784211429`/`35784205382`, multi-provider `35784211481` e upstream `test` `35784211483`. O próximo trabalho não é declarar encerramento: sandbox forte, OAuth/IdP/CSRF distribuído, contratos externos reais, hardware/dispositivos, signing/provenance e homologação permanecem pendentes. A matriz GPU/nativa segue manual e opt-in.

@@ -1946,3 +1946,36 @@ classification: preview/local RC em hardening; NÃO final; NÃO production-ready
 blockers: strong sandbox/process isolation, auth/session/CSRF/IdP lifecycle, OAuth revocation, external provider/deploy/media contracts, physical device/mobile/desktop validation, signing/provenance and store/app review remain open
 next_action: continue the next internal P0/P1 slice; do not merge main automatically
 ```
+
+
+## Hardening P0/P1 pós-CI — 2026-09-22
+
+```yaml
+state: FIXING
+iteration: 38
+branch: feat/manus-parity-omniroute
+remote: class-a-plus/feat/manus-parity-omniroute
+head_sha: 935fb27348842fe40d2fc7aa2ec5b85323ee6d85
+commits:
+  - 8dc74980: UI mantém sessão em memória diante de 403; somente 401 invalida credencial
+  - e9905206: contrato do planner usa api.ChatResponseFunc e compila com o cliente Ollama real
+  - b5d2befe: ledger persistido por digest torna spend, conversão de afiliado e métrica social idempotentes
+  - ed265a5f: terminal allowlisted rejeita flags/path escapes e mantém processo/grupo encerrável
+  - 935fb273: logout agentic revoga bearer server-side e limpa sessão local
+local_evidence:
+  - internal/agent e server tests/vet: PASS
+  - terminal/sandbox focused normal/race e Company/auth regressions: PASS
+  - UI agent session Vitest (5 tests), tsc -b e Vite build: PASS
+  - git diff --check: PASS
+remote_evidence:
+  - class-a-plus-integrity push 35784205466: PASS
+  - dz23-agentic-quality push 35784205382: PASS
+  - class-a-plus-integrity PR 35784211426: PASS
+  - dz23-agentic-quality PR 35784211429: PASS
+  - dz23-multi-provider PR 35784211481: PASS
+  - upstream test PR 35784211483: PASS (Linux, macOS e Windows; race Linux/macOS; patches e go_mod_tidy)
+classification: preview/local RC em hardening; NÃO final; NÃO production-ready
+native_matrix: não executada; permanece workflow_dispatch + run_native_matrix=true com runners compatíveis do operador
+blockers: sandbox/process isolation forte, auth/session/CSRF/IdP distribuído, OAuth lifecycle/revocation externo, providers/deploy/media reais, devices físicos, signing/provenance, stores/app review e homologação externa
+next_action: continuar slices P0/P1 independentes; manter PR aberto para revisão; não fazer merge automático em main
+```

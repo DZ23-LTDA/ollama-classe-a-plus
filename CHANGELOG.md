@@ -316,3 +316,10 @@ O run upstream `35755046119` foi cancelado após confirmar jobs nativos `linux`/
 ## 2026-09-22 — upstream CI multiplataforma verde no head publicado
 
 Os commits `5db7261e`, `86a2706b`, `849781af` e `de0e8677` corrigiram os achados determinísticos do golangci-lint, tornaram o Browser Operator capaz de localizar o Chromium instalado pelo Playwright e normalizaram os arquivos de companion Darwin/Windows. O head `de0e86772e96372789c10d924eb5738f8808821b` passou `class-a-plus-integrity` (`35769597628`), `dz23-agentic-quality` (`35769597363`), `dz23-multi-provider` (`35769597578`) e o upstream `test` (`35769597404`). O upstream executou test em Linux/macOS/Windows e race em Linux/macOS. Isso valida o caminho normal de CI, mas não executa a matriz GPU/nativa manual nem comprova sandbox forte, credenciais, deploys, dispositivos físicos, signing ou produção.
+
+
+## 2026-09-22 — hardening de sessão, Company e terminal
+
+O cliente agentic não encerra mais uma sessão válida ao receber `403`; somente `401` dispara invalidação local. O endpoint autenticado `POST /api/agent/v1/auth/logout` revoga o bearer no servidor, e a UI fornece o fluxo correspondente. Mutations críticas de spend, conversão de afiliado e métrica social aceitam `Idempotency-Key`, armazenam somente digest/fingerprint e tornam retries seguros, com conflito explícito para reutilização com payload diferente. O terminal allowlisted passou a rejeitar flags desconhecidas, argumentos de `pwd` e paths de `ls` fora do workspace. Também foi corrigido o contrato nomeado do callback do planner para o cliente Ollama real.
+
+No head `935fb273`, `class-a-plus-integrity` passou nos runs `35784205466`/`35784211426`, `dz23-agentic-quality` nos runs `35784205382`/`35784211429`, `dz23-multi-provider` no run `35784211481` e o upstream `test` no run `35784211483`. O upstream passou Linux, macOS e Windows, race em Linux/macOS, patches e `go_mod_tidy`. A matriz GPU/nativa continua manual/opt-in e o produto permanece preview/local RC em hardening.

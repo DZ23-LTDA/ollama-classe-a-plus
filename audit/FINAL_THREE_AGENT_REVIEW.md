@@ -280,3 +280,12 @@ O run `35755046119` não era um teste único travado: sua matriz nativa aguardav
 A correção de CI convergiu por diagnóstico observável, sem relaxar assertions ou remover jobs. O head `de0e86772e96372789c10d924eb5738f8808821b` passou os quatro workflows relevantes: integrity `35769597628`, agentic quality `35769597363`, multi-provider `35769597578` e upstream `test` `35769597404`. O upstream passou testes em Linux, macOS e Windows, race em Linux e macOS, patches e `go_mod_tidy`; o workflow agentic passou Go/server, PostgreSQL RLS + Redis DLQ + OTLP, Web/Mobile e SBOM.
 
 O achado é **mitigado para o caminho normal de CI**. A matriz GPU/nativa não foi executada e permanece manual/opt-in com runners do operador. O resultado não altera os achados P0/P1 de sandbox forte, autorização distribuída, OAuth revocation, adapters externos, validação física de desktop/mobile, signing/provenance e homologação. A decisão permanece **FIXING / preview-local em hardening**, sem merge automático em `main`.
+
+
+## Validação independente — hardening pós-CI — 2026-09-22
+
+A revisão desta rodada encontrou e corrigiu cinco lacunas internas verificáveis. O cliente UI agora conserva a sessão em `403` e invalida apenas em `401`; o planner implementa o contrato do tipo `api.ChatResponseFunc`; Company Growth e Social usam um ledger por digest para impedir replay de spend, conversão e métrica; o terminal allowlisted rejeita flags e paths fora do workspace; e o logout agentic revoga o token no `AuthStore` antes da limpeza local. Cada slice recebeu regressões negativas e foi publicada em commits separados/coerentes.
+
+O head `935fb273` passou integrity (`35784211426`), agentic quality (`35784211429`), multi-provider (`35784211481`) e upstream `test` (`35784211483`). O upstream executou testes Linux/macOS/Windows e race Linux/macOS; o workflow agentic executou Go/server, PostgreSQL RLS + Redis DLQ + OTLP, Web/Mobile e SBOM. Isso é mitigação observável do caminho normal, não homologação de GPU, sandbox forte, integrações externas, dispositivos físicos ou release assinado.
+
+A decisão permanece **FIXING / preview-local em hardening**. Não há base para declarar produção-ready ou fazer merge automático em `main`.

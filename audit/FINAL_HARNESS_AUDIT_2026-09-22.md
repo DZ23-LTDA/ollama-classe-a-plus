@@ -428,3 +428,12 @@ A remediação do Browser Operator e do lint condicional por plataforma foi conf
 A causa foi corrigida sem esconder falhas: o Browser Operator agora consegue localizar o Chromium gerenciado pelo Playwright; o lint foi saneado no código compartilhado e nos arquivos condicionais Darwin/Windows; e o erro de credencial protegido foi declarado somente no build não-Windows que o utiliza. Os gates locais também passaram com `golangci-lint v2.13.2`, Go test normal/race, vet, build e compilação cruzada Windows dos pacotes afetados.
 
 Esta evidência fecha o gate do **caminho normal de CI**. Ela não fecha a matriz GPU/nativa, que continua manual e depende de runners compatíveis, nem os blockers de produção listados neste documento. Permanecem abertos sandbox/process isolation forte, auth/session/CSRF/IdP distribuído, OAuth lifecycle/revocation, egress/DLP residual, providers/deploy/media reais, dispositivos físicos, signing/provenance, stores e app review. A classificação vigente continua **preview/local RC em hardening; não production-ready**.
+
+
+## Addendum — hardening Company/session/terminal e CI do head 935fb273 — 2026-09-22
+
+As slices posteriores mitigaram lacunas internas específicas sem apagar os achados originais. A UI deixou de tratar `403` como expiração de sessão; `POST /api/agent/v1/auth/logout` revoga bearer tokens no servidor; o planner usa o contrato efetivo do cliente Ollama; spend, conversão de afiliado e métrica social possuem ledger de idempotência por digest/fingerprint, com replay seguro e conflito explícito; e o terminal allowlisted valida flags e paths antes da execução. Essas correções melhoram retry, logout e autorização operacional, mas não transformam a sessão em um sistema IdP distribuído nem o processo best-effort em sandbox forte.
+
+A prova remota do head `935fb273` é: integrity `35784211426` (também push `35784205466`), agentic quality `35784211429` (também push `35784205382`), multi-provider `35784211481` e upstream `test` `35784211483`; todos passaram. O upstream executou testes em Linux, macOS e Windows, race em Linux/macOS, patches e `go_mod_tidy`. A matriz GPU/nativa não foi executada e permanece manual/opt-in.
+
+Os blockers permanecem: seccomp/cgroups/quotas e isolamento forte de processos; auth/session/CSRF/IdP distribuído; OAuth lifecycle/revocation e refresh reais; egress/DLP residual; providers, deploy/media e marketplaces reais; testes físicos desktop/mobile; signing/provenance; stores e app review. A classificação vigente continua **preview/local RC em hardening; não production-ready**.
