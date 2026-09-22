@@ -289,3 +289,12 @@ A revisão desta rodada encontrou e corrigiu cinco lacunas internas verificávei
 O head `935fb273` passou integrity (`35784211426`), agentic quality (`35784211429`), multi-provider (`35784211481`) e upstream `test` (`35784211483`). O upstream executou testes Linux/macOS/Windows e race Linux/macOS; o workflow agentic executou Go/server, PostgreSQL RLS + Redis DLQ + OTLP, Web/Mobile e SBOM. Isso é mitigação observável do caminho normal, não homologação de GPU, sandbox forte, integrações externas, dispositivos físicos ou release assinado.
 
 A decisão permanece **FIXING / preview-local em hardening**. Não há base para declarar produção-ready ou fazer merge automático em `main`.
+
+
+## Validação independente — sandbox, CSRF, mobile e release — 2026-09-22
+
+A rodada fechou quatro lacunas internas verificáveis. O sandbox strict Linux agora falha fechado sem cgroup v2 delegado, aplica namespaces/no-new-privs/seccomp e mata o cgroup no timeout; o default best-effort permanece explicitamente classificado. O middleware rejeita mutations com Origin não permitido. O mobile não reutiliza cache/outbox/push entre organizações e não enfileira ação autenticada antes de confirmar `organization_id` via `auth/session`. O release workflow gera SBOM, metadata, checksums e valida o manifesto antes do upload.
+
+Os gates locais de Go agent/server, vet/build/integrity, mobile typecheck e Expo web export passaram. Integrity push `35793674459` e PR `35793679458` passaram no head `a7bc82f5`; agentic quality, multi-provider e upstream test ainda não estavam concluídos no momento desta revisão. `npm audit` mobile reportou 18 vulnerabilidades de produção (11 moderate, 7 high), sem aplicar correção forçada.
+
+O resultado é mitigação observável, não homologação de cgroup/AppArmor/SELinux, IdP/OAuth/providers externos, push remoto, dispositivos físicos, assinatura/provenance efetiva, rollback ou lojas. A decisão continua **FIXING / preview-local em hardening**, sem merge automático em `main`.

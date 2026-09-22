@@ -1979,3 +1979,43 @@ native_matrix: não executada; permanece workflow_dispatch + run_native_matrix=t
 blockers: sandbox/process isolation forte, auth/session/CSRF/IdP distribuído, OAuth lifecycle/revocation externo, providers/deploy/media reais, devices físicos, signing/provenance, stores/app review e homologação externa
 next_action: continuar slices P0/P1 independentes; manter PR aberto para revisão; não fazer merge automático em main
 ```
+
+
+## Hardening sandbox/auth/mobile/release — 2026-09-22
+
+```yaml
+state: FIXING
+iteration: 39
+branch: feat/manus-parity-omniroute
+remote: class-a-plus/feat/manus-parity-omniroute
+head_sha: a7bc82f5df416b66a71df819a4969604962be0b8
+commits:
+  - 64b755c8: OAuth refresh/revocation lifecycle tenant-scoped, com CAS e endpoint externo opcional
+  - 0459532a: sandbox strict Linux opt-in com cgroup v2 delegado, namespaces, no-new-privs e seccomp amd64/arm64
+  - e931fcfc: Origin allowlist/CSRF guard para mutations agentic e safe config de sandbox
+  - a12a15e4: cache de missão, outbox offline e push namespaced por servidor/organização; preview web mobile
+  - d1058209: SBOM CycloneDX, release metadata e checksum verification no workflow de release
+  - a7bc82f5: cgroup.kill no timeout do sandbox strict
+local_evidence:
+  - CGO_ENABLED=1 go test ./... -count=1: PASS
+  - go vet, go build, integrity, YAML e diff check: PASS
+  - agent/server auth, sandbox e Company regressions: PASS
+  - mobile typecheck e Expo web export: PASS
+  - checksum manifest smoke: PASS
+remote_evidence:
+  - class-a-plus-integrity push 35793674459: PASS
+  - class-a-plus-integrity PR 35793679458: PASS
+  - dz23-agentic-quality PR 35793679479: IN_PROGRESS no momento do checkpoint
+  - dz23-multi-provider PR 35793679448: IN_PROGRESS no momento do checkpoint
+  - upstream test PR 35793679567: QUEUED no momento do checkpoint
+  - release workflow não foi executado: exige tag e ambiente/credenciais do operador
+classification: preview/local RC em hardening; NÃO final; NÃO production-ready
+limits:
+  - strict sandbox é opt-in e depende de cgroup v2 delegado no host; nenhum host externo foi homologado nesta rodada
+  - default best-effort permanece explicitamente diferente de isolamento forte
+  - npm audit mobile reportou 18 vulnerabilidades de produção (11 moderate, 7 high); não aplicar npm audit fix --force sem triagem
+  - attestation GitHub é condicional a OLLAMA_ENABLE_ATTESTATIONS=true; signing, instaladores, lojas e rollback real continuam não executados
+  - matriz GPU/nativa permanece workflow_dispatch + run_native_matrix=true e exige runners compatíveis
+blockers: auth/IdP distribuído, OAuth com providers reais, egress/integrations/deploy/media externos, testes físicos, push remoto, signing/provenance efetiva, dependências mobile, stores/app review e homologação externa
+next_action: concluir evidência CI do head, triage de vulnerabilidades mobile e continuar P0/P1 independentes; manter PR aberto e não fazer merge automático em main
+```

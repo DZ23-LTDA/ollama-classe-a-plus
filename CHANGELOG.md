@@ -323,3 +323,18 @@ Os commits `5db7261e`, `86a2706b`, `849781af` e `de0e8677` corrigiram os achados
 O cliente agentic não encerra mais uma sessão válida ao receber `403`; somente `401` dispara invalidação local. O endpoint autenticado `POST /api/agent/v1/auth/logout` revoga o bearer no servidor, e a UI fornece o fluxo correspondente. Mutations críticas de spend, conversão de afiliado e métrica social aceitam `Idempotency-Key`, armazenam somente digest/fingerprint e tornam retries seguros, com conflito explícito para reutilização com payload diferente. O terminal allowlisted passou a rejeitar flags desconhecidas, argumentos de `pwd` e paths de `ls` fora do workspace. Também foi corrigido o contrato nomeado do callback do planner para o cliente Ollama real.
 
 No head `935fb273`, `class-a-plus-integrity` passou nos runs `35784205466`/`35784211426`, `dz23-agentic-quality` nos runs `35784205382`/`35784211429`, `dz23-multi-provider` no run `35784211481` e o upstream `test` no run `35784211483`. O upstream passou Linux, macOS e Windows, race em Linux/macOS, patches e `go_mod_tidy`. A matriz GPU/nativa continua manual/opt-in e o produto permanece preview/local RC em hardening.
+
+
+## 2026-09-22 — sandbox strict opt-in e cgroup kill
+
+O `sandbox.exec` ganhou modo Linux `OLLAMA_AGENT_SANDBOX_MODE=strict`, que falha fechado sem cgroup v2 delegado e configura namespaces, `no-new-privs`, seccomp para amd64/arm64, limites de CPU/memória/PIDs/swap e `cgroup.kill` no timeout. O modo padrão permanece best-effort; não há claim de host externo homologado.
+
+## 2026-09-22 — Origin policy e mobile tenant-aware
+
+Mutations agentic com `Origin` cross-site são recusadas pela allowlist existente de `OLLAMA_ORIGINS`, sem transformar `403` em logout. O mobile consulta `auth/session` e somente depois habilita outbox/push autenticados; cache, fila offline e registro de push são namespaced por servidor e organização. Retries usam idempotency key, If-Match, backoff e conflitos explícitos. O typecheck e o Expo web export passaram; builds físicos, push remoto e stores continuam externos.
+
+## 2026-09-22 — release SBOM e metadata verificável
+
+O workflow de release passou a gerar SBOM CycloneDX, `release-metadata.json`, `sha256sum.txt` e verificação `sha256sum -c`; attestation GitHub permanece condicional a `OLLAMA_ENABLE_ATTESTATIONS=true`. Isso melhora a cadeia de evidência, mas não é assinatura efetiva de instaladores nem prova de um release tag executado.
+
+No head `a7bc82f5`, integrity push `35793674459` e PR `35793679458` passaram; os workflows agentic/multi-provider/upstream ainda estavam em execução ou fila no momento do registro. O pacote mobile reportou 18 vulnerabilidades de produção no `npm audit` (11 moderate, 7 high), pendentes de triagem.

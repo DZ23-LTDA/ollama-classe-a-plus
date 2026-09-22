@@ -341,3 +341,12 @@ A matriz GPU/nativa continua manual e opt-in (`workflow_dispatch` + `run_native_
 As operações críticas de Company agora possuem ledger de idempotência por digest: spend imediato ou pendente, conversão de afiliado e métrica social não duplicam efeitos em retry e rejeitam reuso de chave com fingerprint diferente. O ciclo de sessão ganhou logout server-side com revogação do bearer; o cliente preserva tokens em memória e diferencia 401 de 403. `terminal.exec` continua deliberadamente allowlisted e agora valida flags, argumentos e paths do workspace antes de iniciar o processo.
 
 Os workflows do head `935fb273` passaram: integrity `35784211426`/`35784205466`, agentic quality `35784211429`/`35784205382`, multi-provider `35784211481` e upstream `test` `35784211483`. O próximo trabalho não é declarar encerramento: sandbox forte, OAuth/IdP/CSRF distribuído, contratos externos reais, hardware/dispositivos, signing/provenance e homologação permanecem pendentes. A matriz GPU/nativa segue manual e opt-in.
+
+
+## Hardening 2026-09-22 — sandbox strict, mobile por tenant e release metadata
+
+O sandbox agora possui um caminho Linux strict opt-in com cgroup v2 delegado, namespaces, seccomp multi-arquitetura, no-new-privs, limites e kill do cgroup no timeout; ausência de enforcement retorna erro em vez de degradar silenciosamente. A política CSRF/Origin cobre mutations autenticadas. No mobile, auth/session confirma o tenant antes de outbox/push, e cache/fila/registro são isolados por servidor e organização. O pacote também passou typecheck e export web.
+
+O release workflow agora produz SBOM CycloneDX, metadata rastreável por commit/ref, checksum manifest e verificação antes do upload; attestation permanece opcional e nenhuma assinatura/loja foi executada. A próxima etapa deve triagem das 18 vulnerabilidades de produção reportadas pelo npm audit mobile (11 moderate, 7 high), conclusão dos runs do head e, depois, P0/P1 externos: host sandbox real, IdP/OAuth/providers/deploy/media, dispositivos, push remoto e signing/provenance.
+
+A classificação continua **preview/local RC em hardening**. A matriz GPU/nativa segue manual e opt-in.
