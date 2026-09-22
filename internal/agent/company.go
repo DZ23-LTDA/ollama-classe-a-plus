@@ -95,6 +95,30 @@ type CompanyRisk struct {
 	UpdatedAt     time.Time `json:"updated_at"`
 }
 
+type CompanyApprovalStatus string
+
+const (
+	CompanyApprovalPending  CompanyApprovalStatus = "pending"
+	CompanyApprovalApproved CompanyApprovalStatus = "approved"
+	CompanyApprovalRejected CompanyApprovalStatus = "rejected"
+)
+
+type CompanyApproval struct {
+	ID             string                `json:"id"`
+	CompanyID      string                `json:"company_id"`
+	OrganizationID string                `json:"organization_id"`
+	ResourceType   string                `json:"resource_type"`
+	ResourceID     string                `json:"resource_id"`
+	Policy         string                `json:"policy"`
+	Nonce          string                `json:"nonce"`
+	ActorID        string                `json:"actor_id,omitempty"`
+	Status         CompanyApprovalStatus `json:"status"`
+	Reason         string                `json:"reason,omitempty"`
+	ExpiresAt      *time.Time            `json:"expires_at,omitempty"`
+	CreatedAt      time.Time             `json:"created_at"`
+	UpdatedAt      time.Time             `json:"updated_at"`
+}
+
 type CompanyCycle struct {
 	ID              string     `json:"id"`
 	Name            string     `json:"name"`
@@ -112,6 +136,7 @@ type CompanyCycle struct {
 
 type Company struct {
 	ID                string                    `json:"id"`
+	Version           int64                     `json:"version"`
 	OrganizationID    string                    `json:"organization_id"`
 	Name              string                    `json:"name"`
 	Mission           string                    `json:"mission,omitempty"`
@@ -139,6 +164,7 @@ type Company struct {
 	SocialMetrics     []CompanySocialMetric     `json:"social_metrics,omitempty"`
 	Budget            CompanyBudget             `json:"budget"`
 	Risk              CompanyRisk               `json:"risk"`
+	Approvals         []CompanyApproval         `json:"approvals,omitempty"`
 	CreatedAt         time.Time                 `json:"created_at"`
 	UpdatedAt         time.Time                 `json:"updated_at"`
 }
@@ -189,6 +215,9 @@ var (
 	ErrCompanyBudgetExceeded   = errors.New("company budget limit exceeded; company paused")
 	ErrCompanyApprovalRequired = errors.New("approval is required for this company action")
 	ErrCompanyPaused           = errors.New("company is paused")
+	ErrCompanyApprovalConflict = errors.New("company approval version conflict")
+	ErrCompanyApprovalNonce    = errors.New("company approval nonce mismatch")
+	ErrCompanyApprovalNotFound = errors.New("company approval not found or already decided")
 )
 
 type CompanyStore struct {
@@ -266,6 +295,8 @@ func (s *CompanyStore) Create(company Company) (Company, error) {
 	company.SocialAccounts = nil
 	company.SocialDrafts = nil
 	company.SocialMetrics = nil
+	company.Approvals = nil
+	company.Version = 1
 	company.Budget.SpentCents = 0
 	company.Risk = CompanyRisk{}
 	company.CreatedAt = time.Time{}
@@ -343,6 +374,126 @@ func (s *CompanyStore) CreateRequest(request CompanyCreateRequest, organizationI
 	})
 }
 
+func queueCompanyApproval(company *Company, resourceType, resourceID, policy string, now time.Time) {
+	expiresAt := now.Add(30 * time.Minute)
+	company.Approvals = append(company.Approvals, CompanyApproval{
+		ID: "capr_" + uuid.NewString(), CompanyID: company.ID, OrganizationID: company.OrganizationID,
+		ResourceType: resourceType, ResourceID: resourceID, Policy: policy, Nonce: uuid.NewString(),
+		Status: CompanyApprovalPending, ExpiresAt: &expiresAt, CreatedAt: now, UpdatedAt: now,
+	})
+}
+
+func (s *CompanyStore) PendingApproval(id, resourceType, resourceID string) (CompanyApproval, error) {
+	company, err := s.Get(id)
+	if err != nil {
+		return CompanyApproval{}, err
+	}
+	for _, approval := range company.Approvals {
+		if approval.ResourceType == resourceType && approval.ResourceID == resourceID && approval.Status == CompanyApprovalPending {
+			return approval, nil
+		}
+	}
+	return CompanyApproval{}, ErrCompanyApprovalNotFound
+}
+
+func markCompanyApproval(company *Company, resourceType, resourceID string, approved bool, actorID, reason string) bool {
+	for index := range company.Approvals {
+		approval := &company.Approvals[index]
+		if approval.ResourceType != resourceType || approval.ResourceID != resourceID || approval.Status != CompanyApprovalPending {
+			continue
+		}
+		approval.ActorID = strings.TrimSpace(actorID)
+		approval.Reason = strings.TrimSpace(reason)
+		if approved {
+			approval.Status = CompanyApprovalApproved
+		} else {
+			approval.Status = CompanyApprovalRejected
+		}
+		approval.UpdatedAt = time.Now().UTC()
+		return true
+	}
+	return false
+}
+
+func applyCompanyApproval(company *Company, resourceType, resourceID string, approved bool) error {
+	if !approved {
+		return nil
+	}
+	switch resourceType {
+	case "campaign":
+		for index := range company.Campaigns {
+			if company.Campaigns[index].ID == resourceID {
+				company.Campaigns[index].Approved = true
+				company.Campaigns[index].Status = "approved"
+				company.Campaigns[index].UpdatedAt = time.Now().UTC()
+				return nil
+			}
+		}
+	case "affiliate_program":
+		for index := range company.AffiliatePrograms {
+			if company.AffiliatePrograms[index].ID == resourceID {
+				company.AffiliatePrograms[index].Approved = true
+				company.AffiliatePrograms[index].Status = "active"
+				company.AffiliatePrograms[index].UpdatedAt = time.Now().UTC()
+				return nil
+			}
+		}
+	case "order":
+		for index := range company.Orders {
+			if company.Orders[index].ID == resourceID {
+				company.Orders[index].Approved = true
+				company.Orders[index].Status = "approved"
+				company.Orders[index].UpdatedAt = time.Now().UTC()
+				return nil
+			}
+		}
+	case "social_draft":
+		for index := range company.SocialDrafts {
+			if company.SocialDrafts[index].ID == resourceID {
+				company.SocialDrafts[index].Approved = true
+				company.SocialDrafts[index].Status = "approved"
+				company.SocialDrafts[index].UpdatedAt = time.Now().UTC()
+				return nil
+			}
+		}
+	}
+	return ErrCompanyApprovalNotFound
+}
+
+func (s *CompanyStore) DecideApproval(id, approvalID string, approved bool, reason, actorID, organizationID string, expectedVersion int64, nonce string) (Company, error) {
+	return s.mutate(id, func(company *Company) error {
+		if expectedVersion > 0 && company.Version != expectedVersion {
+			return ErrCompanyApprovalConflict
+		}
+		if strings.TrimSpace(actorID) == "" || strings.TrimSpace(reason) == "" {
+			return ErrCompanyApprovalRequired
+		}
+		if strings.TrimSpace(organizationID) == "" || company.OrganizationID != strings.TrimSpace(organizationID) {
+			return ErrCompanyApprovalRequired
+		}
+		for index := range company.Approvals {
+			approval := &company.Approvals[index]
+			if approval.ID != strings.TrimSpace(approvalID) || approval.Status != CompanyApprovalPending {
+				continue
+			}
+			if approval.ExpiresAt != nil && time.Now().UTC().After(*approval.ExpiresAt) {
+				return ErrCompanyApprovalRequired
+			}
+			if strings.TrimSpace(nonce) == "" || strings.TrimSpace(nonce) != approval.Nonce {
+				return ErrCompanyApprovalNonce
+			}
+			if !markCompanyApproval(company, approval.ResourceType, approval.ResourceID, approved, actorID, reason) {
+				return ErrCompanyApprovalNotFound
+			}
+			if err := applyCompanyApproval(company, approval.ResourceType, approval.ResourceID, approved); err != nil {
+				return err
+			}
+			return nil
+		}
+		return ErrCompanyApprovalNotFound
+	})
+}
+
 func (s *CompanyStore) List(organizationID string) []Company {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -400,6 +551,10 @@ func (s *CompanyStore) Update(id string, update CompanyUpdate) (Company, error) 
 		company.Currency = strings.TrimSpace(update.Currency)
 		company.Budget.Currency = company.Currency
 	}
+	if company.Version <= 0 {
+		company.Version = 1
+	}
+	company.Version++
 	company.UpdatedAt = time.Now().UTC()
 	s.companies[id] = company
 	if err := s.persistLocked(company); err != nil {
@@ -614,12 +769,20 @@ func (s *CompanyStore) mutate(id string, fn func(*Company) error) (Company, erro
 	}
 	if err := fn(&company); err != nil {
 		if errors.Is(err, ErrCompanyBudgetExceeded) {
+			if company.Version <= 0 {
+				company.Version = 1
+			}
+			company.Version++
 			company.UpdatedAt = time.Now().UTC()
 			s.companies[company.ID] = company
 			_ = s.persistLocked(company)
 		}
 		return company, err
 	}
+	if company.Version <= 0 {
+		company.Version = 1
+	}
+	company.Version++
 	company.UpdatedAt = time.Now().UTC()
 	s.companies[company.ID] = company
 	if err := s.persistLocked(company); err != nil {

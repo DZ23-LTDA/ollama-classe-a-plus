@@ -137,6 +137,7 @@ func (s *CompanyStore) AddCampaign(id string, campaign CompanyCampaign) (Company
 	campaign.UpdatedAt = campaign.CreatedAt
 	return s.mutate(id, func(company *Company) error {
 		company.Campaigns = append(company.Campaigns, campaign)
+		queueCompanyApproval(company, "campaign", campaign.ID, "campaign:external", campaign.CreatedAt)
 		return nil
 	})
 }
@@ -204,6 +205,7 @@ func (s *CompanyStore) AddAffiliateProgram(id string, program CompanyAffiliatePr
 	program.UpdatedAt = program.CreatedAt
 	return s.mutate(id, func(company *Company) error {
 		company.AffiliatePrograms = append(company.AffiliatePrograms, program)
+		queueCompanyApproval(company, "affiliate_program", program.ID, "affiliate:external", program.CreatedAt)
 		return nil
 	})
 }
@@ -314,6 +316,7 @@ func (s *CompanyStore) CreateOrder(id string, order CompanyOrder) (Company, erro
 				order.CreatedAt = time.Now().UTC()
 				order.UpdatedAt = order.CreatedAt
 				company.Orders = append(company.Orders, order)
+				queueCompanyApproval(company, "order", order.ID, "order:external", order.CreatedAt)
 				return nil
 			}
 		}

@@ -156,3 +156,8 @@ A classificação permanece release candidate local-first. Integrações externa
 - O endpoint usa nonce de uso único e versão corrente da missão, rejeitando replay e conflito de concorrência.
 - Agentic Console e tipos de API foram atualizados para transportar nonce/policy.
 - Company/Growth/Social approvals booleanas continuam explicitamente fora desta garantia até migrarem para decisões auditáveis.
+
+
+## 2026-09-22 — Company OS approvals auditáveis
+
+Campanhas, afiliados, pedidos e drafts sociais passaram a emitir `CompanyApproval` server-side com policy, nonce, expiração, actor, organização, razão e versão CAS. Os endpoints de aprovação não aceitam mais `{}` como autorização: localizam a decisão pendente e só projetam o recurso aprovado após validação. A rota de gasto com `approved` booleano permanece aberta para a próxima slice.

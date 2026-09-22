@@ -57,16 +57,7 @@ func (a *agentAPI) createCompanySocialDraft(c *gin.Context) {
 }
 
 func (a *agentAPI) approveCompanySocialDraft(c *gin.Context) {
-	if _, err := a.companyForRequest(c); err != nil {
-		writeAgentError(c, statusForAgentError(err), err)
-		return
-	}
-	company, err := a.runtime.CompanyStore().ApproveSocialDraft(c.Param("id"), c.Param("draft_id"))
-	if err != nil {
-		writeAgentError(c, statusForAgentError(err), err)
-		return
-	}
-	c.JSON(http.StatusOK, company)
+	a.decideCompanyApproval(c, "social_draft", "draft_id")
 }
 
 func (a *agentAPI) publishCompanySocialDraft(c *gin.Context) {

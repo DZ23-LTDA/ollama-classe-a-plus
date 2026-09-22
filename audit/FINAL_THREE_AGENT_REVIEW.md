@@ -112,3 +112,10 @@ Os gates completos desta slice passaram. Isso não encerra os P0 da auditoria am
 Approvals de missão agora separam a ação de aprovar do executor: em auth mode, owner/admin é obrigatório; a decisão valida organização, razão, nonce de uso único e versão corrente da missão. O Agentic Console envia o nonce retornado pela API. Testes cobrem role policy, nonce errado, replay e CAS; os gates completos passaram.
 
 A correção não cobre ainda os booleans `approved` de Company/Growth/Social, que continuam uma lacuna explícita para decisão auditável, actor/policy/nonce/expiração e proteção contra auto-approval. Sandbox forte, egress/DLP e outros P0 também permanecem abertos.
+
+
+## Slice P0 validada — CompanyApproval ledger — 2026-09-22
+
+Campanhas, programas de afiliados, pedidos e drafts sociais passaram a usar approvals server-side com `resource_type/resource_id`, organization, policy, nonce, expiração, actor, razão e CAS de Company version. Os endpoints de aprovação não confiam mais no booleano ou no estado enviado pelo cliente; o campo `approved` é apenas uma projeção após decisão válida. A UI passa a enviar o nonce da decisão pendente.
+
+A rota de gasto ainda possui `approved` booleano e não foi incluída nesta slice; orçamento, anúncios, contratos e mensagens externas exigem a continuação do approval ledger. A auditoria geral continua aberta.

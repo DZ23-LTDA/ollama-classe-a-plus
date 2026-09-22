@@ -265,9 +265,9 @@ func companyErrorStatus(err error) int {
 	switch {
 	case errors.Is(err, agent.ErrCompanyNotFound):
 		return http.StatusNotFound
-	case errors.Is(err, agent.ErrCompanyBudgetExceeded), errors.Is(err, agent.ErrCompanyAgentBudgetExceeded), errors.Is(err, agent.ErrCompanyApprovalRequired):
+	case errors.Is(err, agent.ErrCompanyBudgetExceeded), errors.Is(err, agent.ErrCompanyAgentBudgetExceeded), errors.Is(err, agent.ErrCompanyApprovalRequired), errors.Is(err, agent.ErrCompanyApprovalConflict), errors.Is(err, agent.ErrCompanyApprovalNonce):
 		return http.StatusConflict
-	case errors.Is(err, agent.ErrCompanyCampaignNotFound), errors.Is(err, agent.ErrCompanyAffiliateNotFound), errors.Is(err, agent.ErrCompanyProductNotFound), errors.Is(err, agent.ErrCompanyOrderNotFound):
+	case errors.Is(err, agent.ErrCompanyCampaignNotFound), errors.Is(err, agent.ErrCompanyAffiliateNotFound), errors.Is(err, agent.ErrCompanyProductNotFound), errors.Is(err, agent.ErrCompanyOrderNotFound), errors.Is(err, agent.ErrCompanyApprovalNotFound):
 		return http.StatusNotFound
 	case errors.Is(err, agent.ErrCompanySocialNotFound):
 		return http.StatusNotFound

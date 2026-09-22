@@ -105,3 +105,35 @@ func TestGrowthExternalURLPolicy(t *testing.T) {
 		t.Fatalf("expected HTTPS policy, got %v", err)
 	}
 }
+
+func TestCompanyApprovalBindsActorNonceAndVersion(t *testing.T) {
+	store, err := NewCompanyStore("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	company, err := store.Create(Company{OrganizationID: "org_a", Name: "Approval Company"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	company, err = store.AddCampaign(company.ID, CompanyCampaign{Name: "Campaign", Objective: "Objective"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	approval, err := store.PendingApproval(company.ID, "campaign", company.Campaigns[0].ID)
+	if err != nil || approval.Nonce == "" {
+		t.Fatalf("approval=%+v err=%v", approval, err)
+	}
+	if _, err := store.DecideApproval(company.ID, approval.ID, true, "approved", "user_a", "org_a", company.Version, "wrong"); !errors.Is(err, ErrCompanyApprovalNonce) {
+		t.Fatalf("wrong nonce err=%v", err)
+	}
+	decided, err := store.DecideApproval(company.ID, approval.ID, true, "approved", "user_a", "org_a", company.Version, approval.Nonce)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !decided.Campaigns[0].Approved || decided.Approvals[0].ActorID != "user_a" || decided.Approvals[0].Status != CompanyApprovalApproved {
+		t.Fatalf("decided company=%+v", decided)
+	}
+	if _, err := store.DecideApproval(company.ID, approval.ID, true, "replay", "user_a", "org_a", decided.Version, approval.Nonce); !errors.Is(err, ErrCompanyApprovalNotFound) {
+		t.Fatalf("expected single-use approval, got %v", err)
+	}
+}

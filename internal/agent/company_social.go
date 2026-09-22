@@ -136,6 +136,7 @@ func (s *CompanyStore) CreateSocialDraft(id string, draft CompanySocialDraft) (C
 			}
 		}
 		company.SocialDrafts = append(company.SocialDrafts, draft)
+		queueCompanyApproval(company, "social_draft", draft.ID, "social:publish", draft.CreatedAt)
 		return nil
 	})
 }

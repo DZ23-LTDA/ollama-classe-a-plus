@@ -769,3 +769,32 @@ proofs: integrity, Go tests/vet/build, UI Vitest/build, mobile typecheck and app
 classification: preview/local RC em hardening
 next_slice: Company/Growth/Social audit-grade approvals or MCP process isolation; no main merge
 ```
+
+
+## Slice P0 CompanyApproval ledger validada — aguardando publicação — 2026-09-22
+
+```yaml
+state: RELEASING
+iteration: 8
+base_commit: 8b5d9752
+working_tree: alterações CompanyApproval ainda não commitadas
+implemented:
+  - CompanyApproval server-side para campaign, affiliate_program, order e social_draft
+  - policy, nonce, expiry, actor, organization, reason e status auditáveis
+  - endpoints approve usam pending lookup, owner/admin policy e Company version CAS
+  - UI Growth/Social envia nonce da decisão pendente
+proofs:
+  - focused Company/domain/HTTP tests: PASS
+  - integrity guard: PASS
+  - CGO_ENABLED=1 go test ./... -count=1: PASS
+  - CGO_ENABLED=1 go vet ./...: PASS
+  - CGO_ENABLED=1 go build: PASS
+  - UI Vitest 20/199: PASS
+  - UI build: PASS; known >500KB warning
+  - mobile typecheck: PASS
+open_p0:
+  - RecordSpend still accepts approved boolean
+  - sandbox/MCP/egress/DLP and plugin ownership remain
+classification: preview/local RC em hardening
+next_action: commit/push, then migrate spend approvals or harden MCP stdio process isolation
+```

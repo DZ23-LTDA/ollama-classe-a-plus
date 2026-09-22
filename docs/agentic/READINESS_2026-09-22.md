@@ -107,3 +107,10 @@ A terceira slice pós-auditoria endureceu approvals de missão. Quando autentica
 A evidência inclui teste de CAS/nonce no Runtime, teste de role policy no servidor e os gates completos: integrity guard, `CGO_ENABLED=1 go test ./... -count=1`, `go vet`, build Go, Vitest 20/199, build UI e typecheck mobile. O modo local sem autenticação continua disponível para instalação loopback e não deve ser confundido com autorização multiusuário.
 
 Esta slice cobre approvals de missão, não todas as decisões do Company/Growth/Social OS. Endpoints que ainda aceitam campos booleanos de aprovação para campanhas, pedidos, drafts ou gasto permanecem pendência P0/P1 e não devem ser tratados como autoridade auditável para efeitos externos.
+
+
+## Slice P0 de approvals auditáveis do Company OS — 2026-09-22
+
+Campanhas, programas de afiliados, pedidos de dropshipping e drafts sociais agora criam uma decisão server-side `CompanyApproval` com organização, recurso, policy, nonce, expiração, actor, razão e status. Os endpoints de approve localizam o approval pendente no servidor, exigem owner/admin quando auth está ativa, validam nonce e versão da Company e só então projetam `approved=true`/estado do recurso. Regressões cobrem nonce incorreto, replay, actor/org e HTTP.
+
+Os gates completos passaram: integrity guard, `CGO_ENABLED=1 go test ./... -count=1`, `go vet`, build Go, Vitest 20/199, build UI e typecheck mobile. O campo booleano `approved` continua no schema apenas como projeção legada; o cliente não é mais a autoridade para aprovar. `RecordSpend`/gasto da Company ainda aceita uma rota distinta com booleano e permanece P0 aberto para migrar ao mesmo approval ledger.

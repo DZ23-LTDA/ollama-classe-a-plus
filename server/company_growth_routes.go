@@ -39,16 +39,7 @@ func (a *agentAPI) addCompanyCampaign(c *gin.Context) {
 }
 
 func (a *agentAPI) approveCompanyCampaign(c *gin.Context) {
-	if _, err := a.companyForRequest(c); err != nil {
-		writeAgentError(c, statusForAgentError(err), err)
-		return
-	}
-	company, err := a.runtime.CompanyStore().ApproveCampaign(c.Param("id"), c.Param("campaign_id"))
-	if err != nil {
-		writeAgentError(c, statusForAgentError(err), err)
-		return
-	}
-	c.JSON(http.StatusOK, company)
+	a.decideCompanyApproval(c, "campaign", "campaign_id")
 }
 
 func (a *agentAPI) launchCompanyCampaign(c *gin.Context) {
@@ -96,16 +87,7 @@ func (a *agentAPI) addCompanyAffiliateProgram(c *gin.Context) {
 }
 
 func (a *agentAPI) approveCompanyAffiliateProgram(c *gin.Context) {
-	if _, err := a.companyForRequest(c); err != nil {
-		writeAgentError(c, statusForAgentError(err), err)
-		return
-	}
-	company, err := a.runtime.CompanyStore().ApproveAffiliateProgram(c.Param("id"), c.Param("program_id"))
-	if err != nil {
-		writeAgentError(c, statusForAgentError(err), err)
-		return
-	}
-	c.JSON(http.StatusOK, company)
+	a.decideCompanyApproval(c, "affiliate_program", "program_id")
 }
 
 func (a *agentAPI) addCompanyAffiliateLink(c *gin.Context) {
@@ -186,16 +168,7 @@ func (a *agentAPI) createCompanyOrder(c *gin.Context) {
 }
 
 func (a *agentAPI) approveCompanyOrder(c *gin.Context) {
-	if _, err := a.companyForRequest(c); err != nil {
-		writeAgentError(c, statusForAgentError(err), err)
-		return
-	}
-	company, err := a.runtime.CompanyStore().ApproveOrder(c.Param("id"), c.Param("order_id"))
-	if err != nil {
-		writeAgentError(c, statusForAgentError(err), err)
-		return
-	}
-	c.JSON(http.StatusOK, company)
+	a.decideCompanyApproval(c, "order", "order_id")
 }
 
 func (a *agentAPI) fulfillCompanyOrder(c *gin.Context) {

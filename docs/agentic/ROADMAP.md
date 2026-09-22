@@ -173,3 +173,10 @@ O resultado permanece **preview/local RC em hardening**; TLS/mTLS, companions f�
 Approvals de missão agora têm policy owner/admin em auth mode, nonce de uso único, razão obrigatória e CAS da versão da missão. O próximo trabalho de approvals deve migrar Company/Growth/Social de booleans caller-controlled para decisões auditáveis com actor, policy, nonce, expiração, idempotência e proteção contra auto-approval, antes de qualquer efeito externo.
 
 A classificação permanece **preview/local RC em hardening**; esta mudança não prova autorização empresarial distribuída nem aprovação dos adapters externos.
+
+
+## Incremento 2026-09-22 — CompanyApproval ledger
+
+O Company OS passou a usar uma decisão auditável para campanhas, afiliados, pedidos e social drafts. O próximo passo imediato é retirar o booleano caller-controlled da rota de gasto e aplicar o mesmo ledger a orçamento, anúncios, contratos e mensagens externas; em paralelo permanecem sandbox/MCP process isolation, egress/DLP e ownership completo de plugins.
+
+A classificação continua **preview/local RC em hardening**. O workflow de afiliados/dropshipping/social permanece sandbox até connectors OAuth e contas externas serem realmente configurados e testados.

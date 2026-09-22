@@ -91,6 +91,10 @@ grep -q 'HeartbeatForOrganization' internal/agent/devices.go
 grep -q 'DecideApprovalForActorCAS' internal/agent/runtime.go
 grep -q 'requireApprovalApprover' server/agent_routes.go
 grep -q 'nonce' app/ui/app/src/components/AgenticConsole.tsx
+grep -q 'type CompanyApproval struct' internal/agent/company.go
+grep -q 'DecideApproval' server/company_approval_routes.go
+grep -q 'PendingApproval' internal/agent/company.go
+grep -q 'CompanyCampaignApprovalHTTPUsesNonceAndOrganization' server/company_approval_test.go
 grep -q 'Capabilities' internal/agent/runtime.go
 grep -q 'Evaluation' internal/agent/evaluation.go
 for route in projects library scheduled skills plugins tasks company; do
