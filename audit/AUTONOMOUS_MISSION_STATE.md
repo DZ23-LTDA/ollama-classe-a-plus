@@ -1767,3 +1767,19 @@ local_evidence:
 classification: preview/local RC em hardening; NÃO final; NÃO production-ready
 next_action: commit/push race fix and verify upstream workflow test on new SHA
 ```
+
+
+## Publicação da correção dos upstream Go races — 2026-09-22
+
+```yaml
+state: VALIDATING_RELEASE
+iteration: 32
+commit: 11f6c940
+branch: feat/manus-parity-omniroute
+remote: class-a-plus/feat/manus-parity-omniroute
+local_evidence: go test, go test -race, go vet, go build, integrity = PASS
+previous_failure: upstream test/race Ubuntu on fd3abc60
+root_causes_fixed: research fixture counter; MCP stderr promoted ReadFrom race
+next_action: confirm upstream test/race and agentic quality workflows on this SHA
+classification: preview/local RC em hardening; NÃO final; NÃO production-ready
+```
