@@ -158,3 +158,10 @@ Regressões locais cobrem redirect, MIME mismatch, magic inválido, payload acim
 Connectors agora aplicam transport sem proxy ambiental também quando o client é substituído por um transport HTTP customizado, preservam o dialer que verifica o IP efetivamente conectado, bloqueiam redirects em cada request e limitam request body a 1 MiB e response body a 2 MiB com detecção de overflow. Regressões cobrem redirect, resposta oversized e request oversized, além dos testes de OAuth tenant-scoped existentes.
 
 Os gates completos passaram: integrity guard, Go tests/vet/build, Vitest 20/199, UI build e mobile typecheck. O contrato de egress não redige credenciais operacionais autorizadas; ainda é necessário separar classificação de dados de usuário, injeção de segredo e payload externo, além de validar uploads e redes distribuídas reais.
+
+
+## Slice P0 de OAuth redirect URI hardening — 2026-09-22
+
+OAuth providers agora carregam `OLLAMA_AGENT_OAUTH_<PROVIDER>_REDIRECT_URIS` como allowlist separada por vírgula, ponto e vírgula ou linha, e só aceitam no start/callback uma URI canônica exatamente presente nessa lista. Redirects exigem HTTPS; HTTP só pode ser usado para loopback quando `..._ALLOW_LOOPBACK_REDIRECT=true` e a URI loopback também está na allowlist. Userinfo, fragmentos e URIs opacas são rejeitados. O AuthStore aplica sintaxe segura e grava a forma canônica no estado PKCE, reduzindo mismatch e evitando confiança em um valor arbitrário do request.
+
+Testes cobrem host não allowlisted, HTTP externo, fragmento, userinfo, loopback explícito e estado inseguro. Os gates completos passaram: integrity guard, Go tests/vet/build, Vitest 20/199, UI build e mobile typecheck. A validação de issuer/audience/nonce OIDC já existente permanece separada; endpoints OAuth ainda precisam ser alinhados ao mesmo egress/IP/redirect policy em uma slice posterior.

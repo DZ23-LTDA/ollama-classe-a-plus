@@ -151,3 +151,8 @@ Downloads remotos de mídia passaram a bloquear redirects, proxy ambiental e des
 ## Slice P0 validada — Connector egress parity — 2026-09-22
 
 Connectors agora removem proxy ambiental, bloqueiam redirects, verificam o IP efetivamente conectado e limitam request/response. Testes negativos reproduzem redirect e payloads oversized em TLS local. A classificação de dados do usuário versus credenciais operacionais, uploads e validação distribuída permanecem abertas.
+
+
+## Slice P0 validada — OAuth redirect URI allowlist — 2026-09-22
+
+OAuth start/callback não aceitam mais redirect arbitrário: cada provider precisa de URI allowlisted e a forma canônica é usada no PKCE state. HTTPS é obrigatório, com loopback HTTP somente em opt-in explícito. A auditoria de egress dos endpoints OAuth e validação real contra um IdP/staging continuam abertas.

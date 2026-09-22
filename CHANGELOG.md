@@ -191,3 +191,8 @@ Downloads de mídia agora bloqueiam redirects e proxy ambiental, verificam o IP 
 ## 2026-09-22 — Connector egress parity
 
 Connectors passaram a bloquear proxy ambiental e redirects mesmo com client HTTP substituído, manter verificação de IP conectado e aplicar limites bounded de request/response. Testes negativos cobrem redirects e payloads oversized sem depender de uma conta externa.
+
+
+## 2026-09-22 — OAuth redirect URI allowlist
+
+OAuth start/callback agora exigem allowlist exata por provider, canonicalização, HTTPS e rejeição de fragmentos/userinfo. Loopback HTTP só é permitido com flag explícita e URI allowlisted; o estado PKCE usa a URI canônica.

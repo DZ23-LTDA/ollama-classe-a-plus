@@ -111,6 +111,9 @@ grep -q 'validateMediaMagic' internal/agent/media.go
 grep -q 'TestMediaMaterializeRejectsRedirectAndInvalidMagic' internal/agent/media_test.go
 grep -q 'connector response payload exceeds limit' internal/agent/connectors.go
 grep -q 'TestConnectorEgressBlocksRedirectsAndBoundsPayloads' internal/agent/connectors_test.go
+grep -q 'ValidateRedirectURI' internal/agent/auth.go
+grep -q 'RedirectURIs' internal/agent/auth.go
+grep -q 'TestOAuthProviderRedirectAllowlist' internal/agent/auth_test.go
 grep -q 'Capabilities' internal/agent/runtime.go
 grep -q 'Evaluation' internal/agent/evaluation.go
 for route in projects library scheduled skills plugins tasks company; do

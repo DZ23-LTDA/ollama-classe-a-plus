@@ -740,7 +740,13 @@ func (a *agentAPI) devToken(c *gin.Context) {
 func oauthProviderFromEnv(name string) agent.OAuthProvider {
 	key := strings.ToUpper(strings.NewReplacer("-", "_", " ", "_").Replace(strings.TrimSpace(name)))
 	prefix := "OLLAMA_AGENT_OAUTH_" + key
-	return agent.OAuthProvider{Name: name, AuthorizeURL: os.Getenv(prefix + "_AUTHORIZE_URL"), TokenURL: os.Getenv(prefix + "_TOKEN_URL"), UserInfoURL: os.Getenv(prefix + "_USERINFO_URL"), IssuerURL: os.Getenv(prefix + "_ISSUER_URL"), Audience: os.Getenv(prefix + "_AUDIENCE"), ClientIDEnv: os.Getenv(prefix + "_CLIENT_ID_ENV"), SecretEnv: os.Getenv(prefix + "_CLIENT_SECRET_ENV")}
+	redirects := make([]string, 0)
+	for _, value := range strings.FieldsFunc(os.Getenv(prefix+"_REDIRECT_URIS"), func(r rune) bool { return r == ',' || r == ';' || r == '\n' }) {
+		if value = strings.TrimSpace(value); value != "" {
+			redirects = append(redirects, value)
+		}
+	}
+	return agent.OAuthProvider{Name: name, AuthorizeURL: os.Getenv(prefix + "_AUTHORIZE_URL"), TokenURL: os.Getenv(prefix + "_TOKEN_URL"), UserInfoURL: os.Getenv(prefix + "_USERINFO_URL"), IssuerURL: os.Getenv(prefix + "_ISSUER_URL"), Audience: os.Getenv(prefix + "_AUDIENCE"), ClientIDEnv: os.Getenv(prefix + "_CLIENT_ID_ENV"), SecretEnv: os.Getenv(prefix + "_CLIENT_SECRET_ENV"), RedirectURIs: redirects, AllowLoopbackRedirect: strings.EqualFold(os.Getenv(prefix+"_ALLOW_LOOPBACK_REDIRECT"), "true")}
 }
 
 func prepareOIDCProvider(ctx context.Context, provider agent.OAuthProvider) (agent.OAuthProvider, error) {
@@ -804,10 +810,13 @@ func (a *agentAPI) oauthStart(c *gin.Context) {
 		writeAgentError(c, http.StatusBadRequest, err)
 		return
 	}
-	redirectURI := strings.TrimSpace(c.Query("redirect_uri"))
+	redirectURI, redirectErr := provider.NormalizeRedirectURI(c.Query("redirect_uri"))
 	verifier := strings.TrimSpace(c.Query("code_verifier"))
-	if redirectURI == "" || verifier == "" {
-		writeAgentError(c, http.StatusBadRequest, errors.New("redirect_uri and PKCE code_verifier are required"))
+	if redirectErr != nil || verifier == "" {
+		if redirectErr == nil {
+			redirectErr = errors.New("redirect_uri and PKCE code_verifier are required")
+		}
+		writeAgentError(c, http.StatusBadRequest, redirectErr)
 		return
 	}
 	userID := ""
@@ -840,11 +849,14 @@ func (a *agentAPI) oauthCallback(c *gin.Context) {
 		writeAgentError(c, http.StatusBadRequest, err)
 		return
 	}
-	redirectURI := strings.TrimSpace(c.Query("redirect_uri"))
+	redirectURI, redirectErr := provider.NormalizeRedirectURI(c.Query("redirect_uri"))
 	code := strings.TrimSpace(c.Query("code"))
 	stateValue := strings.TrimSpace(c.Query("state"))
-	if code == "" || stateValue == "" || redirectURI == "" {
-		writeAgentError(c, http.StatusBadRequest, errors.New("code, state and redirect_uri are required"))
+	if redirectErr != nil || code == "" || stateValue == "" {
+		if redirectErr == nil {
+			redirectErr = errors.New("code, state and redirect_uri are required")
+		}
+		writeAgentError(c, http.StatusBadRequest, redirectErr)
 		return
 	}
 	state, err := a.auth.ConsumeOAuthState(stateValue, provider.Name, redirectURI)

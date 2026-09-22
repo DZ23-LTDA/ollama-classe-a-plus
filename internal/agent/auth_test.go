@@ -3,6 +3,7 @@ package agent
 import (
 	"encoding/base32"
 	"os"
+	"strings"
 	"testing"
 	"time"
 )
@@ -76,6 +77,35 @@ func TestOAuthProviderRejectsNonHTTPS(t *testing.T) {
 	t.Setenv("DZ23_TEST_SECRET", "secret")
 	if err := provider.Validate(); err == nil {
 		t.Fatal("non-HTTPS OAuth endpoint accepted")
+	}
+}
+
+func TestOAuthProviderRedirectAllowlist(t *testing.T) {
+	t.Setenv("DZ23_TEST_CLIENT", "client")
+	t.Setenv("DZ23_TEST_SECRET", "secret")
+	provider := OAuthProvider{Name: "test", AuthorizeURL: "https://idp.example.test/authorize", TokenURL: "https://idp.example.test/token", ClientIDEnv: "DZ23_TEST_CLIENT", SecretEnv: "DZ23_TEST_SECRET", RedirectURIs: []string{"https://app.example.test/oauth/callback"}}
+	if canonical, err := provider.NormalizeRedirectURI("https://app.example.test/oauth/callback"); err != nil || canonical != "https://app.example.test/oauth/callback" {
+		t.Fatalf("valid redirect canonical=%q err=%v", canonical, err)
+	}
+	for _, redirect := range []string{"https://evil.example.test/oauth/callback", "http://app.example.test/oauth/callback", "https://app.example.test/oauth/callback#fragment", "https://user:pass@app.example.test/oauth/callback"} {
+		if err := provider.ValidateRedirectURI(redirect); err == nil {
+			t.Fatalf("redirect accepted: %s", redirect)
+		}
+	}
+	provider.AllowLoopbackRedirect = true
+	provider.RedirectURIs = []string{"http://127.0.0.1:43123/callback"}
+	if err := provider.ValidateRedirectURI("http://127.0.0.1:43123/callback"); err != nil {
+		t.Fatalf("explicit loopback redirect rejected: %v", err)
+	}
+}
+
+func TestOAuthStateRejectsInsecureRedirect(t *testing.T) {
+	store, err := NewAuthStore("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := store.CreateOAuthState("test", "http://127.0.0.1/callback", strings.Repeat("a", 43), "", time.Minute); err == nil {
+		t.Fatal("insecure OAuth state redirect accepted")
 	}
 }
 

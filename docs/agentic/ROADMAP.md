@@ -210,3 +210,8 @@ Downloads de mídia agora compartilham a postura de proxy nil, redirect bloquead
 ## Incremento 2026-09-22 — Connector egress parity
 
 Connectors agora compartilham bloqueio de proxy/redirect, verificação do IP conectado e limites bounded de payload com Remote MCP e Media. A próxima etapa precisa definir classificação/consentimento para payload externo e injeção de credenciais, além de cobrir upload e testes distribuídos sem afirmar integração externa conectada.
+
+
+## Incremento 2026-09-22 — OAuth redirect URI allowlist
+
+OAuth redirect agora depende de allowlist provider-scoped e canonicalização segura, com loopback HTTP explicitamente opt-in. A próxima etapa é aplicar egress/IP/redirect policy aos endpoints de discovery, JWKS, token e userinfo sem afirmar SSO conectado sem IdP real.

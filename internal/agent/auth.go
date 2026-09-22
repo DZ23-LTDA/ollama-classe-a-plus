@@ -418,9 +418,9 @@ func (s *AuthStore) CreateOAuthState(provider, redirectURI, codeVerifier, userID
 
 func (s *AuthStore) CreateOAuthStateWithNonce(provider, redirectURI, codeVerifier, nonce, userID string, ttl time.Duration) (string, OAuthState, error) {
 	provider = strings.TrimSpace(provider)
-	parsed, err := url.Parse(strings.TrimSpace(redirectURI))
-	if err != nil || parsed.Scheme == "" || parsed.Host == "" || parsed.User != nil {
-		return "", OAuthState{}, errors.New("redirect_uri must be an absolute URL")
+	canonicalRedirectURI, err := validateOAuthRedirectSyntax(redirectURI, false)
+	if err != nil {
+		return "", OAuthState{}, err
 	}
 	if len(codeVerifier) < 43 || len(codeVerifier) > 128 {
 		return "", OAuthState{}, errors.New("code_verifier must be PKCE length")
@@ -432,7 +432,7 @@ func (s *AuthStore) CreateOAuthStateWithNonce(provider, redirectURI, codeVerifie
 	if err != nil {
 		return "", OAuthState{}, err
 	}
-	state := OAuthState{Hash: hashSecret(raw), Provider: provider, RedirectURI: redirectURI, CodeVerifier: codeVerifier, Nonce: strings.TrimSpace(nonce), UserID: userID, ExpiresAt: time.Now().UTC().Add(ttl)}
+	state := OAuthState{Hash: hashSecret(raw), Provider: provider, RedirectURI: canonicalRedirectURI, CodeVerifier: codeVerifier, Nonce: strings.TrimSpace(nonce), UserID: userID, ExpiresAt: time.Now().UTC().Add(ttl)}
 	s.mu.Lock()
 	s.oauthStates[state.Hash] = state
 	err = s.persistLocked()
@@ -757,17 +757,58 @@ func filepathJoin(root, name string) string {
 // OAuthProvider validates the provider configuration and exchanges an authorization code
 // through a caller-supplied HTTP client. Secrets are read only from environment variables.
 type OAuthProvider struct {
-	Name         string `json:"name"`
-	AuthorizeURL string `json:"authorize_url"`
-	TokenURL     string `json:"token_url"`
-	UserInfoURL  string `json:"userinfo_url,omitempty"`
-	IssuerURL    string `json:"issuer_url,omitempty"`
-	Audience     string `json:"audience,omitempty"`
-	ClientIDEnv  string `json:"client_id_env"`
-	SecretEnv    string `json:"secret_env"`
+	Name                  string   `json:"name"`
+	AuthorizeURL          string   `json:"authorize_url"`
+	TokenURL              string   `json:"token_url"`
+	UserInfoURL           string   `json:"userinfo_url,omitempty"`
+	IssuerURL             string   `json:"issuer_url,omitempty"`
+	Audience              string   `json:"audience,omitempty"`
+	ClientIDEnv           string   `json:"client_id_env"`
+	SecretEnv             string   `json:"secret_env"`
+	RedirectURIs          []string `json:"redirect_uris,omitempty"`
+	AllowLoopbackRedirect bool     `json:"allow_loopback_redirect,omitempty"`
+}
+
+func (p OAuthProvider) ValidateRedirectURI(raw string) error {
+	_, err := p.NormalizeRedirectURI(raw)
+	return err
+}
+
+func (p OAuthProvider) NormalizeRedirectURI(raw string) (string, error) {
+	canonical, err := validateOAuthRedirectSyntax(raw, p.AllowLoopbackRedirect)
+	if err != nil {
+		return "", err
+	}
+	if len(p.RedirectURIs) == 0 {
+		return "", errors.New("oauth redirect URI allowlist is required")
+	}
+	for _, allowed := range p.RedirectURIs {
+		allowedCanonical, allowedErr := validateOAuthRedirectSyntax(allowed, p.AllowLoopbackRedirect)
+		if allowedErr == nil && allowedCanonical == canonical {
+			return canonical, nil
+		}
+	}
+	return "", errors.New("oauth redirect URI is not allowlisted")
+}
+
+func validateOAuthRedirectSyntax(raw string, allowLoopbackHTTP bool) (string, error) {
+	value := strings.TrimSpace(raw)
+	u, err := url.Parse(value)
+	if err != nil || u.Scheme == "" || u.Host == "" || u.User != nil || u.Fragment != "" || u.Opaque != "" {
+		return "", errors.New("oauth redirect URI must be an absolute URL without userinfo or fragment")
+	}
+	if u.Scheme != "https" && !(allowLoopbackHTTP && u.Scheme == "http" && isLoopbackHost(u.Hostname())) {
+		return "", errors.New("oauth redirect URI must use HTTPS or explicitly allowed loopback HTTP")
+	}
+	return u.String(), nil
 }
 
 func (p OAuthProvider) Validate() error {
+	for _, redirectURI := range p.RedirectURIs {
+		if _, err := validateOAuthRedirectSyntax(redirectURI, p.AllowLoopbackRedirect); err != nil {
+			return err
+		}
+	}
 	for _, raw := range []string{p.AuthorizeURL, p.TokenURL} {
 		if strings.TrimSpace(raw) == "" {
 			continue

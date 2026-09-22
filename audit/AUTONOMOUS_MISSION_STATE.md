@@ -1081,3 +1081,30 @@ proofs: integrity, Go tests/vet/build, UI Vitest/build, mobile typecheck and Con
 classification: preview/local RC em hardening
 next_slice: external payload policy or platform sandbox primitives; no main merge
 ```
+
+
+## Slice P0 OAuth redirect URI allowlist validada — aguardando publicação — 2026-09-22
+
+```yaml
+state: RELEASING
+iteration: 15
+base_commit: 21f49f69
+working_tree: OAuth redirect changes/tests/docs still uncommitted
+implemented:
+  - provider-scoped exact redirect allowlist from environment
+  - canonical redirect URI used in PKCE state
+  - HTTPS requirement and explicit loopback HTTP opt-in
+  - fragment/userinfo/opaque URI rejection
+proofs:
+  - focused Auth/OAuth tests: PASS
+  - integrity guard: PASS
+  - CGO_ENABLED=1 go test ./... -count=1: PASS
+  - CGO_ENABLED=1 go vet ./...: PASS
+  - CGO_ENABLED=1 go build: PASS
+  - UI Vitest 20/199: PASS
+  - UI build: PASS; known >500KB warning
+  - mobile typecheck: PASS
+classification: preview/local RC em hardening
+open_risks: OAuth endpoint egress parity, real IdP/staging, session storage/UI, strong sandbox
+next_action: commit/push, then address OAuth endpoint egress or secure browser token storage
+```
