@@ -84,6 +84,33 @@ func TestPublicSSORouteDoesNotBypassAuthenticatedOAuthLifecycle(t *testing.T) {
 	}
 }
 
+func TestAgentOriginPolicyBlocksCrossSiteMutations(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, test := range []struct {
+		name   string
+		method string
+		origin string
+		want   bool
+	}{
+		{name: "same local web app", method: "POST", origin: "http://localhost:3000", want: true},
+		{name: "native bearer client", method: "POST", origin: "", want: true},
+		{name: "cross site mutation", method: "POST", origin: "https://evil.example", want: false},
+		{name: "safe read", method: "GET", origin: "https://evil.example", want: true},
+		{name: "preflight", method: "OPTIONS", origin: "https://evil.example", want: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			context, _ := gin.CreateTestContext(httptest.NewRecorder())
+			context.Request = httptest.NewRequest(test.method, "/api/agent/v1/missions", nil)
+			if test.origin != "" {
+				context.Request.Header.Set("Origin", test.origin)
+			}
+			if got := agentOriginAllowed(context); got != test.want {
+				t.Fatalf("agentOriginAllowed(%s, %s) = %v, want %v", test.method, test.origin, got, test.want)
+			}
+		})
+	}
+}
+
 func TestDevTokenOnlyAllowsActualLoopback(t *testing.T) {
 	for _, test := range []struct {
 		name string

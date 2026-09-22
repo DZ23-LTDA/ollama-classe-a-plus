@@ -186,6 +186,8 @@ O endpoint `GET /companies/COMPANY_ID/growth/report` resume campanhas ativas, co
 
 Com `OLLAMA_AGENT_AUTH_REQUIRED=true`, a API valida sessão, organização e RBAC antes de permitir ações. O fluxo `GET /auth/oauth/:provider/start` exige `redirect_uri` e `code_verifier` PKCE; o callback consome `state` uma única vez, troca o código no servidor e cifra access/refresh tokens com AES-GCM usando `OLLAMA_AGENT_CREDENTIAL_KEY`. Configure URLs e nomes das variáveis de segredo por provider sem colocar valores no repositório.
 
+Mutations autenticadas com `Origin` usam a allowlist de `OLLAMA_ORIGINS`; origens cross-site são recusadas antes do Bearer/RBAC. `GET`, `HEAD`, `OPTIONS` e clientes nativos sem `Origin` não são bloqueados por esse guard, mas continuam sujeitos a autenticação e autorização. O bypass público de SSO fica limitado a start/callback/metadata/ACS e não alcança refresh, revoke, logout ou ações de tenant.
+
 Depois do callback, o cliente pode renovar e revogar uma credencial somente dentro da organização autenticada:
 
 ```bash

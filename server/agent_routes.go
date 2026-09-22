@@ -448,6 +448,10 @@ func (a *agentAPI) authMiddleware(c *gin.Context) {
 		c.Next()
 		return
 	}
+	if !agentOriginAllowed(c) {
+		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "request origin is not allowed"})
+		return
+	}
 	if strings.HasSuffix(c.Request.URL.Path, "/auth/dev/token") && isDevTokenRequestAllowed(c) {
 		c.Next()
 		return
@@ -500,6 +504,35 @@ func (a *agentAPI) authMiddleware(c *gin.Context) {
 	c.Set("agent.organization", organization)
 	c.Set("agent.membership", membership)
 	c.Next()
+}
+
+func agentOriginAllowed(c *gin.Context) bool {
+	if c == nil || c.Request == nil || c.Request.Method == http.MethodGet || c.Request.Method == http.MethodHead || c.Request.Method == http.MethodOptions || isPublicSSORoute(c) {
+		return true
+	}
+	origin := strings.TrimSpace(c.GetHeader("Origin"))
+	if origin == "" {
+		return true
+	}
+	if strings.ContainsAny(origin, "\r\n") {
+		return false
+	}
+	for _, allowed := range envconfig.AllowedOrigins() {
+		allowed = strings.TrimRight(strings.TrimSpace(allowed), "/")
+		if allowed == "*" {
+			continue
+		}
+		if strings.HasSuffix(allowed, "*") {
+			if strings.HasPrefix(origin, strings.TrimSuffix(allowed, "*")) {
+				return true
+			}
+			continue
+		}
+		if origin == allowed {
+			return true
+		}
+	}
+	return false
 }
 
 func isCompanionConnectRoute(fullPath string) bool {
@@ -613,21 +646,27 @@ func (a *agentAPI) safeConfig(c *gin.Context) {
 	if strings.TrimSpace(os.Getenv("OLLAMA_AGENT_REDIS_URL")) != "" {
 		queue = "redis"
 	}
+	sandboxMode := strings.ToLower(strings.TrimSpace(os.Getenv("OLLAMA_AGENT_SANDBOX_MODE")))
+	if sandboxMode == "" {
+		sandboxMode = "best-effort"
+	}
 	c.JSON(http.StatusOK, gin.H{
-		"runtime":                  "agent-v1",
-		"store":                    store,
-		"queue":                    queue,
-		"auth_required":            a.authRequired,
-		"approval_gated_tools":     true,
-		"workspace_isolation":      true,
-		"planner_model_configured": envConfigured("OLLAMA_AGENT_MODEL"),
-		"embedding_configured":     envConfigured("OLLAMA_AGENT_EMBED_MODEL"),
-		"connectors_configured":    envConfigured("OLLAMA_AGENT_CONNECTORS"),
-		"mcp_configured":           envConfigured("OLLAMA_AGENT_MCP"),
-		"media_configured":         envConfigured("OLLAMA_AGENT_MEDIA_BASE_URL"),
-		"deployments_configured":   envConfigured("OLLAMA_AGENT_DEPLOYMENTS"),
-		"otlp_configured":          envConfigured("OLLAMA_AGENT_OTLP_ENDPOINT"),
-		"push_configured":          envConfigured("OLLAMA_AGENT_PUSH_ENDPOINT"),
+		"runtime":                          "agent-v1",
+		"store":                            store,
+		"queue":                            queue,
+		"auth_required":                    a.authRequired,
+		"approval_gated_tools":             true,
+		"workspace_isolation":              true,
+		"planner_model_configured":         envConfigured("OLLAMA_AGENT_MODEL"),
+		"embedding_configured":             envConfigured("OLLAMA_AGENT_EMBED_MODEL"),
+		"connectors_configured":            envConfigured("OLLAMA_AGENT_CONNECTORS"),
+		"mcp_configured":                   envConfigured("OLLAMA_AGENT_MCP"),
+		"media_configured":                 envConfigured("OLLAMA_AGENT_MEDIA_BASE_URL"),
+		"deployments_configured":           envConfigured("OLLAMA_AGENT_DEPLOYMENTS"),
+		"otlp_configured":                  envConfigured("OLLAMA_AGENT_OTLP_ENDPOINT"),
+		"push_configured":                  envConfigured("OLLAMA_AGENT_PUSH_ENDPOINT"),
+		"sandbox_mode":                     sandboxMode,
+		"sandbox_strict_cgroup_configured": sandboxMode == "strict" && envConfigured("OLLAMA_AGENT_SANDBOX_CGROUP_ROOT"),
 	})
 }
 
