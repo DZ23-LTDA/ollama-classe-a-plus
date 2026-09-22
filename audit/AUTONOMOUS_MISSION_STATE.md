@@ -491,3 +491,16 @@ external_blockers:
   - signed installers, app stores and operator deployment accounts
 next_action: run complete release gates, capture final screens, commit and push feature branch; do not merge main automatically
 ```
+
+
+## Publicação da rodada operacional — 2026-09-22
+
+```yaml
+commit: c9aa8f8941ea55f28ab8e9d70f5a79c6f08ea81f
+branch: feat/manus-parity-omniroute
+remote: https://github.com/DZ23-LTDA/ollama-classe-a-plus.git
+pull_request: https://github.com/DZ23-LTDA/ollama-classe-a-plus/pull/1
+local_tree: clean_after_commit
+public_ci: queued_at_publish
+next_action: external credentialed journeys and distributed staging; do not claim universal production readiness
+```
