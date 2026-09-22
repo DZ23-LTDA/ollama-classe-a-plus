@@ -1831,3 +1831,18 @@ local_evidence: focused normal/race PASS; integrity PASS
 classification: preview/local RC em hardening; NÃO final; NÃO production-ready
 next_action: run full Go/server gates, commit/push, then verify quality workflow
 ```
+
+
+## Publicação do slice P0 bootstrap MCP/Remote MCP — 2026-09-22
+
+```yaml
+state: VALIDATING_RELEASE
+iteration: 34
+commit: 1db3911e
+branch: feat/manus-parity-omniroute
+remote: class-a-plus/feat/manus-parity-omniroute
+local_evidence: focused normal/race; integrity; go test ./...; go vet ./...; go build = PASS
+remote_evidence: pending for this SHA
+classification: preview/local RC em hardening; NÃO final; NÃO production-ready
+next_action: confirm agentic quality/integrity on this SHA and continue transport/security P0s
+```
