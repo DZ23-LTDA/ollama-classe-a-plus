@@ -1,0 +1,4 @@
+upstream_repository=https://github.com/ollama/ollama.git
+accepted_base_commit=6383a0fa9cbf97494b847226e189f6e36b401a08
+recorded_at=2026-09-22
+policy=manual-review-only

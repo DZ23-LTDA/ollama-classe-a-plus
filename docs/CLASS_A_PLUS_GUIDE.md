@@ -224,6 +224,8 @@ Para testes distribuídos que exigem serviços reais, use a tag e variáveis doc
 
 Também revise `git diff --check`, rode scanners de segredos, verifique permissões dos arquivos, confirme que não há tokens em logs e valide autorização negativa por organização. Toda operação com efeito externo deve ter approval, timeout, limite e registro auditável.
 
+Para proteger as superfícies Classe A+ durante atualizações do motor, execute também `scripts/check-class-a-plus-integrity.sh` e `node app/ui/app/scripts/smoke-shell.mjs`. A política completa de atualização manual, o commit upstream aceito e o procedimento de rollback estão em [`UPSTREAM_POLICY.md`](../UPSTREAM_POLICY.md). O remote `upstream` nunca é mesclado automaticamente.
+
 ## Como contribuir
 
 Crie uma branch descritiva a partir de `main`. Para cada feature, documente o objetivo, o contrato de API, a matriz de autorização, os estados de UI, o risco, os testes, a observabilidade e o plano de rollback. Implemente primeiro um fluxo vertical funcional antes de adicionar telas estáticas ou abstrações genéricas.
@@ -265,9 +267,9 @@ Este repositório deriva de uma base Ollama e deve preservar os arquivos de lice
 
 ## Links públicos
 
-- [Repositório Ollama Classe A+](https://github.com/LMPrado-DZ23/ollama-classe-a-plus)
-- [Branch de evolução agentic](https://github.com/LMPrado-DZ23/ollama-classe-a-plus/tree/feat/dz23-claude-codex-desktop)
-- [PR de revisão inicial](https://github.com/LMPrado-DZ23/ollama-classe-a-plus/pulls)
+- [Repositório público canônico](https://github.com/DZ23-LTDA/ollama-classe-a-plus)
+- [Branch de evolução agentic](https://github.com/DZ23-LTDA/ollama-classe-a-plus/tree/feat/manus-parity-omniroute)
+- [PRs de revisão](https://github.com/DZ23-LTDA/ollama-classe-a-plus/pulls)
 - [Arquitetura agentic](agentic/ARCHITECTURE.md)
 - [API agentic](agentic/API.md)
 - [Integrações](agentic/INTEGRATIONS.md)

@@ -11,6 +11,8 @@ Este arquivo registra as entregas públicas da distribuição `DZ23-LTDA/ollama-
 - Endpoint `GET /api/agent/v1/config/safe` sem tokens, caminhos privados ou valores sensíveis.
 - Preset OmniRoute local, opt-in HTTP loopback protegido e smoke tests de forwarding/bearer server-side.
 - Screenshots reais das novas rotas capturadas com Chromium e notas de proveniência atualizadas.
+- Menu lateral Classe A+ aberto por padrão, com smoke test Chromium de rotas, links, ações primárias e estados vazios.
+- `UPSTREAM_BASE_COMMIT`, `UPSTREAM_POLICY.md`, guardrail de integridade e workflow CI para impedir perda silenciosa das superfícies agentic.
 
 ## [0.1.0] — Preview público
 

@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { useState } from "react";
 import {
   ArrowRightIcon,
   CheckCircleIcon,
@@ -85,6 +86,23 @@ function StatCard({ label, value, tone = "neutral" }: { label: string; value: st
 export function ProductWorkspacePage({ kind }: { kind: ProductPageKind }) {
   const copy = pageCopy[kind];
   const current = kind as AppSection;
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const handleAction = () => {
+    if (kind === "tasks") {
+      window.location.assign("/agentic");
+      return;
+    }
+    setNotice(`${copy.action} será conectado ao contrato persistente desta superfície na próxima fatia. Nenhuma ação externa foi executada.`);
+  };
+
+  const handleExplore = () => {
+    if (kind === "projects") {
+      window.location.assign("/agentic");
+      return;
+    }
+    setNotice("O fluxo está protegido por approval e ainda não há dados persistidos neste workspace.");
+  };
 
   return (
     <SidebarLayout title={copy.title} sidebar={<AppSidebar current={current} />}>
@@ -99,11 +117,17 @@ export function ProductWorkspacePage({ kind }: { kind: ProductPageKind }) {
               <h2 className="font-rounded text-3xl font-semibold tracking-tight text-neutral-950 dark:text-white">{copy.title}</h2>
               <p className="mt-3 text-sm leading-6 text-neutral-500 dark:text-neutral-400">{copy.description}</p>
             </div>
-            <button className="inline-flex items-center justify-center gap-2 rounded-xl bg-neutral-950 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-200">
+            <button onClick={handleAction} className="inline-flex items-center justify-center gap-2 rounded-xl bg-neutral-950 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-200">
               <PlusIcon className="h-4 w-4" />
               {copy.action}
             </button>
           </div>
+
+          {notice && (
+            <div role="status" aria-live="polite" className="mt-5 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-xs leading-5 text-violet-800 dark:border-violet-900/60 dark:bg-violet-950/20 dark:text-violet-200">
+              {notice}
+            </div>
+          )}
 
           <div className="mt-7 grid gap-3 sm:grid-cols-3">
             <StatCard label="Status" value={copy.metric} tone="green" />
@@ -123,7 +147,7 @@ export function ProductWorkspacePage({ kind }: { kind: ProductPageKind }) {
               <div className="mt-8 rounded-xl border border-dashed border-neutral-300 px-6 py-10 text-center dark:border-neutral-700">
                 <FolderOpenIcon className="mx-auto h-8 w-8 text-neutral-300 dark:text-neutral-600" />
                 <p className="mx-auto mt-3 max-w-md text-sm text-neutral-500 dark:text-neutral-400">{copy.empty}</p>
-                <button className="mt-5 inline-flex items-center gap-2 rounded-lg border border-neutral-200 px-3 py-2 text-xs font-medium text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800">
+                <button onClick={handleExplore} className="mt-5 inline-flex items-center gap-2 rounded-lg border border-neutral-200 px-3 py-2 text-xs font-medium text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800">
                   Explorar fluxo
                   <ArrowRightIcon className="h-3.5 w-3.5" />
                 </button>

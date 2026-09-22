@@ -3,7 +3,9 @@ import { ChatIcon } from "@/components/ChatIcon";
 import { isWindowsPlatform } from "@/lib/platform";
 import { useState } from "react";
 
-let sessionSidebarOpen = false;
+// The agentic desktop shell is navigation-first. Keep the sidebar visible by
+// default and preserve the operator's choice only for the current session.
+let sessionSidebarOpen = true;
 
 export function SidebarLayout({
   sidebar,
