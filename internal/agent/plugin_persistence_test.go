@@ -158,3 +158,23 @@ func fileMode(t *testing.T, path string) os.FileMode {
 	}
 	return info.Mode()
 }
+
+func TestPersistentMCPManagerRejectsTrailingJSON(t *testing.T) {
+	manifest := filepath.Join(t.TempDir(), "mcp.json")
+	if err := os.WriteFile(manifest, []byte("[] {}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := NewPersistentMCPManager(manifest); err == nil {
+		t.Fatal("expected trailing JSON rejection")
+	}
+}
+
+func TestPersistentRemoteMCPManagerRejectsTrailingJSON(t *testing.T) {
+	manifest := filepath.Join(t.TempDir(), "remote-mcp.json")
+	if err := os.WriteFile(manifest, []byte("[] {}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := NewPersistentRemoteMCPManager(manifest); err == nil {
+		t.Fatal("expected trailing JSON rejection")
+	}
+}

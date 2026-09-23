@@ -56,6 +56,13 @@ func NewPersistentMCPManager(manifestPath string) (*MCPManager, error) {
 		if err := decoder.Decode(&configs); err != nil {
 			return nil, fmt.Errorf("decode MCP manifest: %w", err)
 		}
+		var extra any
+		if err := decoder.Decode(&extra); err != io.EOF {
+			if err == nil {
+				return nil, errors.New("MCP manifest contains trailing JSON")
+			}
+			return nil, fmt.Errorf("decode MCP manifest trailing data: %w", err)
+		}
 		for _, config := range configs {
 			if err := manager.Register(config); err != nil {
 				return nil, fmt.Errorf("load MCP server %q: %w", config.ID, err)
