@@ -505,3 +505,10 @@ A regressão normal/race e os gates Go completos passaram. Esse endpoint continu
 O commit `58cc1f40` adicionou proteção ao adapter de deploy. Roots symlink são rejeitados, redirects são desabilitados e a conexão padrão bloqueia endereços privados depois do DNS para endpoints externos. HTTP permanece permitido somente para loopback; serviços remotos precisam de HTTPS.
 
 O adapter possui smoke determinístico com servidor fixture e limites de arquivo, mas não houve deploy real. Vercel, Netlify, AWS, Cloudflare e outros continuam dependentes de credenciais, contas, permissões, custos, aprovação e rollback do operador. O produto permanece preview/local RC em hardening.
+
+
+## Addendum de segurança multimídia — 2026-09-23
+
+O commit `f45aae49` adicionou containment e proteção de symlink para inputs de áudio/imagem e para outputs no workspace. Arquivos de transcrição acima de 100 MiB são rejeitados antes da leitura, sem truncamento silencioso. Testes normal/race e gates Go completos passaram.
+
+Isso valida o comportamento do adapter e de um provider fixture local. Não valida modelos hospedados, GPU, quota, billing, conta externa, moderação ou qualidade de geração; esses requisitos continuam externos e não production-ready.

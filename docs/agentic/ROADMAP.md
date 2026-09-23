@@ -403,3 +403,8 @@ Esse avanço remove uma quebra de execução multiplataforma sem transformar com
 O adapter de deploy agora possui coleta de workspace sem root symlink, limites de arquivos/tamanho, redirects desativados e verificação do IP conectado após DNS. Esse caminho está pronto para smoke local determinístico e permanece separado de publicação externa.
 
 O próximo gate externo continua exigindo credenciais do operador, contas de provedor, domínio ou projeto, aprovação, custos, smoke reversível, logs, rollback e confirmação de estado. Nenhum desses requisitos é considerado concluído pelo adapter local.
+
+
+## Incremento 2026-09-23 — mídia confinada e limites explícitos
+
+Inputs de áudio/imagem agora ficam confinados ao workspace, com rejeição de symlink/traversal, arquivo não regular e áudio acima de 100 MiB. Os outputs também validam o root antes de gravar. O próximo gate para mídia real continua sendo homologação por provider/modelo, credenciais, quota, GPU ou serviço externo, qualidade, moderação e recuperação.

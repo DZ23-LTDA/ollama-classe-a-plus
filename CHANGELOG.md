@@ -447,3 +447,8 @@ O parser HTTP agentic agora limita bodies JSON a 4 MiB antes do decode, além de
 ## Unreleased — deployment adapter hardening — 2026-09-23
 
 O adapter de deploy agora rejeita root symlink, bloqueia redirects e valida o IP conectado para evitar SSRF por DNS. HTTP é aceito somente em loopback; deploys externos continuam não validados sem credenciais e aprovação do operador. Testes normal/race e gates Go completos passaram.
+
+
+## Unreleased — media workspace input hardening — 2026-09-23
+
+O MediaManager agora rejeita traversal e symlink em inputs de áudio/imagem, valida arquivos regulares dentro do workspace e recusa áudio acima de 100 MiB antes da leitura. Testes normal/race e gates Go completos passaram.

@@ -384,3 +384,8 @@ O limite de transporte do `decodeJSON` é 4 MiB por request. Bodies maiores são
 ## Deployments
 
 O adapter de deployment aceita HTTPS para serviços externos e HTTP somente em loopback. O root do workspace não pode ser symlink; redirects são bloqueados; a conexão padrão verifica o endereço IP real após o DNS e rejeita destinos privados não-loopback. O smoke local usa um servidor fixture. Configurar Vercel, Netlify, AWS, Cloudflare ou outro serviço não significa conta validada, domínio publicado, billing autorizado ou rollback testado.
+
+
+## Mídia
+
+`Transcribe` e `AnalyzeImage` exigem arquivos regulares dentro do workspace informado. O workspace final e os componentes do caminho não podem ser symlinks; traversal e input externo são rejeitados. Transcrição acima de 100 MiB falha antes da leitura. Geração e speech gravam somente em um workspace validado. Provider fixture local valida contrato, não conta, quota, GPU ou upstream externo.

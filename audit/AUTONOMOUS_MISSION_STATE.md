@@ -2318,3 +2318,10 @@ Regressão normal/race confirma rejeição de campo inesperado antes de criar us
 O commit `58cc1f40e478dba5b1b87dc452e172e86b9b2f42` endureceu o adapter de deployments. O workspace raiz agora rejeita symlink; redirects continuam bloqueados; o client padrão remove proxy, marca explicitamente endpoints loopback e rejeita o IP privado real após a conexão para hosts não-loopback. A configuração HTTP local aceita `localhost`, `127.0.0.1` e `::1`; endpoints externos exigem HTTPS.
 
 Regressões cobrem deploy genérico fixture, root symlink, localhost HTTP e dial para endereço privado. Testes normal/race e gates Go completos passaram em integrity, todos os pacotes, vet, build e diff. Nenhum deploy Vercel, Netlify, AWS, Cloudflare ou outro foi executado; esses estados continuam `configured/available`, não `upstream validated`.
+
+
+## Hardening P1 de inputs multimídia — 2026-09-23
+
+O commit `f45aae49866c16f5b5be60ccb083715663af2896` endureceu `MediaManager`. `Transcribe` e `AnalyzeImage` agora aceitam somente arquivos regulares dentro do workspace, recusam workspace/input symlink e rejeitam traversal. A transcrição verifica o tamanho antes de abrir e falha acima de 100 MiB, em vez de truncar silenciosamente com `io.CopyN`. Outputs de imagem, vídeo e speech também validam o root antes de gravar.
+
+Regressões cobrem provider TLS fixture, containment, symlink, arquivo grande, redirects, MIME/magic e limites. Testes normal/race e gates Go completos passaram em integrity, todos os pacotes, vet, build e diff. O fixture local não comprova conta, quota ou provider externo conectado.

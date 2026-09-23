@@ -573,3 +573,10 @@ Testes normal/race e gates Go completos passaram. A rota continua deliberadament
 A revisão do deploy encontrou dois riscos locais: root symlink podia fazer o coletor operar fora da raiz declarada, e o client padrão não verificava o IP real após resolução DNS. O commit `58cc1f40` corrige ambos. A conexão distingue loopback explícito de endpoint externo e bloqueia IP privado, link-local, multicast, unspecified e loopback não autorizado.
 
 Fixture genérico, symlink root, localhost e dial privado têm regressões normal/race. Os gates Go completos passaram. Não há evidência de deploy em provedor real, conta, domínio, billing, publicação ou rollback externo.
+
+
+## Addendum P1 — inputs multimídia confinados ao workspace — 2026-09-23
+
+A revisão encontrou que `Transcribe` aceitava caminho arbitrário e usava `io.CopyN` para cortar silenciosamente arquivos acima do limite. O commit `f45aae49` centralizou validação de root/input, recusou symlink e traversal, exigiu arquivo regular e verificou tamanho antes de abrir. `AnalyzeImage` e outputs do provider passaram a usar o mesmo root seguro.
+
+A cobertura normal/race inclui arquivo externo, symlink, arquivo sparse acima de 100 MiB e provider TLS fixture. Os gates Go completos passaram. Isso não é validação de provider externo, modelo, GPU, quota ou moderação.

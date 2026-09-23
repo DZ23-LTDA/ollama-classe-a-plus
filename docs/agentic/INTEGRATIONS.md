@@ -148,3 +148,10 @@ A tela Plugins permite o cadastro sem receber tokens, passwords ou conteúdo de 
 O runtime possui adapter local para generic, Vercel e Netlify com coleta limitada do workspace, referências de token por nome de variável, HTTPS obrigatório para endpoints remotos, redirects bloqueados, root sem symlink e verificação do endereço conectado. O smoke automatizado usa servidor fixture e não representa publicação externa.
 
 **Configured** significa que o manifest foi aceito e o token é referenciado por nome de ambiente. **Upstream validated** exigiria chamada real autorizada, projeto/conta válidos, resposta redigida, evidência de URL/status, aprovação de custo e caminho de rollback. Vercel, Netlify, AWS, Cloudflare e demais destinos continuam `available/configurable`; nenhuma conta ou publicação externa está conectada ou homologada.
+
+
+## Mídia: contrato local versus provider externo
+
+O `MediaManager` cobre imagem, vídeo, speech, transcrição, visão e tone local com limites, artifacts, MIME/magic e provider OpenAI-compatible/loopback. Inputs de áudio/imagem ficam confinados ao workspace e outputs não gravam em root symlink. Os testes usam fixtures TLS ou geração determinística local.
+
+Isso significa **adapter testado**, não modelo externo conectado. Claude, Grok, providers de vídeo/imagem/TTS/STT, GPU, quota, moderação, billing e qualidade de produção exigem configuração do operador e smoke autorizado por provider; nenhum é promovido a `upstream validated` por esses testes.
