@@ -118,6 +118,9 @@ jobs:
       - name: Mobile typecheck
         working-directory: apps/mobile-agentic
         run: npm ci --no-audit --no-fund && npm run typecheck
+      - name: Mobile production dependency audit
+        working-directory: apps/mobile-agentic
+        run: npm audit --omit=dev --audit-level=high
       - name: Mobile offline policy regression
         working-directory: apps/mobile-agentic
         run: npm run test:policy
@@ -127,6 +130,9 @@ jobs:
       - name: Web typecheck
         working-directory: app/ui/app
         run: ./node_modules/.bin/tsc --noEmit
+      - name: Web production dependency audit
+        working-directory: app/ui/app
+        run: npm audit --omit=dev --audit-level=high
       - name: Web lint
         working-directory: app/ui/app
         run: npm run lint
