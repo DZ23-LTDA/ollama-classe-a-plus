@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sort"
@@ -92,6 +93,7 @@ func (h *SpanHandle) End(status string, runErr error) {
 	}
 	now := time.Now().UTC()
 	span := &h.store.spans[h.index]
+	previous := *span
 	span.Status = status
 	span.EndAt = &now
 	span.Duration = now.Sub(span.StartAt)
@@ -99,8 +101,12 @@ func (h *SpanHandle) End(status string, runErr error) {
 		span.Status = "error"
 		span.Error = RedactDLP(limitError(runErr.Error(), 2000))
 	}
+	if err := h.store.persistLocked(); err != nil {
+		*span = previous
+		slog.Error("agent trace persistence failed", "trace_id", previous.TraceID, "span_id", previous.SpanID, "error", err)
+		return
+	}
 	h.ended = true
-	_ = h.store.persistLocked()
 }
 
 func (s *TraceStore) List(traceID string, limit int) []TraceSpan {
