@@ -44,6 +44,10 @@ func pluginCatalog(c *gin.Context, a *agentAPI) {
 	})
 }
 
+func connectorCatalog(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{"connectors": agent.ConnectorCatalog()})
+}
+
 func writePluginLifecycleError(c *gin.Context, err error) {
 	status := http.StatusNotFound
 	if errors.Is(err, agent.ErrPluginOrganizationScope) {

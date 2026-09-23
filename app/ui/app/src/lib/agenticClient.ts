@@ -31,6 +31,7 @@ export type AgentMission = {
 };
 export type AgentEvent = { id: string; type: string; step_id?: string; created_at: string; payload?: unknown };
 export type AgentConnector = { id: string; provider: string; base_url: string; token_env?: string; oauth_provider?: string; allowed_origins?: string[]; operations?: Array<{ name: string; methods: string[]; path_prefixes: string[] }>; disabled?: boolean };
+export type AgentConnectorCatalogEntry = { id: string; name: string; category: string; kind: string; description: string; auth: string; source: string; status: string; scopes?: string[] };
 export type AgentMCPServer = { id: string; command?: string; url?: string; token_env?: string; transport?: string; args?: string[]; allowed_methods?: string[]; environment_vars?: string[]; timeout_seconds?: number; disabled?: boolean };
 export type AgentSkill = { id: string; version: string; description: string; scopes?: string[]; tools?: string[]; trusted: boolean; enabled: boolean };
 export type AgentCLIStatus = { id: string; name: string; section: string; visibility: string; mode: string; executables?: string[]; installed: boolean; executable?: string };
@@ -122,6 +123,7 @@ export const updateSchedule = (id: string, payload: Partial<AgentSchedule>) => a
 export const deleteSchedule = (id: string) => agentFetch<void>(`/api/agent/v1/schedules/${encodeURIComponent(id)}`, { method: "DELETE" });
 export const listSkills = async () => { const result = await agentFetch<{ skills?: AgentSkill[] | null }>("/api/agent/v1/skills"); return { skills: Array.isArray(result.skills) ? result.skills : [] }; };
 export const listConnectors = async () => { const result = await agentFetch<{ connectors?: AgentConnector[] | null }>("/api/agent/v1/connectors"); return { connectors: Array.isArray(result.connectors) ? result.connectors : [] }; };
+export const listConnectorCatalog = async () => { const result = await agentFetch<{ connectors?: AgentConnectorCatalogEntry[] | null }>("/api/agent/v1/connector-catalog"); return { connectors: Array.isArray(result.connectors) ? result.connectors : [] }; };
 export const listMCPServers = async () => { const result = await agentFetch<{ servers?: AgentMCPServer[] | null; remote_servers?: AgentMCPServer[] | null }>("/api/agent/v1/mcp"); return { servers: [...(Array.isArray(result.servers) ? result.servers : []), ...(Array.isArray(result.remote_servers) ? result.remote_servers.map((server) => ({ ...server, transport: "streamable-http" })) : [])] }; };
 export const listCLIStatus = async () => { const result = await agentFetch<{ tools?: AgentCLIStatus[] | null }>("/api/dz23/cli-catalog"); return { tools: Array.isArray(result.tools) ? result.tools : [] }; };
 export const setConnectorEnabled = (id: string, enabled: boolean) => agentFetch(`/api/agent/v1/connectors/${encodeURIComponent(id)}/${enabled ? "enable" : "disable"}`, { method: "POST", body: "{}" });

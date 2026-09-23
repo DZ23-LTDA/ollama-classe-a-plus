@@ -362,6 +362,7 @@ func (a *agentAPI) register(r *gin.Engine) {
 	group.GET("/metrics/prometheus", a.prometheus)
 	group.GET("/tools", a.tools)
 	group.GET("/connectors", a.connectors)
+	group.GET("/connector-catalog", connectorCatalog)
 	group.POST("/connectors/:id/enable", a.enableConnector)
 	group.POST("/connectors/:id/disable", a.disableConnector)
 	group.DELETE("/connectors/:id", a.removeConnector)
