@@ -604,3 +604,8 @@ A cobertura normal/race e o runner local completo passaram. A CI remota do novo 
 O commit `86597b82` faz o worker local registrar falhas de criação de missão, aplicar backoff de 5/10 segundos e desabilitar o schedule após três falhas consecutivas. Uma execução válida limpa o estado. O claim não avança em memória quando a persistência falha.
 
 Os testes normal/race e o runner local completo passaram. Isso não prova lease distribuído, múltiplos workers, DLQ de schedule ou recuperação em Postgres/Redis reais. A CI remota ainda estava em execução e o produto continua **preview/local RC em hardening**.
+
+
+## Addendum de rollback da fila local — 2026-09-23
+
+O commit `717a7e4f` tornou as transições persistentes da fila local transacionais em relação ao `jobs.json`: falha de escrita não deixa `Claim`, `Ack`, `Nack` ou `Replay` parcialmente aplicados em memória. Testes normais/race e o runner local completo passaram. Isso não equivale a lease multi-processo ou homologação de Redis; o produto permanece **preview/local RC em hardening**.

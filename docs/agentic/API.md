@@ -430,3 +430,8 @@ A resposta contém `company`, `exchange` e, para leitura, `report`. Cada exchang
 
 
 Schedules também expõem `failure_count` e `last_failure_code` de forma sanitizada. O worker local registra `mission_creation_failed`, tenta novamente com backoff de 5 e 10 segundos e desabilita o schedule após três falhas consecutivas; uma execução bem-sucedida zera esses campos. O código interno do provider não é persistido. Essa garantia é local ao `ContextStore`; claim/lease distribuído e DLQ de schedule exigem a camada distribuída correspondente e testes reais.
+
+
+### Atomicidade do queue local
+
+As mutações de job (`Claim`, `Ack`, `Nack` e `Replay`) só permanecem no estado em memória quando a gravação atômica de `jobs.json` é confirmada. Em erro de filesystem, a fila restaura o snapshot anterior. Esse contrato vale para o queue local; o adapter Redis continua exigindo testes distribuídos de lease, fencing, perda de conexão e recuperação de worker.

@@ -655,3 +655,8 @@ A revisão do Company OS identificou que a rota criava e persistia o ciclo antes
 ## Addendum P1 — retry bounded e claim seguro de schedules — 2026-09-23
 
 A auditoria do worker encontrou que `ClaimDueSchedules` avançava o schedule antes de saber se `CreateMission` havia sido criado. A falha era silenciosa e podia perder a execução até o próximo intervalo. O commit `86597b82` registra somente um código de falha sanitizado, aplica backoff bounded, desabilita após três falhas e restaura a cópia anterior quando a persistência do claim falha. Testes normal/race e gates completos passaram. O risco distribuído permanece: `ContextStore` não é lease multi-processo e a prova de PostgreSQL/Redis/DLQ ainda depende de ambiente real.
+
+
+## Addendum P1 — rollback transacional do queue local — 2026-09-23
+
+A auditoria encontrou que o `JobQueue` atualizava o mapa antes de persistir `jobs.json`; uma falha de filesystem deixava o claim em estado `running` somente na memória. O commit `717a7e4f` centraliza o snapshot anterior e desfaz qualquer mutação quando a escrita falha. A regressão normal/race passou e o runner completo local passou. A implementação ainda não é prova de lease/fencing multi-processo nem de recuperação Redis em ambiente distribuído.

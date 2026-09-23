@@ -511,3 +511,8 @@ O commit `46d6b34c` impede ciclos Company órfãos quando a persistência do sch
 ## Unreleased — bounded schedule worker retries — 2026-09-23
 
 O commit `86597b82` registra falhas de criação de missão, aplica backoff bounded e pausa automaticamente schedules após três falhas consecutivas. Claims não persistidos são revertidos em memória. Gates locais completos passaram; worker distribuído e DLQ real permanecem pendentes.
+
+
+## Unreleased — transactional local queue mutations — 2026-09-23
+
+O commit `717a7e4f` impede que falhas de persistência deixem jobs parcialmente aplicados em memória durante claim, ack, nack ou replay. Gates locais completos passaram; lease distribuído e Redis real continuam pendentes.

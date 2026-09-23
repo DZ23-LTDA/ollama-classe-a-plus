@@ -2414,3 +2414,10 @@ Testes normais e race cobrem replay após restart, conflito de payload, rollback
 O commit `86597b827fb247dcc60bbcb0a7c31ee1a0ddc4be` fecha uma perda de tentativa em `Runtime.resumePending`: depois do claim, falhas de `CreateMission` agora ficam registradas no próprio schedule com `failure_count` e código sanitizado `mission_creation_failed`. O worker aplica backoff local de 5 e 10 segundos e desabilita o schedule após três falhas consecutivas; uma execução posterior bem-sucedida limpa o estado. O claim também só avança `NextRunAt` depois da persistência e restaura a cópia anterior se a escrita falhar.
 
 Testes normais e race cobrem planner indisponível, backoff, auto-pause após três falhas, reset após sucesso e rollback de claim em storage quebrado. O runner local absoluto completo passou `FULL_LOCAL_GATES=PASS`. A CI pública do SHA iniciou com jobs queued/in progress e sem falha observada na consulta. Este é um worker local bounded; lease/claim distribuído, múltiplas réplicas e DLQ de schedule continuam dependentes de infraestrutura PostgreSQL/Redis homologada.
+
+
+## P1 de rollback transacional da fila local — 2026-09-23
+
+O commit `717a7e4f9444c4d77d76422f0b1e70ccfe08a944` corrige uma janela no `JobQueue`: `Claim`, `Ack`, `Nack` e `Replay` alteravam o mapa em memória antes de confirmar `jobs.json`. Se a escrita falhasse, um job podia ficar `running` apenas em memória e desaparecer do fluxo até restart. O helper agora restaura o estado anterior ou remove a inserção quando a persistência atômica falha.
+
+A regressão normal/race cobre falha de persistência durante claim e confirma que o job permanece `pending` com zero tentativas. Os gates locais completos passaram `FULL_LOCAL_GATES=PASS`; a CI pública do novo SHA iniciou com jobs em andamento e ainda não é considerada verde. O queue local continua single-process; lease distribuído, fencing e homologação Redis continuam externos a esta slice.
