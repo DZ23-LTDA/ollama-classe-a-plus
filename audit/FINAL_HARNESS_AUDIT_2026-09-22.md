@@ -650,3 +650,8 @@ A jornada Tel-Agent inicialmente mutava Company sem uma chave de retry HTTP, o q
 ## Addendum P1 — Company cycles e schedules transacionais — 2026-09-23
 
 A revisão do Company OS identificou que a rota criava e persistia o ciclo antes de criar o schedule. Uma falha de storage podia deixar estado `enabled` sem executor; uma repetição após timeout podia duplicar ambos. O commit `46d6b34c` adiciona idempotência, vínculo persistente, rollback de ciclo/schedule e rollback da entrada em memória no `ContextStore`. As regressões normal/race e os gates locais completos passaram. Isso melhora consistência local, mas não prova worker distribuído, Postgres/RLS real ou execução externa homologada.
+
+
+## Addendum P1 — retry bounded e claim seguro de schedules — 2026-09-23
+
+A auditoria do worker encontrou que `ClaimDueSchedules` avançava o schedule antes de saber se `CreateMission` havia sido criado. A falha era silenciosa e podia perder a execução até o próximo intervalo. O commit `86597b82` registra somente um código de falha sanitizado, aplica backoff bounded, desabilita após três falhas e restaura a cópia anterior quando a persistência do claim falha. Testes normal/race e gates completos passaram. O risco distribuído permanece: `ContextStore` não é lease multi-processo e a prova de PostgreSQL/Redis/DLQ ainda depende de ambiente real.

@@ -506,3 +506,8 @@ O commit `d67e7a79` adicionou `Idempotency-Key` ao Tel-Agent: replay retorna o m
 ## Unreleased — Company cycles transacionais — 2026-09-23
 
 O commit `46d6b34c` impede ciclos Company órfãos quando a persistência do schedule falha, adiciona replay por `Idempotency-Key` e evita schedules duplicados em retries. Testes normais/race e o runner local completo passaram; a CI remota ainda estava em execução.
+
+
+## Unreleased — bounded schedule worker retries — 2026-09-23
+
+O commit `86597b82` registra falhas de criação de missão, aplica backoff bounded e pausa automaticamente schedules após três falhas consecutivas. Claims não persistidos são revertidos em memória. Gates locais completos passaram; worker distribuído e DLQ real permanecem pendentes.

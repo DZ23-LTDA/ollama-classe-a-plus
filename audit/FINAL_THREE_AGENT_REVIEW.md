@@ -362,3 +362,8 @@ Os testes Go normais/race, Vitest/build e integrity passaram localmente. O prime
 ## Addendum independente — Company cycles transacionais — 2026-09-23
 
 A revisão confirmou no commit `46d6b34c` que a criação de ciclo Company não deixa mais um ciclo `enabled` sem schedule quando a persistência falha. `Idempotency-Key` cobre replay após restart e conflito de payload; o handler compensa ciclo e schedule e o `ContextStore` desfaz a entrada em memória em erro de escrita. Testes normais/race, HTTP e o runner local completo passaram. O próximo risco é distribuído: lease/claim de worker, Postgres/Redis reais e execução multi-processo ainda não foram homologados.
+
+
+## Addendum independente — retry bounded de schedules — 2026-09-23
+
+A revisão confirmou no commit `86597b82` que falhas de criação de missão não são mais descartadas após o claim local. O schedule registra somente código sanitizado, tenta novamente com backoff bounded e desabilita após três falhas; claims cuja escrita falha retornam ao estado anterior. A cobertura normal/race e os gates completos passaram. Isso não encerra o risco de múltiplos workers sem lease distribuído nem substitui homologação de PostgreSQL, Redis e DLQ.

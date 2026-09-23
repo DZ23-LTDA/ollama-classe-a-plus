@@ -597,3 +597,10 @@ O novo head passou o runner local absoluto completo (`FULL_LOCAL_GATES=PASS`), i
 O commit `46d6b34c` tornou a criação de ciclos Company idempotente e compensatória. O ciclo só permanece após schedule criado e vinculado; falhas de persistência não deixam ciclo enabled órfão. Replays com a mesma chave retornam `200` sem duplicar agenda, enquanto payload divergente retorna `409`.
 
 A cobertura normal/race e o runner local completo passaram. A CI remota do novo head ainda estava queued/in progress na última consulta. O produto continua **preview/local RC em hardening**, não finalizado nem production-ready.
+
+
+## Addendum de retry bounded do worker — 2026-09-23
+
+O commit `86597b82` faz o worker local registrar falhas de criação de missão, aplicar backoff de 5/10 segundos e desabilitar o schedule após três falhas consecutivas. Uma execução válida limpa o estado. O claim não avança em memória quando a persistência falha.
+
+Os testes normal/race e o runner local completo passaram. Isso não prova lease distribuído, múltiplos workers, DLQ de schedule ou recuperação em Postgres/Redis reais. A CI remota ainda estava em execução e o produto continua **preview/local RC em hardening**.

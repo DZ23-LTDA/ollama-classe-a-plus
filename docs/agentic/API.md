@@ -427,3 +427,6 @@ A resposta contém `company`, `exchange` e, para leitura, `report`. Cada exchang
 ## Ciclos autônomos do Company OS
 
 `POST /api/agent/v1/companies/:id/cycles` aceita opcionalmente `Idempotency-Key` no header, com limite de 128 bytes. A criação grava o ciclo e o schedule como uma jornada compensatória: se o schedule não puder ser persistido ou vinculado, o ciclo é removido; o `ContextStore` também desfaz a entrada em memória quando sua escrita falha. Repetir a mesma chave e payload retorna `200` com o Company já agendado, sem criar outro schedule; reutilizar a chave com payload diferente retorna `409 Conflict`. O organization ID continua derivado da sessão e o schedule recebe o mesmo tenant.
+
+
+Schedules também expõem `failure_count` e `last_failure_code` de forma sanitizada. O worker local registra `mission_creation_failed`, tenta novamente com backoff de 5 e 10 segundos e desabilita o schedule após três falhas consecutivas; uma execução bem-sucedida zera esses campos. O código interno do provider não é persistido. Essa garantia é local ao `ContextStore`; claim/lease distribuído e DLQ de schedule exigem a camada distribuída correspondente e testes reais.
