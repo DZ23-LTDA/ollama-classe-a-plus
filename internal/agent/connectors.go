@@ -47,7 +47,10 @@ type ConnectorManager struct {
 	persistPath string
 }
 
-var ErrConnectorDisabled = errors.New("connector is disabled")
+var (
+	ErrConnectorDisabled              = errors.New("connector is disabled")
+	ErrConnectorCredentialUnavailable = errors.New("connector credential is unavailable")
+)
 
 type connectorLoopbackContextKey struct{}
 
@@ -424,6 +427,9 @@ func (m *ConnectorManager) call(ctx context.Context, connectorID, operationName,
 	token := tokenOverride
 	if token == "" && config.TokenEnv != "" {
 		token = os.Getenv(config.TokenEnv)
+	}
+	if strings.TrimSpace(token) == "" && (config.TokenEnv != "" || config.OAuthProvider != "") {
+		return 0, "", fmt.Errorf("%w for connector %q", ErrConnectorCredentialUnavailable, connectorID)
 	}
 	if token != "" {
 		request.Header.Set("Authorization", "Bearer "+token)

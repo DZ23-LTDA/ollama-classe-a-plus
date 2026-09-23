@@ -70,6 +70,28 @@ func TestConnectorListReportsCredentialStateWithoutTokenEnvironment(t *testing.T
 	}
 }
 
+func TestConnectorFailsClosedBeforeEgressWhenTokenEnvIsMissing(t *testing.T) {
+	t.Setenv("CONNECTOR_MISSING_TOKEN", "")
+	requests := 0
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+	manager := NewConnectorManager()
+	manager.client = server.Client()
+	if err := manager.Register(ConnectorConfig{ID: "missing-token", Provider: "test", BaseURL: server.URL, TokenEnv: "CONNECTOR_MISSING_TOKEN", Operations: []ConnectorOperation{{Name: "read", Methods: []string{"GET"}, PathPrefixes: []string{"/"}}}}); err != nil {
+		t.Fatal(err)
+	}
+	_, _, err := manager.CallForOrganization(context.Background(), "org_test", "missing-token", "read", "GET", "/resource", nil)
+	if err == nil || !strings.Contains(err.Error(), "credential") {
+		t.Fatalf("missing credential error=%v", err)
+	}
+	if requests != 0 {
+		t.Fatalf("connector made %d request(s) without credential", requests)
+	}
+}
+
 func TestConnectorPathPrefixMatchesSegments(t *testing.T) {
 	if !connectorPathMatches("/users/123", "/users") {
 		t.Fatal("expected child path to match")
