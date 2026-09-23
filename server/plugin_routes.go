@@ -59,6 +59,39 @@ func writePluginLifecycleError(c *gin.Context, err error) {
 func (a *agentAPI) enableConnector(c *gin.Context)  { a.connectorLifecycle(c, true, false) }
 func (a *agentAPI) disableConnector(c *gin.Context) { a.connectorLifecycle(c, false, false) }
 func (a *agentAPI) removeConnector(c *gin.Context)  { a.connectorLifecycle(c, false, true) }
+
+func (a *agentAPI) registerConnector(c *gin.Context) {
+	if !a.requirePluginAdmin(c) {
+		return
+	}
+	var input agent.ConnectorConfig
+	if err := decodeJSON(c, &input); err != nil {
+		writeAgentError(c, http.StatusBadRequest, err)
+		return
+	}
+	if input.CredentialConfigured {
+		writeAgentError(c, http.StatusBadRequest, errors.New("credential_configured is server-derived and cannot be supplied"))
+		return
+	}
+	var err error
+	if a.authRequired {
+		err = a.runtime.RegisterConnectorForOrganization(agentOrganizationID(c), input)
+	} else {
+		if input.OrganizationID != "" {
+			writeAgentError(c, http.StatusBadRequest, errors.New("organization_id is not accepted without authenticated organization scope"))
+			return
+		}
+		// The unauthenticated local mode has one operator scope. The runtime
+		// still validates the HTTPS endpoint, methods and environment names.
+		err = a.runtime.RegisterConnector(input)
+	}
+	if err != nil {
+		writePluginLifecycleError(c, err)
+		return
+	}
+	pluginCatalog(c, a)
+}
+
 func (a *agentAPI) connectorLifecycle(c *gin.Context, enabled, remove bool) {
 	if !a.requirePluginAdmin(c) {
 		return

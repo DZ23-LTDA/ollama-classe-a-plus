@@ -12,6 +12,8 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -38,10 +40,11 @@ type ConnectorOperation struct {
 }
 
 type ConnectorManager struct {
-	mu         sync.RWMutex
-	connectors map[string]ConnectorConfig
-	client     *http.Client
-	auth       *AuthStore
+	mu          sync.RWMutex
+	connectors  map[string]ConnectorConfig
+	client      *http.Client
+	auth        *AuthStore
+	persistPath string
 }
 
 var ErrConnectorDisabled = errors.New("connector is disabled")
@@ -55,6 +58,38 @@ func NewConnectorManager() *ConnectorManager {
 	return &ConnectorManager{connectors: make(map[string]ConnectorConfig), client: &http.Client{Transport: transport, CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return errors.New("connector redirects are disabled") }}}
 }
 
+// NewPersistentConnectorManager loads a connector manifest that contains only
+// configuration references (for example environment variable names), never
+// credential values. Mutations are written back with mode 0600 and an atomic
+// rename so a restart preserves the configured lifecycle state.
+func NewPersistentConnectorManager(manifestPath string) (*ConnectorManager, error) {
+	manifestPath = strings.TrimSpace(manifestPath)
+	manager := NewConnectorManager()
+	if manifestPath == "" {
+		return manager, nil
+	}
+	data, err := os.ReadFile(manifestPath)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return nil, err
+	}
+	if err == nil && len(strings.TrimSpace(string(data))) > 0 {
+		decoder := json.NewDecoder(bytes.NewReader(data))
+		decoder.DisallowUnknownFields()
+		var configs []ConnectorConfig
+		if err := decoder.Decode(&configs); err != nil {
+			return nil, fmt.Errorf("decode connector manifest: %w", err)
+		}
+		for _, config := range configs {
+			if err := validateConnectorConfig(&config); err != nil {
+				return nil, fmt.Errorf("load connector %q: %w", config.ID, err)
+			}
+			manager.connectors[config.ID] = cloneConnectorConfig(config)
+		}
+	}
+	manager.persistPath = manifestPath
+	return manager, nil
+}
+
 func (m *ConnectorManager) SetOAuthStore(store *AuthStore) {
 	if m == nil {
 		return
@@ -65,12 +100,63 @@ func (m *ConnectorManager) SetOAuthStore(store *AuthStore) {
 }
 
 func (m *ConnectorManager) Register(config ConnectorConfig) error {
+	if err := validateConnectorConfig(&config); err != nil {
+		return err
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.registerValidatedLocked(config)
+}
+
+func (m *ConnectorManager) registerValidatedLocked(config ConnectorConfig) error {
+	previous, existed := m.connectors[config.ID]
+	m.connectors[config.ID] = cloneConnectorConfig(config)
+	if err := m.persistLocked(); err != nil {
+		if existed {
+			m.connectors[config.ID] = previous
+		} else {
+			delete(m.connectors, config.ID)
+		}
+		return fmt.Errorf("persist connector manifest: %w", err)
+	}
+	return nil
+}
+
+// RegisterForOrganization ignores any caller-supplied organization and binds
+// the connector to the authenticated organization. A non-empty conflicting
+// organization is rejected instead of silently moving tenant-owned state.
+func (m *ConnectorManager) RegisterForOrganization(organizationID string, config ConnectorConfig) error {
+	organizationID = strings.TrimSpace(organizationID)
+	if organizationID == "" {
+		return errors.New("connector organization scope is required")
+	}
+	if supplied := strings.TrimSpace(config.OrganizationID); supplied != "" && supplied != organizationID {
+		return ErrPluginOrganizationScope
+	}
+	config.OrganizationID = organizationID
+	if err := validateConnectorConfig(&config); err != nil {
+		return err
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if existing, ok := m.connectors[config.ID]; ok && !pluginOwnedByOrganization(existing.OrganizationID, organizationID) {
+		return ErrPluginOrganizationScope
+	}
+	return m.registerValidatedLocked(config)
+}
+
+func validateConnectorConfig(config *ConnectorConfig) error {
 	config.ID = strings.TrimSpace(config.ID)
+	config.OrganizationID = strings.TrimSpace(config.OrganizationID)
 	config.Provider = strings.TrimSpace(config.Provider)
+	config.BaseURL = strings.TrimSpace(config.BaseURL)
+	config.TokenEnv = strings.TrimSpace(config.TokenEnv)
+	config.OAuthProvider = strings.TrimSpace(config.OAuthProvider)
+	config.CredentialConfigured = false
 	if config.ID == "" || config.Provider == "" {
 		return errors.New("connector id and provider are required")
 	}
-	base, err := url.Parse(strings.TrimSpace(config.BaseURL))
+	base, err := url.Parse(config.BaseURL)
 	if err != nil || base.Scheme != "https" || base.Host == "" || base.User != nil {
 		return errors.New("connector base_url must be an https URL without userinfo")
 	}
@@ -88,17 +174,74 @@ func (m *ConnectorManager) Register(config ConnectorConfig) error {
 		}
 		for j := range operation.Methods {
 			operation.Methods[j] = strings.ToUpper(strings.TrimSpace(operation.Methods[j]))
+			if operation.Methods[j] == "" {
+				return errors.New("connector operation methods must be non-empty")
+			}
 		}
 		for j := range operation.PathPrefixes {
+			operation.PathPrefixes[j] = strings.TrimSpace(operation.PathPrefixes[j])
 			if !validConnectorPath(operation.PathPrefixes[j]) {
 				return fmt.Errorf("invalid connector path prefix %q", operation.PathPrefixes[j])
 			}
 		}
 	}
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.connectors[config.ID] = config
 	return nil
+}
+
+func cloneConnectorConfig(config ConnectorConfig) ConnectorConfig {
+	copy := config
+	copy.AllowedOrigins = append([]string(nil), config.AllowedOrigins...)
+	copy.Operations = make([]ConnectorOperation, len(config.Operations))
+	for i, operation := range config.Operations {
+		copy.Operations[i] = ConnectorOperation{
+			Name:         operation.Name,
+			Methods:      append([]string(nil), operation.Methods...),
+			PathPrefixes: append([]string(nil), operation.PathPrefixes...),
+		}
+	}
+	return copy
+}
+
+func (m *ConnectorManager) persistLocked() error {
+	if strings.TrimSpace(m.persistPath) == "" {
+		return nil
+	}
+	configs := make([]ConnectorConfig, 0, len(m.connectors))
+	for _, config := range m.connectors {
+		config.CredentialConfigured = false
+		configs = append(configs, cloneConnectorConfig(config))
+	}
+	sort.Slice(configs, func(i, j int) bool { return configs[i].ID < configs[j].ID })
+	data, err := json.MarshalIndent(configs, "", "  ")
+	if err != nil {
+		return err
+	}
+	data = append(data, '\n')
+	if err := os.MkdirAll(filepath.Dir(m.persistPath), 0o700); err != nil {
+		return err
+	}
+	temporary, err := os.CreateTemp(filepath.Dir(m.persistPath), ".connectors-*.tmp")
+	if err != nil {
+		return err
+	}
+	temporaryName := temporary.Name()
+	defer os.Remove(temporaryName)
+	if err := temporary.Chmod(0o600); err != nil {
+		_ = temporary.Close()
+		return err
+	}
+	if _, err := temporary.Write(data); err != nil {
+		_ = temporary.Close()
+		return err
+	}
+	if err := temporary.Sync(); err != nil {
+		_ = temporary.Close()
+		return err
+	}
+	if err := temporary.Close(); err != nil {
+		return err
+	}
+	return os.Rename(temporaryName, m.persistPath)
 }
 
 func (m *ConnectorManager) List() []ConnectorConfig {
@@ -106,7 +249,7 @@ func (m *ConnectorManager) List() []ConnectorConfig {
 	defer m.mu.RUnlock()
 	result := make([]ConnectorConfig, 0, len(m.connectors))
 	for _, connector := range m.connectors {
-		copy := connector
+		copy := cloneConnectorConfig(connector)
 		copy.TokenEnv = ""
 		copy.CredentialConfigured = m.credentialConfigured(connector, "")
 		result = append(result, copy)
@@ -123,7 +266,7 @@ func (m *ConnectorManager) ListForOrganization(organizationID string) []Connecto
 		if connector.OrganizationID != "" && !pluginOwnedByOrganization(connector.OrganizationID, organizationID) {
 			continue
 		}
-		copy := connector
+		copy := cloneConnectorConfig(connector)
 		copy.TokenEnv = ""
 		copy.CredentialConfigured = m.credentialConfigured(connector, organizationID)
 		result = append(result, copy)
@@ -148,6 +291,11 @@ func (m *ConnectorManager) SetEnabled(id string, enabled bool) error {
 	}
 	connector.Disabled = !enabled
 	m.connectors[id] = connector
+	if err := m.persistLocked(); err != nil {
+		connector.Disabled = !connector.Disabled
+		m.connectors[id] = connector
+		return fmt.Errorf("persist connector manifest: %w", err)
+	}
 	return nil
 }
 
@@ -163,6 +311,11 @@ func (m *ConnectorManager) SetEnabledForOrganization(organizationID, id string, 
 	}
 	connector.Disabled = !enabled
 	m.connectors[connector.ID] = connector
+	if err := m.persistLocked(); err != nil {
+		connector.Disabled = !connector.Disabled
+		m.connectors[connector.ID] = connector
+		return fmt.Errorf("persist connector manifest: %w", err)
+	}
 	return nil
 }
 
@@ -170,10 +323,15 @@ func (m *ConnectorManager) Remove(id string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	id = strings.TrimSpace(id)
-	if _, ok := m.connectors[id]; !ok {
+	connector, ok := m.connectors[id]
+	if !ok {
 		return fmt.Errorf("connector %q is not registered", id)
 	}
 	delete(m.connectors, id)
+	if err := m.persistLocked(); err != nil {
+		m.connectors[id] = connector
+		return fmt.Errorf("persist connector manifest: %w", err)
+	}
 	return nil
 }
 
@@ -189,6 +347,10 @@ func (m *ConnectorManager) RemoveForOrganization(organizationID, id string) erro
 		return ErrPluginOrganizationScope
 	}
 	delete(m.connectors, id)
+	if err := m.persistLocked(); err != nil {
+		m.connectors[id] = connector
+		return fmt.Errorf("persist connector manifest: %w", err)
+	}
 	return nil
 }
 

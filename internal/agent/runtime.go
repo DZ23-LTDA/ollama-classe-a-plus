@@ -252,11 +252,25 @@ func (r *Runtime) SetConnectorEnabled(id string, enabled bool) error {
 	return r.connectors.SetEnabled(id, enabled)
 }
 
+func (r *Runtime) RegisterConnector(config ConnectorConfig) error {
+	if r.connectors == nil {
+		return errors.New("connector manager is unavailable")
+	}
+	return r.connectors.Register(config)
+}
+
 func (r *Runtime) RemoveConnector(id string) error {
 	if r.connectors == nil {
 		return errors.New("connector manager is unavailable")
 	}
 	return r.connectors.Remove(id)
+}
+
+func (r *Runtime) RegisterConnectorForOrganization(organizationID string, config ConnectorConfig) error {
+	if r.connectors == nil {
+		return errors.New("connector manager is unavailable")
+	}
+	return r.connectors.RegisterForOrganization(organizationID, config)
 }
 
 func (r *Runtime) SetMCPEnabled(id string, enabled bool) error {

@@ -147,7 +147,7 @@ func newDefaultAgentRuntime() (*agent.Runtime, error) {
 	if embedModel := strings.TrimSpace(os.Getenv("OLLAMA_AGENT_EMBED_MODEL")); embedModel != "" {
 		contextStore.SetEmbedder(agent.OllamaEmbedder{Client: api.NewClient(envconfig.ConnectableHost(), http.DefaultClient), Model: embedModel})
 	}
-	connectors, err := loadAgentConnectors()
+	connectors, err := loadAgentConnectors(storeRoot)
 	if err != nil {
 		return nil, err
 	}
@@ -192,10 +192,10 @@ func newDefaultAgentRuntime() (*agent.Runtime, error) {
 	return agent.NewRuntime(agent.RuntimeConfig{Store: store, Context: contextStore, Company: companyStore, Planner: planner, WorkspaceRoot: workspaceRoot, DataRoot: storeRoot, Connectors: connectors, MCP: mcp, RemoteMCP: remoteMCP, Media: media, RedisQueue: redisQueue, Telemetry: telemetry, Push: push, Deployments: deployments})
 }
 
-func loadAgentConnectors() (*agent.ConnectorManager, error) {
+func loadAgentConnectors(storeRoot string) (*agent.ConnectorManager, error) {
 	configPath := strings.TrimSpace(os.Getenv("OLLAMA_AGENT_CONNECTORS"))
 	if configPath == "" {
-		return nil, nil
+		return agent.NewPersistentConnectorManager(filepath.Join(storeRoot, "connectors.json"))
 	}
 	data, err := os.ReadFile(configPath)
 	if err != nil {
@@ -373,6 +373,7 @@ func (a *agentAPI) register(r *gin.Engine) {
 	group.GET("/tools", a.tools)
 	group.GET("/connectors", a.connectors)
 	group.GET("/connector-catalog", connectorCatalog)
+	group.POST("/connectors", a.registerConnector)
 	group.POST("/connectors/:id/enable", a.enableConnector)
 	group.POST("/connectors/:id/disable", a.disableConnector)
 	group.DELETE("/connectors/:id", a.removeConnector)

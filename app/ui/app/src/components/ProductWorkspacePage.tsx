@@ -14,6 +14,7 @@ import {
   listProjects,
 	listSchedules,
 	listSkills,
+	registerConnector,
 	setConnectorEnabled,
 	setMCPEnabled,
 	setSkillEnabled,
@@ -70,6 +71,13 @@ export function ProductWorkspacePage({ kind }: { kind: ProductPageKind }) {
 	const [connectorCatalog, setConnectorCatalog] = useState<AgentConnectorCatalogEntry[]>([]);
 	const [connectorSearch, setConnectorSearch] = useState("");
 	const [connectorCategory, setConnectorCategory] = useState("Todos");
+	const [newConnectorID, setNewConnectorID] = useState("");
+	const [newConnectorProvider, setNewConnectorProvider] = useState("");
+	const [newConnectorBaseURL, setNewConnectorBaseURL] = useState("");
+	const [newConnectorTokenEnv, setNewConnectorTokenEnv] = useState("");
+	const [newConnectorOAuthProvider, setNewConnectorOAuthProvider] = useState("");
+	const [newConnectorMethods, setNewConnectorMethods] = useState("GET");
+	const [newConnectorPathPrefix, setNewConnectorPathPrefix] = useState("/");
   const [mcpServers, setMcpServers] = useState<AgentMCPServer[]>([]);
   const [cliCount, setCliCount] = useState(0);
   const [projectName, setProjectName] = useState("");
@@ -161,17 +169,42 @@ export function ProductWorkspacePage({ kind }: { kind: ProductPageKind }) {
 			else await setMCPEnabled(id, enabled, type === "remote-mcp");
 			setNotice(`${id} ${enabled ? "habilitado" : "desabilitado"}.`);
 			await refresh();
-		} catch (cause) { setNotice(cause instanceof Error ? cause.message : "Falha ao alterar lifecycle do plugin."); }
-	};
+			} catch (cause) { setNotice(cause instanceof Error ? cause.message : "Falha ao alterar lifecycle do plugin."); }
+		};
 
-	const renderContent = () => {
+		const createNewConnector = async () => {
+			if (!newConnectorID.trim() || !newConnectorProvider.trim() || !newConnectorBaseURL.trim()) return;
+			try {
+				await registerConnector({
+					id: newConnectorID.trim(),
+					provider: newConnectorProvider.trim(),
+					base_url: newConnectorBaseURL.trim(),
+					...(newConnectorTokenEnv.trim() ? { token_env: newConnectorTokenEnv.trim() } : {}),
+					...(newConnectorOAuthProvider.trim() ? { oauth_provider: newConnectorOAuthProvider.trim() } : {}),
+					operations: [{
+						name: "default",
+						methods: newConnectorMethods.split(",").map((method) => method.trim().toUpperCase()).filter(Boolean),
+						path_prefixes: [newConnectorPathPrefix.trim() || "/"],
+					}],
+				});
+				setNewConnectorID(""); setNewConnectorProvider(""); setNewConnectorBaseURL(""); setNewConnectorTokenEnv(""); setNewConnectorOAuthProvider("");
+				setNotice("Connector registrado no tenant atual. O runtime mantém apenas referências de credencial; o valor deve existir no ambiente do servidor ou no OAuth autorizado.");
+				await refresh();
+			} catch (cause) { setNotice(cause instanceof Error ? cause.message : "Falha ao registrar connector."); }
+		};
+
+		const renderContent = () => {
     if (loading) return <div className="rounded-xl border border-dashed border-neutral-300 px-6 py-12 text-center text-sm text-neutral-500 dark:border-neutral-700">Consultando contratos agentic…</div>;
     if (kind === "projects") return <div className="space-y-3">{projects.length ? projects.map((project) => <ResourceRow key={project.id} onDelete={() => void removeProject(project)}><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="font-medium text-neutral-900 dark:text-white">{editingProject === project.id ? <input autoFocus value={editingProjectName} onChange={(event) => setEditingProjectName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void saveProject(project); if (event.key === "Escape") setEditingProject(null); }} className="h-8 rounded-lg border border-neutral-300 bg-transparent px-2 text-sm dark:border-neutral-700" /> : project.name}</p><p className="mt-1 text-xs text-neutral-500">{project.root || "workspace local gerenciado"} · atualizado {new Date(project.updated_at).toLocaleString()}</p></div>{editingProject === project.id ? <button onClick={() => void saveProject(project)} className="rounded-lg bg-neutral-900 px-3 py-2 text-xs text-white dark:bg-white dark:text-neutral-900">Salvar</button> : <button onClick={() => { setEditingProject(project.id); setEditingProjectName(project.name); }} className="rounded-lg border border-neutral-200 px-3 py-2 text-xs dark:border-neutral-700">Editar</button>}</div></ResourceRow>) : <EmptyState message="Crie um projeto para manter instruções, arquivos e contexto entre missões." action="Criar projeto" onAction={() => document.getElementById("new-project-name")?.focus()} />}</div>;
     if (kind === "tasks") return missions.length ? <div className="space-y-3">{missions.map((mission) => <ResourceRow key={mission.id}><Link to="/agentic" className="block"><div className="flex flex-wrap items-center justify-between gap-2"><p className="font-medium text-neutral-900 dark:text-white">{mission.objective}</p><span className="rounded-full bg-neutral-100 px-2 py-1 text-[10px] font-medium dark:bg-neutral-800">{mission.state}</span></div><p className="mt-1 text-xs text-neutral-500">{mission.id} · {mission.plan?.length ?? 0} passos · {mission.artifacts?.length ?? 0} artifacts · {mission.model || "modelo padrão"}</p></Link></ResourceRow>)}</div> : <EmptyState message="As missões criadas no Agentic Console aparecerão aqui com timeline e artifacts." action="Nova tarefa" onAction={() => window.location.assign("/agentic")} />;
     if (kind === "library") return artifacts.length ? <div className="grid gap-3 md:grid-cols-2">{artifacts.map(({ mission, ...artifact }) => <ResourceRow key={`${mission.id}-${artifact.id}`}><a href={`${API_BASE}/api/agent/v1/missions/${encodeURIComponent(mission.id)}/artifacts/${encodeURIComponent(artifact.id)}`} className="block"><p className="font-medium text-neutral-900 dark:text-white">{artifact.name}</p><p className="mt-1 text-xs text-neutral-500">{Math.round(artifact.size / 1024)} KiB · SHA-256 {artifact.sha256.slice(0, 16)}…</p><p className="mt-1 text-[10px] text-violet-600">Missão {mission.id}</p></a></ResourceRow>)}</div> : <EmptyState message="Os artifacts gerados aparecerão aqui com preview, hash, versão e download." action="Abrir Agentic Console" onAction={() => window.location.assign("/agentic")} />;
     if (kind === "scheduled") return <div className="space-y-3">{schedules.length ? schedules.map((schedule) => <ResourceRow key={schedule.id} onDelete={() => void removeSchedule(schedule)}><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="font-medium text-neutral-900 dark:text-white">{schedule.objective}</p><p className="mt-1 text-xs text-neutral-500">a cada {schedule.interval_seconds}s · próxima {new Date(schedule.next_run_at).toLocaleString()}</p></div><span className={`rounded-full px-2 py-1 text-[10px] ${schedule.enabled ? "bg-emerald-50 text-emerald-700" : "bg-neutral-100 text-neutral-500"}`}>{schedule.enabled ? "ativo" : "pausado"}</span></div></ResourceRow>) : <EmptyState message="Nenhuma automação está agendada. Crie uma para ativar o worker persistente local." action="Agendar tarefa" onAction={() => document.getElementById("new-schedule-objective")?.focus()} />}</div>;
 		if (kind === "skills") return skills.length ? <div className="space-y-3">{skills.map((skill) => <ResourceRow key={skill.id}><div className="flex items-start justify-between gap-3"><div><p className="font-medium text-neutral-900 dark:text-white">{skill.id} <span className="text-xs text-neutral-400">v{skill.version}</span></p><p className="mt-1 text-xs text-neutral-500">{skill.description}</p><p className="mt-1 text-[10px] text-neutral-400">{skill.tools?.length ?? 0} tools · {skill.trusted ? "trusted" : "requer revisão"}</p></div><button type="button" onClick={() => void togglePlugin("skill", skill.id, !skill.enabled)} className="rounded-lg border border-neutral-200 px-2 py-1 text-[10px] dark:border-neutral-700">{skill.enabled ? "Desabilitar" : "Habilitar"}</button></div></ResourceRow>)}</div> : <EmptyState message="Nenhuma skill foi carregada pelo runtime. Instale um manifesto revisado no diretório de skills do servidor." action="Abrir configuração" onAction={() => window.location.assign("/settings#agentic")} />;
-		return <div className="space-y-5"><section>
+			return <div className="space-y-5"><section className="rounded-2xl border border-violet-200 bg-violet-50/60 p-4 dark:border-violet-900/60 dark:bg-violet-950/20">
+				<div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="text-sm font-semibold text-neutral-900 dark:text-white">Registrar connector seguro</h3><p className="mt-1 max-w-2xl text-xs leading-5 text-neutral-600 dark:text-neutral-300">Cadastre endpoint, operações e referências de credencial. O valor do token nunca é aceito nesta tela; use uma variável de ambiente do servidor ou o identificador de um OAuth já autorizado.</p></div><span className="rounded-full bg-white px-2.5 py-1 text-[10px] text-violet-700 dark:bg-neutral-900 dark:text-violet-300">owner/admin</span></div>
+				<div className="mt-4 grid gap-3 md:grid-cols-2"><label className="text-xs text-neutral-600 dark:text-neutral-300">ID<input value={newConnectorID} onChange={(event) => setNewConnectorID(event.target.value)} placeholder="github-prod" className="mt-1 h-10 w-full rounded-xl border border-neutral-300 bg-white px-3 text-sm dark:border-neutral-700 dark:bg-neutral-900" /></label><label className="text-xs text-neutral-600 dark:text-neutral-300">Provider<input value={newConnectorProvider} onChange={(event) => setNewConnectorProvider(event.target.value)} placeholder="GitHub" className="mt-1 h-10 w-full rounded-xl border border-neutral-300 bg-white px-3 text-sm dark:border-neutral-700 dark:bg-neutral-900" /></label><label className="text-xs text-neutral-600 dark:text-neutral-300 md:col-span-2">Base URL HTTPS<input value={newConnectorBaseURL} onChange={(event) => setNewConnectorBaseURL(event.target.value)} placeholder="https://api.example.com" className="mt-1 h-10 w-full rounded-xl border border-neutral-300 bg-white px-3 text-sm dark:border-neutral-700 dark:bg-neutral-900" /></label><label className="text-xs text-neutral-600 dark:text-neutral-300">Nome da variável de token (opcional)<input value={newConnectorTokenEnv} onChange={(event) => setNewConnectorTokenEnv(event.target.value)} placeholder="OLLAMA_GITHUB_TOKEN" className="mt-1 h-10 w-full rounded-xl border border-neutral-300 bg-white px-3 text-sm dark:border-neutral-700 dark:bg-neutral-900" /></label><label className="text-xs text-neutral-600 dark:text-neutral-300">ID do provider OAuth (opcional)<input value={newConnectorOAuthProvider} onChange={(event) => setNewConnectorOAuthProvider(event.target.value)} placeholder="github" className="mt-1 h-10 w-full rounded-xl border border-neutral-300 bg-white px-3 text-sm dark:border-neutral-700 dark:bg-neutral-900" /></label><label className="text-xs text-neutral-600 dark:text-neutral-300">Métodos permitidos<input value={newConnectorMethods} onChange={(event) => setNewConnectorMethods(event.target.value)} placeholder="GET,POST" className="mt-1 h-10 w-full rounded-xl border border-neutral-300 bg-white px-3 text-sm dark:border-neutral-700 dark:bg-neutral-900" /></label><label className="text-xs text-neutral-600 dark:text-neutral-300">Prefixo de caminho<input value={newConnectorPathPrefix} onChange={(event) => setNewConnectorPathPrefix(event.target.value)} placeholder="/v1" className="mt-1 h-10 w-full rounded-xl border border-neutral-300 bg-white px-3 text-sm dark:border-neutral-700 dark:bg-neutral-900" /></label></div>
+				<button type="button" onClick={() => void createNewConnector()} disabled={!newConnectorID.trim() || !newConnectorProvider.trim() || !newConnectorBaseURL.trim()} className="mt-4 rounded-xl bg-violet-700 px-4 py-2.5 text-xs font-medium text-white disabled:cursor-not-allowed disabled:opacity-40">Registrar no tenant atual</button>
+			</section><section>
 			<div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
 				<div><h3 className="text-sm font-semibold text-neutral-900 dark:text-white">Aplicativos e conectores</h3><p className="mt-1 text-xs leading-5 text-neutral-500 dark:text-neutral-400">Catálogo amplo de apps, APIs e MCPs. O botão de configuração nunca inventa uma conexão: cada provider exige OAuth, API key ou homologação própria.</p></div><span className="rounded-full bg-neutral-100 px-2.5 py-1 text-[10px] text-neutral-500 dark:bg-neutral-800 dark:text-neutral-300">{connectorCatalog.length} disponíveis no catálogo</span>
 			</div>
