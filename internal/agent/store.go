@@ -90,12 +90,21 @@ func (s *JSONStore) PutMission(mission Mission) error {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	previous, hadPrevious := s.missions[mission.ID]
 	s.missions[mission.ID] = cloneMission(mission)
 	if !s.persistent {
 		return nil
 	}
 	path := filepath.Join(s.root, "missions", mission.ID+".json")
-	return writeJSONAtomic(path, redactMissionForPersistence(mission))
+	if err := writeJSONAtomic(path, redactMissionForPersistence(mission)); err != nil {
+		if hadPrevious {
+			s.missions[mission.ID] = previous
+		} else {
+			delete(s.missions, mission.ID)
+		}
+		return err
+	}
+	return nil
 }
 
 func (s *JSONStore) PutMissionIfVersion(mission Mission, expectedVersion int64) error {
@@ -108,12 +117,17 @@ func (s *JSONStore) PutMissionIfVersion(mission Mission, expectedVersion int64) 
 	if !ok || current.Version != expectedVersion {
 		return ErrMissionVersionConflict
 	}
+	previous := cloneMission(current)
 	s.missions[mission.ID] = cloneMission(mission)
 	if !s.persistent {
 		return nil
 	}
 	path := filepath.Join(s.root, "missions", mission.ID+".json")
-	return writeJSONAtomic(path, redactMissionForPersistence(mission))
+	if err := writeJSONAtomic(path, redactMissionForPersistence(mission)); err != nil {
+		s.missions[mission.ID] = previous
+		return err
+	}
+	return nil
 }
 
 func (s *JSONStore) AppendEvent(event Event) error {
@@ -123,12 +137,21 @@ func (s *JSONStore) AppendEvent(event Event) error {
 	event.Payload = RedactValue(event.Payload)
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	previous := append([]Event(nil), s.events[event.MissionID]...)
 	s.events[event.MissionID] = append(s.events[event.MissionID], event)
 	if !s.persistent {
 		return nil
 	}
 	path := filepath.Join(s.root, "events", event.MissionID+".json")
-	return writeJSONAtomic(path, s.events[event.MissionID])
+	if err := writeJSONAtomic(path, s.events[event.MissionID]); err != nil {
+		if previous == nil {
+			delete(s.events, event.MissionID)
+		} else {
+			s.events[event.MissionID] = previous
+		}
+		return err
+	}
+	return nil
 }
 
 func redactMissionForPersistence(mission Mission) Mission {

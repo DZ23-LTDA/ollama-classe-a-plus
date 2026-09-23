@@ -206,12 +206,14 @@ func (s *ContextStore) UpdateProject(id, name, root string) (Project, error) {
 	if err != nil {
 		return Project{}, err
 	}
+	previous := project
 	project.Name = name
 	project.Root = canonicalRoot
 	project.UpdatedAt = time.Now().UTC()
 	s.projects[id] = project
 	if s.root != "" {
 		if err := writeJSONAtomic(filepath.Join(s.root, "projects", id+".json"), project); err != nil {
+			s.projects[id] = previous
 			return Project{}, err
 		}
 	}
@@ -283,9 +285,15 @@ func (s *ContextStore) AddMemoryContext(ctx context.Context, memory Memory) (Mem
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	previous := append([]Memory(nil), s.memories[memory.ProjectID]...)
 	s.memories[memory.ProjectID] = append(s.memories[memory.ProjectID], memory)
 	if s.root != "" {
 		if err := writeJSONAtomic(filepath.Join(s.root, "memories", memory.ProjectID+".json"), s.memories[memory.ProjectID]); err != nil {
+			if previous == nil {
+				delete(s.memories, memory.ProjectID)
+			} else {
+				s.memories[memory.ProjectID] = previous
+			}
 			return Memory{}, err
 		}
 	}
@@ -686,6 +694,7 @@ func (s *ContextStore) UpdateSchedule(id string, schedule Schedule) (Schedule, e
 	if !ok {
 		return Schedule{}, os.ErrNotExist
 	}
+	previous := current
 	schedule.ID = id
 	schedule.OrganizationID = current.OrganizationID
 	schedule.CreatedAt = current.CreatedAt
@@ -696,6 +705,7 @@ func (s *ContextStore) UpdateSchedule(id string, schedule Schedule) (Schedule, e
 	s.schedules[id] = schedule
 	if s.root != "" {
 		if err := writeJSONAtomic(filepath.Join(s.root, "schedules", id+".json"), schedule); err != nil {
+			s.schedules[id] = previous
 			return Schedule{}, err
 		}
 	}
@@ -709,12 +719,14 @@ func (s *ContextStore) DeleteSchedule(id string) error {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if _, ok := s.schedules[id]; !ok {
+	schedule, ok := s.schedules[id]
+	if !ok {
 		return os.ErrNotExist
 	}
 	delete(s.schedules, id)
 	if s.root != "" {
 		if err := os.Remove(filepath.Join(s.root, "schedules", id+".json")); err != nil && !errors.Is(err, os.ErrNotExist) {
+			s.schedules[id] = schedule
 			return err
 		}
 	}

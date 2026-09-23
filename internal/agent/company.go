@@ -298,6 +298,18 @@ func (s *CompanyStore) persistLocked(company Company) error {
 	return writeJSONAtomic(filepath.Join(s.root, company.ID+".json"), company)
 }
 
+func cloneCompany(company Company) Company {
+	data, err := json.Marshal(company)
+	if err != nil {
+		return company
+	}
+	var clone Company
+	if err := json.Unmarshal(data, &clone); err != nil {
+		return company
+	}
+	return clone
+}
+
 func (s *CompanyStore) Create(company Company) (Company, error) {
 	company.ID = ""
 	company.Status = ""
@@ -650,6 +662,7 @@ func (s *CompanyStore) Update(id string, update CompanyUpdate) (Company, error) 
 	if !ok {
 		return Company{}, ErrCompanyNotFound
 	}
+	previous := cloneCompany(company)
 	if value := strings.TrimSpace(update.Name); value != "" {
 		company.Name = value
 	}
@@ -682,6 +695,7 @@ func (s *CompanyStore) Update(id string, update CompanyUpdate) (Company, error) 
 	company.UpdatedAt = time.Now().UTC()
 	s.companies[id] = company
 	if err := s.persistLocked(company); err != nil {
+		s.companies[id] = previous
 		return Company{}, err
 	}
 	return company, nil
@@ -947,6 +961,7 @@ func (s *CompanyStore) mutate(id string, fn func(*Company) error) (Company, erro
 	if !ok {
 		return Company{}, ErrCompanyNotFound
 	}
+	previous := cloneCompany(company)
 	if err := fn(&company); err != nil {
 		if errors.Is(err, ErrCompanyBudgetExceeded) || errors.Is(err, ErrCompanySpendApprovalPending) {
 			if company.Version <= 0 {
@@ -955,9 +970,13 @@ func (s *CompanyStore) mutate(id string, fn func(*Company) error) (Company, erro
 			company.Version++
 			company.UpdatedAt = time.Now().UTC()
 			s.companies[company.ID] = company
-			_ = s.persistLocked(company)
+			if persistErr := s.persistLocked(company); persistErr != nil {
+				s.companies[company.ID] = previous
+				return previous, errors.Join(err, persistErr)
+			}
+			return company, err
 		}
-		return company, err
+		return previous, err
 	}
 	if company.Version <= 0 {
 		company.Version = 1
@@ -966,6 +985,7 @@ func (s *CompanyStore) mutate(id string, fn func(*Company) error) (Company, erro
 	company.UpdatedAt = time.Now().UTC()
 	s.companies[company.ID] = company
 	if err := s.persistLocked(company); err != nil {
+		s.companies[company.ID] = previous
 		return Company{}, err
 	}
 	return company, nil
