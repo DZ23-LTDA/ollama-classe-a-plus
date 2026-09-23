@@ -510,3 +510,10 @@ O commit `5816c020` foi publicado com teste dedicado. Os testes normal/race do c
 A revisão cruzada identificou que `OLLAMA_AGENT_CONNECTORS` usava `json.Unmarshal`, permitindo campos desconhecidos no bootstrap. O commit `f78fa0d6` passou a usar `decodeAgentConfigJSON`, que aplica `DisallowUnknownFields` e exige EOF. Regressões cobrem campo `unexpected` e `[] {}`.
 
 A mudança foi validada com testes normal/race do loader e gates Go completos em integrity, `go test ./...`, vet, build e diff. O arquivo de ambiente ainda é somente bootstrap estático; persistência de mutations continua no DataRoot do manager padrão. Não há claim de integração externa ou CI remota final.
+
+
+## Addendum P1 — strict decode de skills — 2026-09-22
+
+A auditoria do último loader de plugins encontrou `json.Unmarshal` em `LoadSkillsForOrganization`. O commit `86300900` substituiu esse caminho por decoder com `DisallowUnknownFields` e verificação explícita de EOF. O loader falha fechado para manifestos com campos desconhecidos ou segundo documento JSON, sem aceitar autoridade de `trusted`/`enabled`.
+
+Foram aprovados testes normal/race do ContextStore e o gate completo Go em integrity, todos os pacotes, vet, build e diff. A proteção é local de parsing e não equivale a attestation de skill, conexão upstream ou isolamento físico.

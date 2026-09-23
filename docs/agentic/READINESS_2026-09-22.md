@@ -442,3 +442,10 @@ Após a mudança, passaram os testes normal/race do connector manager e os gates
 O commit `f78fa0d6` alinhou o loader de `OLLAMA_AGENT_CONNECTORS` ao contrato estrito dos demais manifests. Campos desconhecidos e conteúdo JSON após o array principal agora são rejeitados antes do registro de qualquer connector. Os testes normal/race do loader e os gates completos Go passaram em integrity, test, vet, build e diff.
 
 Esse hardening melhora parsing e previsibilidade local. Ele não transforma o manifest em conexão OAuth, não valida conta upstream e não altera os blockers físicos/distribuídos. O estado permanece **preview/local RC em hardening**, não final e não production-ready.
+
+
+## Addendum de strict decode de skills — 2026-09-22
+
+O commit `86300900` completa a política de parsing seguro para skills. O loader de manifestos rejeita campos desconhecidos e JSON trailing antes de aplicar qualquer entrada. A confiança continua fail-closed: o payload não pode promover `trusted`, e o servidor deriva `enabled`.
+
+Com essa mudança, a família de plugins — connectors, MCP, Remote MCP e skills — possui regressões para campos desconhecidos/trailing nos caminhos relevantes. Os gates Go completos passaram em integrity, testes, vet, build e diff. O produto segue preview/local RC em hardening e não afirma upstream, OAuth, hardware, sandbox físico ou produção.

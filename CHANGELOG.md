@@ -402,3 +402,8 @@ O commit `5816c020` aplica a exigência de EOF ao manifest persistente de connec
 ## Unreleased — strict static connector bootstrap — 2026-09-22
 
 O loader de `OLLAMA_AGENT_CONNECTORS` agora usa o decoder estrito compartilhado, rejeitando campos desconhecidos e JSON trailing. Testes normal/race e gates Go completos passaram. O modo continua estático e não implica conta externa conectada.
+
+
+## Unreleased — strict skill manifest parsing — 2026-09-22
+
+O loader de skills agora rejeita campos desconhecidos e JSON trailing com regressões dedicadas. A família de plugins passa a ter parsing estrito nos loaders de connectors, MCP, Remote MCP e skills. Os gates Go completos passaram.

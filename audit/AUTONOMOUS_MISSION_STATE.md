@@ -2255,3 +2255,10 @@ Os testes normal e race do connector manager passaram. O gate completo pós-harm
 O commit `f78fa0d6c49dc956f8db71452f70f19390c46fee` substituiu o `json.Unmarshal` do loader `OLLAMA_AGENT_CONNECTORS` por `decodeAgentConfigJSON`. O bootstrap estático agora rejeita campos desconhecidos e JSON trailing, alinhando-se aos manifests persistentes. Testes específicos cobrem os dois casos em normal e race.
 
 O gate completo após a mudança passou em integrity, `CGO_ENABLED=1 go test ./... -count=1 -timeout=900s`, vet, build e diff. A configuração por arquivo de ambiente continua explicitamente estática; nenhuma mutation da UI é apresentada como edição desse arquivo. A CI pública do head mais recente continua separada da evidência local.
+
+
+## Fechamento do strict decode da família de plugins — 2026-09-22
+
+O commit `8630090062c437c1de1fc3f8e779c3963f57c58a` endureceu `ContextStore.LoadSkillsForOrganization`. Manifestos de skills agora usam `DisallowUnknownFields` e exigem EOF após o documento principal; `trusted` e `enabled` continuam derivados pelo servidor. Regressões cobrem campo desconhecido e documento trailing, além dos testes de persistência e trust fail-closed existentes.
+
+O gate completo pós-mudança passou em integrity, `CGO_ENABLED=1 go test ./... -count=1 -timeout=900s`, vet, build e diff. Com isso, connectors, MCP, Remote MCP e skills têm parsing estrito tanto no bootstrap/persistência aplicável quanto nas regressões. O head de código foi publicado; a documentação deste checkpoint será o próximo commit.
