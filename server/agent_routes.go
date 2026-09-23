@@ -302,6 +302,12 @@ func (a *agentAPI) authMiddleware(c *gin.Context) {
 		c.Next()
 		return
 	}
+	// Liveness endpoint must stay reachable for health checks even when auth is
+	// required; it exposes no tenant data.
+	if strings.HasSuffix(c.Request.URL.Path, "/agent/v1/health") {
+		c.Next()
+		return
+	}
 	header := strings.TrimSpace(c.GetHeader("Authorization"))
 	if !strings.HasPrefix(strings.ToLower(header), "bearer ") {
 		c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "bearer token is required"})
