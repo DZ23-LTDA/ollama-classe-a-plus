@@ -202,7 +202,7 @@ func loadAgentConnectors(storeRoot string) (*agent.ConnectorManager, error) {
 		return nil, err
 	}
 	var configs []agent.ConnectorConfig
-	if err := json.Unmarshal(data, &configs); err != nil {
+	if err := decodeAgentConfigJSON(data, &configs); err != nil {
 		return nil, err
 	}
 	manager := agent.NewConnectorManager()
