@@ -491,3 +491,10 @@ As regressões normal/race e os gates Go completos passaram. Esse hardening redu
 O commit `09eb26eb` adicionou limite central de 4 MiB ao `decodeJSON`. Requests agentic agora precisam conter um único documento JSON, sem campos desconhecidos, sem trailing e dentro do orçamento de bytes. A regressão de body oversized e os gates Go completos passaram.
 
 Esse limite é um guardrail de transporte; endpoints continuam sujeitos a validações de schema, autorização, approval e limites específicos de payload. O produto permanece preview/local RC em hardening.
+
+
+## Addendum de dev token estrito — 2026-09-23
+
+O endpoint de desenvolvimento `POST /api/agent/v1/auth/dev/token` foi alinhado ao `decodeJSON` no commit `6d00127a`. Ele agora compartilha limite de 4 MiB, rejeição de campos desconhecidos e EOF. A emissão continua exposta somente com flag de desenvolvimento explícita e peer loopback.
+
+A regressão normal/race e os gates Go completos passaram. Esse endpoint continua sendo uma ferramenta de desenvolvimento local, não onboarding de produção ou autenticação externa.

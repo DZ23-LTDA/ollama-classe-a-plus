@@ -2304,3 +2304,10 @@ Foram adicionados testes para segundo objeto, campo desconhecido e whitespace v�
 O commit `09eb26eb33ec12ffd2b2558db3f4949c45e2e243` adicionou `http.MaxBytesReader` ao helper `decodeJSON`, limitando cada body JSON agentic a 4 MiB antes do parsing. A regra vale transversalmente aos handlers que reutilizam o helper e evita leitura ilimitada em endpoints que antes já tinham campos/EOF estritos.
 
 A regressão cobre body acima do limite, além dos casos de campo desconhecido, documento trailing e whitespace válido. Testes normal/race e gates Go completos passaram em integrity, todos os pacotes, vet, build e diff.
+
+
+## Fechamento da exceção dev token — 2026-09-23
+
+A revisão transversal do parser descobriu que `POST /api/agent/v1/auth/dev/token` usava `ShouldBindJSON` diretamente. O commit `6d00127af3341c32b3246c963be324db89f0e3e5` migrou o handler para `decodeJSON`, portanto o endpoint também recebe o limite de 4 MiB, rejeita campos desconhecidos e exige EOF. O gate de segurança do endpoint permanece: flag `OLLAMA_AGENT_AUTH_DEV=true` e peer loopback real.
+
+Regressão normal/race confirma rejeição de campo inesperado antes de criar usuário/organização. Gates Go completos passaram em integrity, todos os pacotes, vet, build e diff.

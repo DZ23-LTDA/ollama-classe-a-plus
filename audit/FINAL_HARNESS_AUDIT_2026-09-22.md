@@ -559,3 +559,10 @@ Testes normal/race e gates Go completos passaram. O efeito alcança todos os end
 Depois de tornar `decodeJSON` estrito até EOF, a revisão adicionou um orçamento central de 4 MiB via `http.MaxBytesReader`. O commit `09eb26eb` evita que endpoints que usam o helper leiam bodies ilimitados antes do parse. O teste oversized confirma rejeição; os testes normal/race e gates Go completos passaram.
 
 Esse é um limite de transporte comum, não substitui limites de domínio como payloads comprimidos, documentos, imagens ou respostas de providers, que permanecem próprios.
+
+
+## Addendum P1 — dev token alinhado ao parser comum — 2026-09-23
+
+O endpoint de emissão de token de desenvolvimento era o único caminho encontrado usando `ShouldBindJSON` fora do helper. O commit `6d00127a` o migrou para `decodeJSON`, mantendo a proteção de flag + loopback e adicionando limite, `DisallowUnknownFields` e EOF. O teste confirma que campo inesperado é rejeitado antes de qualquer criação.
+
+Testes normal/race e gates Go completos passaram. A rota continua deliberadamente limitada ao desenvolvimento local e não representa fluxo de provisionamento de produção.

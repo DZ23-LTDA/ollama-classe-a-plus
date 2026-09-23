@@ -437,3 +437,8 @@ O helper `decodeJSON` agora rejeita trailing JSON depois do primeiro documento, 
 ## Unreleased — bounded agentic JSON bodies — 2026-09-23
 
 O parser HTTP agentic agora limita bodies JSON a 4 MiB antes do decode, além de exigir documento único e rejeitar campos desconhecidos. Testes normal/race e gates Go completos passaram.
+
+
+## Unreleased — strict development token input — 2026-09-23
+
+`/auth/dev/token` agora usa o parser JSON central com limite, campos conhecidos e EOF; a flag explícita e o loopback continuam obrigatórios. Testes normal/race e gates Go completos passaram.
