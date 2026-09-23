@@ -180,7 +180,7 @@ grep -q 'provider != "ollama-local"' internal/agent/runtime.go
 	fi
 grep -q 'TestRuntimeRejectsUnconfiguredMissionProvider' internal/agent/runtime_test.go
 	grep -q 'Empty release artifact' .github/workflows/release.yaml
-	grep -q 'actions/attest-build-provenance@v2' .github/workflows/release.yaml
+		grep -q 'actions/attest-build-provenance@96b4a1ef7235a096b17240c259729fdd70c83d45' .github/workflows/release.yaml
 	grep -q 'OLLAMA_ENABLE_ATTESTATIONS' .github/workflows/release.yaml
 	grep -q 'ollama-classe-a-plus-sbom.cdx.json' .github/workflows/release.yaml
 	grep -q 'sha256sum -c sha256sum.txt' .github/workflows/release.yaml

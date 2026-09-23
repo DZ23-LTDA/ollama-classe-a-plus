@@ -463,7 +463,7 @@ jobs:
         run: npm run build
       - name: Install tscriptify
         run: |
-          go install github.com/tkrajina/typescriptify-golang-structs/tscriptify@latest
+          go install github.com/tkrajina/typescriptify-golang-structs/tscriptify@v0.2.0
       - name: Run UI tests
         if: ${{ startsWith(matrix.os, 'ubuntu') }}
         working-directory: ./app/ui/app

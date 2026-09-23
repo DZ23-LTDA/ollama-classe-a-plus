@@ -872,7 +872,7 @@ jobs:
         working-directory: dist
       - name: Attest checksum manifest when enabled
         if: ${{ vars.OLLAMA_ENABLE_ATTESTATIONS == 'true' }}
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@96b4a1ef7235a096b17240c259729fdd70c83d45 # v2
         with:
           subject-path: dist/sha256sum.txt
       - name: Publish release artifacts

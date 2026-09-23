@@ -1,6 +1,6 @@
 # Desktop Commander Remote MCP
 
-O [Desktop Commander](https://desktopcommander.app/) oferece acesso de IA a arquivos, terminal, processos e máquinas reais. O repositório oficial [Remote Desktop Commander](https://github.com/desktop-commander/remote-desktop-commander) documenta um servidor MCP hospedado em `https://mcp.desktopcommander.app/mcp`, usando Streamable HTTP e OAuth 2.0 com PKCE. Um agente local é iniciado no computador controlado com `npx @wonderwhy-er/desktop-commander@latest remote`, e a máquina fica acessível somente enquanto esse processo está em execução.
+O [Desktop Commander](https://desktopcommander.app/) oferece acesso de IA a arquivos, terminal, processos e máquinas reais. O repositório oficial [Remote Desktop Commander](https://github.com/desktop-commander/remote-desktop-commander) documenta um servidor MCP hospedado em `https://mcp.desktopcommander.app/mcp`, usando Streamable HTTP e OAuth 2.0 com PKCE. Um agente local é iniciado no computador controlado com `npx @wonderwhy-er/desktop-commander@0.2.51 remote`; revise conscientemente a versão antes de atualizá-la. A máquina fica acessível somente enquanto esse processo está em execução.
 
 A documentação oficial lista leitura e busca de arquivos, edição, processos, sessões persistentes, informações de dispositivos, pareamento e revogação. O serviço remoto está em beta e sua implementação hospedada é proprietária; o servidor local `DesktopCommanderMCP` é o projeto open source relacionado. O agente executa com as permissões do usuário da máquina, portanto o Classe A+ deve manter allowlist, escopos, approvals para escrita, execução, processos e ações externas, além de revogação e auditoria.
 
@@ -14,7 +14,7 @@ Este arquivo registra a integração como um preset configurável. Não realiza 
 
 ## Presets no Classe A+
 
-Para usar o servidor local stdio, instale Node.js 18 ou superior e configure `OLLAMA_AGENT_MCP` apontando para [`examples/dz23-desktop-commander-mcp.json`](../../examples/dz23-desktop-commander-mcp.json). O comando configurado é `npx @wonderwhy-er/desktop-commander@latest`; o runtime ainda aplica timeout, métodos allowlisted e approval na tool `mcp.call`.
+Para usar o servidor local stdio, instale Node.js 18 ou superior e configure `OLLAMA_AGENT_MCP` apontando para [`examples/dz23-desktop-commander-mcp.json`](../../examples/dz23-desktop-commander-mcp.json). O exemplo fixa `@wonderwhy-er/desktop-commander@0.2.51`; revise conscientemente essa versão antes de atualizá-la. O runtime ainda aplica timeout, métodos allowlisted e approval na tool `mcp.call`.
 
 ```bash
 export OLLAMA_AGENT_MCP="$PWD/examples/dz23-desktop-commander-mcp.json"
