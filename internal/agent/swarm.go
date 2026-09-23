@@ -329,6 +329,9 @@ func (o *AgentOrchestrator) Run(ctx context.Context, id string) (OrchestrationJo
 		o.jobs[id] = persistedJob
 	}
 	o.mu.Unlock()
+	if err != nil {
+		return persistedJob, err
+	}
 	return job, err
 }
 
