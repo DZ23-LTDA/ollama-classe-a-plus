@@ -92,13 +92,6 @@ func (p OllamaPlanner) Plan(ctx context.Context, mission Mission) ([]Step, error
 	return normalizeSteps(steps)
 }
 
-func (p OllamaPlanner) fallback() Planner {
-	if p.Fallback != nil {
-		return p.Fallback
-	}
-	return RulePlanner{}
-}
-
 func parsePlan(content string) ([]Step, error) {
 	content = strings.TrimSpace(content)
 	content = strings.TrimPrefix(content, "```json")
