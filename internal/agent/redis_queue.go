@@ -117,6 +117,9 @@ func (q *RedisQueue) Ack(jobID string) error {
 	if err != nil {
 		return err
 	}
+	if job.Status != QueueRunning {
+		return errors.New("job is not running")
+	}
 	job.Status = QueueSucceeded
 	job.WorkerID = ""
 	job.LockedAt = nil
@@ -128,6 +131,9 @@ func (q *RedisQueue) Nack(jobID string, runErr error) (QueueJob, error) {
 	job, err := q.get(jobID)
 	if err != nil {
 		return QueueJob{}, err
+	}
+	if job.Status != QueueRunning {
+		return QueueJob{}, errors.New("job is not running")
 	}
 	if runErr != nil {
 		job.LastError = limitError(runErr.Error(), 2000)

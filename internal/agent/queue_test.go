@@ -102,3 +102,20 @@ func TestJobQueueRollsBackClaimWhenPersistenceFails(t *testing.T) {
 		t.Fatalf("claim mutation was not rolled back: %+v", pending)
 	}
 }
+
+func TestJobQueueRejectsAckAndNackForNonRunningJobs(t *testing.T) {
+	queue, err := NewJobQueue("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	job, err := queue.Enqueue("mission-state", 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := queue.Ack(job.ID); err == nil {
+		t.Fatal("ack of pending job unexpectedly succeeded")
+	}
+	if _, err := queue.Nack(job.ID, errors.New("unexpected")); err == nil {
+		t.Fatal("nack of pending job unexpectedly succeeded")
+	}
+}

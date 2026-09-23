@@ -132,6 +132,9 @@ func (q *JobQueue) Ack(jobID string) error {
 	if !ok {
 		return os.ErrNotExist
 	}
+	if job.Status != QueueRunning {
+		return errors.New("job is not running")
+	}
 	job.Status = QueueSucceeded
 	job.WorkerID = ""
 	job.UpdatedAt = time.Now().UTC()
@@ -144,6 +147,9 @@ func (q *JobQueue) Nack(jobID string, runErr error) (QueueJob, error) {
 	job, ok := q.jobs[jobID]
 	if !ok {
 		return QueueJob{}, os.ErrNotExist
+	}
+	if job.Status != QueueRunning {
+		return QueueJob{}, errors.New("job is not running")
 	}
 	if runErr != nil {
 		job.LastError = limitError(runErr.Error(), 2000)
