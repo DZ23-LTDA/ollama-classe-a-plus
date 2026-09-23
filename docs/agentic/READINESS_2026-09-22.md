@@ -414,3 +414,10 @@ As rotas `POST /api/agent/v1/mcp`, `POST /api/agent/v1/remote-mcp` e `POST /api/
 Os testes incluem round-trip após restart, modo `0600`, colisão cross-tenant, remoção/rollback, trust fail-closed, authorization owner/admin, raw-secret/unknown-field rejection, normal e race. O runner local completo passou: integrity, YAML, Go test, vet, build, Vitest, typecheck, Vite build, mobile typecheck, npm audit e diff. Os checks remotos do novo commit estavam recém-enfileirados no instante desta nota e não são tratados como finais.
 
 A classificação permanece **preview/local RC em hardening**, não final e não production-ready. Registrar um MCP, Remote MCP ou skill não executa ação externa, não consente OAuth, não prova uma conta ou upstream e não fornece isolamento físico além das políticas efetivamente provisionadas no host.
+
+
+## Addendum de lifecycle UI — 2026-09-22
+
+No commit `eb97e6b8`, a tela Plugins passou a cobrir também remoção de connectors, MCP/Remote MCP e skills. O botão exige confirmação local e a mensagem informa que a operação remove o manifest do runtime, mas não revoga uma credencial ou conta no serviço upstream. A validação local concluiu build TypeScript/Vite e 204 testes Vitest.
+
+Esse complemento melhora a operação local, mas não muda os blockers de OAuth, upstream smoke, sandbox físico, devices, signing, stores, app review ou deploy. O produto segue **preview/local RC em hardening**, não final e não production-ready; os checks remotos do head mais recente ainda devem ser consultados quando concluírem.

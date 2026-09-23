@@ -382,3 +382,8 @@ Foram publicadas as rotas `POST /api/agent/v1/mcp`, `POST /api/agent/v1/remote-m
 A UI Plugins recebeu chamadas e formulários operacionais correspondentes, sem campo para tokens ou passwords. Os testes cobrem restart, `0600`, rollback, tenant isolation, trust fail-closed, auth, unknown fields, normal e race. O runner local completo passou em integrity, YAML, Go test, vet, build, UI, mobile, audit e diff.
 
 O resultado continua preview/local RC em hardening. Nenhum MCP remoto, conta OAuth, provider externo, social commerce, marketplace, Woovi/OpenPix, fiscal/NF-e ou ação em conta de terceiros é declarado conectado ou validado.
+
+
+## Unreleased — lifecycle UI completion — 2026-09-22
+
+O commit `eb97e6b8` completou a UI de lifecycle: connectors, MCP/Remote MCP e skills podem ser removidos com confirmação, além de habilitados/desabilitados. A microcopy distingue remoção local de revogação no upstream. Build TypeScript/Vite e 204 testes Vitest passaram; o tree foi publicado limpo. A entrega permanece preview/local RC e não representa revogação de contas externas.

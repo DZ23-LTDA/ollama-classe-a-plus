@@ -2227,3 +2227,10 @@ external_blockers_unchanged:
 classification: preview/local RC em hardening; NOT final; NOT production-ready
 next_action: verify current PR checks once, then review distributed/session/sandbox P1 gaps
 ```
+
+
+## Complemento de lifecycle na UI — 2026-09-22
+
+O commit `eb97e6b808f2130071eaf12a85d98c0488d6b83a` completou a superfície de lifecycle no frontend. Connectors, MCP/Remote MCP e skills agora possuem remoção explícita com confirmação, além de habilitar/desabilitar; a mensagem deixa claro que remover o manifest local não revoga a credencial no upstream. O build TypeScript/Vite e os 21 arquivos de teste UI, totalizando 204 testes, passaram. A branch foi publicada e permaneceu limpa após o push.
+
+A classificação não muda: preview/local RC em hardening. CI remoto do head mais recente continua aguardando conclusão; não é declarado verde por inferência do gate local.
