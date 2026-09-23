@@ -609,6 +609,7 @@ func (s *ContextStore) CreateSchedule(schedule Schedule) (Schedule, error) {
 	s.schedules[schedule.ID] = schedule
 	if s.root != "" {
 		if err := writeJSONAtomic(filepath.Join(s.root, "schedules", schedule.ID+".json"), schedule); err != nil {
+			delete(s.schedules, schedule.ID)
 			return Schedule{}, err
 		}
 	}

@@ -226,16 +226,18 @@ type CompanyCreateRequest struct {
 }
 
 var (
-	ErrCompanyNotFound             = errors.New("company not found")
-	ErrCompanyBudgetExceeded       = errors.New("company budget limit exceeded; company paused")
-	ErrCompanyApprovalRequired     = errors.New("approval is required for this company action")
-	ErrCompanyPaused               = errors.New("company is paused")
-	ErrCompanyApprovalConflict     = errors.New("company approval version conflict")
-	ErrCompanyApprovalNonce        = errors.New("company approval nonce mismatch")
-	ErrCompanyApprovalNotFound     = errors.New("company approval not found or already decided")
-	ErrCompanySpendApprovalPending = errors.New("company spend approval is pending")
-	ErrCompanyIdempotentReplay     = errors.New("company idempotent replay")
-	ErrCompanyIdempotencyConflict  = errors.New("company idempotency key was reused with different input")
+	ErrCompanyNotFound                   = errors.New("company not found")
+	ErrCompanyBudgetExceeded             = errors.New("company budget limit exceeded; company paused")
+	ErrCompanyApprovalRequired           = errors.New("approval is required for this company action")
+	ErrCompanyPaused                     = errors.New("company is paused")
+	ErrCompanyApprovalConflict           = errors.New("company approval version conflict")
+	ErrCompanyApprovalNonce              = errors.New("company approval nonce mismatch")
+	ErrCompanyApprovalNotFound           = errors.New("company approval not found or already decided")
+	ErrCompanySpendApprovalPending       = errors.New("company spend approval is pending")
+	ErrCompanyIdempotentReplay           = errors.New("company idempotent replay")
+	ErrCompanyIdempotencyConflict        = errors.New("company idempotency key was reused with different input")
+	ErrCompanyCycleIdempotencyKeyTooLong = errors.New("company cycle idempotency key exceeds 128 bytes")
+	ErrCompanyCycleReplayMissing         = errors.New("company cycle idempotent replay has no persisted cycle")
 )
 
 type CompanyStore struct {
@@ -751,13 +753,22 @@ func (s *CompanyStore) AddBacklog(id string, item CompanyBacklogItem) (Company, 
 }
 
 func (s *CompanyStore) AddCycle(id string, cycle CompanyCycle) (Company, error) {
+	company, _, _, err := s.AddCycleWithIdempotency(id, cycle, "")
+	return company, err
+}
+
+func (s *CompanyStore) AddCycleWithIdempotency(id string, cycle CompanyCycle, idempotencyKey string) (Company, CompanyCycle, bool, error) {
 	cycle.Name = strings.TrimSpace(cycle.Name)
 	cycle.Objective = strings.TrimSpace(cycle.Objective)
 	if cycle.Name == "" || cycle.Objective == "" {
-		return Company{}, errors.New("cycle name and objective are required")
+		return Company{}, CompanyCycle{}, false, errors.New("cycle name and objective are required")
 	}
 	if cycle.IntervalSeconds < 1 || cycle.IntervalSeconds > 31*24*60*60 {
-		return Company{}, errors.New("cycle interval must be between 1 second and 31 days")
+		return Company{}, CompanyCycle{}, false, errors.New("cycle interval must be between 1 second and 31 days")
+	}
+	idempotencyKey = strings.TrimSpace(idempotencyKey)
+	if len([]byte(idempotencyKey)) > 128 {
+		return Company{}, CompanyCycle{}, false, ErrCompanyCycleIdempotencyKeyTooLong
 	}
 	if cycle.ID == "" {
 		cycle.ID = "cyc_" + uuid.NewString()
@@ -769,7 +780,77 @@ func (s *CompanyStore) AddCycle(id string, cycle CompanyCycle) (Company, error) 
 	if cycle.NextRunAt.IsZero() {
 		cycle.NextRunAt = now.Add(time.Duration(cycle.IntervalSeconds) * time.Second)
 	}
-	return s.mutate(id, func(company *Company) error { company.Cycles = append(company.Cycles, cycle); return nil })
+	fingerprintInput := cycle.Name + "\x00" + cycle.Objective + "\x00" + cycle.Frequency + "\x00" + strconv.FormatInt(cycle.IntervalSeconds, 10)
+	fingerprint := companyIdempotencyDigest("company.cycle.input", fingerprintInput)
+	replayed := false
+	var stored CompanyCycle
+	updated, err := s.mutate(id, func(company *Company) error {
+		if err := checkCompanyIdempotency(company, "company.cycle", idempotencyKey, fingerprint); err != nil {
+			if !errors.Is(err, ErrCompanyIdempotentReplay) {
+				return err
+			}
+			var resultID string
+			for index := len(company.Idempotency) - 1; index >= 0; index-- {
+				record := company.Idempotency[index]
+				if record.Operation == "company.cycle" && record.Digest == companyIdempotencyDigest("company.cycle", idempotencyKey) {
+					resultID = record.ResultID
+					break
+				}
+			}
+			for _, existing := range company.Cycles {
+				if existing.ID == resultID {
+					stored = existing
+					replayed = true
+					return nil
+				}
+			}
+			return ErrCompanyCycleReplayMissing
+		}
+		company.Cycles = append(company.Cycles, cycle)
+		if idempotencyKey != "" {
+			rememberCompanyIdempotency(company, "company.cycle", idempotencyKey, fingerprint)
+			for index := len(company.Idempotency) - 1; index >= 0; index-- {
+				if company.Idempotency[index].Operation == "company.cycle" && company.Idempotency[index].Digest == companyIdempotencyDigest("company.cycle", idempotencyKey) {
+					company.Idempotency[index].ResultID = cycle.ID
+					break
+				}
+			}
+		}
+		stored = cycle
+		return nil
+	})
+	return updated, stored, replayed, err
+}
+
+func (s *CompanyStore) RemoveCycle(id, cycleID string) (Company, error) {
+	cycleID = strings.TrimSpace(cycleID)
+	if cycleID == "" {
+		return Company{}, errors.New("cycle id is required")
+	}
+	return s.mutate(id, func(company *Company) error {
+		found := false
+		cycles := make([]CompanyCycle, 0, len(company.Cycles))
+		for _, cycle := range company.Cycles {
+			if cycle.ID == cycleID {
+				found = true
+				continue
+			}
+			cycles = append(cycles, cycle)
+		}
+		if !found {
+			return errors.New("company cycle not found")
+		}
+		company.Cycles = cycles
+		filtered := company.Idempotency[:0]
+		for _, record := range company.Idempotency {
+			if record.Operation == "company.cycle" && record.ResultID == cycleID {
+				continue
+			}
+			filtered = append(filtered, record)
+		}
+		company.Idempotency = filtered
+		return nil
+	})
 }
 
 func (s *CompanyStore) SetCycleSchedule(id, cycleID, scheduleID string) (Company, error) {

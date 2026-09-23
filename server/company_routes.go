@@ -225,16 +225,31 @@ func (a *agentAPI) addCompanyCycle(c *gin.Context) {
 		writeAgentError(c, http.StatusBadRequest, err)
 		return
 	}
-	created, err := a.runtime.CompanyStore().AddCycle(c.Param("id"), input)
+	created, cycle, replayed, err := a.runtime.CompanyStore().AddCycleWithIdempotency(c.Param("id"), input, c.GetHeader("Idempotency-Key"))
 	if err != nil {
+		if errors.Is(err, agent.ErrCompanyIdempotencyConflict) {
+			writeAgentError(c, http.StatusConflict, err)
+			return
+		}
+		if errors.Is(err, agent.ErrCompanyCycleIdempotencyKeyTooLong) {
+			writeAgentError(c, http.StatusBadRequest, err)
+			return
+		}
 		writeAgentError(c, statusForAgentError(err), err)
 		return
 	}
-	if len(created.Cycles) == 0 {
+	if replayed {
+		if cycle.ScheduleID == "" {
+			writeAgentError(c, http.StatusConflict, agent.ErrCompanyCycleReplayMissing)
+			return
+		}
+		c.JSON(http.StatusOK, created)
+		return
+	}
+	if cycle.ID == "" {
 		writeAgentError(c, http.StatusInternalServerError, errors.New("company cycle was not persisted"))
 		return
 	}
-	cycle := created.Cycles[len(created.Cycles)-1]
 	schedule, err := a.context.CreateSchedule(agent.Schedule{
 		Objective:       "Company OS / " + company.Name + ": " + cycle.Objective,
 		Model:           "",
@@ -245,11 +260,14 @@ func (a *agentAPI) addCompanyCycle(c *gin.Context) {
 		NextRunAt:       cycle.NextRunAt,
 	})
 	if err != nil {
+		_, _ = a.runtime.CompanyStore().RemoveCycle(c.Param("id"), cycle.ID)
 		writeAgentError(c, statusForAgentError(err), err)
 		return
 	}
 	updated, err := a.runtime.CompanyStore().SetCycleSchedule(c.Param("id"), cycle.ID, schedule.ID)
 	if err != nil {
+		_ = a.context.DeleteSchedule(schedule.ID)
+		_, _ = a.runtime.CompanyStore().RemoveCycle(c.Param("id"), cycle.ID)
 		writeAgentError(c, statusForAgentError(err), err)
 		return
 	}
