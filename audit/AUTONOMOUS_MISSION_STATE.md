@@ -2234,3 +2234,10 @@ next_action: verify current PR checks once, then review distributed/session/sand
 O commit `eb97e6b808f2130071eaf12a85d98c0488d6b83a` completou a superfície de lifecycle no frontend. Connectors, MCP/Remote MCP e skills agora possuem remoção explícita com confirmação, além de habilitar/desabilitar; a mensagem deixa claro que remover o manifest local não revoga a credencial no upstream. O build TypeScript/Vite e os 21 arquivos de teste UI, totalizando 204 testes, passaram. A branch foi publicada e permaneceu limpa após o push.
 
 A classificação não muda: preview/local RC em hardening. CI remoto do head mais recente continua aguardando conclusão; não é declarado verde por inferência do gate local.
+
+
+## Hardening de parsing estrito de manifestos — 2026-09-22
+
+A auditoria P1 encontrou que os novos loaders persistentes de MCP e Remote MCP aceitavam um primeiro JSON válido mesmo quando havia um segundo valor após ele. O commit `89b4203e9b6815ce9be535edf077fe2231b737e6` agora exige `io.EOF` após o primeiro documento; conteúdo trailing produz erro de bootstrap e não é parcialmente aplicado. Foram adicionadas regressões para `[] {}` nos dois loaders.
+
+Evidências: testes normais e race dos managers persistentes passaram; integrity passou; o gate completo Go passou com `CGO_ENABLED=1 go test ./... -count=1 -timeout=900s`, `go vet ./...`, `go build ./...` e `git diff --check`. Nenhum fallback foi relaxado. O SHA foi publicado na branch de revisão; CI pública do head permanece separada da evidência local até conclusão.

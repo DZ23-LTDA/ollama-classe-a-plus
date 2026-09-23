@@ -489,3 +489,10 @@ A validação stdio exige executável absoluto regular e workspace seguro. A val
 A cobertura executada foi: testes de round-trip/restart, permissões, rollback, tenant collision, trust fail-closed, authorization e raw-secret/unknown-field rejection, normal e race; runner local completo PASS em integrity/YAML/Go/UI/mobile/audit/diff. O SHA novo foi publicado e seus checks remotos ainda estavam pendentes no momento da nota. O modo `OLLAMA_AGENT_MCP`/`OLLAMA_AGENT_REMOTE_MCP` segue bootstrap estático e não apresenta mutation de UI como alteração durável do arquivo indicado.
 
 Riscos não reduzidos nesta slice: OAuth real e refresh/revoke com contas, Desktop Commander ou Composio em upstream, providers externos, social/commerce/fiscal, attestation de skill, isolamento físico de processos/dispositivos, IdP distribuído, homologação em hardware, signing, stores, deploy e app review. Estado: **FIXING / preview-local RC em hardening**, não final e não production-ready.
+
+
+## Addendum P1 — parsing estrito de manifests MCP — 2026-09-22
+
+A revisão do novo storage encontrou uma ambiguidade de decoder: os loaders de MCP e Remote MCP paravam após o primeiro array JSON. O commit `89b4203e` adicionou uma segunda leitura e exige `io.EOF`; conteúdo trailing, incluindo um segundo objeto, falha fechado. O caso `[] {}` tem regressão dedicada nos testes de persistência.
+
+O teste normal/race dos managers e o gate completo Go passaram em integrity, `go test ./...`, vet, build e diff. O comportamento de bootstrap estático não foi relaxado e nenhuma credencial é envolvida. O achado foi classificado como hardening P1 corrigido; blockers externos e o estado preview/local RC permanecem.

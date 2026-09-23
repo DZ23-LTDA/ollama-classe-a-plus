@@ -421,3 +421,10 @@ A classificação permanece **preview/local RC em hardening**, não final e não
 No commit `eb97e6b8`, a tela Plugins passou a cobrir também remoção de connectors, MCP/Remote MCP e skills. O botão exige confirmação local e a mensagem informa que a operação remove o manifest do runtime, mas não revoga uma credencial ou conta no serviço upstream. A validação local concluiu build TypeScript/Vite e 204 testes Vitest.
 
 Esse complemento melhora a operação local, mas não muda os blockers de OAuth, upstream smoke, sandbox físico, devices, signing, stores, app review ou deploy. O produto segue **preview/local RC em hardening**, não final e não production-ready; os checks remotos do head mais recente ainda devem ser consultados quando concluírem.
+
+
+## Addendum de parsing estrito de manifestos — 2026-09-22
+
+O commit `89b4203e` corrigiu um hardening P1 nos carregadores duráveis de MCP e Remote MCP. Após decodificar o array principal, o loader agora exige fim real do documento JSON. Um manifest como `[] {}` é rejeitado em vez de ser aceito parcialmente. Isso reduz risco de configuração ambígua ou de dados anexados após um documento válido.
+
+Os testes normal e race de persistência passaram. O gate completo Go também passou: integrity, todos os pacotes em `go test`, `go vet`, `go build` e `git diff --check`. A mudança não altera o modo de bootstrap estático nem converte falhas externas em sucesso. O produto continua preview/local RC em hardening, não final e não production-ready.

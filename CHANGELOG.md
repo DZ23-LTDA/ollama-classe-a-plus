@@ -387,3 +387,8 @@ O resultado continua preview/local RC em hardening. Nenhum MCP remoto, conta OAu
 ## Unreleased — lifecycle UI completion — 2026-09-22
 
 O commit `eb97e6b8` completou a UI de lifecycle: connectors, MCP/Remote MCP e skills podem ser removidos com confirmação, além de habilitados/desabilitados. A microcopy distingue remoção local de revogação no upstream. Build TypeScript/Vite e 204 testes Vitest passaram; o tree foi publicado limpo. A entrega permanece preview/local RC e não representa revogação de contas externas.
+
+
+## Unreleased — strict MCP manifest parsing — 2026-09-22
+
+O commit `89b4203e` faz os loaders persistentes de MCP e Remote MCP exigirem EOF após o primeiro documento JSON. Payloads como `[] {}` agora falham no bootstrap em vez de deixar conteúdo trailing sem validação. Regressões normal/race e os gates Go completos passaram: integrity, test, vet, build e diff.
