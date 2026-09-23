@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	goruntime "runtime"
 	"strings"
@@ -201,6 +202,9 @@ func TestScheduleClaimIsIdempotent(t *testing.T) {
 func TestBrowserOperatorNavigateAndSnapshot(t *testing.T) {
 	if _, err := os.Stat("/usr/bin/python3"); err != nil {
 		t.Skip("browser operator requires /usr/bin/python3 (Playwright helper); skipping")
+	}
+	if err := exec.Command("/usr/bin/python3", "-c", "import playwright").Run(); err != nil {
+		t.Skip("browser operator requires the Playwright Python package; skipping")
 	}
 	t.Setenv("OLLAMA_AGENT_BROWSER_ALLOW_PRIVATE", "1")
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {

@@ -39,7 +39,15 @@ func newAgentAPI(runtime *agent.Runtime) (*agentAPI, error) {
 		return nil, err
 	}
 	runtime.SetAuthStore(auth)
-	required, _ := strconv.ParseBool(strings.TrimSpace(os.Getenv("OLLAMA_AGENT_AUTH_REQUIRED")))
+	// Fail closed: the agentic surface exposes OS-level tools (desktop, sandbox,
+	// deploy, connectors), so authentication is required unless the operator
+	// explicitly opts out with OLLAMA_AGENT_AUTH_REQUIRED=false for local dev.
+	required := true
+	if raw := strings.TrimSpace(os.Getenv("OLLAMA_AGENT_AUTH_REQUIRED")); raw != "" {
+		if parsed, err := strconv.ParseBool(raw); err == nil {
+			required = parsed
+		}
+	}
 	return &agentAPI{runtime: runtime, context: runtime.Context(), auth: auth, authRequired: required, push: runtime.Push(), samlServices: map[string]*agent.SAMLService{}}, nil
 }
 
@@ -247,6 +255,7 @@ func (a *agentAPI) register(r *gin.Engine) {
 	group.GET("/deployments", a.deployments)
 	group.POST("/builders/:id/deploy/:provider", a.deployBuilder)
 	group.GET("/builders/:id/preview/*path", a.builderPreviewFile)
+	group.GET("/metrics", a.metrics)
 	group.GET("/metrics/prometheus", a.prometheus)
 	group.GET("/tools", a.tools)
 	group.GET("/connectors", a.connectors)
@@ -281,7 +290,7 @@ func (a *agentAPI) authMiddleware(c *gin.Context) {
 		c.Next()
 		return
 	}
-	if strings.HasSuffix(c.Request.URL.Path, "/auth/dev/token") && strings.EqualFold(strings.TrimSpace(os.Getenv("OLLAMA_AGENT_AUTH_DEV")), "true") {
+	if !a.authRequired && strings.HasSuffix(c.Request.URL.Path, "/auth/dev/token") && strings.EqualFold(strings.TrimSpace(os.Getenv("OLLAMA_AGENT_AUTH_DEV")), "true") {
 		c.Next()
 		return
 	}
@@ -479,7 +488,10 @@ func (a *agentAPI) registerPush(c *gin.Context) {
 }
 
 func (a *agentAPI) devToken(c *gin.Context) {
-	if !strings.EqualFold(strings.TrimSpace(os.Getenv("OLLAMA_AGENT_AUTH_DEV")), "true") {
+	// The dev token mints a real 24h credential with a self-chosen organization,
+	// so it is only ever available in local dev where auth is disabled. It must
+	// never be reachable once authentication is required.
+	if a.authRequired || !strings.EqualFold(strings.TrimSpace(os.Getenv("OLLAMA_AGENT_AUTH_DEV")), "true") {
 		c.AbortWithStatus(http.StatusNotFound)
 		return
 	}
@@ -507,7 +519,7 @@ func (a *agentAPI) devToken(c *gin.Context) {
 		writeAgentError(c, http.StatusBadRequest, err)
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{"access_token": raw, "token": token, "user": user.Public(), "organization": organization})
+	c.JSON(http.StatusCreated, gin.H{"access_token": raw, "expires_at": token.ExpiresAt, "user": user.Public(), "organization": organization})
 }
 
 func oauthProviderFromEnv(name string) agent.OAuthProvider {
@@ -671,12 +683,12 @@ func (a *agentAPI) oauthCallback(c *gin.Context) {
 		writeAgentError(c, http.StatusInternalServerError, err)
 		return
 	}
-	localToken, session, err := a.auth.IssueToken(userID, organization.ID, 24*time.Hour)
+	localToken, _, err := a.auth.IssueToken(userID, organization.ID, 24*time.Hour)
 	if err != nil {
 		writeAgentError(c, http.StatusInternalServerError, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"access_token": localToken, "token": session, "credential_id": credential.ID, "provider": provider.Name, "organization": organization, "expires_at": credential.ExpiresAt})
+	c.JSON(http.StatusOK, gin.H{"access_token": localToken, "credential_id": credential.ID, "provider": provider.Name, "organization": organization, "expires_at": credential.ExpiresAt})
 }
 
 func (a *agentAPI) samlStart(c *gin.Context) {
@@ -723,7 +735,7 @@ func (a *agentAPI) samlACS(c *gin.Context) {
 		writeAgentError(c, http.StatusInternalServerError, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"access_token": localToken, "token": session, "provider": service.Provider.Name, "organization": organization, "user": user.Public()})
+	c.JSON(http.StatusOK, gin.H{"access_token": localToken, "expires_at": session.ExpiresAt, "provider": service.Provider.Name, "organization": organization, "user": user.Public()})
 }
 
 func (a *agentAPI) metrics(c *gin.Context) {
@@ -1066,6 +1078,10 @@ func (a *agentAPI) runOrchestration(c *gin.Context) {
 		writeAgentError(c, statusForAgentError(err), err)
 		return
 	}
+	if job.State == agent.OrchestrationRunning {
+		c.AbortWithStatusJSON(http.StatusConflict, gin.H{"error": "orchestration job is already running"})
+		return
+	}
 	go func(id string) { _, _ = a.runtime.Orchestrator().Run(context.Background(), id) }(job.ID)
 	c.JSON(http.StatusAccepted, gin.H{"id": job.ID, "state": agent.OrchestrationRunning})
 }
@@ -1096,14 +1112,37 @@ func (a *agentAPI) research(c *gin.Context) {
 func (a *agentAPI) actorIdentity(c *gin.Context) (string, string) {
 	if value, ok := c.Get("agent.user"); ok {
 		if user, ok := value.(agent.User); ok {
-			return user.ID, ""
+			organizationID := ""
+			if orgValue, ok := c.Get("agent.organization"); ok {
+				if organization, ok := orgValue.(agent.Organization); ok {
+					organizationID = organization.ID
+				}
+			}
+			return user.ID, organizationID
 		}
+	}
+	// Never derive identity from client-supplied headers once authentication is
+	// required: that would let a caller bind pairings/collab to any organization.
+	if a.authRequired {
+		return "", ""
 	}
 	return strings.TrimSpace(c.GetHeader("X-Ollama-User")), strings.TrimSpace(c.GetHeader("X-Ollama-Organization"))
 }
 
 func (a *agentAPI) devices(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"devices": a.runtime.Devices().List()})
+	_, organizationID := a.actorIdentity(c)
+	all := a.runtime.Devices().List()
+	if !a.authRequired {
+		c.JSON(http.StatusOK, gin.H{"devices": all})
+		return
+	}
+	scoped := make([]agent.Device, 0, len(all))
+	for _, device := range all {
+		if device.OrganizationID == organizationID {
+			scoped = append(scoped, device)
+		}
+	}
+	c.JSON(http.StatusOK, gin.H{"devices": scoped})
 }
 
 func (a *agentAPI) startDevicePairing(c *gin.Context) {
@@ -1157,6 +1196,18 @@ func (a *agentAPI) deviceHeartbeat(c *gin.Context) {
 }
 
 func (a *agentAPI) revokeDevice(c *gin.Context) {
+	if a.authRequired {
+		_, organizationID := a.actorIdentity(c)
+		existing, err := a.runtime.Devices().Get(c.Param("id"))
+		if err != nil {
+			writeAgentError(c, statusForAgentError(err), err)
+			return
+		}
+		if existing.OrganizationID != organizationID {
+			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": "device not found"})
+			return
+		}
+	}
 	device, err := a.runtime.Devices().Revoke(c.Param("id"))
 	if err != nil {
 		writeAgentError(c, statusForAgentError(err), err)
@@ -1650,10 +1701,15 @@ func (a *agentAPI) decideApproval(c *gin.Context) {
 	c.JSON(http.StatusOK, mission)
 }
 
+// maxAgentRequestBody bounds every decoded JSON body to guard against
+// memory-exhaustion from an oversized request.
+const maxAgentRequestBody = 8 << 20 // 8 MiB
+
 func decodeJSON(c *gin.Context, value any) error {
 	if c.Request.Body == nil {
 		return errors.New("request body is required")
 	}
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxAgentRequestBody)
 	decoder := json.NewDecoder(c.Request.Body)
 	decoder.DisallowUnknownFields()
 	return decoder.Decode(value)
