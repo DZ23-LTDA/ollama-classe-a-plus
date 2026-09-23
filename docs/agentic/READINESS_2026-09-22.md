@@ -709,3 +709,12 @@ O head `190af0f3` deixa falhas de deploy observáveis. `DeploymentManager` agora
 Evidência local: testes de deploy generic/Netlify, exclusão de arquivos privados, symlink, SSRF e estado parcial passaram; o novo cenário parcial passou também com `-race`; testes server de `Deployment|Builder`, `go vet ./internal/agent ./server`, diff check e scan de segredos passaram. O rollback e health-check específicos de Vercel/Netlify/generic continuam `BLOCKED_BY_EXTERNAL_DEPENDENCY` até existirem contas, contratos, credenciais autorizadas e homologação externa.
 
 A CI pública deste head foi disparada e precisa concluir. O produto segue **FIXING / preview-local RC em hardening — não finalizado e não production-ready**.
+
+
+## Addendum de outbox persistente de push e observabilidade — 2026-09-23
+
+O head `5a94f524` remove o envio de push em goroutine com erro descartado. Eventos de missão elegíveis entram em `.agent-push-outbox/outbox.json`, com organização, payload sanitizado, attempts, lease de um minuto, próximo retry, backoff e último erro. O worker iniciado pelo Runtime entrega por `PushService`, remove itens confirmados e mantém itens falhos para retry/restart. Falhas de AppendEvent, persistência do outbox e entrega push incrementam counters no snapshot/Prometheus.
+
+Evidência local: regressões de persistência/restart, lease/backoff, entrega a fixture HTTPS local e retenção após resposta provider `502` passaram; a suíte completa `CGO_ENABLED=1 go test ./internal/agent -count=1 -timeout=300s`, race do pacote agent, `go vet ./internal/agent ./server`, guardrail de integridade, diff check e scan de segredos passaram. Isso comprova outbox e entrega local, não APNs/FCM, push em dispositivo, OAuth/conta externa ou worker distribuído; esses itens continuam `BLOCKED_BY_EXTERNAL_DEPENDENCY`.
+
+A CI pública do head precisa concluir. O produto permanece **FIXING / preview-local RC em hardening — não finalizado e não production-ready**.
