@@ -25,7 +25,7 @@ func (s *plannerChatStub) Chat(_ context.Context, request *api.ChatRequest, call
 
 func TestOllamaPlannerUsesMissionSelectedModel(t *testing.T) {
 	stub := &plannerChatStub{response: `{"steps":[{"kind":"workspace.read","title":"inspect","risk":"read","input":{"path":"."}}]}`}
-	planner := OllamaPlanner{Client: stub, Model: "default-model", Fallback: RulePlanner{}}
+	planner := OllamaPlanner{Client: stub, Model: "default-model"}
 	steps, err := planner.Plan(context.Background(), Mission{Objective: "inspect", Model: "selected-model"})
 	if err != nil {
 		t.Fatal(err)
@@ -40,9 +40,8 @@ func TestOllamaPlannerUsesMissionSelectedModel(t *testing.T) {
 
 func TestOllamaPlannerSurfacesProviderFailure(t *testing.T) {
 	planner := OllamaPlanner{
-		Client:   &plannerChatStub{err: errors.New("provider unavailable")},
-		Model:    "selected-model",
-		Fallback: RulePlanner{},
+		Client: &plannerChatStub{err: errors.New("provider unavailable")},
+		Model:  "selected-model",
 	}
 	steps, err := planner.Plan(context.Background(), Mission{Objective: "inspect"})
 	if err == nil || !strings.Contains(err.Error(), "planner provider request failed") {
@@ -55,9 +54,8 @@ func TestOllamaPlannerSurfacesProviderFailure(t *testing.T) {
 
 func TestOllamaPlannerSurfacesInvalidPlan(t *testing.T) {
 	planner := OllamaPlanner{
-		Client:   &plannerChatStub{response: `{}`},
-		Model:    "selected-model",
-		Fallback: RulePlanner{},
+		Client: &plannerChatStub{response: `{}`},
+		Model:  "selected-model",
 	}
 	steps, err := planner.Plan(context.Background(), Mission{Objective: "inspect"})
 	if err == nil || !strings.Contains(err.Error(), "planner returned invalid plan") {

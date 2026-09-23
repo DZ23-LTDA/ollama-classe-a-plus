@@ -49,10 +49,15 @@ func (RulePlanner) Plan(_ context.Context, mission Mission) ([]Step, error) {
 	}}, nil
 }
 
+type UnconfiguredPlanner struct{}
+
+func (UnconfiguredPlanner) Plan(_ context.Context, _ Mission) ([]Step, error) {
+	return nil, errors.New("planner model is not configured")
+}
+
 type OllamaPlanner struct {
-	Client   plannerChatClient
-	Model    string
-	Fallback Planner
+	Client plannerChatClient
+	Model  string
 }
 
 func (p OllamaPlanner) Plan(ctx context.Context, mission Mission) ([]Step, error) {

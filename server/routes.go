@@ -1957,6 +1957,7 @@ func (s *Server) GenerateRoutes() (http.Handler, error) {
 		cors.New(corsConfig),
 		allowedHostsMiddleware(s.addr),
 	)
+	s.agentRuntime.SetPlannerResolver(multiProviderPlannerResolver{client: api.NewClient(envconfig.ConnectableHost(), http.DefaultClient)})
 	if configPath := strings.TrimSpace(os.Getenv("OLLAMA_DZ23_CONFIG")); configPath != "" {
 		registry, err := multillm.Load(configPath)
 		if err != nil {
@@ -1965,7 +1966,7 @@ func (s *Server) GenerateRoutes() (http.Handler, error) {
 		s.multiRegistry = registry
 		s.multiProvider = multillm.NewGateway(registry, nil)
 		r.Use(s.multiProvider.Middleware())
-		s.agentRuntime.SetPlannerResolver(multiProviderPlannerResolver{registry: registry})
+		s.agentRuntime.SetPlannerResolver(multiProviderPlannerResolver{registry: registry, client: api.NewClient(envconfig.ConnectableHost(), http.DefaultClient)})
 	}
 
 	// General

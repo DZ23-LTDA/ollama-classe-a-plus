@@ -23,6 +23,25 @@ var legacyRuntimeDirectories = []string{
 	".agent-devices",
 }
 
+// DefaultRuntimeWorkspaceRoot returns the durable default for user-created
+// workspaces. It deliberately avoids the system temporary directory.
+func DefaultRuntimeWorkspaceRoot() (string, error) {
+	configDir, err := os.UserConfigDir()
+	if err != nil {
+		return "", fmt.Errorf("resolve user config directory: %w", err)
+	}
+	return filepath.Join(configDir, "ollama-agent", "workspaces"), nil
+}
+
+// DefaultRuntimeDataRoot returns durable runtime state independently of a workspace.
+func DefaultRuntimeDataRoot() (string, error) {
+	configDir, err := os.UserConfigDir()
+	if err != nil {
+		return "", fmt.Errorf("resolve user config directory: %w", err)
+	}
+	return filepath.Join(configDir, "ollama-agent", "data"), nil
+}
+
 func resolveRuntimeDataRoot(workspaceRoot, configured string) (string, error) {
 	workspaceRoot, err := filepath.Abs(filepath.Clean(workspaceRoot))
 	if err != nil {

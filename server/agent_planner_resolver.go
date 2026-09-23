@@ -20,8 +20,18 @@ type multiProviderPlannerResolver struct {
 func (r multiProviderPlannerResolver) ResolvePlanner(provider, model string) (agent.Planner, error) {
 	provider = strings.TrimSpace(provider)
 	model = strings.TrimSpace(model)
-	if provider == "" || provider == "ollama-local" {
-		return nil, errors.New("remote planner requires a named provider")
+	if provider == "" {
+		return nil, errors.New("planner provider is required")
+	}
+	if provider == "ollama-local" {
+		if model == "" {
+			return nil, errors.New("local provider requires an explicit model")
+		}
+		client := r.client
+		if client == nil {
+			client = api.NewClient(envconfig.ConnectableHost(), http.DefaultClient)
+		}
+		return agent.OllamaPlanner{Client: client, Model: model}, nil
 	}
 	if r.registry == nil {
 		return nil, fmt.Errorf("provider %q is not configured", provider)

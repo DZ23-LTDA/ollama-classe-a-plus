@@ -210,6 +210,20 @@ func (r *Runtime) Context() *ContextStore {
 	return r.context
 }
 
+func (r *Runtime) WorkspaceRoot() string {
+	if r == nil {
+		return ""
+	}
+	return r.workspaceRoot
+}
+
+func (r *Runtime) DataRoot() string {
+	if r == nil {
+		return ""
+	}
+	return r.dataRoot
+}
+
 func (r *Runtime) CompanyStore() *CompanyStore {
 	return r.company
 }
@@ -359,17 +373,28 @@ func (r *Runtime) CreateMission(ctx context.Context, request CreateMissionReques
 	r.metrics.missionsCreated.Add(1)
 	_ = r.event(mission, "mission.created", "", map[string]any{"objective": objective})
 	planner := r.planner
-	if provider != "ollama-local" {
+	if provider == "ollama-local" && mission.Model != "" && r.plannerResolver != nil {
+		planner, err = r.plannerResolver.ResolvePlanner(provider, mission.Model)
+		if err != nil {
+			return r.failMission(mission, err)
+		}
+		if planner == nil {
+			return r.failMission(mission, errors.New("local provider returned no planner"))
+		}
+	} else if provider != "ollama-local" {
 		if r.plannerResolver == nil {
-			return Mission{}, fmt.Errorf("provider %q is not configured in this runtime", provider)
+			return r.failMission(mission, fmt.Errorf("provider %q is not configured in this runtime", provider))
 		}
 		planner, err = r.plannerResolver.ResolvePlanner(provider, mission.Model)
 		if err != nil {
-			return Mission{}, err
+			return r.failMission(mission, err)
 		}
 		if planner == nil {
-			return Mission{}, fmt.Errorf("provider %q returned no planner", provider)
+			return r.failMission(mission, fmt.Errorf("provider %q returned no planner", provider))
 		}
+	}
+	if planner == nil {
+		return r.failMission(mission, errors.New("planner is not configured"))
 	}
 	plan, err := planner.Plan(ctx, mission)
 	if err != nil {

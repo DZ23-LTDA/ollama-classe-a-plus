@@ -39,6 +39,9 @@ var errAgentForbidden = errors.New("object is outside the active organization")
 
 func newAgentAPI(runtime *agent.Runtime) (*agentAPI, error) {
 	storeRoot := strings.TrimSpace(os.Getenv("OLLAMA_AGENT_AUTH_STORE"))
+	if storeRoot == "" && runtime != nil {
+		storeRoot = filepath.Join(runtime.DataRoot(), "auth")
+	}
 	auth, err := agent.NewAuthStore(storeRoot)
 	if err != nil {
 		return nil, err
@@ -105,11 +108,19 @@ func agentHostIsLoopback() bool {
 func newDefaultAgentRuntime() (*agent.Runtime, error) {
 	workspaceRoot := strings.TrimSpace(os.Getenv("OLLAMA_AGENT_ROOT"))
 	if workspaceRoot == "" {
-		workspaceRoot = filepath.Join(os.TempDir(), "ollama-agent-workspace")
+		var err error
+		workspaceRoot, err = agent.DefaultRuntimeWorkspaceRoot()
+		if err != nil {
+			return nil, err
+		}
 	}
 	storeRoot := strings.TrimSpace(os.Getenv("OLLAMA_AGENT_STORE"))
 	if storeRoot == "" {
-		storeRoot = filepath.Join(filepath.Dir(workspaceRoot), ".ollama-agent-store")
+		var err error
+		storeRoot, err = agent.DefaultRuntimeDataRoot()
+		if err != nil {
+			return nil, err
+		}
 	}
 	var store agent.Store
 	if databaseURL := strings.TrimSpace(os.Getenv("OLLAMA_AGENT_DATABASE_URL")); databaseURL != "" {
@@ -171,12 +182,11 @@ func newDefaultAgentRuntime() (*agent.Runtime, error) {
 			return nil, fmt.Errorf("open agent Redis queue: %w", err)
 		}
 	}
-	var planner agent.Planner = agent.RulePlanner{}
+	var planner agent.Planner = agent.UnconfiguredPlanner{}
 	if model := strings.TrimSpace(os.Getenv("OLLAMA_AGENT_MODEL")); model != "" {
 		planner = agent.OllamaPlanner{
-			Client:   api.NewClient(envconfig.ConnectableHost(), http.DefaultClient),
-			Model:    model,
-			Fallback: agent.RulePlanner{},
+			Client: api.NewClient(envconfig.ConnectableHost(), http.DefaultClient),
+			Model:  model,
 		}
 	}
 	return agent.NewRuntime(agent.RuntimeConfig{Store: store, Context: contextStore, Company: companyStore, Planner: planner, WorkspaceRoot: workspaceRoot, DataRoot: storeRoot, Connectors: connectors, MCP: mcp, RemoteMCP: remoteMCP, Media: media, RedisQueue: redisQueue, Telemetry: telemetry, Push: push, Deployments: deployments})
