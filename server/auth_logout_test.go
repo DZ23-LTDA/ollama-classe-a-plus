@@ -43,3 +43,17 @@ func TestAgentAuthLogoutRevokesBearerToken(t *testing.T) {
 		t.Fatal("revoked token authenticated")
 	}
 }
+
+func TestAgentAuthLogoutIsIdempotentInLocalMode(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	api := &agentAPI{authRequired: false}
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/agent/v1/auth/logout", nil)
+
+	api.authLogout(ctx)
+
+	if recorder.Code != http.StatusNoContent {
+		t.Fatalf("local logout status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+}

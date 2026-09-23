@@ -718,6 +718,10 @@ func (a *agentAPI) authSession(c *gin.Context) {
 }
 
 func (a *agentAPI) authLogout(c *gin.Context) {
+	if !a.authRequired {
+		c.AbortWithStatus(http.StatusNoContent)
+		return
+	}
 	header := strings.TrimSpace(c.GetHeader("Authorization"))
 	if !strings.HasPrefix(strings.ToLower(header), "bearer ") {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "bearer token is required"})
