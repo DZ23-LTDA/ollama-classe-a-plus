@@ -2363,3 +2363,10 @@ O gate local completo iniciado no head `2f5674cf` passou por integrity, YAML, Go
 A análise do grafo mostrou que `streamdown@1.4.0` trazia Mermaid 11.12, DOMPurify, lodash-es e uuid em runtime; `@tanstack/react-router-devtools` estava em `dependencies` apesar de não ser importado pela aplicação e trazia `solid-js/seroval`. O commit `eff054c14c38d824654fc44c095b910038bc9726` atualizou Streamdown para `2.6.0`, removeu o devtools não utilizado, declarou Shiki usado diretamente e fixou `mdast-util-to-hast` em `13.2.1` via override. O grafo runtime resultante não contém Mermaid, DOMPurify, lodash-es, seroval ou o devtools removido.
 
 Evidência local pós-correção: Vitest 21 arquivos/204 testes, `npm run build`, `npm ci`/dry-run do lockfile, `npm audit --omit=dev` com zero vulnerabilidades, `apps/mobile-agentic/npm run typecheck` e `npm audit --omit=dev` com zero vulnerabilidades. O CI público do novo SHA ainda precisa concluir; a falha race macOS do head anterior não é reutilizada nem declarada resolvida.
+
+
+## P1 de approval com motivo explícito na UI — 2026-09-23
+
+A Agentic Console deixou de enviar o texto genérico `Aprovado no Agentic Console` ou `Rejeitado no Agentic Console`. O commit `720bbd9245ab4589a508e2627b976c5f7bbf577b` adicionou um campo por decisão, limita o motivo a 512 caracteres, bloqueia Aprovar/Rejeitar quando o texto está vazio e envia o motivo efetivamente escrito junto do nonce e da decisão. O campo é limpo depois de uma resposta aceita.
+
+A regressão `AgenticConsole.approval.test.tsx` confirma que uma decisão sem motivo permanece bloqueada e que o POST contém `approved`, `nonce` e o texto explícito. No head anterior `f9ae5dd8`, o runner absoluto fechou `FULL_LOCAL_GATES=PASS`: integrity, YAML, `CGO_ENABLED=1 go test ./...`, vet, build Go, Vitest 22 arquivos/205 testes, build UI, audit UI/mobile, typecheck mobile e diff. O novo head `720bbd92` foi publicado e seu CI remoto ainda está em execução.

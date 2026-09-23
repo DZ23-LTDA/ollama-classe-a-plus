@@ -476,3 +476,8 @@ Campaigns, affiliate programs/links e orders agora expõem `mode: sandbox`; o re
 ## Unreleased — UI runtime dependency hardening — 2026-09-23
 
 O commit `eff054c1` atualizou `streamdown` para `2.6.0`, removeu o `@tanstack/react-router-devtools` não utilizado de `dependencies`, declarou `shiki` diretamente e fixou `mdast-util-to-hast` em `13.2.1`. A mudança removeu do grafo runtime os caminhos vulneráveis de Mermaid, DOMPurify, lodash-es, seroval e uuid. A UI passou 204 testes, build e `npm audit --omit=dev` sem vulnerabilidades; o mobile também passou typecheck e audit de produção.
+
+
+## Unreleased — explicit approval reasons — 2026-09-23
+
+A Agentic Console agora exige um motivo escrito antes de aprovar ou rejeitar uma ação, limita a entrada a 512 caracteres, desabilita decisões vazias e envia o texto real no ledger via API. A cobertura adicionada confirma o payload com nonce, decisão e justificativa.

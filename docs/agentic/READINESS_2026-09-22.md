@@ -555,3 +555,10 @@ O gate local do head documental `2f5674cf` revelou uma falha objetiva no audit d
 Depois da correção, UI Vitest passou com 204 testes, o build TypeScript/Vite passou, `npm ci` foi reproduzível e `npm audit --omit=dev` retornou zero vulnerabilidades. O mobile também passou typecheck e audit de produção com zero vulnerabilidades. O CI remoto do novo head ainda está pendente; a execução anterior teve race macOS falho e normal macOS ainda em andamento, portanto não há claim de CI totalmente verde.
 
 Estado: dependência interna **implementada/testada/publicada**; homologação externa e o novo CI permanecem pendentes. O veredito continua `FIXING / preview-local RC em hardening`, não final ou production-ready.
+
+
+## Addendum de motivo explícito em approvals — 2026-09-23
+
+A Agentic Console agora exige que o operador registre a justificativa da decisão antes de aprovar ou rejeitar uma ação. O servidor continua sendo a autoridade para nonce, actor, policy, organização e CAS; a UI não substitui essas verificações. O commit `720bbd92` adicionou o campo limitado a 512 caracteres e regressão de payload.
+
+Os gates locais completos foram fechados no head anterior `f9ae5dd8` com caminhos absolutos: `FULL_LOCAL_GATES=PASS`. O novo head funcional foi publicado e o CI remoto ainda precisa concluir. O estado permanece `FIXING / preview-local RC em hardening`, sem promoção a final ou production-ready.

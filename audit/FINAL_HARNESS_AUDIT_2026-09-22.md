@@ -614,3 +614,10 @@ O gate local pós-reauditoria parou no audit de produção da UI com 12 vulnerab
 O commit `eff054c1` atualizou Streamdown para `2.6.0`, removeu o devtools, declarou Shiki que já era importado pelo código e fixou `mdast-util-to-hast@13.2.1`. A UI passou 204 testes, build, lockfile `npm ci` e `npm audit --omit=dev` com zero vulnerabilidades. Mobile typecheck/audit também passaram.
 
 A correção reduz risco de supply chain do bundle, mas não equivale a auditoria integral de todas as dependências de desenvolvimento, assinatura de artefatos ou homologação de release. O CI remoto do novo head precisa concluir, e a falha race macOS observada no head anterior deve ser tratada separadamente.
+
+
+## Addendum P1 — motivo explícito na decisão de approval — 2026-09-23
+
+A revisão da Agentic Console encontrou que o cliente enviava justificativas genéricas e fixas para aprovar ou rejeitar. Isso preservava a validação server-side, mas diminuía a qualidade do registro humano no ledger. O commit `720bbd92` adicionou input por approval, limite de 512 caracteres e bloqueio de decisão vazia. A regressão verifica o payload real com nonce, decisão e texto informado.
+
+A correção melhora a evidência do ator, mas não substitui autorização, policy, CAS, expiração ou auditoria server-side. O CI remoto do head funcional ainda está pendente; a execução local completa foi aprovada no head imediatamente anterior.
