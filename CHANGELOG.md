@@ -397,3 +397,8 @@ O commit `89b4203e` faz os loaders persistentes de MCP e Remote MCP exigirem EOF
 ## Unreleased — persistent manifest parser consistency — 2026-09-22
 
 O commit `5816c020` aplica a exigência de EOF ao manifest persistente de connectors, alinhando-o ao hardening já feito para MCP e Remote MCP. Os três loaders agora rejeitam JSON trailing, com regressão dedicada e gates Go completos aprovados.
+
+
+## Unreleased — strict static connector bootstrap — 2026-09-22
+
+O loader de `OLLAMA_AGENT_CONNECTORS` agora usa o decoder estrito compartilhado, rejeitando campos desconhecidos e JSON trailing. Testes normal/race e gates Go completos passaram. O modo continua estático e não implica conta externa conectada.

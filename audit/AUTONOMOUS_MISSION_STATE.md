@@ -2248,3 +2248,10 @@ Evidências: testes normais e race dos managers persistentes passaram; integrity
 A auditoria cruzada encontrou o mesmo padrão no `NewPersistentConnectorManager`: o decoder aceitava o primeiro array e ignorava conteúdo JSON posterior. O commit `5816c020b83993007d91adee420c5bac4e1d7d3c` adicionou a exigência de EOF ao loader de connectors e uma regressão para `[] {}`. Agora connectors, MCP e Remote MCP usam parsing estrito e falham fechado quando há documento trailing.
 
 Os testes normal e race do connector manager passaram. O gate completo pós-harmonização passou em integrity, `CGO_ENABLED=1 go test ./...`, vet, build e diff. O tree segue publicado na branch pública; a CI remota do head mais recente permanece sujeita ao workflow do GitHub.
+
+
+## Hardening do bootstrap estático de connectors — 2026-09-22
+
+O commit `f78fa0d6c49dc956f8db71452f70f19390c46fee` substituiu o `json.Unmarshal` do loader `OLLAMA_AGENT_CONNECTORS` por `decodeAgentConfigJSON`. O bootstrap estático agora rejeita campos desconhecidos e JSON trailing, alinhando-se aos manifests persistentes. Testes específicos cobrem os dois casos em normal e race.
+
+O gate completo após a mudança passou em integrity, `CGO_ENABLED=1 go test ./... -count=1 -timeout=900s`, vet, build e diff. A configuração por arquivo de ambiente continua explicitamente estática; nenhuma mutation da UI é apresentada como edição desse arquivo. A CI pública do head mais recente continua separada da evidência local.

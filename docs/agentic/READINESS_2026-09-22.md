@@ -435,3 +435,10 @@ Os testes normal e race de persistência passaram. O gate completo Go também pa
 A mesma proteção de EOF foi aplicada ao manifest persistente de connectors no commit `5816c020`. A plataforma agora rejeita documento JSON trailing nos três loaders duráveis: connectors, MCP e Remote MCP. O caso `[] {}` é coberto por regressões e não é tratado como configuração parcial válida.
 
 Após a mudança, passaram os testes normal/race do connector manager e os gates Go completos: integrity, todos os testes, vet, build e diff. O estado continua preview/local RC em hardening; não há mudança nos blockers de OAuth, upstream, sandbox físico, devices ou produção.
+
+
+## Addendum de bootstrap estático strict — 2026-09-22
+
+O commit `f78fa0d6` alinhou o loader de `OLLAMA_AGENT_CONNECTORS` ao contrato estrito dos demais manifests. Campos desconhecidos e conteúdo JSON após o array principal agora são rejeitados antes do registro de qualquer connector. Os testes normal/race do loader e os gates completos Go passaram em integrity, test, vet, build e diff.
+
+Esse hardening melhora parsing e previsibilidade local. Ele não transforma o manifest em conexão OAuth, não valida conta upstream e não altera os blockers físicos/distribuídos. O estado permanece **preview/local RC em hardening**, não final e não production-ready.

@@ -503,3 +503,10 @@ O teste normal/race dos managers e o gate completo Go passaram em integrity, `go
 A auditoria de todos os loaders persistentes encontrou o mesmo risco residual no connector manifest. `NewPersistentConnectorManager` agora valida a segunda leitura do decoder e exige EOF, igual aos loaders MCP e Remote MCP. A entrada `[] {}` falha fechado antes de qualquer configuração ser instalada.
 
 O commit `5816c020` foi publicado com teste dedicado. Os testes normal/race do connector manager e o gate completo Go passaram em integrity, `go test ./...`, vet, build e diff. Não há claim de integração externa ou de CI remota final nesta nota.
+
+
+## Addendum P1 — bootstrap estático de connectors — 2026-09-22
+
+A revisão cruzada identificou que `OLLAMA_AGENT_CONNECTORS` usava `json.Unmarshal`, permitindo campos desconhecidos no bootstrap. O commit `f78fa0d6` passou a usar `decodeAgentConfigJSON`, que aplica `DisallowUnknownFields` e exige EOF. Regressões cobrem campo `unexpected` e `[] {}`.
+
+A mudança foi validada com testes normal/race do loader e gates Go completos em integrity, `go test ./...`, vet, build e diff. O arquivo de ambiente ainda é somente bootstrap estático; persistência de mutations continua no DataRoot do manager padrão. Não há claim de integração externa ou CI remota final.
