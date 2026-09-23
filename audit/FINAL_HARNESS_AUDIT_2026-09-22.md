@@ -621,3 +621,8 @@ A correção reduz risco de supply chain do bundle, mas não equivale a auditori
 A revisão da Agentic Console encontrou que o cliente enviava justificativas genéricas e fixas para aprovar ou rejeitar. Isso preservava a validação server-side, mas diminuía a qualidade do registro humano no ledger. O commit `720bbd92` adicionou input por approval, limite de 512 caracteres e bloqueio de decisão vazia. A regressão verifica o payload real com nonce, decisão e texto informado.
 
 A correção melhora a evidência do ator, mas não substitui autorização, policy, CAS, expiração ou auditoria server-side. O CI remoto do head funcional ainda está pendente; a execução local completa foi aprovada no head imediatamente anterior.
+
+
+## Addendum P1 — limite server-side de reason em approvals — 2026-09-23
+
+A melhoria de approval não ficou restrita ao cliente: `Runtime.DecideApprovalForActorCAS` normaliza e rejeita razões acima de 2048 bytes antes de gravar actor, status ou ledger. A regressão demonstra que um cliente que ignore `maxLength=512` não consegue persistir input excessivo; os testes normal e race de approval passaram.

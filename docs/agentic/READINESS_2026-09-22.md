@@ -562,3 +562,8 @@ Estado: dependência interna **implementada/testada/publicada**; homologação e
 A Agentic Console agora exige que o operador registre a justificativa da decisão antes de aprovar ou rejeitar uma ação. O servidor continua sendo a autoridade para nonce, actor, policy, organização e CAS; a UI não substitui essas verificações. O commit `720bbd92` adicionou o campo limitado a 512 caracteres e regressão de payload.
 
 Os gates locais completos foram fechados no head anterior `f9ae5dd8` com caminhos absolutos: `FULL_LOCAL_GATES=PASS`. O novo head funcional foi publicado e o CI remoto ainda precisa concluir. O estado permanece `FIXING / preview-local RC em hardening`, sem promoção a final ou production-ready.
+
+
+## Addendum de limite server-side de approval — 2026-09-23
+
+O limite de motivo não depende mais somente da UI: o domínio rejeita razões acima de 2048 bytes antes da mutação CAS. Isso complementa o campo de 512 caracteres da Agentic Console e mantém input inválido em status de cliente, sem criar uma falsa garantia de homologação externa.

@@ -2370,3 +2370,8 @@ Evidência local pós-correção: Vitest 21 arquivos/204 testes, `npm run build`
 A Agentic Console deixou de enviar o texto genérico `Aprovado no Agentic Console` ou `Rejeitado no Agentic Console`. O commit `720bbd9245ab4589a508e2627b976c5f7bbf577b` adicionou um campo por decisão, limita o motivo a 512 caracteres, bloqueia Aprovar/Rejeitar quando o texto está vazio e envia o motivo efetivamente escrito junto do nonce e da decisão. O campo é limpo depois de uma resposta aceita.
 
 A regressão `AgenticConsole.approval.test.tsx` confirma que uma decisão sem motivo permanece bloqueada e que o POST contém `approved`, `nonce` e o texto explícito. No head anterior `f9ae5dd8`, o runner absoluto fechou `FULL_LOCAL_GATES=PASS`: integrity, YAML, `CGO_ENABLED=1 go test ./...`, vet, build Go, Vitest 22 arquivos/205 testes, build UI, audit UI/mobile, typecheck mobile e diff. O novo head `720bbd92` foi publicado e seu CI remoto ainda está em execução.
+
+
+## Fechamento P1 do limite server-side de approval — 2026-09-23
+
+O commit `92c7bdd220a39e444e824f2022d9399e756306d5` fechou a fronteira de confiança da melhoria de approval: além do `maxLength=512` da UI, `Runtime.DecideApprovalForActorCAS` agora normaliza e rejeita motivos acima de 2048 bytes com erro de input, antes de alterar o approval. A regressão cobre o bypass por cliente direto e a variante race do conjunto de approvals passou.

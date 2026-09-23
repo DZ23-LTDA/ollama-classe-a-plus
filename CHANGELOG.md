@@ -481,3 +481,8 @@ O commit `eff054c1` atualizou `streamdown` para `2.6.0`, removeu o `@tanstack/re
 ## Unreleased — explicit approval reasons — 2026-09-23
 
 A Agentic Console agora exige um motivo escrito antes de aprovar ou rejeitar uma ação, limita a entrada a 512 caracteres, desabilita decisões vazias e envia o texto real no ledger via API. A cobertura adicionada confirma o payload com nonce, decisão e justificativa.
+
+
+## Unreleased — server-side approval reason bound — 2026-09-23
+
+O runtime agora rejeita motivos de approval acima de 2048 bytes antes da decisão CAS, complementando o limite de 512 caracteres da UI e a regressão contra clientes que contornem o formulário.
