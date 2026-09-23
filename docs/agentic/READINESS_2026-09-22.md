@@ -484,3 +484,10 @@ Os testes normal/race, gates Go completos e compilações de `internal/agent` pa
 O commit `f06891fc` tornou `decodeJSON` estrito até o fim do body. Além de `DisallowUnknownFields`, o helper agora rejeita um segundo documento JSON ou dados inválidos depois do primeiro. Isso se aplica transversalmente aos handlers que reutilizam o parser agentic.
 
 As regressões normal/race e os gates Go completos passaram. Esse hardening reduz ambiguidade de requests, mas não substitui auth, approval, DLP, SSRF ou validações específicas de cada recurso. O estado continua preview/local RC em hardening.
+
+
+## Addendum de limite de body JSON — 2026-09-23
+
+O commit `09eb26eb` adicionou limite central de 4 MiB ao `decodeJSON`. Requests agentic agora precisam conter um único documento JSON, sem campos desconhecidos, sem trailing e dentro do orçamento de bytes. A regressão de body oversized e os gates Go completos passaram.
+
+Esse limite é um guardrail de transporte; endpoints continuam sujeitos a validações de schema, autorização, approval e limites específicos de payload. O produto permanece preview/local RC em hardening.

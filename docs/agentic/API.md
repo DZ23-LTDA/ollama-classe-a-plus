@@ -373,3 +373,6 @@ Para permitir portas variáveis em um host, use `https://host.example:*`. Esse f
 ## Bodies JSON
 
 Os handlers agentic que usam `decodeJSON` aceitam exatamente um documento JSON. Campos desconhecidos são rejeitados e qualquer segundo objeto, array ou conteúdo inválido após o primeiro produz `400`. Whitespace final é permitido. Essa regra é complementar à autorização, approval e validação específica do endpoint.
+
+
+O limite de transporte do `decodeJSON` é 4 MiB por request. Bodies maiores são rejeitados antes de concluir o parse; endpoints com payloads específicos podem impor limites menores. O orçamento não substitui limites de arquivos, documentos comprimidos ou respostas de providers.

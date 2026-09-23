@@ -552,3 +552,10 @@ A cobertura inclui testes normal/race, gates Go completos e compilação cruzada
 O helper `decodeJSON` permitia que um body começando com JSON válido contivesse outro documento posterior. O commit `f06891fc` adicionou segunda leitura e exige EOF, mantendo `DisallowUnknownFields`. A regressão centralizada cobre trailing object, campo desconhecido e whitespace válido.
 
 Testes normal/race e gates Go completos passaram. O efeito alcança todos os endpoints que chamam o helper, mas não altera as políticas de autorização ou a necessidade de approval.
+
+
+## Addendum P1 — limite de body JSON — 2026-09-23
+
+Depois de tornar `decodeJSON` estrito até EOF, a revisão adicionou um orçamento central de 4 MiB via `http.MaxBytesReader`. O commit `09eb26eb` evita que endpoints que usam o helper leiam bodies ilimitados antes do parse. O teste oversized confirma rejeição; os testes normal/race e gates Go completos passaram.
+
+Esse é um limite de transporte comum, não substitui limites de domínio como payloads comprimidos, documentos, imagens ou respostas de providers, que permanecem próprios.

@@ -432,3 +432,8 @@ O `sandbox.exec` agora resolve Python/Node por plataforma. macOS e Windows usam 
 ## Unreleased — strict agentic request JSON — 2026-09-23
 
 O helper `decodeJSON` agora rejeita trailing JSON depois do primeiro documento, além de campos desconhecidos. A proteção vale para todos os handlers que o reutilizam. Testes normal/race e gates Go completos passaram.
+
+
+## Unreleased — bounded agentic JSON bodies — 2026-09-23
+
+O parser HTTP agentic agora limita bodies JSON a 4 MiB antes do decode, além de exigir documento único e rejeitar campos desconhecidos. Testes normal/race e gates Go completos passaram.

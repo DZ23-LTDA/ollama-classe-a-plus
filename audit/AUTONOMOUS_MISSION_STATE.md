@@ -2297,3 +2297,10 @@ Testes normais/race do sandbox passaram. O gate completo Go passou em integrity,
 A auditoria encontrou que `decodeJSON` já rejeitava campos desconhecidos, mas aceitava um segundo documento após o primeiro. O commit `f06891fc02397aca33ae4eaa04397911120f7d9c` exige EOF depois do único documento decodificado. Como dezenas de handlers de agentic reutilizam esse helper, a correção cobre connectors, plugins, Company OS, schedules, OAuth actions, missions e demais mutações que passam pelo parser comum.
 
 Foram adicionados testes para segundo objeto, campo desconhecido e whitespace válido. Testes normal/race e gates Go completos passaram em integrity, todos os pacotes, vet, build e diff. A mudança é de parsing de request; autorização, approval e dependências externas continuam sendo verificadas separadamente.
+
+
+## Limite P1 de bodies JSON agentic — 2026-09-23
+
+O commit `09eb26eb33ec12ffd2b2558db3f4949c45e2e243` adicionou `http.MaxBytesReader` ao helper `decodeJSON`, limitando cada body JSON agentic a 4 MiB antes do parsing. A regra vale transversalmente aos handlers que reutilizam o helper e evita leitura ilimitada em endpoints que antes já tinham campos/EOF estritos.
+
+A regressão cobre body acima do limite, além dos casos de campo desconhecido, documento trailing e whitespace válido. Testes normal/race e gates Go completos passaram em integrity, todos os pacotes, vet, build e diff.
