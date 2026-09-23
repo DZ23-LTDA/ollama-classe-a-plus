@@ -350,6 +350,13 @@ func (r *Runtime) RemoteMCPServers() []RemoteMCPServerConfig {
 	return r.remoteMCP.List()
 }
 
+func (r *Runtime) Skills() []SkillManifest {
+	if r.context == nil {
+		return nil
+	}
+	return r.context.Skills()
+}
+
 func (r *Runtime) Traces(traceID string) []TraceSpan {
 	return r.traces.List(traceID, 500)
 }

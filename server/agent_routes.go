@@ -693,6 +693,16 @@ func (a *agentAPI) safeConfig(c *gin.Context) {
 	if sandboxMode == "" {
 		sandboxMode = "best-effort"
 	}
+	connectorsConfigured := envConfigured("OLLAMA_AGENT_CONNECTORS")
+	mcpConfigured := envConfigured("OLLAMA_AGENT_MCP") || envConfigured("OLLAMA_AGENT_REMOTE_MCP")
+	mediaConfigured := envConfigured("OLLAMA_AGENT_MEDIA_BASE_URL")
+	deploymentsConfigured := envConfigured("OLLAMA_AGENT_DEPLOYMENTS")
+	if a.runtime != nil {
+		connectorsConfigured = connectorsConfigured || len(a.runtime.Connectors()) > 0
+		mcpConfigured = mcpConfigured || len(a.runtime.MCPServers()) > 0 || len(a.runtime.RemoteMCPServers()) > 0
+		mediaConfigured = mediaConfigured || a.runtime.Media() != nil
+		deploymentsConfigured = deploymentsConfigured || (a.runtime.Deployments() != nil && len(a.runtime.Deployments().List()) > 0)
+	}
 	c.JSON(http.StatusOK, gin.H{
 		"runtime":                          "agent-v1",
 		"store":                            store,
@@ -702,10 +712,10 @@ func (a *agentAPI) safeConfig(c *gin.Context) {
 		"workspace_isolation":              true,
 		"planner_model_configured":         envConfigured("OLLAMA_AGENT_MODEL"),
 		"embedding_configured":             envConfigured("OLLAMA_AGENT_EMBED_MODEL"),
-		"connectors_configured":            envConfigured("OLLAMA_AGENT_CONNECTORS"),
-		"mcp_configured":                   envConfigured("OLLAMA_AGENT_MCP"),
-		"media_configured":                 envConfigured("OLLAMA_AGENT_MEDIA_BASE_URL"),
-		"deployments_configured":           envConfigured("OLLAMA_AGENT_DEPLOYMENTS"),
+		"connectors_configured":            connectorsConfigured,
+		"mcp_configured":                   mcpConfigured,
+		"media_configured":                 mediaConfigured,
+		"deployments_configured":           deploymentsConfigured,
 		"otlp_configured":                  envConfigured("OLLAMA_AGENT_OTLP_ENDPOINT"),
 		"push_configured":                  envConfigured("OLLAMA_AGENT_PUSH_ENDPOINT"),
 		"sandbox_mode":                     sandboxMode,

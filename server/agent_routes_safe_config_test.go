@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/ollama/ollama/internal/agent"
 )
 
 func TestSafeConfigRedactsValuesAndReportsConfiguredStates(t *testing.T) {
@@ -44,4 +45,41 @@ func containsString(value, needle string) bool {
 		}
 	}
 	return false
+}
+
+func TestSafeConfigReportsDurableManifestAsConfigured(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, name := range []string{"OLLAMA_AGENT_CONNECTORS", "OLLAMA_AGENT_MCP", "OLLAMA_AGENT_REMOTE_MCP", "OLLAMA_AGENT_MEDIA_BASE_URL", "OLLAMA_AGENT_DEPLOYMENTS"} {
+		t.Setenv(name, "")
+	}
+	manager := agent.NewConnectorManager()
+	if err := manager.Register(agent.ConnectorConfig{
+		ID:       "durable-test",
+		Provider: "fixture",
+		BaseURL:  "https://fixture.example.test",
+		Operations: []agent.ConnectorOperation{{
+			Name:         "health",
+			Methods:      []string{"GET"},
+			PathPrefixes: []string{"/health"},
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	runtime, err := agent.NewRuntime(agent.RuntimeConfig{WorkspaceRoot: t.TempDir(), Connectors: manager})
+	if err != nil {
+		t.Fatal(err)
+	}
+	recorder := httptest.NewRecorder()
+	context, _ := gin.CreateTestContext(recorder)
+	(&agentAPI{runtime: runtime}).safeConfig(context)
+	var body map[string]any
+	if err := json.Unmarshal(recorder.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if body["connectors_configured"] != true {
+		t.Fatalf("durable connector not reported configured: %#v", body)
+	}
+	if containsString(recorder.Body.String(), "fixture.example.test") {
+		t.Fatalf("safe config leaked connector endpoint: %s", recorder.Body.String())
+	}
 }
