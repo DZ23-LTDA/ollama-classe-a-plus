@@ -363,3 +363,8 @@ Esse endpoint revoga somente o token do runtime agentic. Não revoga automaticam
 ## Origin policy
 
 Mutations agentic com `Origin` presente são aceitas somente quando a origem está em `OLLAMA_ORIGINS` ou nos defaults loopback (`localhost`, `127.0.0.1`, `0.0.0.0`, HTTP/HTTPS e portas). Essa política é aplicada com ou sem bearer. GET/HEAD, OPTIONS e clientes nativos sem header `Origin` preservam o caminho compatível. A regra é uma proteção de navegador e não substitui autenticação ou mTLS.
+
+
+## Allowlist de Origin com portas variáveis
+
+Para permitir portas variáveis em um host, use `https://host.example:*`. Esse formato compara scheme e hostname exatos e exige uma porta no header `Origin`; ele não permite subdomínios parecidos. Wildcards de esquema como `app://*` seguem sendo explícitos e separados. Userinfo, path, query e fragment não são aceitos no formato de porta variável.

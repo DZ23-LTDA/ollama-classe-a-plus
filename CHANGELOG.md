@@ -417,3 +417,8 @@ O loader de skills agora rejeita campos desconhecidos e JSON trailing com regres
 ## Unreleased — local Origin policy hardening — 2026-09-22
 
 O middleware agentic agora aplica a política de `Origin` também sem auth bearer. Mutações cross-site recebem `403`; origens loopback padrão continuam permitidas. Testes normal/race e gates Go completos passaram.
+
+
+## Unreleased — strict Origin wildcard matching — 2026-09-23
+
+A allowlist `scheme://host:*` agora aceita somente portas variáveis no host exato; configurações não são mais interpretadas como prefixo arbitrário de domínio. Testes normal/race e gates Go completos passaram.

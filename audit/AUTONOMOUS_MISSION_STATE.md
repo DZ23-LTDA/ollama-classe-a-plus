@@ -2276,3 +2276,10 @@ Foi adicionada regressão local, além do teste existente que prova revogação 
 A auditoria de auth identificou que `auth_required=false` pulava `agentOriginAllowed` e deixava mutações locais sem a política de origem, embora o serviço pudesse ser acessado por um navegador. O commit `79a1197e2e9e857090c32f22c290c1c457a35207` aplica a mesma verificação no ramo local. Origens loopback padrão (`localhost`, `127.0.0.1` e `0.0.0.0`, HTTP/HTTPS e portas) continuam permitidas; uma origem cross-site recebe `403` em métodos de mutação. Leituras, preflight e requests sem Origin preservam o comportamento compatível.
 
 Foi adicionada regressão de middleware local cross-site, além da matriz de `agentOriginAllowed`. Testes normal/race específicos e gates Go completos passaram em integrity, todos os pacotes, vet, build e diff. O modo local continua sem bearer por desenho, mas agora não trata ausência de autenticação como ausência de política de navegador.
+
+
+## Hardening P1 de wildcard de Origin — 2026-09-23
+
+A revisão da política de origem encontrou que o matcher anterior tratava qualquer configuração terminada em `*` como prefixo livre. Uma allowlist malformada como `https://trusted.example*` poderia aceitar `https://trusted.example.evil`. O commit `4200607483bcd51f3d77e6a96ba46c5159839360` restringe `scheme://host:*` a porta variável no hostname exato, rejeita userinfo/path/query/fragment e preserva somente os wildcards de esquema explícitos como `app://*` e `file://*`.
+
+Regressões cobrem porta válida, hostname parecido e ausência de porta. Testes normal/race e gates Go completos passaram em integrity, todos os pacotes, vet, build e diff. A política local continua aplicando Origin a mutações sem bearer.

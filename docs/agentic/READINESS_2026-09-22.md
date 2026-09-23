@@ -463,3 +463,10 @@ A correção evita um falso requisito de sessão no modo local e um possível ac
 O commit `79a1197e` aplica `agentOriginAllowed` também quando `auth_required=false`. Isso mantém o uso local sem bearer, mas bloqueia mutações iniciadas por uma origem cross-site. Os defaults de loopback permanecem permitidos, e GET/HEAD, OPTIONS e requests sem Origin não são transformados em falhas de navegador.
 
 A regressão de middleware e os gates Go completos passaram. A proteção é uma barreira de navegador do runtime local; não substitui autenticação distribuída, IdP, mTLS ou homologação de host. O estado permanece preview/local RC em hardening.
+
+
+## Addendum de wildcard de Origin — 2026-09-23
+
+O commit `42006074` corrigiu o matcher de allowlist. Wildcards terminados em `:*` agora significam somente qualquer porta do hostname exato; não há prefix match de domínio. Userinfo, path, query e fragment são rejeitados nesse formato. Os wildcards explícitos de esquema (`app://*`, `file://*` e equivalentes já suportados) permanecem limitados ao esquema configurado.
+
+A regressão cobre `trusted.example:8443`, `trusted.example.evil:8443` e ausência de porta. Os gates Go completos passaram. O estado permanece preview/local RC em hardening, sem claim de autenticação distribuída ou homologação de browser externo.

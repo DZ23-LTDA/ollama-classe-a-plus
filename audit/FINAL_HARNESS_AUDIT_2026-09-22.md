@@ -531,3 +531,10 @@ Os testes normal/race do handler e os gates Go completos passaram. O ajuste é i
 O ramo sem auth do middleware não aplicava `agentOriginAllowed`, o que deixava mutações locais sem a barreira de origem. O commit `79a1197e` corrige esse bypass. Loopback permanece aceito pelos defaults de `OLLAMA_ORIGINS`; `https://evil.example` em POST é rejeitado com `403`. A regressão cobre o middleware efetivo, não apenas a função isolada.
 
 Os testes normal/race e os gates Go completos passaram. Esse controle reduz CSRF de navegador no serviço local, mas não é uma substituição para autenticação distribuída, mTLS ou isolamento físico.
+
+
+## Addendum P1 — wildcard de Origin restrito — 2026-09-23
+
+A implementação anterior usava prefix match para qualquer allowlist terminada em `*`. O commit `42006074` separa wildcard de porta (`:*`) de wildcard de esquema (`://*`) e valida o primeiro por URL, hostname exato e porta presente. Assim, `trusted.example.evil` não herda autorização de `trusted.example`.
+
+Os testes normal/race e gates Go completos passaram. O achado foi de controle de navegador e não deve ser confundido com autenticação distribuída ou prova de segurança física do host.
