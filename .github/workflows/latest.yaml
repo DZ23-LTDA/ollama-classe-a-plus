@@ -1,13 +1,22 @@
 name: latest
 
+# This inherited workflow is disabled for the public fork by default. The fork
+# does not publish a Docker image until a maintainer configures and homologates
+# a dedicated registry/release pipeline.
 on:
-  release:
-    types: [released]
+  workflow_dispatch:
+    inputs:
+      enable_latest:
+        description: "Enable the explicitly configured Classe A+ Docker registry"
+        required: true
+        default: false
+        type: boolean
 
 jobs:
   update-latest:
+    if: ${{ inputs.enable_latest == true && vars.OLLAMA_ENABLE_LATEST == 'true' && vars.DOCKER_REPO != '' }}
     environment: release
-    runs-on: linux
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Login to Docker Hub
@@ -18,6 +27,7 @@ jobs:
       - name: Tag images as latest
         env:
           PUSH: "1"
+          FINAL_IMAGE_REPO: ${{ vars.DOCKER_REPO }}
         shell: bash
         run: |
           export "VERSION=${GITHUB_REF_NAME#v}"

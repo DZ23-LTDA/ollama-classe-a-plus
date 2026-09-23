@@ -185,7 +185,16 @@ grep -q 'TestRuntimeRejectsUnconfiguredMissionProvider' internal/agent/runtime_t
 	grep -q 'ollama-classe-a-plus-sbom.cdx.json' .github/workflows/release.yaml
 	grep -q 'sha256sum -c sha256sum.txt' .github/workflows/release.yaml
 	grep -q 'release-metadata.json' .github/workflows/release.yaml
-	grep -q 'strictSandboxLauncher' internal/agent/sandbox_seccomp_linux.go
+	grep -q 'workflow_dispatch:' .github/workflows/latest.yaml
+	grep -q "vars.OLLAMA_ENABLE_LATEST == 'true'" .github/workflows/latest.yaml
+	if grep -q '^  release:' .github/workflows/latest.yaml; then
+		echo "latest Docker publication must not be release-triggered in the fork" >&2
+		exit 1
+	fi
+	grep -q 'local/ollama-classe-a-plus' scripts/env.sh
+	grep -q 'refusing to publish an upstream or local placeholder image' scripts/tag_latest.sh
+	grep -q 'operator-owned registry' scripts/build_docker.sh
+		grep -q 'strictSandboxLauncher' internal/agent/sandbox_seccomp_linux.go
 	grep -q 'OLLAMA_AGENT_SANDBOX_CGROUP_ROOT' internal/agent/sandbox_linux.go
 	grep -q 'killSandboxControl' internal/agent/tools.go
 	grep -q 'agentOriginAllowed' server/agent_routes.go

@@ -11,6 +11,10 @@ if [ -z "${PUSH}" ] ; then
     echo "Building ${FINAL_IMAGE_REPO}:$VERSION locally.  set PUSH=1 to push"
     LOAD_OR_PUSH="--load"
 else
+    if [ "${FINAL_IMAGE_REPO}" = "local/ollama-classe-a-plus" ]; then
+        echo "ERROR: set FINAL_IMAGE_REPO to an operator-owned registry before pushing" >&2
+        exit 1
+    fi
     echo "Will be pushing ${FINAL_IMAGE_REPO}:$VERSION"
     LOAD_OR_PUSH="--push"
 fi
