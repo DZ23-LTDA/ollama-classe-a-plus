@@ -10,11 +10,15 @@
 
 Este repositório público reúne a base Ollama DZ23 e a evolução agentic do projeto. O manual completo, os contratos, a configuração e a política de atualização estão em [`docs/CLASS_A_PLUS_GUIDE.md`](docs/CLASS_A_PLUS_GUIDE.md).
 
-### Visão rápida — estado visual observado em desenvolvimento
+### Visão rápida — captura Home da branch de desenvolvimento
+
+![Home do Ollama Classe A+](docs/images/screens/class-a-plus-home.png)
+
+> **Proveniência:** esta imagem foi fornecida pelo mantenedor e representa a captura da Home na branch de desenvolvimento `feat/manus-parity-omniroute`; ela é publicada aqui somente como documentação visual e **não significa que essa implementação esteja integrada à `main`**. SHA-256 do arquivo: `0291a918e1af8ea282721ea4b4f126c7d9ceb95c983299da964d1e9461b235bf`. Ela usa dados demonstrativos locais e não comprova credenciais, contas externas, dispositivos, deploy ou homologação. Consulte a [proveniência dos assets](docs/images/ASSET_PROVENANCE.md) antes de interpretar qualquer imagem em `docs/images/` como tela do produto.
 
 ![Mission Console do Classe A+](docs/images/screens/agentic-console.png)
 
-> **Proveniência:** esta é uma captura real da rota `/agentic`, publicada na `main` como documentação do estado visual observado durante o desenvolvimento. Ela usa dados demonstrativos locais e não representa um release instalável nem comprova credenciais, contas externas, dispositivos, deploy ou homologação. Consulte a [proveniência dos assets](docs/images/ASSET_PROVENANCE.md) antes de interpretar qualquer imagem em `docs/images/` como tela do produto.
+> **Proveniência:** esta é uma captura real da rota `/agentic`, publicada na `main` como documentação do estado visual observado durante o desenvolvimento. Ela usa dados demonstrativos locais e não representa um release instalável nem comprova credenciais, contas externas, dispositivos, deploy ou homologação.
 
 Para conhecer o estado das telas planejadas de configuração, builder e mobile, veja a [galeria visual](docs/CLASS_A_PLUS_GUIDE.md#telas-e-estado-visual). Mockups conceituais são identificados como conceito e não são apresentados como funcionalidades concluídas.
 
