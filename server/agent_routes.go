@@ -10,6 +10,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -555,17 +556,26 @@ func agentOriginAllowed(c *gin.Context) bool {
 		if allowed == "*" {
 			continue
 		}
-		if strings.HasSuffix(allowed, "*") {
-			if strings.HasPrefix(origin, strings.TrimSuffix(allowed, "*")) {
-				return true
-			}
-			continue
-		}
-		if origin == allowed {
+		if originMatchesAllowed(origin, allowed) {
 			return true
 		}
 	}
 	return false
+}
+
+func originMatchesAllowed(origin, allowed string) bool {
+	if strings.HasSuffix(allowed, ":*") {
+		allowedURL, err := url.Parse(strings.TrimSuffix(allowed, ":*"))
+		originURL, originErr := url.Parse(origin)
+		if err != nil || originErr != nil || allowedURL.Scheme == "" || allowedURL.Hostname() == "" || originURL.Scheme == "" || originURL.Hostname() == "" || allowedURL.User != nil || originURL.User != nil || allowedURL.Path != "" || originURL.Path != "" || originURL.RawQuery != "" || originURL.Fragment != "" {
+			return false
+		}
+		return strings.EqualFold(originURL.Scheme, allowedURL.Scheme) && strings.EqualFold(originURL.Hostname(), allowedURL.Hostname()) && originURL.Port() != ""
+	}
+	if strings.HasSuffix(allowed, "://*") {
+		return strings.HasPrefix(origin, strings.TrimSuffix(allowed, "*"))
+	}
+	return origin == allowed
 }
 
 func isCompanionConnectRoute(fullPath string) bool {

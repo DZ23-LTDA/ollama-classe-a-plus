@@ -167,3 +167,22 @@ func TestLocalAuthMiddlewareAppliesOriginPolicyToMutations(t *testing.T) {
 		t.Fatalf("local cross-site mutation status=%d aborted=%v body=%s", recorder.Code, context.IsAborted(), recorder.Body.String())
 	}
 }
+
+func TestAgentOriginWildcardMatchesPortOnlyOnExactHost(t *testing.T) {
+	t.Setenv("OLLAMA_ORIGINS", "https://trusted.example:*")
+	for _, test := range []struct {
+		origin string
+		want   bool
+	}{
+		{origin: "https://trusted.example:8443", want: true},
+		{origin: "https://trusted.example.evil:8443", want: false},
+		{origin: "https://trusted.example", want: false},
+	} {
+		context, _ := gin.CreateTestContext(httptest.NewRecorder())
+		context.Request = httptest.NewRequest("POST", "/api/agent/v1/missions", nil)
+		context.Request.Header.Set("Origin", test.origin)
+		if got := agentOriginAllowed(context); got != test.want {
+			t.Fatalf("agentOriginAllowed(%q)=%v, want %v", test.origin, got, test.want)
+		}
+	}
+}
