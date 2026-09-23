@@ -660,3 +660,8 @@ A auditoria do worker encontrou que `ClaimDueSchedules` avançava o schedule ant
 ## Addendum P1 — rollback transacional do queue local — 2026-09-23
 
 A auditoria encontrou que o `JobQueue` atualizava o mapa antes de persistir `jobs.json`; uma falha de filesystem deixava o claim em estado `running` somente na memória. O commit `717a7e4f` centraliza o snapshot anterior e desfaz qualquer mutação quando a escrita falha. A regressão normal/race passou e o runner completo local passou. A implementação ainda não é prova de lease/fencing multi-processo nem de recuperação Redis em ambiente distribuído.
+
+
+## Addendum P1 — Ack/Nack condicionados a running — 2026-09-23
+
+A revisão do queue encontrou que as transições de finalização não verificavam o estado atual do job. O commit `9d28cbc2` adiciona a guarda em local e Redis e uma regressão para chamadas sobre job `pending`. Os gates Go e race passaram. Ainda não há claim lease/fencing distribuído comprovado; a guarda reduz uma classe de replay lógico, mas não constitui coordenação multi-worker.

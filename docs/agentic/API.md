@@ -435,3 +435,8 @@ Schedules também expõem `failure_count` e `last_failure_code` de forma sanitiz
 ### Atomicidade do queue local
 
 As mutações de job (`Claim`, `Ack`, `Nack` e `Replay`) só permanecem no estado em memória quando a gravação atômica de `jobs.json` é confirmada. Em erro de filesystem, a fila restaura o snapshot anterior. Esse contrato vale para o queue local; o adapter Redis continua exigindo testes distribuídos de lease, fencing, perda de conexão e recuperação de worker.
+
+
+### Estado permitido para Ack/Nack
+
+Um worker só pode concluir (`Ack`) ou devolver para retry/DLQ (`Nack`) um job que esteja `running`. Jobs em `pending`, `succeeded` ou `dead_letter` são rejeitados. A guarda existe no queue local e no adapter Redis; ela não substitui lease, fencing token ou recuperação de worker distribuídos.

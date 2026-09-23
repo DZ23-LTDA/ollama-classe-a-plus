@@ -516,3 +516,8 @@ O commit `86597b82` registra falhas de criação de missão, aplica backoff boun
 ## Unreleased — transactional local queue mutations — 2026-09-23
 
 O commit `717a7e4f` impede que falhas de persistência deixem jobs parcialmente aplicados em memória durante claim, ack, nack ou replay. Gates locais completos passaram; lease distribuído e Redis real continuam pendentes.
+
+
+## Unreleased — queue running-state guards — 2026-09-23
+
+O commit `9d28cbc2` impede `Ack` e `Nack` fora de jobs `running` em queues local e Redis. A validação Go completa passou; integração Redis real e lease distribuído continuam pendentes.

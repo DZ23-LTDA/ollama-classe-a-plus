@@ -609,3 +609,8 @@ Os testes normal/race e o runner local completo passaram. Isso não prova lease 
 ## Addendum de rollback da fila local — 2026-09-23
 
 O commit `717a7e4f` tornou as transições persistentes da fila local transacionais em relação ao `jobs.json`: falha de escrita não deixa `Claim`, `Ack`, `Nack` ou `Replay` parcialmente aplicados em memória. Testes normais/race e o runner local completo passaram. Isso não equivale a lease multi-processo ou homologação de Redis; o produto permanece **preview/local RC em hardening**.
+
+
+## Addendum de transições Ack/Nack — 2026-09-23
+
+O commit `9d28cbc2` faz `Ack` e `Nack` aceitarem somente jobs `running` nas implementações local e Redis. A cobertura local e os gates Go completos passaram; o smoke Redis real e o lease distribuído continuam bloqueados por infraestrutura de homologação. O produto permanece **preview/local RC em hardening**.

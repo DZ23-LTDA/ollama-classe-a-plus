@@ -2421,3 +2421,10 @@ Testes normais e race cobrem planner indisponível, backoff, auto-pause após tr
 O commit `717a7e4f9444c4d77d76422f0b1e70ccfe08a944` corrige uma janela no `JobQueue`: `Claim`, `Ack`, `Nack` e `Replay` alteravam o mapa em memória antes de confirmar `jobs.json`. Se a escrita falhasse, um job podia ficar `running` apenas em memória e desaparecer do fluxo até restart. O helper agora restaura o estado anterior ou remove a inserção quando a persistência atômica falha.
 
 A regressão normal/race cobre falha de persistência durante claim e confirma que o job permanece `pending` com zero tentativas. Os gates locais completos passaram `FULL_LOCAL_GATES=PASS`; a CI pública do novo SHA iniciou com jobs em andamento e ainda não é considerada verde. O queue local continua single-process; lease distribuído, fencing e homologação Redis continuam externos a esta slice.
+
+
+## P1 de transições de queue condicionadas a running — 2026-09-23
+
+O commit `9d28cbc2b947160ad18e7b26c87a81dc740806f1` restringe `Ack` e `Nack` da fila local e do adapter Redis a jobs no estado `running`. Um job `pending`, `succeeded` ou `dead_letter` não pode ser finalizado ou reenviado por uma chamada fora da execução que o possui. A regressão local cobre as transições inválidas; o adapter Redis foi compilado e permanece dependente de integração Redis para o smoke distribuído.
+
+Integrity, YAML, `CGO_ENABLED=1 go test ./...`, vet, build e race do queue passaram localmente. A CI remota do head ainda está em execução. O worker distribuído continua sem claim lease/fencing homologado em múltiplos processos.

@@ -372,3 +372,8 @@ A revisão confirmou no commit `86597b82` que falhas de criação de missão nã
 ## Addendum independente — rollback transacional do queue local — 2026-09-23
 
 A revisão confirmou no commit `717a7e4f` que uma falha de `jobs.json` não deixa mais claim ou outra transição parcialmente aplicada no mapa em memória. A regressão normal/race e os gates completos passaram. O resultado reduz o risco local de jobs presos, mas não fecha lease distribuído, fencing, múltiplos workers ou recuperação Redis.
+
+
+## Addendum independente — Ack/Nack condicionados a running — 2026-09-23
+
+A revisão confirmou no commit `9d28cbc2` que jobs fora de `running` não podem mais ser confirmados ou reenviados por Ack/Nack em local e Redis. Os gates Go completos e race passaram. O risco de lease distribuído, fencing e recuperação de worker permanece aberto e requer infraestrutura Redis/Postgres real.
