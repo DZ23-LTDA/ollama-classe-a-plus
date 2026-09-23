@@ -290,21 +290,25 @@ func (a *agentAPI) authMiddleware(c *gin.Context) {
 		c.Next()
 		return
 	}
-	if !a.authRequired && strings.HasSuffix(c.Request.URL.Path, "/auth/dev/token") && strings.EqualFold(strings.TrimSpace(os.Getenv("OLLAMA_AGENT_AUTH_DEV")), "true") {
+	// Exemptions match the matched ROUTE PATTERN (c.FullPath()), never a raw path
+	// suffix: the builder preview route is a `/*path` catch-all, so a suffix match
+	// like ".../preview/x/connect" could otherwise smuggle an unauthenticated
+	// request into a real handler.
+	route := c.FullPath()
+	// SSO start/callback/metadata/acs may be reached without a prior session when
+	// the operator explicitly enables public SSO.
+	if (strings.HasPrefix(route, "/api/agent/v1/auth/oauth/") || strings.HasPrefix(route, "/api/agent/v1/auth/saml/")) && strings.EqualFold(strings.TrimSpace(os.Getenv("OLLAMA_AGENT_AUTH_SSO_PUBLIC")), "true") {
 		c.Next()
 		return
 	}
-	if (strings.Contains(c.Request.URL.Path, "/auth/oauth/") || strings.Contains(c.Request.URL.Path, "/auth/saml/")) && strings.EqualFold(strings.TrimSpace(os.Getenv("OLLAMA_AGENT_AUTH_SSO_PUBLIC")), "true") {
-		c.Next()
-		return
-	}
-	if strings.HasSuffix(c.Request.URL.Path, "/connect") {
+	// The device companion upgrade authenticates itself with a device token.
+	if route == "/api/agent/v1/devices/:id/connect" {
 		c.Next()
 		return
 	}
 	// Liveness endpoint must stay reachable for health checks even when auth is
 	// required; it exposes no tenant data.
-	if strings.HasSuffix(c.Request.URL.Path, "/agent/v1/health") {
+	if route == "/api/agent/v1/health" {
 		c.Next()
 		return
 	}
@@ -863,7 +867,7 @@ func (a *agentAPI) projectForCaller(c *gin.Context, projectID string) (agent.Pro
 	}
 	if a.authRequired {
 		_, organizationID := a.actorIdentity(c)
-		if project.OrganizationID != organizationID {
+		if organizationID == "" || project.OrganizationID != organizationID {
 			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": "project not found"})
 			return agent.Project{}, false
 		}
@@ -892,10 +896,16 @@ func (a *agentAPI) collabActor(c *gin.Context) string {
 }
 
 func (a *agentAPI) collabSnapshot(c *gin.Context) {
+	if _, ok := a.projectForCaller(c, c.Param("project_id")); !ok {
+		return
+	}
 	c.JSON(http.StatusOK, a.runtime.Collaboration().Snapshot(c.Param("project_id")))
 }
 
 func (a *agentAPI) collabComment(c *gin.Context) {
+	if _, ok := a.projectForCaller(c, c.Param("project_id")); !ok {
+		return
+	}
 	var request struct {
 		Body string `json:"body"`
 	}
@@ -912,6 +922,9 @@ func (a *agentAPI) collabComment(c *gin.Context) {
 }
 
 func (a *agentAPI) collabPresence(c *gin.Context) {
+	if _, ok := a.projectForCaller(c, c.Param("project_id")); !ok {
+		return
+	}
 	var request struct {
 		Status string `json:"status"`
 	}
@@ -928,6 +941,9 @@ func (a *agentAPI) collabPresence(c *gin.Context) {
 }
 
 func (a *agentAPI) collabStream(c *gin.Context) {
+	if _, ok := a.projectForCaller(c, c.Param("project_id")); !ok {
+		return
+	}
 	c.Header("Content-Type", "text/event-stream")
 	c.Header("Cache-Control", "no-cache")
 	c.Header("Connection", "keep-alive")
@@ -1065,7 +1081,22 @@ func (a *agentAPI) traces(c *gin.Context) {
 }
 
 func (a *agentAPI) allTraces(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"spans": a.runtime.Traces(c.Query("trace_id"))})
+	traceID := strings.TrimSpace(c.Query("trace_id"))
+	if traceID == "" {
+		writeAgentError(c, http.StatusBadRequest, errors.New("trace_id is required"))
+		return
+	}
+	// Trace IDs are "tr_<missionID>"; require that the mission belongs to the
+	// caller's organization so a tenant cannot read another tenant's spans (nor
+	// dump every span with an empty trace_id).
+	if a.authRequired {
+		missionID := strings.TrimPrefix(traceID, "tr_")
+		if _, err := a.missionByID(c, missionID); err != nil {
+			writeAgentError(c, statusForAgentError(err), err)
+			return
+		}
+	}
+	c.JSON(http.StatusOK, gin.H{"spans": a.runtime.Traces(traceID)})
 }
 
 func (a *agentAPI) createOrchestration(c *gin.Context) {
@@ -1105,7 +1136,7 @@ func (a *agentAPI) orchestrationForCaller(c *gin.Context, jobID string) (agent.O
 	}
 	if a.authRequired {
 		_, organizationID := a.actorIdentity(c)
-		if job.OrganizationID != organizationID {
+		if organizationID == "" || job.OrganizationID != organizationID {
 			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": "orchestration job not found"})
 			return agent.OrchestrationJob{}, false
 		}
@@ -1514,7 +1545,7 @@ func (a *agentAPI) builderForCaller(c *gin.Context, builderID string) (agent.Bui
 	}
 	if a.authRequired {
 		_, organizationID := a.actorIdentity(c)
-		if project.OrganizationID != organizationID {
+		if organizationID == "" || project.OrganizationID != organizationID {
 			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": "builder not found"})
 			return agent.BuilderProject{}, false
 		}
@@ -1684,12 +1715,8 @@ func (a *agentAPI) deployBuilder(c *gin.Context) {
 }
 
 func (a *agentAPI) builderPreviewFile(c *gin.Context) {
-	if _, ok := a.builderForCaller(c, c.Param("id")); !ok {
-		return
-	}
-	project, err := a.runtime.Builder().Get(c.Param("id"))
-	if err != nil {
-		writeAgentError(c, statusForAgentError(err), err)
+	project, ok := a.builderForCaller(c, c.Param("id"))
+	if !ok {
 		return
 	}
 	relative := strings.TrimPrefix(c.Param("path"), "/")

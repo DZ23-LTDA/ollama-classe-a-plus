@@ -203,7 +203,18 @@ func (e *ResearchEngine) allowedByRobots(ctx context.Context, target *url.URL) b
 			// open (allow), consistently with the client.Do error path below.
 			return true
 		}
-		response, err := e.client().Do(request)
+		// Pin the robots pre-flight to validated public IPs too (unless the test
+		// http override is active); otherwise it re-resolves DNS and follows
+		// redirects, reopening the SSRF/rebind window the main fetch closes.
+		robotsClient := e.client()
+		if !(e.AllowHTTPForTests && target.Scheme == "http") {
+			pinned, perr := pinnedClient(ctx, robotsClient, robotsURL)
+			if perr != nil {
+				return true
+			}
+			robotsClient = pinned
+		}
+		response, err := robotsClient.Do(request)
 		if err != nil {
 			return true
 		}
