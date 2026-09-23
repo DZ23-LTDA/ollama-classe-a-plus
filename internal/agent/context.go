@@ -19,14 +19,15 @@ import (
 )
 
 type ContextStore struct {
-	mu         sync.RWMutex
-	root       string
-	projects   map[string]Project
-	memories   map[string][]Memory
-	skills     map[string]SkillManifest
-	skillPaths map[string]string
-	schedules  map[string]Schedule
-	embedder   Embedder
+	mu            sync.RWMutex
+	root          string
+	workspaceRoot string
+	projects      map[string]Project
+	memories      map[string][]Memory
+	skills        map[string]SkillManifest
+	skillPaths    map[string]string
+	schedules     map[string]Schedule
+	embedder      Embedder
 }
 
 type Embedder interface {
@@ -115,6 +116,20 @@ func NewContextStore(root string) (*ContextStore, error) {
 	return store, nil
 }
 
+func (s *ContextStore) SetWorkspaceRoot(root string) error {
+	if s == nil {
+		return errors.New("context store is required")
+	}
+	canonical, err := canonicalExistingDirectory(root)
+	if err != nil {
+		return fmt.Errorf("runtime workspace is invalid: %w", err)
+	}
+	s.mu.Lock()
+	s.workspaceRoot = canonical
+	s.mu.Unlock()
+	return nil
+}
+
 func (s *ContextStore) CreateProject(name, root string, organizationIDs ...string) (Project, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
@@ -131,9 +146,15 @@ func (s *ContextStore) CreateProject(name, root string, organizationIDs ...strin
 	project := Project{ID: "prj_" + uuid.NewString(), Name: name, Root: root, OrganizationID: organizationID, CreatedAt: now, UpdatedAt: now}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	canonicalRoot, err := canonicalProjectRoot(s.workspaceRoot, root)
+	if err != nil {
+		return Project{}, err
+	}
+	project.Root = canonicalRoot
 	s.projects[project.ID] = project
 	if s.root != "" {
 		if err := writeJSONAtomic(filepath.Join(s.root, "projects", project.ID+".json"), project); err != nil {
+			delete(s.projects, project.ID)
 			return Project{}, err
 		}
 	}
@@ -181,8 +202,12 @@ func (s *ContextStore) UpdateProject(id, name, root string) (Project, error) {
 	if !ok {
 		return Project{}, os.ErrNotExist
 	}
+	canonicalRoot, err := canonicalProjectRoot(s.workspaceRoot, root)
+	if err != nil {
+		return Project{}, err
+	}
 	project.Name = name
-	project.Root = root
+	project.Root = canonicalRoot
 	project.UpdatedAt = time.Now().UTC()
 	s.projects[id] = project
 	if s.root != "" {

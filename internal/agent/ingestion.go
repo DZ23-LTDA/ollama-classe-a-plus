@@ -26,8 +26,9 @@ type DocumentIngestRequest struct {
 }
 
 type DocumentIngestor struct {
-	Context  *ContextStore
-	Research *ResearchEngine
+	Context       *ContextStore
+	Research      *ResearchEngine
+	WorkspaceRoot string
 }
 
 func (i DocumentIngestor) Ingest(ctx context.Context, request DocumentIngestRequest) ([]Memory, error) {
@@ -45,9 +46,11 @@ func (i DocumentIngestor) Ingest(ctx context.Context, request DocumentIngestRequ
 	if len(request.Paths) > 0 && projectRoot == "" {
 		return nil, errors.New("project root is required for path ingestion")
 	}
-	projectRoot, err = filepath.Abs(projectRoot)
-	if err != nil {
-		return nil, err
+	if projectRoot != "" {
+		projectRoot, err = canonicalProjectRoot(i.WorkspaceRoot, projectRoot)
+		if err != nil {
+			return nil, err
+		}
 	}
 	root := projectRoot
 	if strings.TrimSpace(request.Workspace) != "" {
@@ -55,11 +58,19 @@ func (i DocumentIngestor) Ingest(ctx context.Context, request DocumentIngestRequ
 		if err != nil {
 			return nil, err
 		}
+		canonicalRoot, canonicalErr := canonicalPathAllowMissing(root)
+		if canonicalErr != nil {
+			return nil, canonicalErr
+		}
+		root = canonicalRoot
 		if !isWithin(projectRoot, root) {
 			return nil, errors.New("ingestion workspace must be inside the project root")
 		}
 	}
 	if len(request.Paths) > 0 {
+		if _, err := canonicalExistingDirectory(root); err != nil {
+			return nil, fmt.Errorf("ingestion workspace is not safe: %w", err)
+		}
 		rootInfo, statErr := os.Stat(root)
 		if statErr != nil {
 			return nil, statErr

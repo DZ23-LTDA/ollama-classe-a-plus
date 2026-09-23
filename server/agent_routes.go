@@ -383,6 +383,8 @@ func (a *agentAPI) register(r *gin.Engine) {
 	group.POST("/builders/:id/publish", a.publishBuilder)
 	group.GET("/deployments", a.deployments)
 	group.POST("/builders/:id/deploy/:provider", a.deployBuilder)
+	group.POST("/builders/:id/deploy/:provider/approval", a.requestDeploymentApproval)
+	group.POST("/builders/:id/deploy/:provider/approval/:approval_id", a.decideDeploymentApproval)
 	group.GET("/builders/:id/preview/*path", a.builderPreviewFile)
 	group.GET("/metrics/prometheus", a.prometheus)
 	group.GET("/tools", a.tools)
@@ -1299,14 +1301,41 @@ func (a *agentAPI) webhook(c *gin.Context) {
 		writeAgentError(c, http.StatusUnauthorized, errors.New("webhook secret is invalid"))
 		return
 	}
+	scheduleOrganization := strings.TrimSpace(schedule.OrganizationID)
+	if scheduleOrganization == "" {
+		scheduleOrganization = "local"
+	}
+	if scheduleOrganization != companyOrganizationID(c) {
+		writeAgentError(c, http.StatusForbidden, errAgentForbidden)
+		return
+	}
+	idempotencyKey := strings.TrimSpace(c.GetHeader("Idempotency-Key"))
+	if idempotencyKey == "" {
+		idempotencyKey = strings.TrimSpace(c.GetHeader("X-Ollama-Webhook-ID"))
+	}
+	if idempotencyKey == "" || len(idempotencyKey) > 200 {
+		writeAgentError(c, http.StatusBadRequest, errors.New("Idempotency-Key is required and must be <= 200 characters"))
+		return
+	}
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 64<<10)
 	payload, err := io.ReadAll(c.Request.Body)
 	if err != nil {
 		writeAgentError(c, http.StatusBadRequest, err)
 		return
 	}
+	if replay := a.runtime.WebhookReplay(); replay == nil {
+		writeAgentError(c, http.StatusServiceUnavailable, errors.New("webhook replay store is unavailable"))
+		return
+	} else if err := replay.Claim(schedule.ID, idempotencyKey); err != nil {
+		if errors.Is(err, agent.ErrWebhookReplay) {
+			writeAgentError(c, http.StatusConflict, err)
+		} else {
+			writeAgentError(c, http.StatusServiceUnavailable, err)
+		}
+		return
+	}
 	objective := schedule.Objective + "\nWebhook payload:\n" + string(payload)
-	mission, err := a.runtime.CreateMission(c.Request.Context(), agent.CreateMissionRequest{Objective: objective, Model: schedule.Model, Workspace: schedule.Workspace, ProjectID: schedule.ProjectID, OrganizationID: schedule.OrganizationID, AutoRun: true})
+	mission, err := a.scopedRuntime(c).CreateMission(c.Request.Context(), agent.CreateMissionRequest{Objective: objective, Model: schedule.Model, Workspace: schedule.Workspace, ProjectID: schedule.ProjectID, OrganizationID: schedule.OrganizationID, AutoRun: true})
 	if err != nil {
 		writeAgentError(c, http.StatusBadRequest, err)
 		return
@@ -2161,15 +2190,12 @@ func (a *agentAPI) deployments(c *gin.Context) {
 
 func (a *agentAPI) deployBuilder(c *gin.Context) {
 	var request struct {
-		Target   string `json:"target,omitempty"`
-		Approved bool   `json:"approved"`
+		Target     string `json:"target,omitempty"`
+		ApprovalID string `json:"approval_id"`
+		Nonce      string `json:"nonce"`
 	}
 	if err := decodeJSON(c, &request); err != nil {
 		writeAgentError(c, http.StatusBadRequest, err)
-		return
-	}
-	if !request.Approved {
-		writeAgentError(c, http.StatusPreconditionRequired, errors.New("external deployment requires explicit approval"))
 		return
 	}
 	manager := a.runtime.Deployments()
@@ -2182,12 +2208,81 @@ func (a *agentAPI) deployBuilder(c *gin.Context) {
 		writeAgentError(c, statusForAgentError(err), err)
 		return
 	}
+	approval, err := a.runtime.DeploymentApprovals().Consume(request.ApprovalID, companyOrganizationID(c), project.ID, c.Param("provider"), request.Target, request.Nonce)
+	if err != nil {
+		writeAgentError(c, statusForAgentError(err), err)
+		return
+	}
 	result, err := manager.Deploy(c.Request.Context(), c.Param("provider"), agent.DeploymentRequest{Name: project.Name, Root: project.Root, Target: request.Target})
 	if err != nil {
 		writeAgentError(c, statusForAgentError(err), err)
 		return
 	}
-	c.JSON(http.StatusAccepted, gin.H{"project": project, "deployment": result})
+	c.JSON(http.StatusAccepted, gin.H{"project": project, "approval": approval, "deployment": result})
+}
+
+func (a *agentAPI) requestDeploymentApproval(c *gin.Context) {
+	project, err := a.builderForRequest(c)
+	if err != nil {
+		writeAgentError(c, statusForAgentError(err), err)
+		return
+	}
+	manager := a.runtime.Deployments()
+	if manager == nil {
+		writeAgentError(c, http.StatusNotImplemented, errors.New("no deployment providers are configured"))
+		return
+	}
+	provider := strings.ToLower(strings.TrimSpace(c.Param("provider")))
+	configured := false
+	for _, config := range manager.List() {
+		if config.ID == provider {
+			configured = true
+			break
+		}
+	}
+	if !configured {
+		writeAgentError(c, http.StatusNotFound, errors.New("deployment provider is not configured"))
+		return
+	}
+	var request struct {
+		Target string `json:"target,omitempty"`
+	}
+	if err := decodeJSON(c, &request); err != nil {
+		writeAgentError(c, http.StatusBadRequest, err)
+		return
+	}
+	approval, err := a.runtime.DeploymentApprovals().Request(companyOrganizationID(c), project.ID, provider, request.Target, agentActorID(c))
+	if err != nil {
+		writeAgentError(c, statusForAgentError(err), err)
+		return
+	}
+	c.JSON(http.StatusCreated, approval)
+}
+
+func (a *agentAPI) decideDeploymentApproval(c *gin.Context) {
+	if !a.requireApprovalApprover(c) {
+		return
+	}
+	project, err := a.builderForRequest(c)
+	if err != nil {
+		writeAgentError(c, statusForAgentError(err), err)
+		return
+	}
+	var request struct {
+		Approved bool   `json:"approved"`
+		Reason   string `json:"reason,omitempty"`
+		Nonce    string `json:"nonce"`
+	}
+	if err := decodeJSON(c, &request); err != nil {
+		writeAgentError(c, http.StatusBadRequest, err)
+		return
+	}
+	approval, err := a.runtime.DeploymentApprovals().Decide(c.Param("approval_id"), companyOrganizationID(c), project.ID, c.Param("provider"), agentActorID(c), request.Reason, request.Nonce, request.Approved)
+	if err != nil {
+		writeAgentError(c, statusForAgentError(err), err)
+		return
+	}
+	c.JSON(http.StatusOK, approval)
 }
 
 func (a *agentAPI) builderPreviewFile(c *gin.Context) {
@@ -2372,11 +2467,14 @@ func statusForAgentError(err error) int {
 	if status := companyErrorStatus(err); status != 0 {
 		return status
 	}
-	if errors.Is(err, errAgentForbidden) || errors.Is(err, agent.ErrBuilderForbidden) || errors.Is(err, agent.ErrOrchestrationForbidden) || errors.Is(err, agent.ErrDeviceForbidden) || errors.Is(err, agent.ErrQueueJobForbidden) {
+	if errors.Is(err, errAgentForbidden) || errors.Is(err, agent.ErrBuilderForbidden) || errors.Is(err, agent.ErrOrchestrationForbidden) || errors.Is(err, agent.ErrDeviceForbidden) || errors.Is(err, agent.ErrQueueJobForbidden) || errors.Is(err, agent.ErrDeploymentApprovalOrganization) {
 		return http.StatusForbidden
 	}
-	if errors.Is(err, agent.ErrApprovalVersionConflict) {
+	if errors.Is(err, agent.ErrApprovalVersionConflict) || errors.Is(err, agent.ErrDeploymentApprovalNonce) || errors.Is(err, agent.ErrDeploymentApprovalConflict) || errors.Is(err, agent.ErrDeploymentApprovalExpired) {
 		return http.StatusConflict
+	}
+	if errors.Is(err, agent.ErrDeploymentApprovalNotFound) {
+		return http.StatusNotFound
 	}
 	if errors.Is(err, os.ErrNotExist) {
 		return http.StatusNotFound

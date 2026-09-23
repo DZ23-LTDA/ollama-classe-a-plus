@@ -2,6 +2,9 @@ package agent
 
 import (
 	"context"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -71,5 +74,38 @@ func TestProjectAndScheduleCRUDPersistsAndDeletes(t *testing.T) {
 	}
 	if len(store.ListProjects()) != 0 || len(store.ListSchedules()) != 0 {
 		t.Fatalf("store was not deleted: projects=%v schedules=%v", store.ListProjects(), store.ListSchedules())
+	}
+}
+
+func TestProjectRootCreateAndUpdateStayInsideRuntimeWorkspace(t *testing.T) {
+	workspace := t.TempDir()
+	outside := t.TempDir()
+	store, err := NewContextStore("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SetWorkspaceRoot(workspace); err != nil {
+		t.Fatal(err)
+	}
+	inside := filepath.Join(workspace, "project")
+	if err := os.MkdirAll(inside, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	project, err := store.CreateProject("Workspace", inside)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.CreateProject("Outside", outside); err == nil || !strings.Contains(err.Error(), "outside the runtime workspace") {
+		t.Fatalf("outside create error = %v", err)
+	}
+	if _, err := store.UpdateProject(project.ID, "Outside", outside); err == nil || !strings.Contains(err.Error(), "outside the runtime workspace") {
+		t.Fatalf("outside update error = %v", err)
+	}
+	current, err := store.GetProject(project.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if current.Root != inside {
+		t.Fatalf("project root changed after rejected update: %q", current.Root)
 	}
 }

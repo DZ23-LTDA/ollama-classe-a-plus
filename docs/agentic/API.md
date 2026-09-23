@@ -385,6 +385,14 @@ O limite de transporte do `decodeJSON` é 4 MiB por request. Bodies maiores são
 
 O adapter de deployment aceita HTTPS para serviços externos e HTTP somente em loopback. O root do workspace não pode ser symlink; redirects são bloqueados; a conexão padrão verifica o endereço IP real após o DNS e rejeita destinos privados não-loopback. O smoke local usa um servidor fixture. Configurar Vercel, Netlify, AWS, Cloudflare ou outro serviço não significa conta validada, domínio publicado, billing autorizado ou rollback testado.
 
+Deploy externo não confia em `{"approved":true}` enviado pelo cliente. O fluxo é persistente e vinculado à organização, ao builder, ao provider e ao target:
+
+1. `POST /api/agent/v1/builders/:id/deploy/:provider/approval` solicita uma aprovação pendente; o corpo aceita somente `target`.
+2. `POST /api/agent/v1/builders/:id/deploy/:provider/approval/:approval_id` decide a aprovação com `approved`, `reason` e `nonce`. Em auth-required, somente owner/admin podem decidir; o servidor compara tenant, builder, provider, estado pendente, expiração e nonce.
+3. `POST /api/agent/v1/builders/:id/deploy/:provider` exige `approval_id`, `nonce` e o mesmo `target`. O servidor consome a aprovação com uma transição CAS persistente antes de chamar o provider; replay, tenant mismatch, nonce incorreto ou a tentativa de usar o booleano cliente sem aprovação não chegam ao egress.
+
+O ledger local fica em `OLLAMA_AGENT_STORE/.agent-deployment-approvals` e sobrevive a restart. Se o provider falhar depois do consumo, a operação deve ser tratada como `unknown/partial` pelo operador; o código não inventa rollback universal de Vercel/Netlify/generic.
+
 
 ## Mídia
 
@@ -430,6 +438,10 @@ A resposta contém `company`, `exchange` e, para leitura, `report`. Cada exchang
 
 
 Schedules também expõem `failure_count` e `last_failure_code` de forma sanitizada. O worker local registra `mission_creation_failed`, tenta novamente com backoff de 5 e 10 segundos e desabilita o schedule após três falhas consecutivas; uma execução bem-sucedida zera esses campos. O código interno do provider não é persistido. Essa garantia é local ao `ContextStore`; claim/lease distribuído e DLQ de schedule exigem a camada distribuída correspondente e testes reais.
+
+### Webhooks de schedules
+
+`POST /api/agent/v1/webhooks/:schedule_id` exige o segredo configurado em `WebhookSecretEnv`, compara a organização do schedule com a organização ativa e exige `Idempotency-Key` (ou o alias `X-Ollama-Webhook-ID`) de até 200 bytes. A chave é persistida por schedule antes da criação da missão; repetir a chave retorna `409 Conflict` sem criar outra missão. O ledger fica em `OLLAMA_AGENT_STORE/.agent-webhook-replay` e sobrevive a restart. Falha ao persistir a chave falha fechada; o endpoint não é uma autorização bearer cross-tenant nem um webhook de provider externo já homologado.
 
 
 ### Atomicidade do queue local

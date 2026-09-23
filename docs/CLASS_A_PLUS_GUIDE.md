@@ -175,19 +175,32 @@ Configure o arquivo `examples/agent-deployments.json` e aponte `OLLAMA_AGENT_DEP
 
 ```bash
 export OLLAMA_AGENT_DEPLOYMENTS="$PWD/examples/agent-deployments.json"
-export DZ23_VERCEL_TOKEN='token-fora-do-repositorio'
+export DZ23_VERCEL_TOKEN="$DZ23_VERCEL_TOKEN_FROM_SECRET_MANAGER"
 ```
 
-Uma publicação externa precisa ser explícita:
+Uma publicação externa precisa de uma aprovação persistida e tenant-bound. O cliente não pode autorizar a si mesmo enviando `approved=true` diretamente no deploy:
 
 ```bash
+# 1. solicitar approval pendente
 curl -X POST \
-  http://127.0.0.1:11434/api/agent/v1/builders/proj_123/deploy/vercel \
+  http://127.0.0.1:11434/api/agent/v1/builders/bld_123/deploy/vercel/approval \
   -H 'Content-Type: application/json' \
-  -d '{"approved":true,"target":"production"}'
+  -d '{"target":"production"}'
+
+# 2. owner/admin decide com a nonce retornada pelo servidor
+curl -X POST \
+  http://127.0.0.1:11434/api/agent/v1/builders/bld_123/deploy/vercel/approval/dapr_123 \
+  -H 'Content-Type: application/json' \
+  -d '{"approved":true,"reason":"release revisado","nonce":"nonce-do-servidor"}'
+
+# 3. consumir uma única vez a approval no deploy
+curl -X POST \
+  http://127.0.0.1:11434/api/agent/v1/builders/bld_123/deploy/vercel \
+  -H 'Content-Type: application/json' \
+  -d '{"approval_id":"dapr_123","target":"production","nonce":"nonce-do-servidor"}'
 ```
 
-O runtime valida o workspace, rejeita symlinks, limita tamanho e quantidade de arquivos, bloqueia redirects e exige HTTPS para endpoints externos. A implementação não concede automaticamente domínio, DNS, billing, projeto ou permissões de conta. O adapter generic permite integrar um gateway próprio; o contrato e a política de segurança desse gateway continuam responsabilidade do operador.
+O runtime valida o workspace, rejeita symlinks, limita tamanho e quantidade de arquivos, bloqueia redirects e exige HTTPS para endpoints externos. A implementação não concede automaticamente domínio, DNS, billing, projeto ou permissões de conta. O adapter generic permite integrar um gateway próprio; o contrato, o health check, o rollback/compensação e a política de segurança desse gateway continuam responsabilidade do operador. A nonce do exemplo é ilustrativa e não é uma credencial.
 
 ## Telas e estado visual
 

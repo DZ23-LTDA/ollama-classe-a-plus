@@ -62,6 +62,31 @@ func TestDocumentIngestorRejectsWorkspaceOutsideProjectAndSymlink(t *testing.T) 
 	}
 }
 
+func TestDocumentIngestorRejectsPersistedProjectRootOutsideRuntimeWorkspace(t *testing.T) {
+	runtimeWorkspace := t.TempDir()
+	outside := t.TempDir()
+	if err := os.WriteFile(filepath.Join(outside, "secret.txt"), []byte("outside runtime workspace"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	storeRoot := t.TempDir()
+	legacyStore, err := NewContextStore(storeRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	project, err := legacyStore.CreateProject("Legacy", outside)
+	if err != nil {
+		t.Fatal(err)
+	}
+	contextStore, err := NewContextStore(storeRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = (DocumentIngestor{Context: contextStore, WorkspaceRoot: runtimeWorkspace}).Ingest(context.Background(), DocumentIngestRequest{ProjectID: project.ID, Paths: []string{"secret.txt"}})
+	if err == nil || !strings.Contains(err.Error(), "outside the runtime workspace") {
+		t.Fatalf("outside project root was accepted: %v", err)
+	}
+}
+
 func TestDocumentIngestorHonorsCancellationBeforeReading(t *testing.T) {
 	root := t.TempDir()
 	contextStore, err := NewContextStore("")

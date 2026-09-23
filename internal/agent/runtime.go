@@ -15,59 +15,63 @@ import (
 )
 
 type Runtime struct {
-	store            Store
-	planner          Planner
-	plannerResolver  PlannerResolver
-	tools            *Registry
-	capabilityPolicy CapabilityPolicy
-	workspaceRoot    string
-	dataRoot         string
-	context          *ContextStore
-	company          *CompanyStore
-	remoteMCP        *RemoteMCPManager
-	metrics          *RuntimeMetrics
-	connectors       *ConnectorManager
-	mcp              *MCPManager
-	queue            *JobQueue
-	redisQueue       *RedisQueue
-	traces           *TraceStore
-	telemetry        *Telemetry
-	media            *MediaManager
-	builder          *BuilderService
-	collaboration    *CollaborationStore
-	orchestrator     *AgentOrchestrator
-	research         *ResearchEngine
-	devices          *DeviceStore
-	ingestion        DocumentIngestor
-	push             *PushService
-	deployments      *DeploymentManager
-	mu               *sync.Mutex
-	running          map[string]bool
-	activeCancels    map[string]context.CancelFunc
+	store               Store
+	planner             Planner
+	plannerResolver     PlannerResolver
+	tools               *Registry
+	capabilityPolicy    CapabilityPolicy
+	workspaceRoot       string
+	dataRoot            string
+	context             *ContextStore
+	company             *CompanyStore
+	remoteMCP           *RemoteMCPManager
+	metrics             *RuntimeMetrics
+	connectors          *ConnectorManager
+	mcp                 *MCPManager
+	queue               *JobQueue
+	redisQueue          *RedisQueue
+	traces              *TraceStore
+	telemetry           *Telemetry
+	media               *MediaManager
+	builder             *BuilderService
+	collaboration       *CollaborationStore
+	orchestrator        *AgentOrchestrator
+	research            *ResearchEngine
+	devices             *DeviceStore
+	ingestion           DocumentIngestor
+	push                *PushService
+	deployments         *DeploymentManager
+	deploymentApprovals *DeploymentApprovalStore
+	webhookReplay       *WebhookReplayStore
+	mu                  *sync.Mutex
+	running             map[string]bool
+	activeCancels       map[string]context.CancelFunc
 }
 
 type RuntimeConfig struct {
-	Store           Store
-	Planner         Planner
-	PlannerResolver PlannerResolver
-	Tools           *Registry
-	WorkspaceRoot   string
-	DataRoot        string
-	Context         *ContextStore
-	Company         *CompanyStore
-	RemoteMCP       *RemoteMCPManager
-	Connectors      *ConnectorManager
-	MCP             *MCPManager
-	Queue           *JobQueue
-	RedisQueue      *RedisQueue
-	Traces          *TraceStore
-	Telemetry       *Telemetry
-	Media           *MediaManager
-	Builder         *BuilderService
-	Collaboration   *CollaborationStore
-	Devices         *DeviceStore
-	Push            *PushService
-	Deployments     *DeploymentManager
+	Store               Store
+	Planner             Planner
+	PlannerResolver     PlannerResolver
+	Tools               *Registry
+	WorkspaceRoot       string
+	DataRoot            string
+	Context             *ContextStore
+	Company             *CompanyStore
+	RemoteMCP           *RemoteMCPManager
+	Connectors          *ConnectorManager
+	MCP                 *MCPManager
+	Queue               *JobQueue
+	RedisQueue          *RedisQueue
+	Traces              *TraceStore
+	Telemetry           *Telemetry
+	Media               *MediaManager
+	Builder             *BuilderService
+	Collaboration       *CollaborationStore
+	Devices             *DeviceStore
+	Push                *PushService
+	Deployments         *DeploymentManager
+	DeploymentApprovals *DeploymentApprovalStore
+	WebhookReplay       *WebhookReplayStore
 }
 
 var (
@@ -127,6 +131,23 @@ func NewRuntime(config RuntimeConfig) (*Runtime, error) {
 			return nil, err
 		}
 	}
+	if err := contextStore.SetWorkspaceRoot(root); err != nil {
+		return nil, err
+	}
+	deploymentApprovals := config.DeploymentApprovals
+	if deploymentApprovals == nil {
+		deploymentApprovals, err = NewDeploymentApprovalStore(filepath.Join(dataRoot, ".agent-deployment-approvals"))
+		if err != nil {
+			return nil, err
+		}
+	}
+	webhookReplay := config.WebhookReplay
+	if webhookReplay == nil {
+		webhookReplay, err = NewWebhookReplayStore(filepath.Join(dataRoot, ".agent-webhook-replay"))
+		if err != nil {
+			return nil, err
+		}
+	}
 	companyStore := config.Company
 	if companyStore == nil {
 		companyStore, err = NewCompanyStore(filepath.Join(dataRoot, ".agent-companies"))
@@ -169,7 +190,7 @@ func NewRuntime(config RuntimeConfig) (*Runtime, error) {
 			return nil, err
 		}
 	}
-	runtime := &Runtime{store: store, planner: planner, plannerResolver: config.PlannerResolver, tools: tools, capabilityPolicy: capabilityPolicy, workspaceRoot: root, dataRoot: dataRoot, context: contextStore, company: companyStore, remoteMCP: config.RemoteMCP, metrics: &RuntimeMetrics{}, connectors: config.Connectors, mcp: config.MCP, queue: queue, redisQueue: config.RedisQueue, traces: traces, telemetry: telemetry, media: config.Media, builder: builder, collaboration: collaboration, push: config.Push, deployments: config.Deployments, mu: &sync.Mutex{}, running: make(map[string]bool), activeCancels: make(map[string]context.CancelFunc)}
+	runtime := &Runtime{store: store, planner: planner, plannerResolver: config.PlannerResolver, tools: tools, capabilityPolicy: capabilityPolicy, workspaceRoot: root, dataRoot: dataRoot, context: contextStore, company: companyStore, remoteMCP: config.RemoteMCP, metrics: &RuntimeMetrics{}, connectors: config.Connectors, mcp: config.MCP, queue: queue, redisQueue: config.RedisQueue, traces: traces, telemetry: telemetry, media: config.Media, builder: builder, collaboration: collaboration, push: config.Push, deployments: config.Deployments, deploymentApprovals: deploymentApprovals, webhookReplay: webhookReplay, mu: &sync.Mutex{}, running: make(map[string]bool), activeCancels: make(map[string]context.CancelFunc)}
 	orchestrator, err := NewAgentOrchestrator(filepath.Join(dataRoot, ".agent-orchestrator"), runtime.SubagentRunner)
 	if err != nil {
 		return nil, err
@@ -184,7 +205,7 @@ func NewRuntime(config RuntimeConfig) (*Runtime, error) {
 		}
 	}
 	runtime.devices = devices
-	runtime.ingestion = DocumentIngestor{Context: contextStore, Research: runtime.research}
+	runtime.ingestion = DocumentIngestor{Context: contextStore, Research: runtime.research, WorkspaceRoot: root}
 	return runtime, nil
 }
 
@@ -383,6 +404,10 @@ func (r *Runtime) Ingestion() DocumentIngestor { return r.ingestion }
 func (r *Runtime) Push() *PushService { return r.push }
 
 func (r *Runtime) Deployments() *DeploymentManager { return r.deployments }
+
+func (r *Runtime) DeploymentApprovals() *DeploymentApprovalStore { return r.deploymentApprovals }
+
+func (r *Runtime) WebhookReplay() *WebhookReplayStore { return r.webhookReplay }
 
 func (r *Runtime) CreateMission(ctx context.Context, request CreateMissionRequest) (Mission, error) {
 	objective := strings.TrimSpace(request.Objective)
