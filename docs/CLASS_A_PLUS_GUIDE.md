@@ -4,11 +4,11 @@
 
 O **Ollama Classe A+** é a distribuição experimental do Ollama DZ23 que combina execução local de modelos, roteamento multi-provider e um runtime agentic com missões persistentes, ferramentas com aprovação, sandbox, memória, pesquisa, Browser Operator, companions, conectores, builders, observabilidade e publicação controlada. O projeto preserva a compatibilidade da base Ollama sempre que possível e evolui as superfícies agentic em camadas verificáveis.
 
-> **Estado real:** o projeto está em **preview/local RC em hardening**. Possui uma base agentic implementada e testada localmente, mas não deve ser descrito como paridade total, release de produção ou substituto de contas externas, hardware, certificados, lojas, modelos multimodais e ambientes distribuídos.
+> **Estado real:** o projeto possui uma base extensa implementada e endurecida com testes locais. Os gates de backend, vet, UI e mobile desta revisão passaram. Isso ainda não equivale a paridade total com todos os produtos do mercado: recursos dependentes de contas externas, hardware, certificados, lojas, modelos multimodais e ambientes distribuídos precisam de validação adicional.
 
 ## Visão geral
 
-O produto é organizado em quatro superfícies. O servidor Ollama continua responsável pelo runtime de modelos, APIs compatíveis e gerenciamento local. O runtime agentic adiciona missões, planejamento, execução, approvals, artefatos, memória, filas e eventos. A interface web oferece o Agentic Console para operação. O cliente Expo e os companions representam a camada de operação remota, pareamento de dispositivos e notificações.
+O produto é organizado em quatro superfícies. O servidor Ollama continua responsável pelo runtime de modelos, APIs compatíveis e gerenciamento local. O runtime agentic adiciona missões, planejamento, execução, approvals, artefatos, memória, filas e eventos. A interface web oferece o Agentic Console, um shell de workspace com Nova tarefa, Agente, Tarefas, Agendado, Habilidades, Plugins, Biblioteca, Projetos e Configurações, além do Agentic Control Center. O cliente Expo e os companions representam a camada de operação remota, pareamento de dispositivos e notificações.
 
 A arquitetura é local-first. Um operador pode começar apenas com o binário e um modelo local, adicionar um planner configurado, habilitar armazenamento PostgreSQL, workers Redis, OpenTelemetry, conectores, MCP, SAML, OAuth, mídia, publicação e companions conforme a necessidade. Cada capacidade opcional é configurada explicitamente e não deve receber credenciais dentro do repositório.
 
@@ -18,39 +18,50 @@ A arquitetura é local-first. Um operador pode começar apenas com o binário e 
 |---|---|---|
 | Chat e API Ollama | Implementado na base herdada | Preserva os comandos e contratos principais do Ollama. |
 | Multi-provider DZ23 | Implementado | Provedores explicitamente configurados e endpoints compatíveis. |
+| xAI/Grok API | Adapter implementado | Preset Responses/chat com bearer server-side; a validação externa depende de chave, quota e modelo xAI. Não é o Grok Bot hospedado. |
+| Composio Connect | Adapter implementado | Remote MCP com headers server-side, allowlist e approval; connected accounts e OAuth por app/tenant dependem do operador. |
+| OmniRoute | Adapter OpenAI-compatible com preset local | Exige instância OmniRoute, chave e smoke test do operador; auto-routing externo não é inventado pelo Classe A+. |
 | Missões agentic | Implementado | Plano validado, execução, eventos, recovery e artefatos. |
 | Approvals e sandbox | Implementado | Tools classificadas e execução protegida por políticas do servidor. |
 | Multiagente e pesquisa | Implementado localmente | Papéis, orçamento, síntese, citações, cache, robots e SSRF guard. |
 | Browser Operator | Implementado como adapter Playwright | Requer Chromium e configuração de sessão/allowlist. |
 | Companion | Implementado com pairing e WebSocket | Transporte TLS/mTLS e adapters por plataforma ainda exigem testes físicos. |
 | Memória e ingestão | Implementado | Memória lexical/semântica e ingestão de formatos documentais suportados. |
-| Builder | Implementado parcialmente | Canvas, bindings, undo/redo, preview, exportação e publicação local. |
+| Builder | Implementado parcialmente | Canvas, bindings, undo/redo, preview, exportação e publicação local; smoke E2E e approval gate de deploy executados. |
 | Deploy externo | Adapters implementados | Vercel, Netlify e generic; smoke real depende de credenciais. |
 | SSO | Implementado em adapters | OAuth/OIDC e SAML exigem IdP, certificados e testes de produção. |
 | Mobile | Base Expo implementada | Push, conflitos avançados, assinatura e lojas ainda dependem de ambiente real. |
 | Modelos locais de mídia | Adapter configurável | Não confundir adapter multimodal com modelos locais completos já distribuídos. |
+| Shell desktop Classe A+ | Parcialmente implementado | Home com composer e recomendações, menu persistente, CRUD real de Projetos e Agendado, catálogos reais de Tasks/Skills/Plugins/Biblioteca, lifecycle de plugins e Control Center sanitizado; builder rico e superfícies de produção ainda evoluem. |
+| HarnessRouter | Adapter implementado | Provider OpenAI Responses-compatible com `harness_id` server-side para Codex/Claude Code; exige instância, chave e harness instalados para validação ponta a ponta. |
+| Company OS | Implementado localmente nesta rodada | Empresa/tenant, identidade, 7 departamentos, roadmap, KPIs, backlog, ciclos, relatório, budget, approvals, pausa por limite/anomalia e Growth OS sandbox para campanhas, afiliados, catálogo e pedidos; CRM, social, marketplaces, fulfillment e ads reais ainda dependem de connectors e ambientes externos. |
+| Desktop Commander Remote MCP | Adapter implementado | Stdio local e Streamable HTTP remoto com allowlist, HTTPS, bearer opcional e approval; OAuth PKCE, conta, device pairing e testes físicos dependem do operador. |
+| Hardening e release preview | Verificado localmente | Auth fail-closed fora de loopback, contenção de symlink/StepID, MCP estrito, approvals auditáveis, tenant checks, idempotência, `go test ./...`, `go vet ./...`, build UI e typecheck mobile aprovados. |
+| Grok Live e Evaluation OS | Verificado localmente | Responses/streaming/status sanitizado, router por capacidades/saúde/custo e casos determinísticos de avaliação; xAI real e datasets externos continuam dependentes de credenciais e quota. |
+| Agentes departamentais e Social OS | Verificado localmente em sandbox | Agentes com supervisor, orçamento, SLA, pausa/retomada, drafts sociais, approval e métricas; contas, publicação e commerce externo permanecem bloqueados até autorização. |
 
-## Instalação rápida
+O relatório [`READINESS_2026-09-22.md`](agentic/READINESS_2026-09-22.md) registra o smoke das APIs fornecidas, a chamada gratuita ponta a ponta via OpenRouter e a lista de gates que ainda dependem de contas, hardware, dispositivos ou infraestrutura externa. As chaves usadas no teste foram fornecidas fora do repositório e devem ser rotacionadas pelo operador.
 
-### Linux
+## Build e execução rápidos
 
-O fork ainda não publica instaladores assinados, binários versionados ou imagem Docker própria. Não use o instalador do domínio `ollama.com` para instalar este repositório. Para executar o Classe A+ a partir do código-fonte:
+O fork público distribui o código-fonte, não um instalador assinado, binário de release, imagem Docker pública ou pacote de loja Classe A+. Não use `ollama.com/install.sh`, `OllamaSetup.exe`, `Ollama.dmg` ou `ollama/ollama` para instalar este fork: esses artefatos pertencem ao upstream. Compile a revisão do repositório para desenvolvimento e validação local:
 
 ```bash
 git clone https://github.com/DZ23-LTDA/ollama-classe-a-plus.git
 cd ollama-classe-a-plus
 
-# A main é a linha pública de documentação; esta branch contém a evolução agentic em revisão.
-git switch feat/manus-parity-omniroute
+# Conferir a revisão pública
+git log -1 --oneline
 
 # Executar testes do runtime agentic
-CGO_ENABLED=0 go test ./internal/agent -count=1
+CGO_ENABLED=1 go test ./internal/agent -count=1
 
 # Testar servidor e integrações principais
 CGO_ENABLED=1 go test ./server ./cmd/launch ./internal/multillm -count=1
 
-# Compilar o binário
-go build -o ./bin/ollama-classe-a-plus .
+# Compilar o binário do fork
+mkdir -p bin
+CGO_ENABLED=1 go build -trimpath -o bin/ollama-classe-a-plus .
 ```
 
 Para utilizar o binário compilado:
@@ -59,30 +70,21 @@ Para utilizar o binário compilado:
 OLLAMA_HOST=127.0.0.1:11434 ./bin/ollama-classe-a-plus serve
 ```
 
-Em outro terminal, a UI web pode ser executada em desenvolvimento com `npm ci` e `npm run dev -- --host 127.0.0.1` dentro de `app/ui/app`. O runtime agentic usa o mesmo servidor Ollama e publica as rotas versionadas sob `/api/agent/v1`. O frontend de desenvolvimento consulta a API local configurada em `app/ui/app/src/lib/config.ts`.
-
-> **BLOCKED_BY_EXTERNAL_DEPENDENCY:** instaladores assinados, artefatos de release, auto-update, rollback verificável, imagens Docker publicadas e validação física em cada sistema operacional exigem pipeline de release, chaves, máquinas e homologação do mantenedor.
+Os helpers `scripts/install.sh` e `scripts/install.ps1` fazem o mesmo build local e instalam o executável em um diretório escolhido pelo operador. Eles não baixam binários, modelos ou serviços externos. O runtime agentic usa o mesmo servidor compatível e publica as rotas versionadas sob `/api/agent/v1`.
 
 ### Docker e infraestrutura distribuída
 
-A composição local de desenvolvimento está em `deploy/docker-compose.agentic.yml`. Ela fornece serviços auxiliares para testes de PostgreSQL, Redis e OpenTelemetry Collector; não é uma imagem ou distribuição Docker publicada do fork. Não trate o compose de desenvolvimento como configuração de produção: troque senhas, restrinja rede, use TLS e faça backup antes de expor qualquer serviço.
+A composição de desenvolvimento está em `deploy/docker-compose.agentic.yml`. Ela fornece os serviços auxiliares usados para testar PostgreSQL, Redis e OpenTelemetry Collector, prende as portas em loopback por padrão e exige senhas fornecidas pelo ambiente. Não trate o compose de desenvolvimento como configuração de produção: use secrets manager, TLS, backups e rede privada antes de qualquer exposição.
 
 ```bash
-docker compose -f deploy/docker-compose.agentic.yml up -d
-export OLLAMA_AGENT_DATABASE_URL='postgres://usuario:senha@127.0.0.1:5432/ollama_agent?sslmode=disable'
-export OLLAMA_AGENT_REDIS_URL='redis://127.0.0.1:6379/0'
+export OLLAMA_AGENT_POSTGRES_PASSWORD="$(openssl rand -hex 24)"
+export OLLAMA_AGENT_REDIS_PASSWORD="$(openssl rand -hex 24)"
+docker compose -f deploy/docker-compose.agentic.yml up -d --wait
+export OLLAMA_AGENT_DATABASE_URL="postgres://ollama_agent:${OLLAMA_AGENT_POSTGRES_PASSWORD}@127.0.0.1:5432/ollama_agent?sslmode=disable"
+export OLLAMA_AGENT_REDIS_URL="redis://:${OLLAMA_AGENT_REDIS_PASSWORD}@127.0.0.1:6379/0"
 export OLLAMA_AGENT_OTLP_ENDPOINT='http://127.0.0.1:4318'
-./ollama-classe-a-plus serve
+OLLAMA_HOST=127.0.0.1:11434 ./bin/ollama-classe-a-plus serve
 ```
-
-> **Importante — RLS exige um papel sem superusuário.** O isolamento por
-> organização é aplicado por Row Level Security (`FORCE ROW LEVEL SECURITY`). O
-> PostgreSQL **ignora RLS para superusuários** (e para papéis com `BYPASSRLS`),
-> então a aplicação **nunca** deve conectar como o superusuário do banco. O
-> `deploy/postgres-init.sql` provisiona um papel de aplicação dedicado
-> `ollama_app` (`NOSUPERUSER NOBYPASSRLS`) que é o dono das tabelas criadas pelas
-> migrações; aponte `OLLAMA_AGENT_DATABASE_URL` para esse papel. Conectar como
-> superusuário anula silenciosamente o isolamento entre tenants.
 
 Em produção, use PostgreSQL gerenciado ou uma instância com backups e RLS revisado, Redis com autenticação e rede privada, e um collector OTLP com autenticação e retenção definida.
 
@@ -97,7 +99,7 @@ export OLLAMA_AGENT_MODEL='qwen3:32b'
 export OLLAMA_AGENT_EMBED_MODEL='nomic-embed-text'
 export OLLAMA_AGENT_AUTH_REQUIRED='true'
 export OLLAMA_AGENT_AUTH_STORE="$HOME/.local/share/ollama-classe-a-plus/auth"
-./ollama-classe-a-plus serve
+OLLAMA_HOST=127.0.0.1:11434 ./bin/ollama-classe-a-plus serve
 ```
 
 ### Variáveis do runtime
@@ -119,7 +121,8 @@ export OLLAMA_AGENT_AUTH_STORE="$HOME/.local/share/ollama-classe-a-plus/auth"
 | `OLLAMA_AGENT_OTLP_ENDPOINT` | Endpoint OTLP HTTP para traces distribuídos. |
 | `OLLAMA_AGENT_OTLP_ALLOW_INSECURE` | Permite OTLP HTTP sem TLS apenas em desenvolvimento controlado. |
 | `OLLAMA_AGENT_CONNECTORS` | Arquivo JSON de connectors HTTP allowlisted. |
-| `OLLAMA_AGENT_MCP` | Arquivo JSON de servidores MCP declarativos. |
+| `OLLAMA_AGENT_MCP` | Arquivo JSON de servidores MCP stdio declarativos. |
+| `OLLAMA_AGENT_REMOTE_MCP` | Arquivo JSON de servidores Remote MCP Streamable HTTP. |
 | `OLLAMA_AGENT_DEPLOYMENTS` | Arquivo JSON de providers Vercel, Netlify e generic. |
 | `OLLAMA_AGENT_MEDIA_BASE_URL` | Endpoint compatível para operações multimodais. |
 | `OLLAMA_AGENT_MEDIA_LOCAL` | Usa o endpoint local de mídia quando habilitado explicitamente. |
@@ -174,34 +177,50 @@ export OLLAMA_AGENT_DEPLOYMENTS="$PWD/examples/agent-deployments.json"
 export DZ23_VERCEL_TOKEN="$DZ23_VERCEL_TOKEN_FROM_SECRET_MANAGER"
 ```
 
-Uma publicação externa precisa ser explícita:
+Uma publicação externa precisa de uma aprovação persistida e tenant-bound. O cliente não pode autorizar a si mesmo enviando `approved=true` diretamente no deploy:
 
 ```bash
+# 1. solicitar approval pendente
 curl -X POST \
-  http://127.0.0.1:11434/api/agent/v1/builders/proj_123/deploy/vercel \
+  http://127.0.0.1:11434/api/agent/v1/builders/bld_123/deploy/vercel/approval \
   -H 'Content-Type: application/json' \
-  -d '{"approved":true,"target":"production"}'
+  -d '{"target":"production"}'
+
+# 2. owner/admin decide com a nonce retornada pelo servidor
+curl -X POST \
+  http://127.0.0.1:11434/api/agent/v1/builders/bld_123/deploy/vercel/approval/dapr_123 \
+  -H 'Content-Type: application/json' \
+  -d '{"approved":true,"reason":"release revisado","nonce":"nonce-do-servidor"}'
+
+# 3. consumir uma única vez a approval no deploy
+curl -X POST \
+  http://127.0.0.1:11434/api/agent/v1/builders/bld_123/deploy/vercel \
+  -H 'Content-Type: application/json' \
+  -d '{"approval_id":"dapr_123","target":"production","nonce":"nonce-do-servidor"}'
 ```
 
-O runtime valida o workspace, rejeita symlinks, limita tamanho e quantidade de arquivos, bloqueia redirects e exige HTTPS para endpoints externos. A implementação não concede automaticamente domínio, DNS, billing, projeto ou permissões de conta. O adapter generic permite integrar um gateway próprio; o contrato e a política de segurança desse gateway continuam responsabilidade do operador.
+O runtime valida o workspace, rejeita symlinks, limita tamanho e quantidade de arquivos, bloqueia redirects e exige HTTPS para endpoints externos. A implementação não concede automaticamente domínio, DNS, billing, projeto ou permissões de conta. O adapter generic permite integrar um gateway próprio; o contrato, o health check, o rollback/compensação e a política de segurança desse gateway continuam responsabilidade do operador. A nonce do exemplo é ilustrativa e não é uma credencial.
 
 ## Telas e estado visual
 
-A captura abaixo é real da rota `/agentic`, renderizada com Chromium usando fixtures locais demonstrativas para exibir a tela sem executar ações externas. Ela foi publicada na `main` como documentação do estado observado durante o desenvolvimento, não como prova de release ou de integração externa:
-
-![Mission Console atual](images/screens/agentic-console.png)
-
-Esta branch de documentação contém também a captura histórica de Settings e mockups conceituais, todos classificados explicitamente para não serem confundidos com funcionalidades homologadas:
+As capturas abaixo foram atualizadas em **2026-09-22** com Chromium, Vite dev e o servidor Ollama local em `127.0.0.1:3001`. Elas usam somente estado local/sandbox e não executam ações externas:
 
 | Tela | Imagem | Estado |
 |---|---|---|
-| Configurações e integrações | [configuration-mockup.png](images/mockups/configuration-mockup.png) | Direção visual planejada; configuração atual via API/env. |
-| Builder visual | [builder-mockup.png](images/mockups/builder-mockup.png) | Canvas e histórico têm base; editor rico ainda evolui. |
-| Companion mobile | [mobile-mockup.png](images/mockups/mobile-mockup.png) | Base Expo existe; push, conflitos avançados e lojas pendentes. |
-| Agentic Console real | [agentic-console.png](images/screens/agentic-console.png) | Rota implementada, dados da captura são demonstrativos. |
-| Settings publicada | [settings.png](images/screens/settings.png) | Captura documental da revisão publicada; não comprova contas ou integrações externas. |
+| Home do shell | [class-a-plus-home.png](images/screens/class-a-plus-home.png) | Composer, recomendações e navegação local-first. |
+| Agentic Console | [class-a-plus-agentic.png](images/screens/class-a-plus-agentic.png) | Nova tarefa, seleção de motor local, projeto, orquestração e pesquisa. |
+| Configurações e integrações | [class-a-plus-settings.png](images/screens/class-a-plus-settings.png) | Agentic Control Center sanitizado; valores de secrets não são exibidos. |
+| Company OS | [class-a-plus-company.png](images/screens/class-a-plus-company.png) | Growth OS sandbox com campanha, afiliados e produto local. |
+| Projetos | [class-a-plus-projects.png](images/screens/class-a-plus-projects.png) | CRUD local de projetos e política de approvals. |
+| Biblioteca | [class-a-plus-library.png](images/screens/class-a-plus-library.png) | Biblioteca consultando contratos locais de artifacts/memória. |
+| Agendado | [class-a-plus-scheduled.png](images/screens/class-a-plus-scheduled.png) | Schedules persistentes locais e estado de execução. |
+| Skills | [class-a-plus-skills.png](images/screens/class-a-plus-skills.png) | Catálogo de manifests e estado de confiança. |
+| Plugins | [class-a-plus-plugins.png](images/screens/class-a-plus-plugins.png) | Catalogs de connectors/MCP e política de approval. |
+| Tarefas | [class-a-plus-tasks.png](images/screens/class-a-plus-tasks.png) | Inbox de missões, estados e provider persistido. |
+| Builder visual | [builder-mockup.png](images/mockups/builder-mockup.png) | **CONCEITO** para o editor rico; preview/export local têm screenshots de API, não esta imagem. |
+| Companion mobile | [mobile-mockup.png](images/mockups/mobile-mockup.png) | **CONCEITO**; push, conflitos avançados, builds e lojas continuam pendentes. |
 
-As notas de proveniência estão em [`docs/images/ASSET_PROVENANCE.md`](images/ASSET_PROVENANCE.md), `docs/images/screens/SCREEN_CAPTURE_NOTES.md` e `docs/images/mockups/MOCKUP_NOTES.md`. Assets de Cline, Codex, Goose, VS Code e outras ferramentas na raiz `docs/images/` pertencem à documentação de integração herdada; não são telas do Classe A+.
+As notas de proveniência estão em `docs/images/screens/SCREEN_CAPTURE_NOTES.md`, no [manifesto com hashes](images/screens/class-a-plus-capture-manifest.json) e em `docs/images/mockups/MOCKUP_NOTES.md`. A CI executa `npm run screens:verify` para detectar alterações não registradas. Isso evita apresentar uma tela conceitual como funcionalidade concluída, mas não substitui homologação de produto.
 
 ## Desktop, mobile e companions
 
@@ -234,6 +253,8 @@ Para testes distribuídos que exigem serviços reais, use a tag e variáveis doc
 
 Também revise `git diff --check`, rode scanners de segredos, verifique permissões dos arquivos, confirme que não há tokens em logs e valide autorização negativa por organização. Toda operação com efeito externo deve ter approval, timeout, limite e registro auditável.
 
+Para proteger as superfícies Classe A+ durante atualizações do motor, execute também `scripts/check-class-a-plus-integrity.sh` e `node app/ui/app/scripts/smoke-shell.mjs`. A política completa de atualização manual, o commit upstream aceito e o procedimento de rollback estão em [`UPSTREAM_POLICY.md`](../UPSTREAM_POLICY.md). O remote `upstream` nunca é mesclado automaticamente.
+
 ## Como contribuir
 
 Crie uma branch descritiva a partir de `main`. Para cada feature, documente o objetivo, o contrato de API, a matriz de autorização, os estados de UI, o risco, os testes, a observabilidade e o plano de rollback. Implemente primeiro um fluxo vertical funcional antes de adicionar telas estáticas ou abstrações genéricas.
@@ -263,9 +284,7 @@ server/               rotas HTTP, auth, SAML, TLS e WebSocket
 app/ui/app/            UI web e Agentic Console
 apps/mobile-agentic/  cliente Expo para operação mobile
 docs/agentic/          arquitetura, API, integrações, roadmap e entregas
-docs/images/screens/   capturas observadas da UI Classe A+
-docs/images/mockups/   conceitos visuais, sempre rotulados
-docs/images/           assets upstream/terceiros de documentação de integração
+docs/images/           screenshots reais e mockups identificados
 examples/              configurações sem segredos
 schemas/               contratos versionados
 scripts/               gates e verificações
@@ -277,7 +296,7 @@ Este repositório deriva de uma base Ollama e deve preservar os arquivos de lice
 
 ## Links públicos
 
-- [Repositório Ollama Classe A+](https://github.com/DZ23-LTDA/ollama-classe-a-plus)
+- [Repositório público canônico](https://github.com/DZ23-LTDA/ollama-classe-a-plus)
 - [Branch de evolução agentic](https://github.com/DZ23-LTDA/ollama-classe-a-plus/tree/feat/manus-parity-omniroute)
 - [PRs de revisão](https://github.com/DZ23-LTDA/ollama-classe-a-plus/pulls)
 - [Arquitetura agentic](agentic/ARCHITECTURE.md)

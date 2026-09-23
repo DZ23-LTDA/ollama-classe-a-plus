@@ -88,10 +88,10 @@ type AgentResult struct {
 
 type OrchestrationJob struct {
 	ID             string             `json:"id"`
+	OrganizationID string             `json:"organization_id,omitempty"`
 	Objective      string             `json:"objective"`
 	Workspace      string             `json:"workspace,omitempty"`
 	ProjectID      string             `json:"project_id,omitempty"`
-	OrganizationID string             `json:"organization_id,omitempty"`
 	State          OrchestrationState `json:"state"`
 	Budget         AgentBudget        `json:"budget"`
 	Tasks          []AgentTask        `json:"tasks"`
@@ -114,6 +114,8 @@ type AgentOrchestrator struct {
 	reducer ResultReducer
 	jobs    map[string]OrchestrationJob
 }
+
+var ErrOrchestrationForbidden = errors.New("orchestration job is outside the active organization")
 
 func NewAgentOrchestrator(root string, runner SubagentRunner) (*AgentOrchestrator, error) {
 	if strings.TrimSpace(root) == "" {
@@ -159,17 +161,24 @@ func PlanAgentTasks(objective, workspace, projectID string, roles []AgentRole) (
 	return tasks, nil
 }
 
-func (o *AgentOrchestrator) Plan(objective, workspace, projectID, organizationID string, roles []AgentRole, budget AgentBudget) (OrchestrationJob, error) {
+func (o *AgentOrchestrator) Plan(objective, workspace, projectID string, roles []AgentRole, budget AgentBudget) (OrchestrationJob, error) {
+	return o.PlanForOrganization("local", objective, workspace, projectID, roles, budget)
+}
+
+func (o *AgentOrchestrator) PlanForOrganization(organizationID, objective, workspace, projectID string, roles []AgentRole, budget AgentBudget) (OrchestrationJob, error) {
 	tasks, err := PlanAgentTasks(objective, workspace, projectID, roles)
 	if err != nil {
 		return OrchestrationJob{}, err
 	}
 	budget = normalizeAgentBudget(budget, len(tasks))
 	now := time.Now().UTC()
-	job := OrchestrationJob{ID: "orch_" + uuid.NewString(), Objective: strings.TrimSpace(objective), Workspace: workspace, ProjectID: projectID, OrganizationID: strings.TrimSpace(organizationID), State: OrchestrationPlanned, Budget: budget, Tasks: tasks, CreatedAt: now, UpdatedAt: now}
+	job := OrchestrationJob{ID: "orch_" + uuid.NewString(), OrganizationID: normalizedOrganizationID(organizationID), Objective: strings.TrimSpace(objective), Workspace: workspace, ProjectID: projectID, State: OrchestrationPlanned, Budget: budget, Tasks: tasks, CreatedAt: now, UpdatedAt: now}
 	o.mu.Lock()
 	o.jobs[job.ID] = job
 	err = o.persistLocked()
+	if err != nil {
+		delete(o.jobs, job.ID)
+	}
 	o.mu.Unlock()
 	return job, err
 }
@@ -184,9 +193,21 @@ func (o *AgentOrchestrator) Get(id string) (OrchestrationJob, error) {
 	return job, nil
 }
 
+func (o *AgentOrchestrator) GetForOrganization(id, organizationID string) (OrchestrationJob, error) {
+	job, err := o.Get(id)
+	if err != nil {
+		return OrchestrationJob{}, err
+	}
+	if normalizedOrganizationID(job.OrganizationID) != normalizedOrganizationID(organizationID) {
+		return OrchestrationJob{}, ErrOrchestrationForbidden
+	}
+	return job, nil
+}
+
 func (o *AgentOrchestrator) Run(ctx context.Context, id string) (OrchestrationJob, error) {
 	o.mu.Lock()
-	job, ok := o.jobs[strings.TrimSpace(id)]
+	id = strings.TrimSpace(id)
+	job, ok := o.jobs[id]
 	if !ok {
 		o.mu.Unlock()
 		return OrchestrationJob{}, os.ErrNotExist
@@ -195,10 +216,15 @@ func (o *AgentOrchestrator) Run(ctx context.Context, id string) (OrchestrationJo
 		o.mu.Unlock()
 		return job, errors.New("orchestration job is already running")
 	}
+	previous := job
 	job.State = OrchestrationRunning
 	job.UpdatedAt = time.Now().UTC()
 	o.jobs[id] = job
-	_ = o.persistLocked()
+	if err := o.persistLocked(); err != nil {
+		o.jobs[id] = previous
+		o.mu.Unlock()
+		return previous, err
+	}
 	o.mu.Unlock()
 	if job.Budget.MaxSeconds > 0 {
 		var cancel context.CancelFunc
@@ -296,10 +322,24 @@ func (o *AgentOrchestrator) Run(ctx context.Context, id string) (OrchestrationJo
 	job.CompletedAt = &now
 	job.UpdatedAt = now
 	o.mu.Lock()
+	persistedJob := o.jobs[id]
 	o.jobs[id] = job
 	err := o.persistLocked()
+	if err != nil {
+		o.jobs[id] = persistedJob
+	}
 	o.mu.Unlock()
+	if err != nil {
+		return persistedJob, err
+	}
 	return job, err
+}
+
+func (o *AgentOrchestrator) RunForOrganization(ctx context.Context, id, organizationID string) (OrchestrationJob, error) {
+	if _, err := o.GetForOrganization(id, organizationID); err != nil {
+		return OrchestrationJob{}, err
+	}
+	return o.Run(ctx, id)
 }
 
 func (o *AgentOrchestrator) Cancel(id string) (OrchestrationJob, error) {
@@ -310,12 +350,32 @@ func (o *AgentOrchestrator) Cancel(id string) (OrchestrationJob, error) {
 		return OrchestrationJob{}, os.ErrNotExist
 	}
 	if job.State == OrchestrationPlanned {
+		previous := job
 		job.State = OrchestrationCancelled
 		job.UpdatedAt = time.Now().UTC()
 		o.jobs[id] = job
-		return job, o.persistLocked()
+		err := o.persistLocked()
+		if err != nil {
+			o.jobs[id] = previous
+			return previous, err
+		}
+		return job, nil
 	}
 	return job, errors.New("running cancellation requires the request context")
+}
+
+func (o *AgentOrchestrator) CancelForOrganization(id, organizationID string) (OrchestrationJob, error) {
+	if _, err := o.GetForOrganization(id, organizationID); err != nil {
+		return OrchestrationJob{}, err
+	}
+	return o.Cancel(id)
+}
+
+func normalizedOrganizationID(organizationID string) string {
+	if strings.TrimSpace(organizationID) == "" {
+		return "local"
+	}
+	return strings.TrimSpace(organizationID)
 }
 
 func (o *AgentOrchestrator) persistLocked() error {
@@ -368,8 +428,7 @@ func inferAgentRoles(objective string) []AgentRole {
 }
 
 func roleObjective(role AgentRole, objective string) string {
-	//nolint:misspell // "independente" é português (independently), não um erro de grafia
-	return fmt.Sprintf("Você é o subagente %s. Trabalhe de forma independente sobre o objetivo abaixo, registre evidências verificáveis, não invente resultados e entregue uma saída curta para síntese.\n\nObjetivo: %s", role, objective)
+	return fmt.Sprintf("Você é o subagente %s. Trabalhe de forma independente sobre o objetivo abaixo, registre evidências verificáveis, não invente resultados e entregue uma saída curta para síntese.\n\nObjetivo: %s", role, objective) //nolint:misspell // Portuguese orchestration prompt.
 }
 
 func defaultAgentReducer(_ context.Context, job OrchestrationJob) (string, []string, error) {

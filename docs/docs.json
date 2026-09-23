@@ -1,10 +1,16 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "name": "Ollama Classe A+",
+  "name": "Ollama",
   "colors": {
     "primary": "#000",
     "light": "#b5b5b5",
     "dark": "#000"
+  },
+  "favicon": "/images/favicon.png",
+  "logo": {
+    "light": "/images/logo.png",
+    "dark": "/images/logo-dark.png",
+    "href": "https://ollama.com"
   },
   "theme": "maple",
   "background": {
@@ -31,11 +37,16 @@
     ]
   },
   "navbar": {
-    "links": [],
+    "links": [
+      {
+        "label": "Sign in",
+        "href": "https://ollama.com/signin"
+      }
+    ],
     "primary": {
       "type": "button",
-      "label": "GitHub do projeto",
-      "href": "https://github.com/DZ23-LTDA/ollama-classe-a-plus"
+      "label": "Download",
+      "href": "https://ollama.com/download"
     }
   },
   "api": {
@@ -101,17 +112,12 @@
   "navigation": {
     "tabs": [
       {
-        "tab": "Classe A+ e compatibilidade",
+        "tab": "Guide",
         "groups": [
           {
-            "group": "Classe A+",
+            "group": "Get started",
             "pages": [
-              "index"
-            ]
-          },
-          {
-            "group": "Compatibilidade do motor",
-            "pages": [
+              "index",
               "quickstart",
               "/cloud"
             ]

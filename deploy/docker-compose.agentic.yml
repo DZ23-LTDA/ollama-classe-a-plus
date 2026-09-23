@@ -5,14 +5,14 @@ services:
     environment:
       POSTGRES_DB: ollama_agent
       POSTGRES_USER: ollama_agent
-      POSTGRES_PASSWORD: change-me-local-only
-    ports:
-      - "5432:5432"
+      POSTGRES_PASSWORD: ${OLLAMA_AGENT_POSTGRES_PASSWORD:?set OLLAMA_AGENT_POSTGRES_PASSWORD before starting compose}
     volumes:
       - agent-postgres:/var/lib/postgresql/data
-      - ./postgres-init.sql:/docker-entrypoint-initdb.d/10-nosuperuser.sql:ro
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "127.0.0.1:${OLLAMA_AGENT_POSTGRES_PORT:-5432}:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ollama_agent -d ollama_agent"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -20,13 +20,15 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes"]
+    environment:
+      OLLAMA_AGENT_REDIS_PASSWORD: ${OLLAMA_AGENT_REDIS_PASSWORD:?set OLLAMA_AGENT_REDIS_PASSWORD before starting compose}
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${OLLAMA_AGENT_REDIS_PASSWORD:?set OLLAMA_AGENT_REDIS_PASSWORD before starting compose}"]
     ports:
-      - "6379:6379"
+      - "127.0.0.1:${OLLAMA_AGENT_REDIS_PORT:-6379}:6379"
     volumes:
       - agent-redis:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "redis-cli -a \"$$OLLAMA_AGENT_REDIS_PASSWORD\" ping | grep -q PONG"]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -38,8 +40,8 @@ services:
     volumes:
       - ./otel-collector.yaml:/etc/otelcol/config.yaml:ro
     ports:
-      - "4318:4318"
-      - "4317:4317"
+      - "127.0.0.1:${OLLAMA_AGENT_OTLP_HTTP_PORT:-4318}:4318"
+      - "127.0.0.1:${OLLAMA_AGENT_OTLP_GRPC_PORT:-4317}:4317"
 
 volumes:
   agent-postgres:

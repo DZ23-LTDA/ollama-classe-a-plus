@@ -3,9 +3,12 @@
 package multillm
 
 import (
+	"errors"
 	"os"
 	"strings"
 )
+
+var errUnsupportedProtectedCredential = errors.New("protected credential format is unsupported on this platform")
 
 func credentialFilePermissionsSafe(info os.FileInfo) bool {
 	return info.Mode().Perm()&0o077 == 0

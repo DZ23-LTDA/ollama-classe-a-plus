@@ -25,6 +25,7 @@ import {
   ArrowPathIcon,
   Squares2X2Icon,
 } from "@heroicons/react/20/solid";
+import { AgenticControlCenter } from "@/components/AgenticControlCenter";
 import { Settings as SettingsType } from "@/gotypes";
 import { isWindowsPlatform } from "@/lib/platform";
 import { settingsMutationScope } from "@/lib/settingsMutationScope";
@@ -34,12 +35,12 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useBlocker } from "@tanstack/react-router";
 import {
   getSettings,
-  type CloudStatusSource,
   type CloudStatusResponse,
   updateCloudSetting,
   updateSettings,
   getInferenceCompute,
 } from "@/api";
+import { applySettingsDefaults } from "./settingsUtils";
 
 function AnimatedDots() {
   return (
@@ -55,18 +56,6 @@ function AnimatedDots() {
   );
 }
 
-interface SettingsDefaultsActions {
-  updateSettings: (settings: SettingsType) => Promise<unknown>;
-  updateCloud: (enabled: boolean) => Promise<unknown>;
-  updateShowAppsInMenu: (visible: boolean) => Promise<unknown>;
-  resetChatGPTModels: () => Promise<boolean>;
-  resetClaudeMappings: () => Promise<boolean>;
-  currentSettings: SettingsType;
-  currentShowAppsInMenu: boolean;
-  cloudSource: CloudStatusSource;
-  onSaved: () => void;
-}
-
 interface CloudUpdateRequest {
   enabled: boolean;
   requestId: number;
@@ -74,69 +63,6 @@ interface CloudUpdateRequest {
 
 let latestCloudRequestId = 0;
 const savedConfirmationDuration = 3000;
-
-export async function applySettingsDefaults({
-  updateSettings,
-  updateCloud,
-  updateShowAppsInMenu,
-  resetChatGPTModels,
-  resetClaudeMappings,
-  currentSettings,
-  currentShowAppsInMenu,
-  cloudSource,
-  onSaved,
-}: SettingsDefaultsActions): Promise<void> {
-  const cloudNeedsReset = cloudSource === "config" || cloudSource === "both";
-  const rollbacks: Array<() => Promise<unknown>> = [];
-
-  try {
-    if (cloudNeedsReset) {
-      await updateCloud(true);
-      rollbacks.push(() => updateCloud(false));
-    }
-
-    await updateSettings(
-      new SettingsType({
-        Expose: false,
-        Browser: false,
-        Models: "",
-        Agent: false,
-        Tools: false,
-        ContextLength: currentSettings.ContextLength,
-        AutoUpdateEnabled: true,
-      }),
-    );
-    rollbacks.push(() => updateSettings(currentSettings));
-
-    await updateShowAppsInMenu(true);
-    rollbacks.push(() => updateShowAppsInMenu(currentShowAppsInMenu));
-
-    // Reset app-specific model settings only after the rest of the page has
-    // succeeded, because those native profile changes cannot be rolled back
-    // with the settings API.
-    if (!(await resetChatGPTModels())) {
-      throw new Error("ChatGPT models could not be reset");
-    }
-    if (!(await resetClaudeMappings())) {
-      throw new Error("Claude model mappings could not be reset");
-    }
-  } catch (error) {
-    const rollbackErrors: unknown[] = [];
-    for (const rollback of rollbacks.reverse()) {
-      try {
-        await rollback();
-      } catch (rollbackError) {
-        rollbackErrors.push(rollbackError);
-      }
-    }
-    if (rollbackErrors.length > 0) {
-      console.error("Failed to roll back settings reset:", rollbackErrors);
-    }
-    throw error;
-  }
-
-  onSaved();
-}
 
 export default function Settings() {
   const queryClient = useQueryClient();
@@ -239,15 +165,16 @@ export default function Settings() {
 
       queryClient.setQueryData<CloudStatusResponse | null>(
         ["cloudStatus"],
-        previous
-          ? {
-              ...previous,
-              disabled: !enabled || envForcesDisabled,
-            }
-          : {
-              disabled: !enabled,
-              source: "config",
-            },
+        (): CloudStatusResponse | null =>
+          previous
+            ? {
+                ...previous,
+                disabled: !enabled || envForcesDisabled,
+              }
+            : {
+                disabled: !enabled,
+                source: "config",
+              },
       );
 
       return { previous };
@@ -473,15 +400,23 @@ export default function Settings() {
     }
   };
 
-  if (loading) {
-    return null;
-  }
-
-  if (error || !settings) {
+  if (loading || error || !settings) {
     return (
-      <div className="flex flex-1 items-center justify-center">
-        <div className="text-red-500">Failed to load settings</div>
-      </div>
+      <main className="flex min-h-0 w-full flex-1 flex-col select-none dark:bg-neutral-900">
+        <div className="w-full flex-1 overflow-y-auto p-6 overscroll-contain">
+          <div className="mx-auto max-w-4xl space-y-4">
+            <AgenticControlCenter />
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-200">
+              <div className="font-medium">
+                {loading ? "Consultando configuração nativa…" : "Configuração nativa indisponível neste momento"}
+              </div>
+              <p className="mt-1 text-xs leading-5 opacity-80">
+                O painel agentic acima continua disponível para diagnóstico sanitizado; inicie o servidor Ollama para editar as preferências nativas.
+              </p>
+            </div>
+          </div>
+        </div>
+      </main>
     );
   }
 
@@ -495,6 +430,7 @@ export default function Settings() {
           aria-busy={resettingToDefaults}
           className="mx-auto max-w-4xl space-y-4 border-0 p-0"
         >
+          <AgenticControlCenter />
           {/* Connect Ollama Account */}
           <div className="overflow-hidden rounded-xl bg-white dark:bg-neutral-800">
             <div className="p-4">

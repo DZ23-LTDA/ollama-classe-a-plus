@@ -28,6 +28,9 @@ func BuildArtifactManifest(workspace, missionID, stepID, name, relativePath stri
 	if !isWithin(root, candidate) {
 		return ArtifactManifest{}, errors.New("artifact path escapes workspace")
 	}
+	if err := rejectSymlinkComponents(root, candidate); err != nil {
+		return ArtifactManifest{}, err
+	}
 	info, err := os.Stat(candidate)
 	if err != nil {
 		return ArtifactManifest{}, err

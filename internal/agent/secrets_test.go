@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -43,4 +44,34 @@ func TestDLPRedactsKnownCredentialShapes(t *testing.T) {
 	if strings.Contains(redacted, "abcdefghijklmnop1234") || strings.Contains(redacted, "ghp_abcdefghijklmnopqrstuvwxyz123456") {
 		t.Fatalf("DLP did not redact: %s", redacted)
 	}
+}
+
+func TestRedactValueRecursesThroughToolPayloads(t *testing.T) {
+	value := map[string]any{
+		"nested":     map[string]any{"token": "xai-abcdefghijklmnopqrstuvwxyz123456"},
+		"items":      []any{"sk-or-v1-abcdefghijklmnopqrstuvwxyz123456", "AKIA1234567890ABCDEF"},
+		"credential": "api_key=super-secret-token-value",
+	}
+	redacted, ok := RedactValue(value).(map[string]any)
+	if !ok {
+		t.Fatalf("redacted type=%T", RedactValue(value))
+	}
+	if strings.Contains(strings.Join([]string{stringValue(redacted["credential"]), redactedString(redacted["nested"]), redactedString(redacted["items"])}, " "), "super-secret-token-value") {
+		t.Fatalf("credential survived redaction: %+v", redacted)
+	}
+	if strings.Contains(redactedString(redacted["nested"]), "xai-") || strings.Contains(redactedString(redacted["items"]), "sk-or-v1-") || strings.Contains(redactedString(redacted["items"]), "AKIA") {
+		t.Fatalf("token survived redaction: %+v", redacted)
+	}
+}
+
+func stringValue(value any) string {
+	if text, ok := value.(string); ok {
+		return text
+	}
+	return ""
+}
+
+func redactedString(value any) string {
+	encoded, _ := json.Marshal(value)
+	return string(encoded)
 }

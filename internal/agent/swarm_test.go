@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"errors"
+	"os"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -36,7 +37,7 @@ func TestAgentOrchestratorRunsSpecialistsAndSynthesizes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	job, err := orchestrator.Plan("pesquisar e revisar arquitetura", t.TempDir(), "project-1", "", []AgentRole{RoleResearch, RoleSecurity, RoleReview}, AgentBudget{MaxAgents: 2, MaxRetries: 1, MaxSeconds: 10})
+	job, err := orchestrator.Plan("pesquisar e revisar arquitetura", t.TempDir(), "project-1", []AgentRole{RoleResearch, RoleSecurity, RoleReview}, AgentBudget{MaxAgents: 2, MaxRetries: 1, MaxSeconds: 10})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,7 +62,7 @@ func TestAgentOrchestratorPersistsAndCancelsPlannedJob(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	job, err := orchestrator.Plan("test", root, "", "", []AgentRole{RoleTesting}, AgentBudget{})
+	job, err := orchestrator.Plan("test", root, "", []AgentRole{RoleTesting}, AgentBudget{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,4 +77,75 @@ func TestAgentOrchestratorPersistsAndCancelsPlannedJob(t *testing.T) {
 	if err != nil || stored.State != OrchestrationCancelled {
 		t.Fatalf("stored=%+v err=%v", stored, err)
 	}
+}
+
+func TestAgentOrchestratorOrganizationScope(t *testing.T) {
+	orchestrator, err := NewAgentOrchestrator(t.TempDir(), func(context.Context, AgentTask) (AgentResult, error) { return AgentResult{}, nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+	job, err := orchestrator.PlanForOrganization("org-a", "tenant A", t.TempDir(), "", []AgentRole{RoleTesting}, AgentBudget{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := orchestrator.GetForOrganization(job.ID, "org-b"); !errors.Is(err, ErrOrchestrationForbidden) {
+		t.Fatalf("cross-tenant orchestration read err=%v", err)
+	}
+	if _, err := orchestrator.CancelForOrganization(job.ID, "org-b"); !errors.Is(err, ErrOrchestrationForbidden) {
+		t.Fatalf("cross-tenant orchestration cancel err=%v", err)
+	}
+	stored, err := orchestrator.GetForOrganization(job.ID, "org-a")
+	if err != nil || stored.State != OrchestrationPlanned {
+		t.Fatalf("cross-tenant cancel mutated job=%+v err=%v", stored, err)
+	}
+}
+
+func TestAgentOrchestratorRollsBackRunAndCancelOnPersistenceFailure(t *testing.T) {
+	t.Run("run", func(t *testing.T) {
+		root := t.TempDir()
+		orchestrator, err := NewAgentOrchestrator(root, func(context.Context, AgentTask) (AgentResult, error) {
+			return AgentResult{Output: "unused"}, nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		job, err := orchestrator.Plan("run rollback", root, "", []AgentRole{RoleTesting}, AgentBudget{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.RemoveAll(root); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := orchestrator.Run(context.Background(), job.ID); err == nil {
+			t.Fatal("run unexpectedly succeeded without a writable ledger")
+		}
+		stored, err := orchestrator.Get(job.ID)
+		if err != nil || stored.State != OrchestrationPlanned {
+			t.Fatalf("run mutated memory after persistence failure: stored=%+v err=%v", stored, err)
+		}
+	})
+
+	t.Run("cancel", func(t *testing.T) {
+		root := t.TempDir()
+		orchestrator, err := NewAgentOrchestrator(root, func(context.Context, AgentTask) (AgentResult, error) {
+			return AgentResult{}, nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		job, err := orchestrator.Plan("cancel rollback", root, "", []AgentRole{RoleTesting}, AgentBudget{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.RemoveAll(root); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := orchestrator.Cancel(job.ID); err == nil {
+			t.Fatal("cancel unexpectedly succeeded without a writable ledger")
+		}
+		stored, err := orchestrator.Get(job.ID)
+		if err != nil || stored.State != OrchestrationPlanned {
+			t.Fatalf("cancel mutated memory after persistence failure: stored=%+v err=%v", stored, err)
+		}
+	})
 }

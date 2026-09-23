@@ -1,10 +1,12 @@
 package agent
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"os"
 	"path/filepath"
@@ -17,13 +19,15 @@ import (
 )
 
 type ContextStore struct {
-	mu        sync.RWMutex
-	root      string
-	projects  map[string]Project
-	memories  map[string][]Memory
-	skills    map[string]SkillManifest
-	schedules map[string]Schedule
-	embedder  Embedder
+	mu            sync.RWMutex
+	root          string
+	workspaceRoot string
+	projects      map[string]Project
+	memories      map[string][]Memory
+	skills        map[string]SkillManifest
+	skillPaths    map[string]string
+	schedules     map[string]Schedule
+	embedder      Embedder
 }
 
 type Embedder interface {
@@ -32,7 +36,7 @@ type Embedder interface {
 
 func NewContextStore(root string) (*ContextStore, error) {
 	if strings.TrimSpace(root) == "" {
-		return &ContextStore{projects: map[string]Project{}, memories: map[string][]Memory{}, skills: map[string]SkillManifest{}, schedules: map[string]Schedule{}}, nil
+		return &ContextStore{projects: map[string]Project{}, memories: map[string][]Memory{}, skills: map[string]SkillManifest{}, skillPaths: map[string]string{}, schedules: map[string]Schedule{}}, nil
 	}
 	if err := os.MkdirAll(filepath.Join(root, "projects"), 0o700); err != nil {
 		return nil, err
@@ -43,7 +47,10 @@ func NewContextStore(root string) (*ContextStore, error) {
 	if err := os.MkdirAll(filepath.Join(root, "schedules"), 0o700); err != nil {
 		return nil, err
 	}
-	store := &ContextStore{root: root, projects: map[string]Project{}, memories: map[string][]Memory{}, skills: map[string]SkillManifest{}, schedules: map[string]Schedule{}}
+	if err := os.MkdirAll(filepath.Join(root, "skills"), 0o700); err != nil {
+		return nil, err
+	}
+	store := &ContextStore{root: root, projects: map[string]Project{}, memories: map[string][]Memory{}, skills: map[string]SkillManifest{}, skillPaths: map[string]string{}, schedules: map[string]Schedule{}}
 	projectEntries, err := os.ReadDir(filepath.Join(root, "projects"))
 	if err != nil {
 		return nil, err
@@ -87,10 +94,43 @@ func NewContextStore(root string) (*ContextStore, error) {
 		}
 		store.schedules[schedule.ID] = schedule
 	}
+	skillEntries, err := os.ReadDir(filepath.Join(root, "skills"))
+	if err != nil {
+		return nil, err
+	}
+	for _, entry := range skillEntries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
+			continue
+		}
+		var manifest SkillManifest
+		if err := readJSON(filepath.Join(root, "skills", entry.Name()), &manifest); err != nil {
+			return nil, err
+		}
+		if err := validateSkillManifest(&manifest); err != nil {
+			return nil, fmt.Errorf("skill %s: %w", entry.Name(), err)
+		}
+		manifest.Trusted = false
+		store.skills[manifest.ID] = manifest
+		store.skillPaths[manifest.ID] = filepath.Join(root, "skills", entry.Name())
+	}
 	return store, nil
 }
 
-func (s *ContextStore) CreateProject(name, root, organizationID string) (Project, error) {
+func (s *ContextStore) SetWorkspaceRoot(root string) error {
+	if s == nil {
+		return errors.New("context store is required")
+	}
+	canonical, err := canonicalExistingDirectory(root)
+	if err != nil {
+		return fmt.Errorf("runtime workspace is invalid: %w", err)
+	}
+	s.mu.Lock()
+	s.workspaceRoot = canonical
+	s.mu.Unlock()
+	return nil
+}
+
+func (s *ContextStore) CreateProject(name, root string, organizationIDs ...string) (Project, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return Project{}, errors.New("project name is required")
@@ -99,16 +139,39 @@ func (s *ContextStore) CreateProject(name, root, organizationID string) (Project
 		return Project{}, errors.New("project name is too long")
 	}
 	now := time.Now().UTC()
-	project := Project{ID: "prj_" + uuid.NewString(), Name: name, Root: root, OrganizationID: strings.TrimSpace(organizationID), CreatedAt: now, UpdatedAt: now}
+	organizationID := ""
+	if len(organizationIDs) > 0 {
+		organizationID = strings.TrimSpace(organizationIDs[0])
+	}
+	project := Project{ID: "prj_" + uuid.NewString(), Name: name, Root: root, OrganizationID: organizationID, CreatedAt: now, UpdatedAt: now}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	canonicalRoot, err := canonicalProjectRoot(s.workspaceRoot, root)
+	if err != nil {
+		return Project{}, err
+	}
+	project.Root = canonicalRoot
 	s.projects[project.ID] = project
 	if s.root != "" {
 		if err := writeJSONAtomic(filepath.Join(s.root, "projects", project.ID+".json"), project); err != nil {
+			delete(s.projects, project.ID)
 			return Project{}, err
 		}
 	}
 	return project, nil
+}
+
+func (s *ContextStore) ListProjects() []Project {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	result := make([]Project, 0, len(s.projects))
+	for _, project := range s.projects {
+		result = append(result, project)
+	}
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].UpdatedAt.After(result[j].UpdatedAt)
+	})
+	return result
 }
 
 func (s *ContextStore) GetProject(id string) (Project, error) {
@@ -119,6 +182,65 @@ func (s *ContextStore) GetProject(id string) (Project, error) {
 		return Project{}, os.ErrNotExist
 	}
 	return project, nil
+}
+
+func (s *ContextStore) UpdateProject(id, name, root string) (Project, error) {
+	id = strings.TrimSpace(id)
+	name = strings.TrimSpace(name)
+	if id == "" {
+		return Project{}, errors.New("project id is required")
+	}
+	if name == "" {
+		return Project{}, errors.New("project name is required")
+	}
+	if len(name) > 200 {
+		return Project{}, errors.New("project name is too long")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	project, ok := s.projects[id]
+	if !ok {
+		return Project{}, os.ErrNotExist
+	}
+	canonicalRoot, err := canonicalProjectRoot(s.workspaceRoot, root)
+	if err != nil {
+		return Project{}, err
+	}
+	previous := project
+	project.Name = name
+	project.Root = canonicalRoot
+	project.UpdatedAt = time.Now().UTC()
+	s.projects[id] = project
+	if s.root != "" {
+		if err := writeJSONAtomic(filepath.Join(s.root, "projects", id+".json"), project); err != nil {
+			s.projects[id] = previous
+			return Project{}, err
+		}
+	}
+	return project, nil
+}
+
+func (s *ContextStore) DeleteProject(id string) error {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return errors.New("project id is required")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.projects[id]; !ok {
+		return os.ErrNotExist
+	}
+	delete(s.projects, id)
+	delete(s.memories, id)
+	if s.root != "" {
+		if err := os.Remove(filepath.Join(s.root, "projects", id+".json")); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+		if err := os.Remove(filepath.Join(s.root, "memories", id+".json")); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *ContextStore) SetEmbedder(embedder Embedder) {
@@ -163,9 +285,15 @@ func (s *ContextStore) AddMemoryContext(ctx context.Context, memory Memory) (Mem
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	previous := append([]Memory(nil), s.memories[memory.ProjectID]...)
 	s.memories[memory.ProjectID] = append(s.memories[memory.ProjectID], memory)
 	if s.root != "" {
 		if err := writeJSONAtomic(filepath.Join(s.root, "memories", memory.ProjectID+".json"), s.memories[memory.ProjectID]); err != nil {
+			if previous == nil {
+				delete(s.memories, memory.ProjectID)
+			} else {
+				s.memories[memory.ProjectID] = previous
+			}
 			return Memory{}, err
 		}
 	}
@@ -244,7 +372,11 @@ func cosineSimilarity(a, b []float32) float64 {
 	return dot / (math.Sqrt(normA) * math.Sqrt(normB))
 }
 
-func (s *ContextStore) LoadSkills(dir string, trusted bool) error {
+func (s *ContextStore) LoadSkills(dir string, _ bool) error {
+	return s.LoadSkillsForOrganization(dir, "")
+}
+
+func (s *ContextStore) LoadSkillsForOrganization(dir, organizationID string) error {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return err
@@ -259,13 +391,27 @@ func (s *ContextStore) LoadSkills(dir string, trusted bool) error {
 			return err
 		}
 		var manifest SkillManifest
-		if err := json.Unmarshal(data, &manifest); err != nil {
+		decoder := json.NewDecoder(bytes.NewReader(data))
+		decoder.DisallowUnknownFields()
+		if err := decoder.Decode(&manifest); err != nil {
 			return fmt.Errorf("skill %s: %w", entry.Name(), err)
+		}
+		var extra any
+		if err := decoder.Decode(&extra); err != io.EOF {
+			if err == nil {
+				return fmt.Errorf("skill %s contains trailing JSON", entry.Name())
+			}
+			return fmt.Errorf("skill %s trailing JSON: %w", entry.Name(), err)
 		}
 		if strings.TrimSpace(manifest.ID) == "" || strings.TrimSpace(manifest.Version) == "" {
 			return fmt.Errorf("skill %s has no id or version", entry.Name())
 		}
-		manifest.Trusted = trusted
+		// A skill manifest is untrusted until a future signed-attestation path
+		// verifies its source, digest and owner. Never accept trust from JSON or
+		// from a caller-controlled boolean.
+		manifest.OrganizationID = strings.TrimSpace(organizationID)
+		manifest.Trusted = false
+		manifest.Enabled = true
 		loaded[manifest.ID] = manifest
 	}
 	s.mu.Lock()
@@ -274,6 +420,94 @@ func (s *ContextStore) LoadSkills(dir string, trusted bool) error {
 		s.skills[id] = manifest
 	}
 	return nil
+}
+
+func validateSkillManifest(manifest *SkillManifest) error {
+	manifest.ID = strings.TrimSpace(manifest.ID)
+	manifest.Version = strings.TrimSpace(manifest.Version)
+	manifest.OrganizationID = strings.TrimSpace(manifest.OrganizationID)
+	manifest.Description = strings.TrimSpace(manifest.Description)
+	if manifest.ID == "" || manifest.Version == "" {
+		return errors.New("skill id and version are required")
+	}
+	if len(manifest.ID) > 120 || strings.ContainsAny(manifest.ID, "/\\\x00\r\n") {
+		return errors.New("skill id is invalid")
+	}
+	if len(manifest.Version) > 64 || len(manifest.Description) > 4000 {
+		return errors.New("skill manifest field is too long")
+	}
+	return nil
+}
+
+func (s *ContextStore) RegisterSkill(manifest SkillManifest) error {
+	return s.registerSkill(manifest, "")
+}
+
+func (s *ContextStore) RegisterSkillForOrganization(organizationID string, manifest SkillManifest) error {
+	organizationID = strings.TrimSpace(organizationID)
+	if organizationID == "" {
+		return errors.New("skill organization scope is required")
+	}
+	if supplied := strings.TrimSpace(manifest.OrganizationID); supplied != "" && supplied != organizationID {
+		return ErrPluginOrganizationScope
+	}
+	manifest.OrganizationID = organizationID
+	return s.registerSkill(manifest, organizationID)
+}
+
+func (s *ContextStore) registerSkill(manifest SkillManifest, organizationID string) error {
+	manifest.Trusted = false
+	manifest.Enabled = true
+	if err := validateSkillManifest(&manifest); err != nil {
+		return err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if organizationID != "" {
+		if existing, ok := s.skills[manifest.ID]; ok && !pluginOwnedByOrganization(existing.OrganizationID, organizationID) {
+			return ErrPluginOrganizationScope
+		}
+	}
+	if s.skillPaths == nil {
+		s.skillPaths = map[string]string{}
+	}
+	path := s.skillPaths[manifest.ID]
+	if path == "" && s.root != "" {
+		path = filepath.Join(s.root, "skills", manifest.ID+".json")
+		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+			return err
+		}
+	}
+	previous, existed := s.skills[manifest.ID]
+	previousPath := s.skillPaths[manifest.ID]
+	s.skills[manifest.ID] = manifest
+	if path != "" {
+		s.skillPaths[manifest.ID] = path
+		if err := writeJSONAtomic(path, manifest); err != nil {
+			if existed {
+				s.skills[manifest.ID] = previous
+			} else {
+				delete(s.skills, manifest.ID)
+			}
+			if previousPath != "" {
+				s.skillPaths[manifest.ID] = previousPath
+			} else {
+				delete(s.skillPaths, manifest.ID)
+			}
+			return fmt.Errorf("persist skill manifest: %w", err)
+		}
+	}
+	return nil
+}
+
+func (s *ContextStore) persistSkillLocked(id string) error {
+	path := s.skillPaths[id]
+	if path == "" {
+		return nil
+	}
+	manifest := s.skills[id]
+	manifest.Trusted = false
+	return writeJSONAtomic(path, manifest)
 }
 
 func (s *ContextStore) Skills() []SkillManifest {
@@ -285,6 +519,105 @@ func (s *ContextStore) Skills() []SkillManifest {
 	}
 	sort.Slice(result, func(i, j int) bool { return result[i].ID < result[j].ID })
 	return result
+}
+
+func (s *ContextStore) SkillsForOrganization(organizationID string) []SkillManifest {
+	organizationID = strings.TrimSpace(organizationID)
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	result := make([]SkillManifest, 0)
+	for _, skill := range s.skills {
+		if skill.OrganizationID != "" && !pluginOwnedByOrganization(skill.OrganizationID, organizationID) {
+			continue
+		}
+		result = append(result, skill)
+	}
+	sort.Slice(result, func(i, j int) bool { return result[i].ID < result[j].ID })
+	return result
+}
+
+func (s *ContextStore) SetSkillEnabled(id string, enabled bool) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	id = strings.TrimSpace(id)
+	skill, ok := s.skills[id]
+	if !ok {
+		return fmt.Errorf("skill %q is not registered", id)
+	}
+	skill.Enabled = enabled
+	s.skills[id] = skill
+	if err := s.persistSkillLocked(id); err != nil {
+		skill.Enabled = !skill.Enabled
+		s.skills[id] = skill
+		return fmt.Errorf("persist skill manifest: %w", err)
+	}
+	return nil
+}
+
+func (s *ContextStore) SetSkillEnabledForOrganization(organizationID, id string, enabled bool) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	id = strings.TrimSpace(id)
+	skill, ok := s.skills[id]
+	if !ok {
+		return fmt.Errorf("skill %q is not registered", id)
+	}
+	if !pluginOwnedByOrganization(skill.OrganizationID, strings.TrimSpace(organizationID)) {
+		return ErrPluginOrganizationScope
+	}
+	skill.Enabled = enabled
+	s.skills[id] = skill
+	if err := s.persistSkillLocked(id); err != nil {
+		skill.Enabled = !skill.Enabled
+		s.skills[id] = skill
+		return fmt.Errorf("persist skill manifest: %w", err)
+	}
+	return nil
+}
+
+func (s *ContextStore) RemoveSkill(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	id = strings.TrimSpace(id)
+	skill, ok := s.skills[id]
+	if !ok {
+		return fmt.Errorf("skill %q is not registered", id)
+	}
+	delete(s.skills, id)
+	path := s.skillPaths[id]
+	delete(s.skillPaths, id)
+	if path != "" {
+		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+			s.skills[id] = skill
+			s.skillPaths[id] = path
+			return fmt.Errorf("remove skill manifest: %w", err)
+		}
+	}
+	return nil
+}
+
+func (s *ContextStore) RemoveSkillForOrganization(organizationID, id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	id = strings.TrimSpace(id)
+	skill, ok := s.skills[id]
+	if !ok {
+		return fmt.Errorf("skill %q is not registered", id)
+	}
+	if !pluginOwnedByOrganization(skill.OrganizationID, strings.TrimSpace(organizationID)) {
+		return ErrPluginOrganizationScope
+	}
+	delete(s.skills, id)
+	path := s.skillPaths[id]
+	delete(s.skillPaths, id)
+	if path != "" {
+		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+			s.skills[id] = skill
+			s.skillPaths[id] = path
+			return fmt.Errorf("remove skill manifest: %w", err)
+		}
+	}
+	return nil
 }
 
 func (s *ContextStore) CreateSchedule(schedule Schedule) (Schedule, error) {
@@ -309,6 +642,7 @@ func (s *ContextStore) CreateSchedule(schedule Schedule) (Schedule, error) {
 	s.schedules[schedule.ID] = schedule
 	if s.root != "" {
 		if err := writeJSONAtomic(filepath.Join(s.root, "schedules", schedule.ID+".json"), schedule); err != nil {
+			delete(s.schedules, schedule.ID)
 			return Schedule{}, err
 		}
 	}
@@ -326,14 +660,77 @@ func (s *ContextStore) GetSchedule(id string) (Schedule, error) {
 }
 
 func (s *ContextStore) ListSchedules() []Schedule {
+	return s.ListSchedulesForOrganization("")
+}
+
+func (s *ContextStore) ListSchedulesForOrganization(organizationID string) []Schedule {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	result := make([]Schedule, 0, len(s.schedules))
 	for _, schedule := range s.schedules {
+		if organizationID != "" && schedule.OrganizationID != organizationID {
+			continue
+		}
 		result = append(result, schedule)
 	}
 	sort.Slice(result, func(i, j int) bool { return result[i].NextRunAt.Before(result[j].NextRunAt) })
 	return result
+}
+
+func (s *ContextStore) UpdateSchedule(id string, schedule Schedule) (Schedule, error) {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return Schedule{}, errors.New("schedule id is required")
+	}
+	if strings.TrimSpace(schedule.Objective) == "" {
+		return Schedule{}, errors.New("schedule objective is required")
+	}
+	if schedule.IntervalSeconds < 1 || schedule.IntervalSeconds > 31*24*60*60 {
+		return Schedule{}, errors.New("schedule interval must be between 1 second and 31 days")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	current, ok := s.schedules[id]
+	if !ok {
+		return Schedule{}, os.ErrNotExist
+	}
+	previous := current
+	schedule.ID = id
+	schedule.OrganizationID = current.OrganizationID
+	schedule.CreatedAt = current.CreatedAt
+	schedule.UpdatedAt = time.Now().UTC()
+	if schedule.NextRunAt.IsZero() {
+		schedule.NextRunAt = time.Now().UTC().Add(time.Duration(schedule.IntervalSeconds) * time.Second)
+	}
+	s.schedules[id] = schedule
+	if s.root != "" {
+		if err := writeJSONAtomic(filepath.Join(s.root, "schedules", id+".json"), schedule); err != nil {
+			s.schedules[id] = previous
+			return Schedule{}, err
+		}
+	}
+	return schedule, nil
+}
+
+func (s *ContextStore) DeleteSchedule(id string) error {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return errors.New("schedule id is required")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	schedule, ok := s.schedules[id]
+	if !ok {
+		return os.ErrNotExist
+	}
+	delete(s.schedules, id)
+	if s.root != "" {
+		if err := os.Remove(filepath.Join(s.root, "schedules", id+".json")); err != nil && !errors.Is(err, os.ErrNotExist) {
+			s.schedules[id] = schedule
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *ContextStore) ClaimDueSchedules(now time.Time) []Schedule {
@@ -344,15 +741,19 @@ func (s *ContextStore) ClaimDueSchedules(now time.Time) []Schedule {
 		if !schedule.Enabled || schedule.NextRunAt.After(now) {
 			continue
 		}
-		due = append(due, schedule)
+		previous := schedule
 		last := now
 		schedule.LastRunAt = &last
 		schedule.NextRunAt = now.Add(time.Duration(schedule.IntervalSeconds) * time.Second)
 		schedule.UpdatedAt = now
-		s.schedules[id] = schedule
 		if s.root != "" {
-			_ = writeJSONAtomic(filepath.Join(s.root, "schedules", id+".json"), schedule)
+			if err := writeJSONAtomic(filepath.Join(s.root, "schedules", id+".json"), schedule); err != nil {
+				s.schedules[id] = previous
+				continue
+			}
 		}
+		s.schedules[id] = schedule
+		due = append(due, schedule)
 	}
 	return due
 }

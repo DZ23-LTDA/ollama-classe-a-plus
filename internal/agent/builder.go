@@ -29,8 +29,8 @@ const (
 
 type BuilderProject struct {
 	ID             string              `json:"id"`
+	OrganizationID string              `json:"organization_id"`
 	Name           string              `json:"name"`
-	OrganizationID string              `json:"organization_id,omitempty"`
 	Kind           BuilderKind         `json:"kind"`
 	Entry          string              `json:"entry"`
 	Version        int                 `json:"version"`
@@ -128,6 +128,13 @@ func (b *BuilderService) Create(ctx context.Context, spec BuilderSpec) (BuilderP
 			return BuilderProject{}, err
 		}
 	}
+	if _, exists := spec.Files[entry]; !exists {
+		return BuilderProject{}, fmt.Errorf("builder entry %q does not exist", entry)
+	}
+	organizationID := strings.TrimSpace(spec.OrganizationID)
+	if organizationID == "" {
+		organizationID = "local"
+	}
 	id := "bld_" + uuid.NewString()
 	now := time.Now().UTC()
 	projectRoot := filepath.Join(b.root, id)
@@ -140,7 +147,7 @@ func (b *BuilderService) Create(ctx context.Context, spec BuilderSpec) (BuilderP
 			return BuilderProject{}, err
 		}
 	}
-	project := BuilderProject{ID: id, Name: name, OrganizationID: strings.TrimSpace(spec.OrganizationID), Kind: spec.Kind, Entry: filepath.ToSlash(entry), Version: 1, Status: "draft", Root: projectRoot, Components: spec.Components, CreatedAt: now, UpdatedAt: now}
+	project := BuilderProject{ID: id, OrganizationID: organizationID, Name: name, Kind: spec.Kind, Entry: filepath.ToSlash(entry), Version: 1, Status: "draft", Root: projectRoot, Components: spec.Components, CreatedAt: now, UpdatedAt: now}
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.projects[id] = project
@@ -259,6 +266,26 @@ func (b *BuilderService) Get(id string) (BuilderProject, error) {
 	return project, nil
 }
 
+var ErrBuilderForbidden = errors.New("builder project is outside the active organization")
+
+func normalizedBuilderOrganization(id string) string {
+	if strings.TrimSpace(id) == "" {
+		return "local"
+	}
+	return strings.TrimSpace(id)
+}
+
+func (b *BuilderService) GetForOrganization(id, organizationID string) (BuilderProject, error) {
+	project, err := b.Get(id)
+	if err != nil {
+		return BuilderProject{}, err
+	}
+	if normalizedBuilderOrganization(project.OrganizationID) != normalizedBuilderOrganization(organizationID) {
+		return BuilderProject{}, ErrBuilderForbidden
+	}
+	return project, nil
+}
+
 func (b *BuilderService) Preview(ctx context.Context, id string) (BuilderProject, ArtifactManifest, error) {
 	if err := ctx.Err(); err != nil {
 		return BuilderProject{}, ArtifactManifest{}, err
@@ -270,6 +297,9 @@ func (b *BuilderService) Preview(ctx context.Context, id string) (BuilderProject
 		return BuilderProject{}, ArtifactManifest{}, os.ErrNotExist
 	}
 	entryPath := filepath.Join(project.Root, filepath.FromSlash(project.Entry))
+	if err := rejectSymlinkComponents(project.Root, entryPath); err != nil {
+		return BuilderProject{}, ArtifactManifest{}, err
+	}
 	if _, err := os.Stat(entryPath); err != nil {
 		return BuilderProject{}, ArtifactManifest{}, err
 	}
@@ -375,6 +405,20 @@ func (b *BuilderService) List() []BuilderProject {
 	return result
 }
 
+func (b *BuilderService) ListForOrganization(organizationID string) []BuilderProject {
+	organizationID = normalizedBuilderOrganization(organizationID)
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	result := make([]BuilderProject, 0, len(b.projects))
+	for _, project := range b.projects {
+		if normalizedBuilderOrganization(project.OrganizationID) == organizationID {
+			result = append(result, project)
+		}
+	}
+	sort.Slice(result, func(i, j int) bool { return result[i].UpdatedAt.Before(result[j].UpdatedAt) })
+	return result
+}
+
 func (b *BuilderService) persistLocked() error {
 	return writeJSONAtomic(filepath.Join(b.root, "projects.json"), b.projects)
 }
@@ -400,7 +444,7 @@ func validateBuilderFile(path, contents string) error {
 }
 
 func templateFiles(kind BuilderKind, name string) map[string]string {
-	title := name
+	title := htmlEscape(name)
 	switch kind {
 	case BuilderGame:
 		return map[string]string{"index.html": "<!doctype html><html><head><meta charset=\"utf-8\"><title>" + title + "</title></head><body><main id=\"game\"></main><script type=\"module\" src=\"game.ts\"></script></body></html>", "game.ts": "// Babylon.js game entrypoint. Add GameCanvas integration here.\nconst root = document.querySelector('#game'); if (root) root.textContent = 'Game preview ready';"}
@@ -487,6 +531,9 @@ func copyFiles(src, dst string) error {
 		}
 		if relative == "." {
 			return nil
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return errors.New("builder export refuses symlink")
 		}
 		target := filepath.Join(dst, relative)
 		if info.IsDir() {

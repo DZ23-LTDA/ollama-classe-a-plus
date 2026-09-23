@@ -153,9 +153,9 @@ func (e *ResearchEngine) fetch(ctx context.Context, rawURL string, maxBytes int6
 	request.Header.Set("User-Agent", "ollama-dz23-research/1")
 	fetchClient := e.client()
 	if !(e.AllowHTTPForTests && parsed.Scheme == "http") {
-		pinned, err := pinnedClient(ctx, fetchClient, rawURL)
-		if err != nil {
-			result.Error = err.Error()
+		pinned, perr := pinnedClient(ctx, fetchClient, rawURL)
+		if perr != nil {
+			result.Error = perr.Error()
 			return result
 		}
 		fetchClient = pinned
@@ -200,13 +200,13 @@ func (e *ResearchEngine) allowedByRobots(ctx context.Context, target *url.URL) b
 		robotsURL := key + "/robots.txt"
 		request, err := http.NewRequestWithContext(ctx, http.MethodGet, robotsURL, nil)
 		if err != nil {
-			// robots.txt is advisory: when it cannot be fetched or built we fail
-			// open (allow), consistently with the client.Do error path below.
+			// robots.txt is advisory: fail open (allow) when it cannot be built,
+			// consistently with the client.Do error path below.
 			return true
 		}
-		// Pin the robots pre-flight to validated public IPs too (unless the test
-		// http override is active); otherwise it re-resolves DNS and follows
-		// redirects, reopening the SSRF/rebind window the main fetch closes.
+		// Pin the robots pre-flight to the validated public IPs as well, so it
+		// cannot re-resolve DNS to an internal target (SSRF/rebind) or follow a
+		// redirect to one.
 		robotsClient := e.client()
 		if !(e.AllowHTTPForTests && target.Scheme == "http") {
 			pinned, perr := pinnedClient(ctx, robotsClient, robotsURL)

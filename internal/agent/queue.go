@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sort"
@@ -86,6 +87,11 @@ func (q *JobQueue) Enqueue(missionID string, maxAttempts int) (QueueJob, error) 
 	job := QueueJob{ID: "job_" + uuid.NewString(), MissionID: missionID, Status: QueuePending, MaxAttempts: maxAttempts, AvailableAt: now, CreatedAt: now, UpdatedAt: now}
 	q.mu.Lock()
 	defer q.mu.Unlock()
+	for _, existing := range q.jobs {
+		if existing.MissionID == missionID && (existing.Status == QueuePending || existing.Status == QueueRunning) {
+			return existing, nil
+		}
+	}
 	if err := q.persistLocked(job); err != nil {
 		return QueueJob{}, err
 	}
@@ -132,6 +138,9 @@ func (q *JobQueue) Ack(jobID string) error {
 	if !ok {
 		return os.ErrNotExist
 	}
+	if job.Status != QueueRunning {
+		return errors.New("job is not running")
+	}
 	job.Status = QueueSucceeded
 	job.WorkerID = ""
 	job.UpdatedAt = time.Now().UTC()
@@ -144,6 +153,9 @@ func (q *JobQueue) Nack(jobID string, runErr error) (QueueJob, error) {
 	job, ok := q.jobs[jobID]
 	if !ok {
 		return QueueJob{}, os.ErrNotExist
+	}
+	if job.Status != QueueRunning {
+		return QueueJob{}, errors.New("job is not running")
 	}
 	if runErr != nil {
 		job.LastError = limitError(runErr.Error(), 2000)
@@ -214,9 +226,13 @@ func (q *JobQueue) Start(ctx context.Context, workerID string, handler func(cont
 			job, ok, err := q.Claim(workerID, time.Now().UTC())
 			if err == nil && ok {
 				if runErr := handler(ctx, job); runErr != nil {
-					_, _ = q.Nack(job.ID, runErr)
+					if _, nackErr := q.Nack(job.ID, runErr); nackErr != nil {
+						slog.Error("agent queue NACK failed", "job_id", job.ID, "error", nackErr)
+					}
 				} else {
-					_ = q.Ack(job.ID)
+					if ackErr := q.Ack(job.ID); ackErr != nil {
+						slog.Error("agent queue ACK failed", "job_id", job.ID, "error", ackErr)
+					}
 				}
 				continue
 			}
@@ -237,11 +253,20 @@ func (q *JobQueue) Start(ctx context.Context, workerID string, handler func(cont
 }
 
 func (q *JobQueue) persistLocked(job QueueJob) error {
+	previous, existed := q.jobs[job.ID]
 	q.jobs[job.ID] = job
 	if q.root == "" {
 		return nil
 	}
-	return writeJSONAtomic(filepath.Join(q.root, "jobs.json"), q.jobs)
+	if err := writeJSONAtomic(filepath.Join(q.root, "jobs.json"), q.jobs); err != nil {
+		if existed {
+			q.jobs[job.ID] = previous
+		} else {
+			delete(q.jobs, job.ID)
+		}
+		return err
+	}
+	return nil
 }
 
 func (q *JobQueue) signal() {

@@ -118,23 +118,21 @@ export function ChatSidebar({ currentChatId }: ChatSidebarProps) {
     });
   }, [data?.chatInfos]);
 
-  const isToday = (date: Date) => {
-    const today = new Date();
-    return (
-      date.getDate() === today.getDate() &&
-      date.getMonth() === today.getMonth() &&
-      date.getFullYear() === today.getFullYear()
-    );
-  };
-
-  const isThisWeek = (date: Date) => {
-    const now = new Date();
-    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    return date > weekAgo && !isToday(date);
-  };
-
   // Group chats by time period
   const groupedChats = useMemo(() => {
+    const isToday = (date: Date) => {
+      const today = new Date();
+      return (
+        date.getDate() === today.getDate() &&
+        date.getMonth() === today.getMonth() &&
+        date.getFullYear() === today.getFullYear()
+      );
+    };
+    const isThisWeek = (date: Date) => {
+      const now = new Date();
+      const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      return date > weekAgo && !isToday(date);
+    };
     const groups = {
       today: [] as typeof sortedChats,
       thisWeek: [] as typeof sortedChats,

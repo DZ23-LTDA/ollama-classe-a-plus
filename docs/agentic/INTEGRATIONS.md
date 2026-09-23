@@ -15,7 +15,9 @@ export DZ23_WHATSAPP_TOKEN='...'
 
 O exemplo [agent-connectors.json](../../examples/agent-connectors.json) cobre GitHub, Google Workspace, Slack, Discord e WhatsApp Cloud. Cada chamada exige uma operação declarada, método permitido e prefixo de caminho permitido. Redirects são desativados, o timeout é limitado e a resposta é limitada a 2 MiB. Operações de escrita são tools de efeito externo e exigem approval do runtime.
 
-O fluxo de autenticação OAuth usa PKCE, state one-time, armazenamento AES-GCM e refresh server-side. Configure os endpoints do provider e `OLLAMA_AGENT_CREDENTIAL_KEY` fora do repositório. Tokens pessoais por `token_env` continuam disponíveis apenas para desenvolvimento ou conectores explicitamente não multiusuário.
+O fluxo de autenticação OAuth usa PKCE, state one-time, armazenamento AES-GCM, refresh server-side com rotação/CAS e revogação local com endpoint remoto opcional. Configure os endpoints do provider, incluindo `OLLAMA_AGENT_OAUTH_<PROVIDER>_REVOCATION_URL` quando suportado, e `OLLAMA_AGENT_CREDENTIAL_KEY` fora do repositório. Tokens pessoais por `token_env` continuam disponíveis apenas para desenvolvimento ou conectores explicitamente não multiusuário. A implementação possui testes com provider TLS fixture; a homologação contra cada IdP, revocation semantics, quotas e rotação real continua dependente de conta de teste do operador.
+
+O endpoint `GET /api/agent/v1/connectors` também expõe um catálogo de integrações com categoria, capabilities, estado de habilitação e `credential_configured`. Esse último campo é somente booleano e não revela token, nome de variável ou ciphertext. O catálogo inclui contratos para GitHub, Google Workspace, Slack, Discord, WhatsApp, Composio, deploy, social commerce, Woovi/OpenPix e fiscal/NF-e; ele não declara qualquer conta externa como conectada. Uma conexão real exige credencial provisionada pelo operador, escopos mínimos, approval e smoke reversível com auditoria.
 
 ## SAML enterprise
 
@@ -42,6 +44,20 @@ O processo é iniciado apenas quando uma chamada é feita. O manager usa JSON-RP
 
 O isolamento de filesystem e rede do servidor MCP ainda deve ser reforçado com um executor sandbox dedicado em instalações multiusuário. Nunca registre um MCP com `environment_vars` que incluam credenciais sem uma policy de tenant e auditoria equivalente.
 
+## Desktop Commander local e Remote MCP
+
+O [Desktop Commander](https://desktopcommander.app/) pode ser usado localmente como servidor MCP stdio com o preset [`examples/dz23-desktop-commander-mcp.json`](../../examples/dz23-desktop-commander-mcp.json). Ele requer Node.js 18+ e inicia o pacote `@wonderwhy-er/desktop-commander` com os métodos allowlisted. Filesystem, terminal, processos e edição continuam sujeitos ao registry de tools, approval e permissões do usuário do processo.
+
+O Remote Desktop Commander oficial documenta o endpoint `https://mcp.desktopcommander.app/mcp`, Streamable HTTP, OAuth 2.0 com PKCE e pareamento por device flow. O preset [`examples/dz23-desktop-commander-remote.json`](../../examples/dz23-desktop-commander-remote.json) é carregado por `OLLAMA_AGENT_REMOTE_MCP`; o adapter usa HTTPS, allowlist de métodos, timeout e um bearer opcional em `DESKTOP_COMMANDER_ACCESS_TOKEN`. O runtime não tenta obter credenciais, abrir sessão OAuth, parear máquinas nem revogar dispositivos. A conta, o agente `npx ... remote`, a aprovação do código e a revogação devem ser feitos pelo operador no dashboard oficial.
+
+O catálogo `GET /api/agent/v1/mcp` retorna servidores stdio e remotos sem o valor do token. Chamadas remotas passam pela tool `mcp.remote.call`, que exige approval. O serviço remoto está documentado como beta e executa com as permissões do usuário da máquina; não conecte uma conta de produção sem revisar escopos, dispositivo, logs e política de desligamento.
+
+## HarnessRouter e harnesses de coding
+
+O [HarnessRouter Community Edition](https://github.com/HarnessRouter/harnessrouter) pode ser configurado como provider `openai-compatible` em [`examples/dz23-harnessrouter.json`](../../examples/dz23-harnessrouter.json). Cada `ModelConfig` pode declarar `harness_id`; o proxy Classe A+ preserva metadata existente e sobrescreve `metadata.harness_id` no servidor, permitindo selecionar `harnessrouter/codex` ou `harnessrouter/claude-code` sem aceitar esse controle do browser.
+
+A integração é opt-in, usa `HARNESSROUTER_API_KEY` somente no processo do servidor e mantém uma chave de entrada do gateway Classe A+ separada. O endpoint local HTTP é permitido apenas com allowlist de loopback; hosts externos exigem HTTPS. O adapter não prova instalação, autenticação, licença ou disponibilidade de um CLI: streaming, sessões de follow-up, cancelamento, artifacts e recovery precisam ser testados contra uma instância real antes de classificar o provider como validado.
+
 
 ## Infraestrutura distribuída
 
@@ -58,3 +74,107 @@ O protocolo inicial é `dz23-companion.v1` e suporta `hello`, `heartbeat`, `ping
 ## Publicação de builders
 
 Configure `OLLAMA_AGENT_DEPLOYMENTS` apontando para um JSON como [`examples/agent-deployments.json`](../../examples/agent-deployments.json). Os adapters `vercel` e `netlify` usam as APIs oficiais; `generic` envia um payload de arquivos base64 para `/deploy`, permitindo integrar AWS, Cloudflare, um pipeline interno ou outro hosting sem colocar SDKs e credenciais no binário. Os tokens são lidos de `token_env`, e uma publicação exige approval no endpoint. O código cria a requisição de publicação e valida o workspace, mas credenciais de conta, domínio, projeto, DNS, billing e permissões de hosting continuam responsabilidade do operador.
+
+
+## Composio Connect e plugin Composio
+
+O Classe A+ pode registrar o [Composio Connect](https://docs.composio.dev/docs/composio-connect) como Remote MCP através de [`examples/dz23-composio-connect.json`](../../examples/dz23-composio-connect.json). O preset usa `https://connect.composio.dev/mcp`, permite somente os métodos JSON-RPC necessários (`initialize`, `notifications/initialized`, `tools/list` e `tools/call`) e injeta `x-consumer-api-key` apenas no servidor por meio de `COMPOSIO_CONSUMER_API_KEY`. O valor nunca é retornado pela API de capabilities, browser ou logs.
+
+```bash
+export OLLAMA_AGENT_REMOTE_MCP="$PWD/examples/dz23-composio-connect.json"
+export COMPOSIO_CONSUMER_API_KEY='valor-fora-do-repositorio'
+```
+
+O Composio Connect expõe meta-tools para descobrir tools, obter schemas, iniciar conexões OAuth e executar tools. Por isso, “ter o plugin” significa ter o adapter MCP e o fluxo de aprovação no Classe A+; ainda é necessário autorizar cada conta upstream no navegador do operador. A integração não cria uma conta Composio, não completa OAuth automaticamente e não declara que Instagram, TikTok Shop, Shopify ou qualquer outro toolkit está conectado. Para multiusuário, a próxima evolução deve usar uma sessão Composio por `organization_id`/usuário, persistir somente referências cifradas e aplicar scopes mínimos por departamento.
+
+## xAI / Grok por API
+
+A API oficial da [xAI](https://docs.x.ai/overview) é OpenAI-compatible na Responses API. O preset [`examples/dz23-xai.json`](../../examples/dz23-xai.json) encaminha `/v1/responses` e `/v1/chat/completions` para `https://api.x.ai/v1`, usando `XAI_API_KEY` somente no processo do servidor:
+
+```bash
+export OLLAMA_DZ23_CONFIG="$PWD/examples/dz23-xai.json"
+export OLLAMA_DZ23_GATEWAY_KEY='chave-do-cliente-fora-do-repositorio'
+export XAI_API_KEY='chave-xai-fora-do-repositorio'
+```
+
+No cliente compatível com Responses API, use o modelo `xai/grok-4.7` e envie `input`, `tools` e as opções suportadas pela versão da API. O proxy Classe A+ preserva o corpo Responses, reescreve apenas o identificador lógico para o modelo upstream e aplica autenticação server-side. Isso integra a **API xAI**, não o produto hospedado Grok Bot. Browser, computador cloud persistente, bots coordenados, skills e rotinas continuam sendo implementados pelo runtime próprio do Classe A+ ou pelos adapters aprovados, sem copiar internals proprietários.
+
+## Redes sociais, afiliados e marketplaces
+
+A base atual tem Growth OS sandbox, conectores HTTP allowlisted, OAuth tenant-aware, MCP e approvals. Ela consegue planejar campanhas, criar rascunhos, manter catálogo/pedidos locais, registrar atribuição e simular fulfillment; não publica nem vende em uma plataforma externa sem um connector específico e credenciais autorizadas.
+
+| Canal | Estado atual | Próximo adapter operacional |
+|---|---|---|
+| Instagram/Meta | Adapter genérico e catálogo Composio possível; publicação não validada no Classe A+ | Meta Login/OAuth, `instagram_business_content_publish`, mídia pública, webhooks, rate limit, approval e teste em conta profissional |
+| X/Twitter | Toolkit Composio listado; não há conexão validada no projeto | OAuth, publicação/leitura permitida, rate limits, políticas de automação e approval |
+| YouTube | Toolkit/API pública disponível; não há upload validado no projeto | OAuth Google, upload/resumable, metadata, quota, copyright e approval |
+| WhatsApp | Connector HTTP/MCP possível; não há fluxo Cloud API validado | Meta Business, templates, opt-in, webhooks, proteção contra spam e approval |
+| TikTok Shop | Growth sandbox; APIs oficiais cobrem catálogo, pedidos, fulfillment, promoções, finanças, webhooks e Affiliate Seller/Creator/Partner | App Partner Center, seller/creator authorization, scopes por região, sandbox, webhooks assinados, idempotência, returns/refunds, compliance e testes por mercado |
+| Shopify | Pode ser conectado por Composio ou connector dedicado; não há OAuth/Admin GraphQL validado | App OAuth, scopes mínimos, produtos/pedidos, webhooks, rate limits e approval para mutações |
+| Outros marketplaces | Connector genérico/MCP permite integração futura; nenhum marketplace é declarado conectado | Adapter específico por marketplace, catálogo, estoque, pedidos, logística, devoluções, pagamentos e reconciliação |
+
+A documentação oficial consultada informa que as Affiliate APIs do TikTok Shop não estão disponíveis no Reino Unido e União Europeia e que o onboarding de creators não pode ser totalmente moderado por parceiros via API. Logo, a jornada “como TikTok Shop” é viável **arquiteturalmente** e pode ser implementada com autorização de seller/creator/partner, mas não pode ser marcada como operação real universal antes da aprovação do app, da região, dos escopos e da sandbox correspondente.
+
+Nenhum connector deve publicar posts, iniciar anúncios, enviar mensagens, criar produtos, alterar preço/estoque, aprovar pedidos, solicitar fulfillment, cobrar ou movimentar dinheiro sem approval explícito, idempotency key, trilha de auditoria, limites de orçamento e política de pausa automática.
+
+
+## Lifecycle operacional de plugins
+
+Connectors, MCP stdio, Remote MCP e skills possuem lifecycle explícito no runtime. A UI pode solicitar habilitar, desabilitar ou remover um recurso, mas a decisão é server-side e revalida tenant, allowlist, estado e capabilities antes de alterar o registro. Desabilitar bloqueia a execução sem apagar credenciais; remover exige uma ação explícita e não remove secrets externos.
+
+O Composio, xAI/Grok, Desktop Commander e canais de Social Commerce permanecem adapters opt-in. O Classe A+ fornece contratos, presets sem segredos, headers server-side, approvals e testes locais. Connected accounts, OAuth, quotas, app review, webhooks, device pairing e publicação real só podem ser promovidos após smoke autorizado e reversível.
+
+
+## Cadastro durável e estados de conexão
+
+O lifecycle agora distingue quatro estados que não devem ser colapsados na UI. **Registrado** significa que o runtime aceitou a configuração e a operação allowlisted. **Configurado** significa que o manifest durável contém endpoint e referências de autenticação. **Credencial presente** significa apenas que o nome de env resolve um valor no processo ou que há uma credencial OAuth local para a organização. **Upstream validado** exige uma chamada real, reversível e autorizada ao serviço, com evidência de conta, escopos, resposta e redaction. O catálogo e o booleano `credential_configured` nunca afirmam o quarto estado.
+
+Na execução, `TokenEnv` e `OAuthProvider` são referências obrigatórias quando declaradas. Se a variável não resolve valor ou a credencial OAuth da organização não está disponível, `CallForOrganization` retorna `connector credential is unavailable` antes de construir ou enviar a requisição; um connector autenticado não faz egress silencioso.
+
+Quando `OLLAMA_AGENT_CONNECTORS` está vazio, o `ConnectorManager` carrega e grava `OLLAMA_AGENT_STORE/connectors.json`. O manifest tem permissões restritas e persiste somente `token_env`, `oauth_provider`, URL HTTPS, métodos e prefixos. Quando `OLLAMA_AGENT_CONNECTORS` aponta para um arquivo, esse arquivo é tratado como fonte estática de bootstrap; alterações feitas pelo endpoint não são descritas como edição persistente desse manifest. O endpoint `POST /api/agent/v1/connectors` exige owner/admin em auth mode, força o tenant da sessão, usa `DisallowUnknownFields` e recusa token, api key, password, ciphertext ou qualquer outro segredo cru.
+
+A tela Plugins segue a mesma regra: ela permite cadastrar a referência de env/OAuth, habilitar ou desabilitar e remover o registro, mas não coleta senha nem cola token no browser. Composio, Google Workspace, GitHub, Woovi/OpenPix, APIs fiscais/NF-e, redes sociais e marketplaces continuam disponíveis como adapters/configuráveis ou exigem ação do operador. Nenhum desses nomes deve ser renderizado como “conectado” sem smoke autorizado no upstream correspondente.
+
+
+## MCP, Remote MCP e skills: registro não é conexão
+
+O lifecycle persistente agora cobre três classes. MCP stdio é um manifest local com executável absoluto regular, workspace e métodos allowlisted. Remote MCP é um manifest HTTPS com SSRF/DNS pinning, origin de redirect e referências de env. Skill é um manifest de capacidade que inicia não confiável e exige revisão/approval para qualquer confiança posterior. Todos os três ficam escopados à organização quando cadastrados pelo endpoint autenticado; IDs já pertencentes a outro tenant não podem ser sobrescritos.
+
+O estado **registrado** significa que a configuração passou pelas validações. O estado **persistido** significa que o runtime padrão escreveu o manifest no DataRoot. Isso não significa que um processo MCP foi iniciado com sucesso, que um endpoint remoto respondeu, que um token existe ou que uma skill tem código confiável. `credential_configured` e estado OAuth continuam separados de upstream smoke. O modo de bootstrap por `OLLAMA_AGENT_MCP`/`OLLAMA_AGENT_REMOTE_MCP` permanece estático e é documentado como tal.
+
+A tela Plugins permite o cadastro sem receber tokens, passwords ou conteúdo de credenciais. Para Desktop Commander, Composio, Google Workspace, GitHub, Woovi/OpenPix, fiscal/NF-e, redes sociais e marketplaces, o produto fornece contratos e pontos de configuração, mas uma conta real exige provisionamento seguro, scopes mínimos, consentimento, approval e homologação do serviço. Nenhum adapter é reportado como conectado por ter sido apenas registrado.
+
+
+## Deploy: adapter local versus publicação externa
+
+O runtime possui adapter local para generic, Vercel e Netlify com coleta limitada do workspace, referências de token por nome de variável, HTTPS obrigatório para endpoints remotos, redirects bloqueados, root sem symlink e verificação do endereço conectado. O smoke automatizado usa servidor fixture e não representa publicação externa.
+
+**Configured** significa que o manifest foi aceito e o token é referenciado por nome de ambiente. **Upstream validated** exigiria chamada real autorizada, projeto/conta válidos, resposta redigida, evidência de URL/status, aprovação de custo e caminho de rollback. Vercel, Netlify, AWS, Cloudflare e demais destinos continuam `available/configurable`; nenhuma conta ou publicação externa está conectada ou homologada.
+
+
+## Mídia: contrato local versus provider externo
+
+O `MediaManager` cobre imagem, vídeo, speech, transcrição, visão e tone local com limites, artifacts, MIME/magic e provider OpenAI-compatible/loopback. Inputs de áudio/imagem ficam confinados ao workspace e outputs não gravam em root symlink. Os testes usam fixtures TLS ou geração determinística local.
+
+Isso significa **adapter testado**, não modelo externo conectado. Claude, Grok, providers de vídeo/imagem/TTS/STT, GPU, quota, moderação, billing e qualidade de produção exigem configuração do operador e smoke autorizado por provider; nenhum é promovido a `upstream validated` por esses testes.
+
+
+## Company Growth OS: sandbox versus commerce real
+
+Campaigns, affiliate programs/links e orders do Company OS carregam `mode: sandbox`, e o relatório expõe `sandbox_only`. O runtime simula planejamento, approval, budget, inventário, atribuição, métricas e fulfillment com tracking local. Isso não publica em Instagram/TikTok/WhatsApp, não cria checkout, não cobra via Woovi/OpenPix, não compra em marketplace, não solicita logística e não emite NF-e.
+
+Qualquer modo não-sandbox é recusado até existir adapter específico, credencial tenant-aware, approval de ação, idempotency key, webhook/reconciliação, limites financeiros, rollback e smoke autorizado. Woovi/OpenPix, fiscal/NF-e, redes sociais, TikTok Shop, Shopify, Mercado Livre, Amazon Seller e redes de afiliados permanecem `available/configurable`, nunca `connected`.
+
+
+## Reauditoria de mídia e deploy
+
+Os adapters locais agora têm contratos de segurança mais fortes, mas continuam distintos de uma integração upstream validada. O `MediaManager` usa provider fixture local nos testes; nenhum provider externo ou conta foi conectado. O `DeploymentManager` monta e valida um pacote público, rejeita conteúdo privado antes da transmissão e protege o egress; nenhum deploy em Vercel, Netlify, AWS, Cloudflare ou outro destino foi executado.
+
+A captura de dez rotas usa o backend Ollama local e um bridge local para o bundle distribuído. Ela comprova apenas o estado observado nessa execução. Não transforma catálogo, configuração, fixture, `configured` ou build em `connected`, `validated`, `published` ou `production-ready`.
+
+
+## Tel-Agent: canal textual versus telefonia externa
+
+O estado publicado em `45393d8c` cobre `tel-agent.text` dentro do Company OS. O canal aceita operações locais allowlisted, persiste histórico redigido por tenant e exige role operacional para mutações autenticadas. `report.read` retorna o estado da empresa; `backlog.create` cria uma tarefa local; `campaign.draft` cria um rascunho sandbox com approval pendente.
+
+Isso não equivale a telefonia ou mensageria externa. SIP, PSTN, SMS, WhatsApp, gravação de voz e discagem permanecem `telephony: not_configured` e `BLOCKED_BY_EXTERNAL_DEPENDENCY` até contas, credenciais, consentimento, destino de teste e homologação autorizada. Nenhum catálogo ou tela de configuração deve ser interpretado como conta conectada.

@@ -1,47 +1,40 @@
 ---
-title: Ollama Classe A+ documentation
-sidebarTitle: Classe A+
+title: Ollama documentation
+sidebarTitle: Welcome
 ---
 
-O **Ollama Classe A+** é um fork público de Ollama com runtime local-first e superfícies agentic para missões, approvals, conectores, MCP, memória, pesquisa, builders e operação observável. O estado atual é **preview/local RC em hardening**; esta documentação distingue o que foi implementado e testado localmente do que ainda depende de credenciais, hardware, serviços externos ou homologação.
-
-<Note>
-  A instalação do fork não usa `ollama.com/install.sh`, downloads oficiais, `ollama/ollama` no Docker Hub ou pacotes de SDK como se fossem o binário Classe A+. Comece pelo [guia de build do repositório Classe A+](https://github.com/DZ23-LTDA/ollama-classe-a-plus/blob/main/docs/CLASS_A_PLUS_GUIDE.md) e pelo [README](https://github.com/DZ23-LTDA/ollama-classe-a-plus#compilar-e-executar-este-fork).
-</Note>
+Use open models in your desktop apps and coding agents, or build them into your application.
 
 <CardGroup cols={2}>
-  <Card title="Construir o fork" icon="hammer" href="https://github.com/DZ23-LTDA/ollama-classe-a-plus/blob/main/docs/CLASS_A_PLUS_GUIDE.md">
-    Compile o código deste repositório, inicialize o servidor local e configure a UI web de desenvolvimento.
+  <Card title="Use your apps" icon="desktop" href="/quickstart#get-started">
+    Connect Claude or ChatGPT on your desktop, or launch a coding agent from your terminal.
   </Card>
-  <Card title="Auditar o estado real" icon="shield-check" href="https://github.com/DZ23-LTDA/ollama-classe-a-plus/blob/main/docs/agentic/READINESS_2026-09-22.md">
-    Consulte evidências, gates, dependências externas e blockers antes de tratar o projeto como release.
+  <Card title="Build an application" icon="code" href="/quickstart#build-an-application">
+    Call cloud models with Ollama, OpenAI, or Anthropic APIs.
   </Card>
 </CardGroup>
 
-## Superfícies Classe A+
+## Explore models
+
+Choose cloud models or run models on your computer.
 
 <CardGroup cols={2}>
-  <Card title="Runtime agentic" icon="cpu" href="https://github.com/DZ23-LTDA/ollama-classe-a-plus/blob/main/docs/agentic/ARCHITECTURE.md">
-    Missões persistentes, planejamento, execução, artifacts, memória, filas, eventos e recuperação local.
+  <Card title="Cloud models" icon="cloud" href="/cloud">
+    Run models without a local GPU.
   </Card>
-  <Card title="API e integrações" icon="plug" href="https://github.com/DZ23-LTDA/ollama-classe-a-plus/blob/main/docs/agentic/API.md">
-    Providers configuráveis, connectors, MCP, approvals, auth e limites de egress documentados.
-  </Card>
-  <Card title="Company OS" icon="building" href="https://github.com/DZ23-LTDA/ollama-classe-a-plus/blob/main/docs/agentic/COMPANY_OS.md">
-    Jornadas organizacionais sandbox, departamentos, ciclos, KPIs e growth com guardrails locais.
-  </Card>
-  <Card title="Assets e telas" icon="image" href="https://github.com/DZ23-LTDA/ollama-classe-a-plus/blob/main/docs/images/ASSET_PROVENANCE.md">
-    Proveniência de screenshots próprias, mockups conceituais e imagens herdadas de integrações.
+  <Card title="Local models" icon="hard-drive" href="/quickstart#run-a-model-locally">
+    Download Ollama and run a model on your computer.
   </Card>
 </CardGroup>
 
-## Documentação de compatibilidade upstream
+Browse the [model library](https://ollama.com/search) for coding, vision, embeddings, and reasoning models.
 
-As páginas abaixo foram herdadas ou adaptadas da documentação do ecossistema Ollama para preservar referências de API, modelos, CLI e integrações. Elas descrevem compatibilidade e serviços externos; não são promessa de que o Classe A+ publica os mesmos instaladores, contas, modelos hospedados ou integrações homologadas.
+## Documentation
 
-- [API compatível](/api/introduction) — endpoints Ollama e clientes compatíveis.
-- [CLI de compatibilidade](/cli) — comandos preservados quando aplicável.
-- [Importação de modelos](/import) — formatos e limites do motor.
-- [Integrações externas](/integrations/index) — referências upstream; credenciais e consentimentos continuam do operador.
+- [Integrations](/integrations) — connect an app, editor, or agent.
+- [API reference](/api/introduction) — use Ollama's API or compatible OpenAI and Anthropic clients.
+- [Python library](https://github.com/ollama/ollama-python) and [JavaScript library](https://github.com/ollama/ollama-js) — use Ollama from your application.
 
-A licença, atribuição e a política para atualizações manuais estão em [`UPSTREAM_POLICY.md`](https://github.com/DZ23-LTDA/ollama-classe-a-plus/blob/main/UPSTREAM_POLICY.md). Não copiamos código, interface ou assets proprietários de outros produtos para alegar paridade visual.
+## Community
+
+Join the conversation on [Discord](https://discord.gg/ollama) or [Reddit](https://reddit.com/r/ollama).

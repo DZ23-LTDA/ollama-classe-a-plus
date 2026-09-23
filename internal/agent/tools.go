@@ -8,6 +8,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -15,6 +17,12 @@ import (
 
 type Registry struct {
 	tools map[string]Tool
+}
+
+var ErrCapabilityDenied = errors.New("tool capability is not granted to this mission")
+
+func capabilityAllowed(descriptor ToolDescriptor, granted []string) bool {
+	return DefaultCapabilityPolicy().Allows(descriptor, granted)
 }
 
 func NewRegistry() *Registry {
@@ -61,7 +69,7 @@ func (r *Registry) Descriptors() []ToolDescriptor {
 type workspaceListTool struct{}
 
 func (workspaceListTool) Descriptor() ToolDescriptor {
-	return ToolDescriptor{Name: "workspace.list", Version: "1", Description: "Listar entradas do workspace autorizado", Risk: RiskRead}
+	return ToolDescriptor{Name: "workspace.list", Version: "1", Description: "Listar entradas do workspace autorizado", Risk: RiskRead, Scopes: []string{"workspace:read"}}
 }
 
 func (workspaceListTool) Execute(_ context.Context, toolContext ToolContext, input map[string]any) (ToolResult, error) {
@@ -75,6 +83,9 @@ func (workspaceListTool) Execute(_ context.Context, toolContext ToolContext, inp
 	}
 	if maxEntries > 500 {
 		maxEntries = 500
+	}
+	if err := rejectSymlinkComponents(toolContext.Workspace, path); err != nil {
+		return ToolResult{}, err
 	}
 	entries, err := os.ReadDir(path)
 	if err != nil {
@@ -93,12 +104,15 @@ func (workspaceListTool) Execute(_ context.Context, toolContext ToolContext, inp
 type workspaceReadTool struct{}
 
 func (workspaceReadTool) Descriptor() ToolDescriptor {
-	return ToolDescriptor{Name: "workspace.read", Version: "1", Description: "Ler um arquivo do workspace autorizado", Risk: RiskRead}
+	return ToolDescriptor{Name: "workspace.read", Version: "1", Description: "Ler um arquivo do workspace autorizado", Risk: RiskRead, Scopes: []string{"workspace:read"}}
 }
 
 func (workspaceReadTool) Execute(_ context.Context, toolContext ToolContext, input map[string]any) (ToolResult, error) {
 	path, err := safeWorkspacePath(toolContext.Workspace, stringInput(input, "path", ""))
 	if err != nil {
+		return ToolResult{}, err
+	}
+	if err := rejectSymlinkComponents(toolContext.Workspace, path); err != nil {
 		return ToolResult{}, err
 	}
 	data, err := os.ReadFile(path)
@@ -114,7 +128,7 @@ func (workspaceReadTool) Execute(_ context.Context, toolContext ToolContext, inp
 type workspaceWriteTool struct{}
 
 func (workspaceWriteTool) Descriptor() ToolDescriptor {
-	return ToolDescriptor{Name: "workspace.write", Version: "1", Description: "Escrever arquivo no workspace após aprovação", Risk: RiskWrite, RequiresApproval: true}
+	return ToolDescriptor{Name: "workspace.write", Version: "1", Description: "Escrever arquivo no workspace após aprovação", Risk: RiskWrite, RequiresApproval: true, Scopes: []string{"workspace:write"}}
 }
 
 func (workspaceWriteTool) Execute(_ context.Context, toolContext ToolContext, input map[string]any) (ToolResult, error) {
@@ -126,7 +140,13 @@ func (workspaceWriteTool) Execute(_ context.Context, toolContext ToolContext, in
 	if len(content) > 1<<20 {
 		return ToolResult{}, errors.New("workspace.write limit exceeded")
 	}
+	if err := rejectSymlinkComponents(toolContext.Workspace, filepath.Dir(path)); err != nil {
+		return ToolResult{}, err
+	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return ToolResult{}, err
+	}
+	if err := rejectSymlinkComponents(toolContext.Workspace, path); err != nil {
 		return ToolResult{}, err
 	}
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
@@ -158,21 +178,49 @@ func (t terminalExecTool) Execute(ctx context.Context, toolContext ToolContext, 
 			return ToolResult{}, errors.New("terminal argument contains a control character")
 		}
 	}
-	if executable == "git" && (len(args) == 0 || args[0] != "status") {
-		return ToolResult{}, errors.New("only git status is allowlisted in the default terminal policy")
+	if err := validateTerminalArguments(executable, args, toolContext.Workspace); err != nil {
+		return ToolResult{}, err
 	}
 	deadline, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	command := exec.CommandContext(deadline, executable, args...)
+	command := exec.Command(executable, args...)
 	command.Dir = toolContext.Workspace
 	command.Env = []string{"PATH=/usr/bin:/bin", "HOME=" + toolContext.Workspace, "PWD=" + toolContext.Workspace}
+	configureToolProcess(command)
 	var stdout, stderr bytes.Buffer
 	command.Stdout = &limitedBuffer{Buffer: &stdout, Limit: 64 << 10}
 	command.Stderr = &limitedBuffer{Buffer: &stderr, Limit: 64 << 10}
-	if err := command.Run(); err != nil {
-		return ToolResult{Value: map[string]any{"stdout": stdout.String(), "stderr": stderr.String()}}, err
+	if err := runToolCommand(deadline, command); err != nil {
+		return ToolResult{Value: map[string]any{"stdout": RedactDLP(stdout.String()), "stderr": RedactDLP(stderr.String()), "execution_isolation": "best-effort-process-group", "resource_limits": "context-timeout-and-output-bounded"}}, err
 	}
-	return ToolResult{Value: map[string]any{"stdout": stdout.String(), "stderr": stderr.String(), "exit_code": 0}}, nil
+	return ToolResult{Value: map[string]any{"stdout": RedactDLP(stdout.String()), "stderr": RedactDLP(stderr.String()), "exit_code": 0, "execution_isolation": "best-effort-process-group", "resource_limits": "context-timeout-and-output-bounded"}}, nil
+}
+
+func validateTerminalArguments(executable string, args []string, workspace string) error {
+	switch executable {
+	case "pwd":
+		if len(args) != 0 {
+			return errors.New("pwd does not accept arguments in the default terminal policy")
+		}
+	case "git":
+		if len(args) != 1 || args[0] != "status" {
+			return errors.New("only git status is allowlisted in the default terminal policy")
+		}
+	case "ls":
+		allowedFlags := map[string]bool{"-a": true, "-A": true, "-l": true, "-la": true, "-al": true, "--all": true, "--almost-all": true, "--format=long": true}
+		for _, arg := range args {
+			if strings.HasPrefix(arg, "-") {
+				if !allowedFlags[arg] {
+					return fmt.Errorf("ls flag %q is not allowlisted", arg)
+				}
+				continue
+			}
+			if _, err := safeWorkspacePath(workspace, arg); err != nil {
+				return fmt.Errorf("ls path is not inside the workspace: %w", err)
+			}
+		}
+	}
+	return nil
 }
 
 type limitedBuffer struct {
@@ -205,29 +253,69 @@ func safeWorkspacePath(workspace, relative string) (string, error) {
 	if !isWithin(root, candidate) {
 		return "", errors.New("tool path escapes workspace")
 	}
-	// Defend against a symlink placed inside the workspace (e.g. by sandbox.exec
-	// or an ingested repo) that points outside root: resolve the deepest existing
-	// ancestor of the candidate and re-check containment against the resolved
-	// root. The lexical check above is not enough once symlinks exist on disk.
-	resolvedRoot, err := filepath.EvalSymlinks(root)
-	if err != nil {
+	if err := rejectSymlinkComponents(root, candidate); err != nil {
 		return "", err
 	}
-	existing := candidate
-	for {
-		if resolved, err := filepath.EvalSymlinks(existing); err == nil {
-			if !isWithin(resolvedRoot, resolved) {
-				return "", errors.New("tool path escapes workspace via symlink")
-			}
-			break
-		}
-		parent := filepath.Dir(existing)
-		if parent == existing {
-			break
-		}
-		existing = parent
-	}
 	return candidate, nil
+}
+
+func rejectSymlinkComponents(root, candidate string) error {
+	root, err := filepath.Abs(root)
+	if err != nil {
+		return err
+	}
+	candidate, err = filepath.Abs(candidate)
+	if err != nil {
+		return err
+	}
+	if !isWithin(root, candidate) {
+		return errors.New("tool path escapes workspace")
+	}
+	realRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return err
+	}
+	relative, err := filepath.Rel(root, candidate)
+	if err != nil {
+		return err
+	}
+	current := root
+	if relative == "." {
+		return nil
+	}
+	for _, component := range strings.Split(relative, string(filepath.Separator)) {
+		if component == "" || component == "." {
+			continue
+		}
+		current = filepath.Join(current, component)
+		info, statErr := os.Lstat(current)
+		if errors.Is(statErr, os.ErrNotExist) {
+			break
+		}
+		if statErr != nil {
+			return statErr
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return errors.New("tool path contains a symlink")
+		}
+		resolved, resolveErr := filepath.EvalSymlinks(current)
+		if resolveErr != nil {
+			return resolveErr
+		}
+		if !isWithin(realRoot, resolved) {
+			return errors.New("tool path resolves outside workspace")
+		}
+	}
+	return nil
+}
+
+var safeStepIDPattern = regexp.MustCompile(`^step_[A-Za-z0-9_-]{1,100}$`)
+
+func validateStepID(stepID string) error {
+	if !safeStepIDPattern.MatchString(strings.TrimSpace(stepID)) {
+		return errors.New("step id is invalid")
+	}
+	return nil
 }
 
 func stringInput(input map[string]any, key, fallback string) string {
@@ -286,14 +374,55 @@ func minInt(a, b int) int {
 type sandboxExecTool struct{}
 
 func (sandboxExecTool) Descriptor() ToolDescriptor {
-	return ToolDescriptor{Name: "sandbox.exec", Version: "1", Description: "Executar Python ou Node em user namespace isolado e sem rede", Risk: RiskWrite, RequiresApproval: true, Scopes: []string{"sandbox:execute"}}
+	return ToolDescriptor{Name: "sandbox.exec", Version: "3", Description: "Executar Python ou Node; strict Linux exige namespaces, seccomp e cgroup v2 delegado; outras plataformas reportam best-effort sem isolamento de rede", Risk: RiskWrite, RequiresApproval: true, Scopes: []string{"sandbox:execute"}}
+}
+
+func resolveSandboxInterpreter(language string) (string, error) {
+	var candidates []string
+	switch language {
+	case "python", "python3":
+		if runtime.GOOS == "linux" {
+			candidates = []string{"/usr/bin/python3"}
+		} else {
+			candidates = []string{"python3", "python"}
+		}
+	case "node":
+		if runtime.GOOS == "linux" {
+			candidates = []string{"/usr/bin/node"}
+		} else {
+			candidates = []string{"node"}
+		}
+	default:
+		return "", errors.New("sandbox language must be python or node")
+	}
+	for _, candidate := range candidates {
+		resolved, err := exec.LookPath(candidate)
+		if err != nil {
+			continue
+		}
+		info, err := os.Stat(resolved)
+		if err == nil && info.Mode().IsRegular() {
+			return resolved, nil
+		}
+	}
+	return "", fmt.Errorf("sandbox interpreter unavailable for %s", language)
 }
 
 func (sandboxExecTool) Execute(ctx context.Context, toolContext ToolContext, input map[string]any) (ToolResult, error) {
+	if err := validateStepID(toolContext.StepID); err != nil {
+		return ToolResult{}, err
+	}
 	language := strings.ToLower(strings.TrimSpace(stringInput(input, "language", "")))
-	interpreter := map[string]string{"python": "/usr/bin/python3", "python3": "/usr/bin/python3", "node": "/usr/bin/node"}[language]
-	if interpreter == "" {
-		return ToolResult{}, errors.New("sandbox language must be python or node")
+	interpreter, err := resolveSandboxInterpreter(language)
+	if err != nil {
+		return ToolResult{}, err
+	}
+	mode := strings.ToLower(strings.TrimSpace(os.Getenv("OLLAMA_AGENT_SANDBOX_MODE")))
+	if mode == "" {
+		mode = "best-effort"
+	}
+	if mode != "best-effort" && mode != "strict" {
+		return ToolResult{}, errors.New("OLLAMA_AGENT_SANDBOX_MODE must be best-effort or strict")
 	}
 	code := stringInput(input, "code", "")
 	if strings.TrimSpace(code) == "" {
@@ -302,10 +431,20 @@ func (sandboxExecTool) Execute(ctx context.Context, toolContext ToolContext, inp
 	if len(code) > 512<<10 {
 		return ToolResult{}, errors.New("sandbox code limit exceeded")
 	}
-	if _, err := os.Stat(interpreter); err != nil {
-		return ToolResult{}, fmt.Errorf("sandbox interpreter unavailable: %w", err)
+	strict := mode == "strict"
+	var control *sandboxControl
+	if strict {
+		var err error
+		control, err = newSandboxControl(toolContext.StepID)
+		if err != nil {
+			return ToolResult{}, fmt.Errorf("strict sandbox unavailable: %w", err)
+		}
+		defer closeSandboxControl(control)
 	}
 	sandboxDir := filepath.Join(toolContext.Workspace, ".agent-sandbox")
+	if err := rejectSymlinkComponents(toolContext.Workspace, sandboxDir); err != nil {
+		return ToolResult{}, err
+	}
 	if err := os.MkdirAll(sandboxDir, 0o700); err != nil {
 		return ToolResult{}, err
 	}
@@ -318,24 +457,89 @@ func (sandboxExecTool) Execute(ctx context.Context, toolContext ToolContext, inp
 		return ToolResult{}, err
 	}
 	defer os.Remove(codePath)
+	launcherPath := ""
+	if strict {
+		launcherPath = filepath.Join(sandboxDir, toolContext.StepID+"-strict-launcher.py")
+		if err := os.WriteFile(launcherPath, []byte(strictSandboxLauncher), 0o600); err != nil {
+			return ToolResult{}, err
+		}
+		defer os.Remove(launcherPath)
+	}
 	deadline, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
+	if runtime.GOOS != "linux" {
+		command := exec.Command(interpreter, codePath)
+		command.Dir = toolContext.Workspace
+		command.Env = []string{"PATH=" + os.Getenv("PATH"), "HOME=" + toolContext.Workspace, "PWD=" + toolContext.Workspace}
+		configureToolProcess(command)
+		var stdout, stderr bytes.Buffer
+		command.Stdout = &limitedBuffer{Buffer: &stdout, Limit: 128 << 10}
+		command.Stderr = &limitedBuffer{Buffer: &stderr, Limit: 128 << 10}
+		if err := runToolCommand(deadline, command); err != nil {
+			return ToolResult{Value: map[string]any{"stdout": RedactDLP(stdout.String()), "stderr": RedactDLP(stderr.String()), "execution_isolation": "best-effort-platform-process", "resource_limits": "context-timeout-output-bounded", "network_isolation": "not-enforced"}}, err
+		}
+		return ToolResult{Value: map[string]any{"stdout": RedactDLP(stdout.String()), "stderr": RedactDLP(stderr.String()), "exit_code": 0, "execution_isolation": "best-effort-platform-process", "resource_limits": "context-timeout-output-bounded", "network_isolation": "not-enforced"}}, nil
+	}
 	mountScript := `set -eu
+ulimit -t 55 || true
+ulimit -v 524288 || true
+ulimit -u 64 || true
+ulimit -n 256 || true
+ulimit -f 1048576 || true
 mount --make-rprivate /
 mount -t tmpfs tmpfs /home
 mkdir -p /home/workspace /tmp
 mount --bind "$1" /home/workspace
 mount -t tmpfs tmpfs /tmp
 cd /home/workspace
-exec "$2" "$3"`
-	command := exec.CommandContext(deadline, "unshare", "--user", "--map-root-user", "--mount", "--pid", "--fork", "--mount-proc", "--net", "/bin/sh", "-c", mountScript, "sandbox", toolContext.Workspace, interpreter, "/home/workspace/.agent-sandbox/"+filepath.Base(codePath))
+	if [ "$4" = "strict" ]; then
+		exec /usr/bin/setpriv --no-new-privs /usr/bin/python3 /home/workspace/.agent-sandbox/` + filepath.Base(launcherPath) + ` "$2" "$3"
+	fi
+	exec "$2" "$3"`
+	args := []string{"--user", "--map-root-user", "--mount", "--pid", "--fork", "--mount-proc", "--net", "--kill-child", "--propagation", "private", "/bin/sh", "-c", mountScript, "sandbox", toolContext.Workspace, interpreter, "/home/workspace/.agent-sandbox/" + filepath.Base(codePath), mode}
+	command := exec.Command("unshare", args...)
 	command.Dir = toolContext.Workspace
 	command.Env = []string{"PATH=/usr/bin:/bin", "HOME=/home/workspace", "PWD=/home/workspace"}
+	configureToolProcess(command)
+	if err := configureSandboxCommand(command, control); err != nil {
+		return ToolResult{}, fmt.Errorf("configure strict sandbox: %w", err)
+	}
 	var stdout, stderr bytes.Buffer
 	command.Stdout = &limitedBuffer{Buffer: &stdout, Limit: 128 << 10}
 	command.Stderr = &limitedBuffer{Buffer: &stderr, Limit: 128 << 10}
-	if err := command.Run(); err != nil {
-		return ToolResult{Value: map[string]any{"stdout": stdout.String(), "stderr": stderr.String()}}, err
+	if err := runToolCommand(deadline, command, control); err != nil {
+		isolation := "best-effort-unshare"
+		limits := "ulimit-context-timeout-output-bounded"
+		if strict {
+			isolation = "strict-linux-user-mount-pid-net-seccomp-cgroupv2"
+			limits = "cgroup-v2-cpu-memory-pids-swap-timeout-output-bounded"
+		}
+		return ToolResult{Value: map[string]any{"stdout": RedactDLP(stdout.String()), "stderr": RedactDLP(stderr.String()), "execution_isolation": isolation, "resource_limits": limits}}, err
 	}
-	return ToolResult{Value: map[string]any{"stdout": stdout.String(), "stderr": stderr.String(), "exit_code": 0}}, nil
+	isolation := "best-effort-unshare"
+	limits := "ulimit-context-timeout-output-bounded"
+	if strict {
+		isolation = "strict-linux-user-mount-pid-net-seccomp-cgroupv2"
+		limits = "cgroup-v2-cpu-memory-pids-swap-timeout-output-bounded"
+	}
+	return ToolResult{Value: map[string]any{"stdout": RedactDLP(stdout.String()), "stderr": RedactDLP(stderr.String()), "exit_code": 0, "execution_isolation": isolation, "resource_limits": limits}}, nil
+}
+
+func runToolCommand(ctx context.Context, command *exec.Cmd, controls ...*sandboxControl) error {
+	if err := command.Start(); err != nil {
+		return err
+	}
+	done := make(chan error, 1)
+	go func() { done <- command.Wait() }()
+	select {
+	case err := <-done:
+		return err
+	case <-ctx.Done():
+		if len(controls) > 0 {
+			killSandboxControl(controls[0])
+		}
+		terminateToolProcess(command)
+		<-done
+		return ctx.Err()
+	}
 }

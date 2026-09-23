@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"errors"
+	"os"
 	"testing"
 	"time"
 )
@@ -77,5 +78,62 @@ func TestJobQueueWorkerAcknowledgesJobs(t *testing.T) {
 	}
 	if status := queue.List(QueueSucceeded); len(status) != 1 {
 		t.Fatalf("succeeded = %+v", status)
+	}
+}
+
+func TestJobQueueRollsBackClaimWhenPersistenceFails(t *testing.T) {
+	root := t.TempDir()
+	queue, err := NewJobQueue(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	job, err := queue.Enqueue("mission-rollback", 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.RemoveAll(root); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok, err := queue.Claim("worker-rollback", time.Now().UTC()); err == nil || ok {
+		t.Fatalf("claim = ok=%v err=%v, want persistence failure", ok, err)
+	}
+	pending := queue.List(QueuePending)
+	if len(pending) != 1 || pending[0].ID != job.ID || pending[0].Attempts != 0 {
+		t.Fatalf("claim mutation was not rolled back: %+v", pending)
+	}
+}
+
+func TestJobQueueRejectsAckAndNackForNonRunningJobs(t *testing.T) {
+	queue, err := NewJobQueue("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	job, err := queue.Enqueue("mission-state", 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := queue.Ack(job.ID); err == nil {
+		t.Fatal("ack of pending job unexpectedly succeeded")
+	}
+	if _, err := queue.Nack(job.ID, errors.New("unexpected")); err == nil {
+		t.Fatal("nack of pending job unexpectedly succeeded")
+	}
+}
+
+func TestJobQueueEnqueueIsIdempotentByMission(t *testing.T) {
+	queue, err := NewJobQueue("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := queue.Enqueue("mission-idempotent", 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := queue.Enqueue("mission-idempotent", 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if second.ID != first.ID || len(queue.List("")) != 1 {
+		t.Fatalf("duplicate mission jobs: first=%+v second=%+v jobs=%+v", first, second, queue.List(""))
 	}
 }

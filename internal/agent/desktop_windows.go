@@ -43,32 +43,6 @@ func desktopProcessTerminate(ctx context.Context, pid int) error {
 	return runPowerShell(ctx, `Stop-Process -Id `+strconv.Itoa(pid)+` -Force:$false`, nil)
 }
 
-func runDesktop(ctx context.Context, name string, args ...string) error {
-	_, err := runDesktopOutput(ctx, name, args...)
-	return err
-}
-
-func runDesktopOutput(ctx context.Context, name string, args ...string) (string, error) {
-	deadline, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-	command := exec.CommandContext(deadline, name, args...)
-	var stdout, stderr bytes.Buffer
-	command.Stdout = &limitedBuffer{Buffer: &stdout, Limit: 128 << 10}
-	command.Stderr = &limitedBuffer{Buffer: &stderr, Limit: 32 << 10}
-	if err := command.Run(); err != nil {
-		return stdout.String(), fmt.Errorf("desktop %s: %w: %s", name, err, strings.TrimSpace(stderr.String()))
-	}
-	return stdout.String(), nil
-}
-
-func runDesktopWithInput(ctx context.Context, input, name string, args ...string) error {
-	deadline, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-	command := exec.CommandContext(deadline, name, args...)
-	command.Stdin = strings.NewReader(input)
-	return command.Run()
-}
-
 func runPowerShell(ctx context.Context, script string, variables map[string]string) error {
 	_, err := runPowerShellOutput(ctx, script, variables)
 	return err

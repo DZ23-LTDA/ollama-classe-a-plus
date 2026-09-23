@@ -14,9 +14,37 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      - name: Run install script
-        run: sh ./scripts/install.sh
+      - name: Set up Go from go.mod
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Run source installer into runner temp directory
         env:
-          OLLAMA_NO_START: 1 # do not start app
-      - name: Verify ollama is available
-        run: ollama --version
+          OLLAMA_INSTALL_DIR: ${{ runner.temp }}/ollama-classe-a-plus-bin
+          OLLAMA_BINARY_NAME: ollama-classe-a-plus
+        run: sh ./scripts/install.sh
+      - name: Verify the exact source-built fork binary
+        env:
+          OLLAMA_INSTALL_DIR: ${{ runner.temp }}/ollama-classe-a-plus-bin
+        run: |
+          test -x "$OLLAMA_INSTALL_DIR/ollama-classe-a-plus"
+          "$OLLAMA_INSTALL_DIR/ollama-classe-a-plus" --version
+          test ! -e "$OLLAMA_INSTALL_DIR/ollama"
+      - name: Verify actionable failures without Go and with invalid install directory
+        run: |
+          no_go_bin="${{ runner.temp }}/no-go-bin"
+          mkdir -p "$no_go_bin"
+          ln -s "$(command -v dirname)" "$no_go_bin/dirname"
+          ln -s "$(command -v pwd)" "$no_go_bin/pwd"
+          set +e
+          PATH="$no_go_bin" OLLAMA_INSTALL_DIR="${{ runner.temp }}/missing-go" /bin/sh ./scripts/install.sh >/tmp/install-no-go.log 2>&1
+          no_go_status=$?
+          set -e
+          test "$no_go_status" -ne 0
+          grep -F "Go is required" /tmp/install-no-go.log
+          if OLLAMA_INSTALL_DIR=relative-install-dir sh ./scripts/install.sh >/tmp/install-relative.log 2>&1; then
+            echo "relative install directory unexpectedly succeeded" >&2
+            exit 1
+          fi
+          grep -F "must be an absolute path" /tmp/install-relative.log

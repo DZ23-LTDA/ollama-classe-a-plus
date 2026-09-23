@@ -21,6 +21,8 @@ type PostgresStore struct {
 	systemAccess   bool
 }
 
+var ErrPostgresTenantRequiresNonSuperuser = errors.New("tenant-scoped postgres store requires a non-superuser role")
+
 func OpenPostgresStore(ctx context.Context, dsn string) (*PostgresStore, error) {
 	if strings.TrimSpace(dsn) == "" {
 		return nil, errors.New("postgres DSN is required")
@@ -48,7 +50,7 @@ func OpenPostgresStore(ctx context.Context, dsn string) (*PostgresStore, error) 
 		}
 		if privileged {
 			_ = db.Close()
-			return nil, errors.New("agent database role must not be a superuser or have BYPASSRLS (it silently disables tenant RLS); use a NOSUPERUSER NOBYPASSRLS role such as ollama_app, or set OLLAMA_AGENT_ALLOW_SUPERUSER_DB=1 to override")
+			return nil, errors.New("agent database role must not be a superuser or have BYPASSRLS (it silently disables tenant RLS); use a NOSUPERUSER NOBYPASSRLS role, or set OLLAMA_AGENT_ALLOW_SUPERUSER_DB=1 to override")
 		}
 	}
 	if err := store.Migrate(ctx); err != nil {
@@ -103,6 +105,17 @@ func (s *PostgresStore) begin(ctx context.Context) (*sql.Tx, error) {
 	if err != nil {
 		return nil, err
 	}
+	if !s.systemAccess {
+		var isSuperuser bool
+		if err := tx.QueryRowContext(ctx, `SELECT usesuper FROM pg_user WHERE usename = current_user`).Scan(&isSuperuser); err != nil {
+			_ = tx.Rollback()
+			return nil, err
+		}
+		if isSuperuser {
+			_ = tx.Rollback()
+			return nil, ErrPostgresTenantRequiresNonSuperuser
+		}
+	}
 	org := s.organizationID
 	if _, err := tx.ExecContext(ctx, `SELECT set_config('app.current_organization_id', $1, true), set_config('app.system_access', $2, true)`, org, boolString(s.systemAccess)); err != nil {
 		_ = tx.Rollback()
@@ -134,6 +147,9 @@ func (s *PostgresStore) GetMission(id string) (Mission, error) {
 	mission, err := s.getMissionTx(tx, id)
 	if err != nil {
 		return Mission{}, err
+	}
+	if !s.systemAccess && mission.OrganizationID != s.organizationID {
+		return Mission{}, os.ErrNotExist
 	}
 	return mission, tx.Commit()
 }
@@ -170,34 +186,25 @@ func (s *PostgresStore) ListMissions() ([]Mission, error) {
 		return nil, err
 	}
 	defer tx.Rollback()
-	rows, err := tx.Query(`SELECT id FROM agent_missions ORDER BY updated_at ASC,id ASC`)
+	rows, err := tx.Query(`SELECT id FROM agent_missions WHERE ($1 = '' OR organization_id = $1) ORDER BY updated_at ASC,id ASC`, s.organizationID)
 	if err != nil {
 		return nil, err
 	}
-	// Drain every id before issuing per-mission queries: database/sql runs a
-	// transaction on a single connection, so calling getMissionTx while these
-	// rows are still open fails with "conn busy: another query is running".
-	var ids []string
+	defer rows.Close()
+	var missions []Mission
 	for rows.Next() {
 		var id string
 		if err := rows.Scan(&id); err != nil {
-			rows.Close()
 			return nil, err
 		}
-		ids = append(ids, id)
-	}
-	if err := rows.Err(); err != nil {
-		rows.Close()
-		return nil, err
-	}
-	rows.Close()
-	var missions []Mission
-	for _, id := range ids {
 		mission, err := s.getMissionTx(tx, id)
 		if err != nil {
 			return nil, err
 		}
 		missions = append(missions, mission)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
@@ -210,6 +217,10 @@ func (s *PostgresStore) PutMission(mission Mission) error {
 	if strings.TrimSpace(mission.ID) == "" {
 		return errors.New("mission id is required")
 	}
+	if !s.systemAccess && strings.TrimSpace(mission.OrganizationID) != s.organizationID {
+		return os.ErrPermission
+	}
+	mission = redactMissionForPersistence(mission)
 	plan, _ := json.Marshal(mission.Plan)
 	approvals, _ := json.Marshal(mission.Approvals)
 	artifacts, _ := json.Marshal(mission.Artifacts)
@@ -225,10 +236,53 @@ func (s *PostgresStore) PutMission(mission Mission) error {
 	return tx.Commit()
 }
 
+func (s *PostgresStore) PutMissionIfVersion(mission Mission, expectedVersion int64) error {
+	if strings.TrimSpace(mission.ID) == "" {
+		return errors.New("mission id is required")
+	}
+	if !s.systemAccess && strings.TrimSpace(mission.OrganizationID) != s.organizationID {
+		return os.ErrPermission
+	}
+	mission = redactMissionForPersistence(mission)
+	plan, err := json.Marshal(mission.Plan)
+	if err != nil {
+		return err
+	}
+	approvals, err := json.Marshal(mission.Approvals)
+	if err != nil {
+		return err
+	}
+	artifacts, err := json.Marshal(mission.Artifacts)
+	if err != nil {
+		return err
+	}
+	tx, err := s.begin(context.Background())
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	result, err := tx.Exec(`UPDATE agent_missions SET version=$1,objective=$2,model=$3,workspace=$4,project_id=$5,organization_id=$6,auto_run=$7,state=$8,plan=$9,approvals=$10,artifacts=$11,last_error=$12,updated_at=$13,completed_at=$14 WHERE id=$15 AND version=$16`, mission.Version, mission.Objective, mission.Model, mission.Workspace, mission.ProjectID, mission.OrganizationID, mission.AutoRun, mission.State, plan, approvals, artifacts, mission.LastError, mission.UpdatedAt, mission.CompletedAt, mission.ID, expectedVersion)
+	if err != nil {
+		return err
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows != 1 {
+		return ErrMissionVersionConflict
+	}
+	return tx.Commit()
+}
+
 func (s *PostgresStore) AppendEvent(event Event) error {
 	if event.ID == "" || event.MissionID == "" {
 		return errors.New("event id and mission id are required")
 	}
+	if !s.systemAccess && strings.TrimSpace(event.OrganizationID) != s.organizationID {
+		return os.ErrPermission
+	}
+	event.Payload = RedactValue(event.Payload)
 	payload, _ := json.Marshal(event.Payload)
 	tx, err := s.begin(context.Background())
 	if err != nil {
@@ -248,7 +302,7 @@ func (s *PostgresStore) ListEvents(missionID string) ([]Event, error) {
 		return nil, err
 	}
 	defer tx.Rollback()
-	rows, err := tx.Query(`SELECT id,mission_id,organization_id,type,step_id,payload,created_at FROM agent_events WHERE mission_id=$1 ORDER BY created_at ASC,id ASC`, strings.TrimSpace(missionID))
+	rows, err := tx.Query(`SELECT id,mission_id,organization_id,type,step_id,payload,created_at FROM agent_events WHERE mission_id=$1 AND ($2 = '' OR organization_id=$2) ORDER BY created_at ASC,id ASC`, strings.TrimSpace(missionID), s.organizationID)
 	if err != nil {
 		return nil, err
 	}

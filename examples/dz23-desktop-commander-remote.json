@@ -1,0 +1,9 @@
+[
+  {
+    "id": "desktop-commander-remote",
+    "url": "https://mcp.desktopcommander.app/mcp",
+    "token_env": "DESKTOP_COMMANDER_ACCESS_TOKEN",
+    "allowed_methods": ["initialize", "notifications/initialized", "tools/list", "tools/call", "resources/list", "resources/read"],
+    "timeout_seconds": 60
+  }
+]

@@ -15,9 +15,12 @@ type Store interface {
 	GetMission(id string) (Mission, error)
 	ListMissions() ([]Mission, error)
 	PutMission(mission Mission) error
+	PutMissionIfVersion(mission Mission, expectedVersion int64) error
 	AppendEvent(event Event) error
 	ListEvents(missionID string) ([]Event, error)
 }
+
+var ErrMissionVersionConflict = errors.New("mission version conflict")
 
 type JSONStore struct {
 	mu         sync.RWMutex
@@ -87,26 +90,82 @@ func (s *JSONStore) PutMission(mission Mission) error {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	previous, hadPrevious := s.missions[mission.ID]
 	s.missions[mission.ID] = cloneMission(mission)
 	if !s.persistent {
 		return nil
 	}
 	path := filepath.Join(s.root, "missions", mission.ID+".json")
-	return writeJSONAtomic(path, mission)
+	if err := writeJSONAtomic(path, redactMissionForPersistence(mission)); err != nil {
+		if hadPrevious {
+			s.missions[mission.ID] = previous
+		} else {
+			delete(s.missions, mission.ID)
+		}
+		return err
+	}
+	return nil
+}
+
+func (s *JSONStore) PutMissionIfVersion(mission Mission, expectedVersion int64) error {
+	if strings.TrimSpace(mission.ID) == "" {
+		return errors.New("mission id is required")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	current, ok := s.missions[mission.ID]
+	if !ok || current.Version != expectedVersion {
+		return ErrMissionVersionConflict
+	}
+	previous := cloneMission(current)
+	s.missions[mission.ID] = cloneMission(mission)
+	if !s.persistent {
+		return nil
+	}
+	path := filepath.Join(s.root, "missions", mission.ID+".json")
+	if err := writeJSONAtomic(path, redactMissionForPersistence(mission)); err != nil {
+		s.missions[mission.ID] = previous
+		return err
+	}
+	return nil
 }
 
 func (s *JSONStore) AppendEvent(event Event) error {
 	if strings.TrimSpace(event.MissionID) == "" || strings.TrimSpace(event.ID) == "" {
 		return errors.New("event id and mission id are required")
 	}
+	event.Payload = RedactValue(event.Payload)
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	previous := append([]Event(nil), s.events[event.MissionID]...)
 	s.events[event.MissionID] = append(s.events[event.MissionID], event)
 	if !s.persistent {
 		return nil
 	}
 	path := filepath.Join(s.root, "events", event.MissionID+".json")
-	return writeJSONAtomic(path, s.events[event.MissionID])
+	if err := writeJSONAtomic(path, s.events[event.MissionID]); err != nil {
+		if previous == nil {
+			delete(s.events, event.MissionID)
+		} else {
+			s.events[event.MissionID] = previous
+		}
+		return err
+	}
+	return nil
+}
+
+func redactMissionForPersistence(mission Mission) Mission {
+	safe := cloneMission(mission)
+	safe.Objective = RedactDLP(safe.Objective)
+	safe.LastError = RedactDLP(safe.LastError)
+	for index := range safe.Plan {
+		if safe.Plan[index].Input != nil {
+			safe.Plan[index].Input, _ = RedactValue(safe.Plan[index].Input).(map[string]any)
+		}
+		safe.Plan[index].Result = RedactValue(safe.Plan[index].Result)
+		safe.Plan[index].Error = RedactDLP(safe.Plan[index].Error)
+	}
+	return safe
 }
 
 func (s *JSONStore) ListEvents(missionID string) ([]Event, error) {

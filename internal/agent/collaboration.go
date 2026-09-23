@@ -2,6 +2,7 @@ package agent
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -45,8 +46,12 @@ func NewCollaborationStore(root string) (*CollaborationStore, error) {
 	if err := os.MkdirAll(root, 0o700); err != nil {
 		return nil, err
 	}
-	_ = readJSON(filepath.Join(root, "comments.json"), &store.comments)
-	_ = readJSON(filepath.Join(root, "presence.json"), &store.presence)
+	if err := readJSON(filepath.Join(root, "comments.json"), &store.comments); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return nil, fmt.Errorf("load collaboration comments: %w", err)
+	}
+	if err := readJSON(filepath.Join(root, "presence.json"), &store.presence); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return nil, fmt.Errorf("load collaboration presence: %w", err)
+	}
 	return store, nil
 }
 
@@ -63,8 +68,17 @@ func (s *CollaborationStore) AddComment(projectID, userID, body string) (Comment
 	comment := Comment{ID: "com_" + uuid.NewString(), ProjectID: projectID, UserID: userID, Body: body, CreatedAt: time.Now().UTC()}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	previous := append([]Comment(nil), s.comments[projectID]...)
 	s.comments[projectID] = append(s.comments[projectID], comment)
-	return comment, s.persistLocked()
+	if err := s.persistLocked(); err != nil {
+		if len(previous) == 0 {
+			delete(s.comments, projectID)
+		} else {
+			s.comments[projectID] = previous
+		}
+		return Comment{}, err
+	}
+	return comment, nil
 }
 
 func (s *CollaborationStore) Comments(projectID string) []Comment {
@@ -91,8 +105,20 @@ func (s *CollaborationStore) SetPresence(projectID, userID, status string) (Pres
 	if s.presence[projectID] == nil {
 		s.presence[projectID] = map[string]Presence{}
 	}
+	previous, existed := s.presence[projectID][userID]
 	s.presence[projectID][userID] = presence
-	return presence, s.persistLocked()
+	if err := s.persistLocked(); err != nil {
+		if existed {
+			s.presence[projectID][userID] = previous
+		} else {
+			delete(s.presence[projectID], userID)
+			if len(s.presence[projectID]) == 0 {
+				delete(s.presence, projectID)
+			}
+		}
+		return Presence{}, err
+	}
+	return presence, nil
 }
 
 func (s *CollaborationStore) Presence(projectID string) []Presence {

@@ -10,8 +10,6 @@ import (
 )
 
 func TestResearchEngineFetchesSourcesWithCitationsAndCache(t *testing.T) {
-	// The engine fetches URLs concurrently (MaxConcurrency=2), so the handler
-	// runs on multiple goroutines: count requests atomically to stay race-free.
 	var calls atomic.Int64
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls.Add(1)
@@ -36,8 +34,8 @@ func TestResearchEngineFetchesSourcesWithCitationsAndCache(t *testing.T) {
 	if _, err := engine.Research(context.Background(), ResearchRequest{Query: "project", URLs: []string{server.URL + "/one"}, RespectRobots: false}); err != nil {
 		t.Fatal(err)
 	}
-	if total := calls.Load(); total < 3 || total > 4 {
-		t.Fatalf("expected cached source fetches, got %d requests", total)
+	if calls.Load() < 3 || calls.Load() > 4 {
+		t.Fatalf("expected cached source fetches, got %d requests", calls.Load())
 	}
 }
 

@@ -19,6 +19,12 @@ ollama serve
 
 Never commit populated environment or credential files. Configured models remain visible without credentials and use the `provider-unavailable` family marker; requests are routed only after the corresponding `api_key_env` exists.
 
+### OmniRoute local
+
+OmniRoute can be connected as an optional OpenAI-compatible gateway. Start the operator-controlled OmniRoute instance on its documented loopback endpoint, copy [`examples/dz23-omniroute.json`](../examples/dz23-omniroute.json), set `OLLAMA_DZ23_CONFIG` to that file, and place only the gateway key in `OMNIROUTE_API_KEY` (or its `_FILE` companion). The `allow_insecure_loopback` flag is deliberately required for the default local HTTP endpoint and is accepted only together with `allow_private` and a numeric loopback host. External providers still require HTTPS.
+
+The preset exposes `omniroute/auto`; the actual model catalog and routing policy remain controlled by the OmniRoute instance. A configured endpoint is not proof that the gateway is running, authenticated or that any upstream account is available. Validate it with a local smoke test before using it in an autonomous mission.
+
 Every credential also supports an `_FILE` companion (for example, `GROQ_API_KEY_FILE`). On Linux/macOS the file must be readable only by its owner. The Windows installer includes **Ollama DZ23 - Configure APIs**, which stores the key as a current-user DPAPI-encrypted file and sets only the file location in the user environment; it does not persist the plaintext key. Restart Ollama DZ23 after changing a credential.
 
 The bundled Desktop configuration is kept in the current user's application-data directory and is preserved by upgrades and uninstall. It is local-only by default, so the Desktop can call remote providers without storing a second gateway token. If you bind Ollama to a non-loopback interface or put it behind a reverse proxy, add `"gateway_api_key_env": "OLLAMA_DZ23_GATEWAY_KEY"` to the configuration and set a long random value before exposing the listener.
@@ -48,7 +54,7 @@ Provider and model priorities are additive. Privacy-sensitive callers should use
 
 ## Security
 
-- Provider endpoints require HTTPS.
+- Provider endpoints require HTTPS. The only exception is an explicitly configured HTTP loopback service with `allow_private: true` and `allow_insecure_loopback: true`; this is intended for administrator-controlled local gateways such as OmniRoute.
 - Private, loopback, unspecified, and link-local destinations are rejected after DNS resolution unless `allow_private` is explicitly enabled; approved public addresses are pinned for the request to prevent DNS rebinding.
 - API keys are read from environment-variable names and are never serialized in the model catalog or safe registry snapshot.
 - Client `Authorization` headers are not forwarded to providers.
@@ -203,3 +209,27 @@ Before selecting a model in either client, verify:
 The gateway never forwards a client `Authorization` header to a provider. If
 the listener is accessed off-host, configure `gateway_api_key_env`, use the
 gateway bearer token, and protect the connection with TLS/firewall rules.
+
+
+## xAI / Grok Responses API
+
+A API xAI pode ser configurada como provider OpenAI-compatible com o preset [`examples/dz23-xai.json`](../examples/dz23-xai.json):
+
+```bash
+export OLLAMA_DZ23_CONFIG=/absolute/path/to/examples/dz23-xai.json
+export OLLAMA_DZ23_GATEWAY_KEY='chave-do-gateway-fora-do-repositorio'
+export XAI_API_KEY='chave-xai-fora-do-repositorio'
+```
+
+O modelo lógico é `xai/grok-4.7`. O preset permite `/v1/responses` e `/v1/chat/completions`; o proxy não converte o corpo Responses, apenas reescreve o model id e adiciona autenticação server-side. Tools, web search, structured outputs, quota, billing e versões aceitas dependem da API xAI. A integração não transforma o servidor local no Grok Bot hospedado e não inclui o computador cloud, bots persistentes ou aplicativos proprietários desse serviço.
+
+## Composio via Remote MCP
+
+Para disponibilizar toolkits Composio pelo runtime agentic, use [`examples/dz23-composio-connect.json`](../examples/dz23-composio-connect.json):
+
+```bash
+export OLLAMA_AGENT_REMOTE_MCP=/absolute/path/to/examples/dz23-composio-connect.json
+export COMPOSIO_CONSUMER_API_KEY='chave-fora-do-repositorio'
+```
+
+A autorização das contas upstream ocorre por OAuth do Composio e deve ser concluída pelo operador. O runtime exige approval para `mcp.remote.call`, mantém a chave no servidor e permite somente os métodos MCP do preset. Para uso com múltiplas organizações, substitua a chave global por sessões Composio por tenant e credential store cifrado.

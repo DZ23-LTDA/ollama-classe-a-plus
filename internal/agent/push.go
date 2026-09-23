@@ -69,10 +69,21 @@ func (p *PushService) Register(token, platform, userID, organizationID string) (
 	id := "push_" + hashSecret(token)[:24]
 	item := PushSubscription{ID: id, Token: token, Platform: platform, UserID: userID, OrganizationID: organizationID, CreatedAt: now, UpdatedAt: now}
 	p.mu.Lock()
+	previous, existed := p.items[id]
 	p.items[id] = item
 	err := p.persistLocked()
+	if err != nil {
+		if existed {
+			p.items[id] = previous
+		} else {
+			delete(p.items, id)
+		}
+	}
 	p.mu.Unlock()
-	return item, err
+	if err != nil {
+		return PushSubscription{}, err
+	}
+	return item, nil
 }
 
 func (p *PushService) ListOrganization(organizationID string) []PushSubscription {

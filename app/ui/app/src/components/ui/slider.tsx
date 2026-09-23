@@ -26,7 +26,7 @@ const Slider = React.forwardRef<HTMLDivElement, SliderProps>(
       onChange?.(optionValue);
     };
 
-    const getClosestOption = (clientX: number) => {
+    const getClosestOption = React.useCallback((clientX: number) => {
       if (!containerRef.current || !options) return null;
 
       const rect = containerRef.current.getBoundingClientRect();
@@ -38,7 +38,7 @@ const Slider = React.forwardRef<HTMLDivElement, SliderProps>(
       closestIndex = Math.max(0, Math.min(closestIndex, options.length - 1));
 
       return options[closestIndex].value;
-    };
+    }, [options]);
 
     const handleMouseDown = (e: React.MouseEvent) => {
       if (disabled) return;
@@ -46,7 +46,7 @@ const Slider = React.forwardRef<HTMLDivElement, SliderProps>(
       e.preventDefault();
     };
 
-    const handleMouseMove = (e: MouseEvent) => {
+    const handleMouseMove = React.useCallback((e: MouseEvent) => {
       if (!isDragging) return;
 
       const closestValue = getClosestOption(e.clientX);
@@ -54,15 +54,15 @@ const Slider = React.forwardRef<HTMLDivElement, SliderProps>(
         setSelectedValue(closestValue);
         // Don't call onChange during drag, just update visual state
       }
-    };
+    }, [getClosestOption, isDragging, selectedValue]);
 
-    const handleMouseUp = () => {
+    const handleMouseUp = React.useCallback(() => {
       if (isDragging) {
         // Call onChange with the final value when drag ends
         onChange?.(selectedValue);
       }
       setIsDragging(false);
-    };
+    }, [isDragging, onChange, selectedValue]);
 
     React.useEffect(() => {
       if (isDragging) {
@@ -73,7 +73,7 @@ const Slider = React.forwardRef<HTMLDivElement, SliderProps>(
           document.removeEventListener("mouseup", handleMouseUp);
         };
       }
-    }, [isDragging, selectedValue]);
+    }, [handleMouseMove, handleMouseUp, isDragging]);
 
     if (!options) {
       return null;

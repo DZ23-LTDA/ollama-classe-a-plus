@@ -44,3 +44,20 @@ func TestDevicePairingHeartbeatAndRevocation(t *testing.T) {
 		t.Fatalf("stored=%+v err=%v", stored, err)
 	}
 }
+
+func TestDevicePairingRejectsOrganizationOverride(t *testing.T) {
+	store, err := NewDeviceStore("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, _, err := store.StartPairing("user-a", "org-a", time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := store.CompletePairing(code, "Org B device", "linux", "user-b", "org-b", nil); err != ErrDeviceForbidden {
+		t.Fatalf("cross-tenant pairing err=%v, want ErrDeviceForbidden", err)
+	}
+	if _, _, err := store.CompletePairing(code, "Org A device", "linux", "user-a", "org-a", nil); err != nil {
+		t.Fatal(err)
+	}
+}

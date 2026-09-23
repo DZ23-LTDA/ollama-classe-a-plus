@@ -48,22 +48,26 @@ const (
 )
 
 type CreateMissionRequest struct {
-	Objective      string `json:"objective"`
-	Model          string `json:"model,omitempty"`
-	Workspace      string `json:"workspace,omitempty"`
-	ProjectID      string `json:"project_id,omitempty"`
-	OrganizationID string `json:"organization_id,omitempty"`
-	AutoRun        bool   `json:"auto_run,omitempty"`
+	Objective      string   `json:"objective"`
+	Provider       string   `json:"provider,omitempty"`
+	Model          string   `json:"model,omitempty"`
+	Workspace      string   `json:"workspace,omitempty"`
+	ProjectID      string   `json:"project_id,omitempty"`
+	OrganizationID string   `json:"organization_id,omitempty"`
+	Capabilities   []string `json:"capabilities,omitempty"`
+	AutoRun        bool     `json:"auto_run,omitempty"`
 }
 
 type Mission struct {
 	ID             string             `json:"id"`
 	Version        int64              `json:"version"`
 	Objective      string             `json:"objective"`
+	Provider       string             `json:"provider,omitempty"`
 	Model          string             `json:"model,omitempty"`
 	Workspace      string             `json:"workspace,omitempty"`
 	ProjectID      string             `json:"project_id,omitempty"`
 	OrganizationID string             `json:"organization_id,omitempty"`
+	Capabilities   []string           `json:"capabilities,omitempty"`
 	AutoRun        bool               `json:"auto_run,omitempty"`
 	State          MissionState       `json:"state"`
 	Plan           []Step             `json:"plan"`
@@ -89,13 +93,18 @@ type Step struct {
 }
 
 type Approval struct {
-	ID        string         `json:"id"`
-	MissionID string         `json:"mission_id"`
-	StepID    string         `json:"step_id"`
-	Status    ApprovalStatus `json:"status"`
-	Reason    string         `json:"reason,omitempty"`
-	CreatedAt time.Time      `json:"created_at"`
-	UpdatedAt time.Time      `json:"updated_at"`
+	ID             string         `json:"id"`
+	MissionID      string         `json:"mission_id"`
+	StepID         string         `json:"step_id"`
+	OrganizationID string         `json:"organization_id,omitempty"`
+	ActorID        string         `json:"actor_id,omitempty"`
+	Policy         string         `json:"policy,omitempty"`
+	Nonce          string         `json:"nonce,omitempty"`
+	Status         ApprovalStatus `json:"status"`
+	Reason         string         `json:"reason,omitempty"`
+	ExpiresAt      *time.Time     `json:"expires_at,omitempty"`
+	CreatedAt      time.Time      `json:"created_at"`
+	UpdatedAt      time.Time      `json:"updated_at"`
 }
 
 type Event struct {
@@ -167,12 +176,14 @@ type Memory struct {
 }
 
 type SkillManifest struct {
-	ID          string   `json:"id"`
-	Version     string   `json:"version"`
-	Description string   `json:"description"`
-	Scopes      []string `json:"scopes,omitempty"`
-	Tools       []string `json:"tools,omitempty"`
-	Trusted     bool     `json:"trusted"`
+	ID             string   `json:"id"`
+	OrganizationID string   `json:"organization_id,omitempty"`
+	Version        string   `json:"version"`
+	Description    string   `json:"description"`
+	Scopes         []string `json:"scopes,omitempty"`
+	Tools          []string `json:"tools,omitempty"`
+	Trusted        bool     `json:"trusted"`
+	Enabled        bool     `json:"enabled"`
 }
 
 type Schedule struct {
@@ -181,11 +192,14 @@ type Schedule struct {
 	Model            string     `json:"model,omitempty"`
 	Workspace        string     `json:"workspace,omitempty"`
 	ProjectID        string     `json:"project_id,omitempty"`
+	OrganizationID   string     `json:"organization_id,omitempty"`
 	IntervalSeconds  int64      `json:"interval_seconds"`
 	Enabled          bool       `json:"enabled"`
 	WebhookSecretEnv string     `json:"webhook_secret_env,omitempty"`
 	NextRunAt        time.Time  `json:"next_run_at"`
 	LastRunAt        *time.Time `json:"last_run_at,omitempty"`
+	FailureCount     int        `json:"failure_count,omitempty"`
+	LastFailureCode  string     `json:"last_failure_code,omitempty"`
 	CreatedAt        time.Time  `json:"created_at"`
 	UpdatedAt        time.Time  `json:"updated_at"`
 }

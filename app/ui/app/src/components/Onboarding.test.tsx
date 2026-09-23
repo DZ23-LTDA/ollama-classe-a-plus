@@ -5,14 +5,16 @@ import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ClaudeConnectedIntro,
-  FIRST_MODEL_COMMAND,
   ConnectAppsScreen,
   IntroScreen,
   default as Onboarding,
   RunOllamaScreen,
-  shouldShowClaudeConnectedIntro,
   WelcomeScreen,
 } from "./Onboarding";
+import {
+  FIRST_MODEL_COMMAND,
+  shouldShowClaudeConnectedIntro,
+} from "./onboardingUtils";
 import {
   CLAUDE_CONNECTION_TIMEOUT_MS,
   CLAUDE_INSTALL_TIMEOUT_MS,

@@ -14,6 +14,16 @@ type Planner interface {
 	Plan(ctx context.Context, mission Mission) ([]Step, error)
 }
 
+type PlannerResolver interface {
+	// ResolvePlanner must return an executable planner for the requested provider.
+	// It must not silently substitute a different provider or a rule-only plan.
+	ResolvePlanner(provider, model string) (Planner, error)
+}
+
+type plannerChatClient interface {
+	Chat(ctx context.Context, request *api.ChatRequest, callback api.ChatResponseFunc) error
+}
+
 type RulePlanner struct{}
 
 func (RulePlanner) Plan(_ context.Context, mission Mission) ([]Step, error) {
@@ -39,24 +49,36 @@ func (RulePlanner) Plan(_ context.Context, mission Mission) ([]Step, error) {
 	}}, nil
 }
 
+type UnconfiguredPlanner struct{}
+
+func (UnconfiguredPlanner) Plan(_ context.Context, _ Mission) ([]Step, error) {
+	return nil, errors.New("planner model is not configured")
+}
+
 type OllamaPlanner struct {
-	Client   *api.Client
-	Model    string
-	Fallback Planner
+	Client plannerChatClient
+	Model  string
 }
 
 func (p OllamaPlanner) Plan(ctx context.Context, mission Mission) ([]Step, error) {
-	if p.Client == nil || strings.TrimSpace(p.Model) == "" {
-		return p.fallback().Plan(ctx, mission)
+	model := strings.TrimSpace(mission.Model)
+	if model == "" {
+		model = strings.TrimSpace(p.Model)
+	}
+	if p.Client == nil {
+		return nil, errors.New("planner provider client is unavailable")
+	}
+	if model == "" {
+		return nil, errors.New("planner provider model is required")
 	}
 	stream := false
 	format := json.RawMessage(`"json"`)
 	request := &api.ChatRequest{
-		Model:  p.Model,
+		Model:  model,
 		Stream: &stream,
 		Format: format,
 		Messages: []api.Message{
-			{Role: "system", Content: "You are a mission planner. Return only JSON with a top-level steps array. Each step must have kind, title, risk, requires_approval, and input. Allowed kinds are workspace.list, workspace.read, workspace.write, terminal.exec, sandbox.exec, browser.operator, desktop.companion, mcp.call, connector.http. Never invent completed results. Use read risk for inspection, write risk for filesystem changes, external_side_effect for browser, desktop, MCP, and connector actions, and require approval for write, terminal, sandbox, browser, desktop, MCP, or connector steps."},
+			{Role: "system", Content: "You are a mission planner. Return only JSON with a top-level steps array. Each step must have kind, title, risk, requires_approval, and input. Allowed kinds are workspace.list, workspace.read, workspace.write, terminal.exec, sandbox.exec, browser.operator, desktop.companion, mcp.call, mcp.remote.call, connector.http. Never invent completed results. Use read risk for inspection, write risk for filesystem changes, external_side_effect for browser, desktop, MCP, and connector actions, and require approval for write, terminal, sandbox, browser, desktop, MCP, or connector steps."},
 			{Role: "user", Content: fmt.Sprintf("Objective: %s\nWorkspace: %s\nProject: %s", mission.Objective, mission.Workspace, mission.ProjectID)},
 		},
 	}
@@ -66,20 +88,13 @@ func (p OllamaPlanner) Plan(ctx context.Context, mission Mission) ([]Step, error
 		return nil
 	})
 	if err != nil {
-		return p.fallback().Plan(ctx, mission)
+		return nil, fmt.Errorf("planner provider request failed: %w", err)
 	}
 	steps, err := parsePlan(response)
 	if err != nil {
-		return p.fallback().Plan(ctx, mission)
+		return nil, fmt.Errorf("planner returned invalid plan: %w", err)
 	}
 	return normalizeSteps(steps)
-}
-
-func (p OllamaPlanner) fallback() Planner {
-	if p.Fallback != nil {
-		return p.Fallback
-	}
-	return RulePlanner{}
 }
 
 func parsePlan(content string) ([]Step, error) {
@@ -113,6 +128,7 @@ func normalizeSteps(steps []Step) ([]Step, error) {
 		"browser.operator":  RiskExternalSideEffect,
 		"desktop.companion": RiskExternalSideEffect,
 		"mcp.call":          RiskExternalSideEffect,
+		"mcp.remote.call":   RiskExternalSideEffect,
 		"connector.http":    RiskExternalSideEffect,
 	}
 	for i := range steps {

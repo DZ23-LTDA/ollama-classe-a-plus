@@ -2911,3 +2911,9 @@ func TestFormerAgentEntryPointsAreRejected(t *testing.T) {
 		})
 	}
 }
+
+func TestAgentEntryPointIsAvailable(t *testing.T) {
+	if _, _, err := NewCLI().Find([]string{"agent"}); err != nil {
+		t.Fatalf("agent command should be available: %v", err)
+	}
+}

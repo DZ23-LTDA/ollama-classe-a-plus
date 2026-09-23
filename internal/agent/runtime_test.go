@@ -2,14 +2,16 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
-	goruntime "runtime"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -55,13 +57,66 @@ func TestRuntimePersistsAndRunsReadMission(t *testing.T) {
 	}
 }
 
+func TestRuntimeRejectsUnconfiguredMissionProvider(t *testing.T) {
+	root := t.TempDir()
+	store, err := NewJSONStore(filepath.Join(root, ".store"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	runtime, err := NewRuntime(RuntimeConfig{Store: store, Planner: RulePlanner{}, WorkspaceRoot: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runtime.CreateMission(context.Background(), CreateMissionRequest{Objective: "testar provider", Provider: "claude"}); err == nil || !strings.Contains(err.Error(), "not configured") {
+		t.Fatalf("provider error = %v", err)
+	}
+	mission, err := runtime.CreateMission(context.Background(), CreateMissionRequest{Objective: "usar provider local"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if mission.Provider != "ollama-local" {
+		t.Fatalf("provider = %q", mission.Provider)
+	}
+}
+
+func TestRuntimeQueueJobsOrganizationScope(t *testing.T) {
+	root := t.TempDir()
+	runtime, err := NewRuntime(RuntimeConfig{Store: NewMemoryStore(), Planner: RulePlanner{}, WorkspaceRoot: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mission, err := runtime.CreateMission(context.Background(), CreateMissionRequest{Objective: "fila tenant", OrganizationID: "org_a"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	job, err := runtime.EnqueueMission(mission.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	jobs, err := runtime.QueueJobsForOrganization("org_a", "")
+	if err != nil || len(jobs) != 1 || jobs[0].ID != job.ID {
+		t.Fatalf("org_a jobs=%+v err=%v", jobs, err)
+	}
+	jobs, err = runtime.QueueJobsForOrganization("org_b", "")
+	if err != nil || len(jobs) != 0 {
+		t.Fatalf("org_b jobs=%+v err=%v", jobs, err)
+	}
+	if _, err := runtime.ReplayJobForOrganization(job.ID, "org_b"); !errors.Is(err, ErrQueueJobForbidden) {
+		t.Fatalf("cross-tenant replay error=%v", err)
+	}
+	jobs, err = runtime.QueueJobsForOrganization("org_a", "")
+	if err != nil || len(jobs) != 1 || jobs[0].Status != QueuePending {
+		t.Fatalf("job mutated after rejected replay: %+v err=%v", jobs, err)
+	}
+}
+
 func TestRuntimeRequiresApprovalBeforeWritingAndBuildsArtifact(t *testing.T) {
 	root := t.TempDir()
 	runtime, err := NewRuntime(RuntimeConfig{Store: NewMemoryStore(), Planner: fixedPlanner{steps: []Step{{ID: "step_1", Kind: "workspace.write", Title: "write", Risk: RiskWrite, RequiresApproval: true, State: StepPending, Input: map[string]any{"path": "result.txt", "content": "hello"}}}}, WorkspaceRoot: root})
 	if err != nil {
 		t.Fatal(err)
 	}
-	mission, err := runtime.CreateMission(context.Background(), CreateMissionRequest{Objective: "escrever resultado"})
+	mission, err := runtime.CreateMission(context.Background(), CreateMissionRequest{Objective: "escrever resultado", Capabilities: []string{"workspace:read", "workspace:write"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -95,7 +150,7 @@ func TestRuntimeRequiresApprovalBeforeWritingAndBuildsArtifact(t *testing.T) {
 }
 
 func TestWorkspaceToolsRejectTraversal(t *testing.T) {
-	runtime, err := NewRuntime(RuntimeConfig{Store: NewMemoryStore(), WorkspaceRoot: t.TempDir()})
+	runtime, err := NewRuntime(RuntimeConfig{Store: NewMemoryStore(), Planner: RulePlanner{}, WorkspaceRoot: t.TempDir()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -113,6 +168,32 @@ func TestWorkspaceToolsRejectTraversal(t *testing.T) {
 	}
 }
 
+func TestWorkspaceToolsRejectSymlinkEscape(t *testing.T) {
+	root := t.TempDir()
+	outside := t.TempDir()
+	if err := os.WriteFile(filepath.Join(outside, "secret.txt"), []byte("secret"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(root, "linked")); err != nil {
+		t.Skipf("symlink unavailable on this platform: %v", err)
+	}
+	runtime, err := NewRuntime(RuntimeConfig{Store: NewMemoryStore(), Planner: RulePlanner{}, WorkspaceRoot: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mission, err := runtime.CreateMission(context.Background(), CreateMissionRequest{Objective: "ler arquivo"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	tool, ok := runtime.tools.Get("workspace.read")
+	if !ok {
+		t.Fatal("workspace.read not registered")
+	}
+	if _, err := tool.Execute(context.Background(), ToolContext{MissionID: mission.ID, StepID: "step_1", Workspace: mission.Workspace}, map[string]any{"path": "linked/secret.txt"}); err == nil {
+		t.Fatal("expected symlink escape rejection")
+	}
+}
+
 type fixedPlanner struct {
 	steps []Step
 }
@@ -121,13 +202,163 @@ func (p fixedPlanner) Plan(_ context.Context, _ Mission) ([]Step, error) {
 	return append([]Step(nil), p.steps...), nil
 }
 
+type cancellationProbeTool struct {
+	started chan struct{}
+	release chan struct{}
+	calls   atomic.Int32
+}
+
+func (t *cancellationProbeTool) Descriptor() ToolDescriptor {
+	return ToolDescriptor{Name: "workspace.read", Version: "test", Description: "cancellation probe", Risk: RiskRead, Scopes: []string{"workspace:read"}}
+}
+
+func (t *cancellationProbeTool) Execute(ctx context.Context, _ ToolContext, _ map[string]any) (ToolResult, error) {
+	call := t.calls.Add(1)
+	if call == 1 {
+		close(t.started)
+		select {
+		case <-ctx.Done():
+			return ToolResult{}, ctx.Err()
+		case <-t.release:
+		}
+	}
+	return ToolResult{Value: map[string]any{"calls": call}}, nil
+}
+
+func TestRuntimeCancelInterruptsActiveToolAndPreventsNextStep(t *testing.T) {
+	probe := &cancellationProbeTool{started: make(chan struct{}), release: make(chan struct{})}
+	registry := NewRegistry()
+	registry.Register(probe)
+	runtime, err := NewRuntime(RuntimeConfig{
+		Store:         NewMemoryStore(),
+		Tools:         registry,
+		WorkspaceRoot: t.TempDir(),
+		Planner: fixedPlanner{steps: []Step{
+			{ID: "step_1", Kind: "workspace.read", Title: "blocking", Risk: RiskRead, State: StepPending},
+			{ID: "step_2", Kind: "workspace.read", Title: "must not run", Risk: RiskRead, State: StepPending},
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mission, err := runtime.CreateMission(context.Background(), CreateMissionRequest{Objective: "cancel active tool"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	runDone := make(chan error, 1)
+	go func() { runDone <- runtime.Run(context.Background(), mission.ID) }()
+	select {
+	case <-probe.started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("tool did not start")
+	}
+	if _, err := runtime.Cancel(mission.ID); err != nil {
+		t.Fatal(err)
+	}
+	close(probe.release)
+	select {
+	case err := <-runDone:
+		if err != nil {
+			t.Fatalf("cancelled run returned error: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("cancelled tool did not stop")
+	}
+	cancelled, err := runtime.GetMission(mission.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cancelled.State != MissionCancelled {
+		t.Fatalf("state = %s, want CANCELLED", cancelled.State)
+	}
+	if calls := probe.calls.Load(); calls != 1 {
+		t.Fatalf("tool calls = %d, want exactly one", calls)
+	}
+}
+
+type dlpResultTool struct{}
+
+func (dlpResultTool) Descriptor() ToolDescriptor {
+	return ToolDescriptor{Name: "workspace.read", Version: "test", Description: "test tool", Risk: RiskRead, Scopes: []string{"workspace:read"}}
+}
+
+func (dlpResultTool) Execute(context.Context, ToolContext, map[string]any) (ToolResult, error) {
+	return ToolResult{Value: map[string]any{
+		"safe":       "visible",
+		"nested":     map[string]any{"token": "xai-abcdefghijklmnopqrstuvwxyz123456"},
+		"credential": "api_key=super-secret-token-value",
+	}}, nil
+}
+
+func TestRuntimeRedactsStepResultsEventsTracesAndPersistence(t *testing.T) {
+	root := t.TempDir()
+	store, err := NewJSONStore(filepath.Join(root, ".store"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	registry := NewRegistry()
+	registry.Register(dlpResultTool{})
+	traces, err := NewTraceStore("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	runtime, err := NewRuntime(RuntimeConfig{Store: store, Tools: registry, Traces: traces, Planner: fixedPlanner{steps: []Step{{ID: "step_secret", Kind: "workspace.read", Title: "secret result", Risk: RiskRead, State: StepPending}}}, WorkspaceRoot: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mission, err := runtime.CreateMission(context.Background(), CreateMissionRequest{Objective: "redaction test", OrganizationID: "org_a"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := runtime.Run(context.Background(), mission.ID); err != nil {
+		t.Fatal(err)
+	}
+	completed, err := runtime.GetMission(mission.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	encodedResult, _ := json.Marshal(completed.Plan[0].Result)
+	if strings.Contains(string(encodedResult), "xai-") || strings.Contains(string(encodedResult), "super-secret-token-value") {
+		t.Fatalf("step result leaked credential: %s", encodedResult)
+	}
+	if err := runtime.event(completed, "test.secret", completed.Plan[0].ID, map[string]any{"token": "Bearer abcdefghijklmnop1234"}); err != nil {
+		t.Fatal(err)
+	}
+	events, err := runtime.Events(mission.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	encodedEvents, _ := json.Marshal(events)
+	if strings.Contains(string(encodedEvents), "abcdefghijklmnop1234") {
+		t.Fatalf("event leaked bearer token: %s", encodedEvents)
+	}
+	span := traces.StartForOrganization("org_a", "trace_secret", "", "test", map[string]any{"api_key": "super-secret-token-value"})
+	span.End("error", errors.New("provider failed with xai-abcdefghijklmnopqrstuvwxyz123456"))
+	encodedTraces, _ := json.Marshal(traces.ListForOrganization("org_a", "trace_secret", 10))
+	if strings.Contains(string(encodedTraces), "super-secret-token-value") || strings.Contains(string(encodedTraces), "xai-") {
+		t.Fatalf("trace leaked credential: %s", encodedTraces)
+	}
+	reloaded, err := NewJSONStore(filepath.Join(root, ".store"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	persisted, err := reloaded.GetMission(mission.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	persistedResult, _ := json.Marshal(persisted.Plan[0].Result)
+	if strings.Contains(string(persistedResult), "super-secret-token-value") || strings.Contains(string(persistedResult), "xai-") {
+		t.Fatalf("persisted result leaked credential: %s", persistedResult)
+	}
+}
+
 func TestContextStorePersistsProjectAndMemory(t *testing.T) {
 	root := t.TempDir()
 	store, err := NewContextStore(filepath.Join(root, "context"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	project, err := store.CreateProject("DZ23", filepath.Join(root, "workspace"), "")
+	project, err := store.CreateProject("DZ23", filepath.Join(root, "workspace"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -148,24 +379,19 @@ func TestContextStorePersistsProjectAndMemory(t *testing.T) {
 }
 
 func TestSandboxExecRunsIsolatedPython(t *testing.T) {
-	if goruntime.GOOS != "linux" {
-		t.Skip("sandbox.exec relies on Linux user namespaces (unshare); skipping on " + goruntime.GOOS)
+	if _, err := exec.LookPath("unshare"); err != nil {
+		t.Skip("sandbox test requires unshare")
 	}
-	if _, err := os.Stat("/usr/bin/python3"); err != nil {
-		t.Skip("python3 interpreter is unavailable; skipping sandbox test")
-	}
-	// sandbox.exec relies on unprivileged user namespaces (unshare --user), which
-	// are disabled on some hosts (e.g. Ubuntu 24.04's AppArmor restriction on
-	// GitHub runners). Probe the capability and skip when it is not available.
-	if err := exec.Command("unshare", "--user", "--map-root-user", "true").Run(); err != nil {
-		t.Skip("unprivileged user namespaces are unavailable; skipping sandbox test")
+	probe := exec.Command("unshare", "--user", "--map-root-user", "--mount", "--pid", "--fork", "--mount-proc", "--net", "/bin/true")
+	if output, err := probe.CombinedOutput(); err != nil {
+		t.Skipf("user namespace sandbox unavailable: %v (%s)", err, strings.TrimSpace(string(output)))
 	}
 	root := t.TempDir()
 	runtime, err := NewRuntime(RuntimeConfig{Store: NewMemoryStore(), WorkspaceRoot: root, Planner: fixedPlanner{steps: []Step{{ID: "step_1", Kind: "sandbox.exec", Title: "run", Risk: RiskWrite, RequiresApproval: true, State: StepPending, Input: map[string]any{"language": "python", "code": "print(2 + 2)"}}}}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	mission, err := runtime.CreateMission(context.Background(), CreateMissionRequest{Objective: "executar código"})
+	mission, err := runtime.CreateMission(context.Background(), CreateMissionRequest{Objective: "executar código", Capabilities: []string{"sandbox:execute"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -180,8 +406,135 @@ func TestSandboxExecRunsIsolatedPython(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if completed.State != MissionCompleted || !strings.Contains(completed.Plan[0].Result.(map[string]any)["stdout"].(string), "4") {
+	result, ok := completed.Plan[0].Result.(map[string]any)
+	stdout, stdoutOK := result["stdout"].(string)
+	if completed.State != MissionCompleted || !ok || !stdoutOK || !strings.Contains(stdout, "4") {
 		t.Fatalf("completed = %+v", completed)
+	}
+}
+
+func TestApprovalBindsActorOrganizationAndReason(t *testing.T) {
+	runtime, err := NewRuntime(RuntimeConfig{Store: NewMemoryStore(), WorkspaceRoot: t.TempDir(), Planner: fixedPlanner{steps: []Step{{ID: "step_1", Kind: "workspace.write", Title: "write", Risk: RiskWrite, RequiresApproval: true, Input: map[string]any{"path": "approval.txt", "content": "ok"}}}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mission, err := runtime.CreateMission(context.Background(), CreateMissionRequest{Objective: "aprovar operação", OrganizationID: "org_a"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runtime.DecideApprovalForActor(mission.ID, mission.Approvals[0].ID, true, "approved", "user_a", "org_b"); err == nil {
+		t.Fatal("expected organization mismatch")
+	}
+	if _, err := runtime.DecideApprovalForActor(mission.ID, mission.Approvals[0].ID, true, "", "user_a", "org_a"); err == nil {
+		t.Fatal("expected empty reason rejection")
+	}
+	mission, err = runtime.DecideApprovalForActor(mission.ID, mission.Approvals[0].ID, true, "approved", "user_a", "org_a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	approval := mission.Approvals[0]
+	if approval.ActorID != "user_a" || approval.OrganizationID != "org_a" || approval.Nonce == "" || approval.Policy != "capabilities:workspace:write;risk:write" || approval.ExpiresAt == nil {
+		t.Fatalf("approval metadata = %+v", approval)
+	}
+}
+
+func TestApprovalCASAndNonceAreSingleUse(t *testing.T) {
+	runtime, err := NewRuntime(RuntimeConfig{Store: NewMemoryStore(), WorkspaceRoot: t.TempDir(), Planner: fixedPlanner{steps: []Step{{ID: "step_1", Kind: "workspace.write", Title: "write", Risk: RiskWrite, RequiresApproval: true, Input: map[string]any{"path": "approval-cas.txt", "content": "ok"}}}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mission, err := runtime.CreateMission(context.Background(), CreateMissionRequest{Objective: "approval CAS", OrganizationID: "org_a"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	approval := mission.Approvals[0]
+	if _, err := runtime.DecideApprovalForActorCAS(mission.ID, approval.ID, true, "approved", "admin_a", "org_a", mission.Version, "wrong"); !errors.Is(err, ErrApprovalNonceMismatch) {
+		t.Fatalf("wrong nonce err=%v", err)
+	}
+	if _, err := runtime.DecideApprovalForActorCAS(mission.ID, approval.ID, true, strings.Repeat("x", 2049), "admin_a", "org_a", mission.Version, approval.Nonce); !errors.Is(err, ErrApprovalReasonTooLong) {
+		t.Fatalf("oversized reason err=%v", err)
+	}
+	decided, err := runtime.DecideApprovalForActorCAS(mission.ID, approval.ID, true, "approved", "admin_a", "org_a", mission.Version, approval.Nonce)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if decided.Approvals[0].Status != ApprovalApproved {
+		t.Fatalf("decided=%+v", decided.Approvals[0])
+	}
+	if _, err := runtime.DecideApprovalForActorCAS(mission.ID, approval.ID, true, "replay", "admin_a", "org_a", decided.Version, approval.Nonce); err == nil {
+		t.Fatal("approval nonce was reusable")
+	}
+}
+
+func TestApprovalCASConcurrentDecisionsHaveOneWinner(t *testing.T) {
+	runtime, err := NewRuntime(RuntimeConfig{Store: NewMemoryStore(), WorkspaceRoot: t.TempDir(), Planner: fixedPlanner{steps: []Step{{ID: "step_1", Kind: "workspace.write", Title: "write", Risk: RiskWrite, RequiresApproval: true, Input: map[string]any{"path": "approval-concurrent.txt", "content": "ok"}}}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mission, err := runtime.CreateMission(context.Background(), CreateMissionRequest{Objective: "approval concurrent CAS", OrganizationID: "org_a"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	approval := mission.Approvals[0]
+	start := make(chan struct{})
+	results := make(chan error, 2)
+	var group sync.WaitGroup
+	for _, actor := range []string{"admin_a", "admin_b"} {
+		group.Add(1)
+		go func(actor string) {
+			defer group.Done()
+			<-start
+			_, decideErr := runtime.DecideApprovalForActorCAS(mission.ID, approval.ID, true, "approved", actor, "org_a", mission.Version, approval.Nonce)
+			results <- decideErr
+		}(actor)
+	}
+	close(start)
+	group.Wait()
+	close(results)
+	winners := 0
+	conflicts := 0
+	for decideErr := range results {
+		if decideErr == nil {
+			winners++
+		} else if errors.Is(decideErr, ErrApprovalVersionConflict) {
+			conflicts++
+		}
+	}
+	if winners != 1 || conflicts != 1 {
+		t.Fatalf("winners=%d conflicts=%d", winners, conflicts)
+	}
+	decided, err := runtime.GetMission(mission.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if decided.Approvals[0].Status != ApprovalApproved {
+		t.Fatalf("approval status = %s, want APPROVED", decided.Approvals[0].Status)
+	}
+}
+
+func TestCapabilityPolicyDefaultsToLocalScopes(t *testing.T) {
+	if !capabilityAllowed(ToolDescriptor{Name: "workspace.read", Scopes: []string{"workspace:read"}}, []string{"workspace:read", "workspace:write"}) {
+		t.Fatal("local workspace read should be allowed by the default policy")
+	}
+	if capabilityAllowed(ToolDescriptor{Name: "browser.operator", Scopes: []string{"browser:navigate"}}, []string{"workspace:read", "workspace:write"}) {
+		t.Fatal("browser capability must require explicit grant")
+	}
+	if !capabilityAllowed(ToolDescriptor{Name: "browser.operator", Scopes: []string{"browser:navigate"}}, []string{"browser:navigate"}) {
+		t.Fatal("explicit browser capability should be accepted")
+	}
+	got := normalizeMissionCapabilities([]string{" browser:navigate ", "workspace:read", "browser:navigate"})
+	if strings.Join(got, ",") != "browser:navigate,workspace:read" {
+		t.Fatalf("normalized capabilities = %v", got)
+	}
+}
+
+func TestRuntimeRejectsUnknownMissionCapability(t *testing.T) {
+	runtime, err := NewRuntime(RuntimeConfig{Store: NewMemoryStore(), WorkspaceRoot: t.TempDir()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runtime.CreateMission(context.Background(), CreateMissionRequest{Objective: "invalid grant", Capabilities: []string{"workspace:read", "payments:charge"}}); !errors.Is(err, ErrUnknownCapability) {
+		t.Fatalf("err=%v, want unknown capability", err)
 	}
 }
 
@@ -206,12 +559,6 @@ func TestScheduleClaimIsIdempotent(t *testing.T) {
 }
 
 func TestBrowserOperatorNavigateAndSnapshot(t *testing.T) {
-	if _, err := os.Stat("/usr/bin/python3"); err != nil {
-		t.Skip("browser operator requires /usr/bin/python3 (Playwright helper); skipping")
-	}
-	if err := exec.Command("/usr/bin/python3", "-c", "import playwright").Run(); err != nil {
-		t.Skip("browser operator requires the Playwright Python package; skipping")
-	}
 	t.Setenv("OLLAMA_AGENT_BROWSER_ALLOW_PRIVATE", "1")
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
@@ -231,5 +578,53 @@ func TestBrowserOperatorNavigateAndSnapshot(t *testing.T) {
 	content, ok := result.Value.(map[string]any)["content"].(string)
 	if !ok || !strings.Contains(content, "Hello Browser") {
 		t.Fatalf("browser result = %+v", result.Value)
+	}
+}
+
+type plannerResolverStub struct {
+	provider string
+	model    string
+	planner  Planner
+}
+
+func (s *plannerResolverStub) ResolvePlanner(provider, model string) (Planner, error) {
+	s.provider = provider
+	s.model = model
+	return s.planner, nil
+}
+
+func TestRuntimeUsesExplicitPlannerResolverForRemoteProvider(t *testing.T) {
+	resolver := &plannerResolverStub{planner: RulePlanner{}}
+	runtime, err := NewRuntime(RuntimeConfig{
+		Store:           NewMemoryStore(),
+		PlannerResolver: resolver,
+		WorkspaceRoot:   t.TempDir(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mission, err := runtime.CreateMission(context.Background(), CreateMissionRequest{
+		Objective: "inspect remote provider",
+		Provider:  "anthropic",
+		Model:     "claude-sonnet-4-5",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolver.provider != "anthropic" || resolver.model != "claude-sonnet-4-5" {
+		t.Fatalf("resolver request = %q/%q", resolver.provider, resolver.model)
+	}
+	if mission.Provider != "anthropic" || mission.Model != "claude-sonnet-4-5" {
+		t.Fatalf("mission provider/model = %q/%q", mission.Provider, mission.Model)
+	}
+}
+
+func TestRuntimeRejectsRemoteProviderWithoutResolver(t *testing.T) {
+	runtime, err := NewRuntime(RuntimeConfig{Store: NewMemoryStore(), WorkspaceRoot: t.TempDir()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runtime.CreateMission(context.Background(), CreateMissionRequest{Objective: "remote", Provider: "codex", Model: "codex-mini"}); err == nil || !strings.Contains(err.Error(), "not configured") {
+		t.Fatalf("err = %v, want explicit unavailable provider", err)
 	}
 }

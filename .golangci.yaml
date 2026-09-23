@@ -20,6 +20,10 @@ linters:
   disable:
     - errcheck
     - usestdlibvars
+  exclusions:
+    paths:
+      - node_modules/
+      - app/ui/app/dist/
   settings:
     depguard:
       rules:

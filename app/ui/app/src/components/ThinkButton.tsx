@@ -1,5 +1,6 @@
 import { forwardRef, useState, useRef, useEffect } from "react";
 import type { ThinkingLevel } from "./ChatForm";
+import type { CloseableButtonHandle } from "@/types/imperative";
 
 const THINKING_LEVELS = {
   LOW: "low",
@@ -23,7 +24,7 @@ interface ThinkButtonProps {
   onDropdownToggle?: (isOpen: boolean) => void;
 }
 
-export const ThinkButton = forwardRef<HTMLButtonElement, ThinkButtonProps>(
+export const ThinkButton = forwardRef<CloseableButtonHandle, ThinkButtonProps>(
   function ThinkButton(
     {
       mode,
@@ -46,7 +47,7 @@ export const ThinkButton = forwardRef<HTMLButtonElement, ThinkButtonProps>(
         ref.current &&
         mode === "thinkingLevel"
       ) {
-        (ref.current as any).closeDropdown = () => setIsDropdownOpen(false);
+        ref.current.closeDropdown = () => setIsDropdownOpen(false);
       }
     }, [ref, mode]);
 

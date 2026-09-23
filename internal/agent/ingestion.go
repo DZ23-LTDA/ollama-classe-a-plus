@@ -26,8 +26,9 @@ type DocumentIngestRequest struct {
 }
 
 type DocumentIngestor struct {
-	Context  *ContextStore
-	Research *ResearchEngine
+	Context       *ContextStore
+	Research      *ResearchEngine
+	WorkspaceRoot string
 }
 
 func (i DocumentIngestor) Ingest(ctx context.Context, request DocumentIngestRequest) ([]Memory, error) {
@@ -41,13 +42,52 @@ func (i DocumentIngestor) Ingest(ctx context.Context, request DocumentIngestRequ
 	if err != nil {
 		return nil, err
 	}
-	root := project.Root
-	if strings.TrimSpace(request.Workspace) != "" {
-		root = request.Workspace
+	projectRoot := strings.TrimSpace(project.Root)
+	if len(request.Paths) > 0 && projectRoot == "" {
+		return nil, errors.New("project root is required for path ingestion")
 	}
-	root, err = filepath.Abs(root)
-	if err != nil {
-		return nil, err
+	if projectRoot != "" {
+		projectRoot, err = canonicalProjectRoot(i.WorkspaceRoot, projectRoot)
+		if err != nil {
+			return nil, err
+		}
+	}
+	root := projectRoot
+	if strings.TrimSpace(request.Workspace) != "" {
+		root, err = filepath.Abs(request.Workspace)
+		if err != nil {
+			return nil, err
+		}
+		canonicalRoot, canonicalErr := canonicalPathAllowMissing(root)
+		if canonicalErr != nil {
+			return nil, canonicalErr
+		}
+		root = canonicalRoot
+		if !isWithin(projectRoot, root) {
+			return nil, errors.New("ingestion workspace must be inside the project root")
+		}
+	}
+	if len(request.Paths) > 0 {
+		if _, err := canonicalExistingDirectory(root); err != nil {
+			return nil, fmt.Errorf("ingestion workspace is not safe: %w", err)
+		}
+		rootInfo, statErr := os.Stat(root)
+		if statErr != nil {
+			return nil, statErr
+		}
+		if !rootInfo.IsDir() {
+			return nil, errors.New("ingestion workspace must be a directory")
+		}
+		rootLinkInfo, lstatErr := os.Lstat(root)
+		if lstatErr != nil {
+			return nil, lstatErr
+		}
+		if rootLinkInfo.Mode()&os.ModeSymlink != 0 {
+			return nil, errors.New("ingestion workspace must not be a symlink")
+		}
+		if err := rejectSymlinkComponents(projectRoot, root); err != nil {
+			return nil, fmt.Errorf("ingestion workspace is not safe: %w", err)
+		}
 	}
 	if len(request.Paths)+len(request.URLs) == 0 {
 		return nil, errors.New("at least one path or URL is required")
@@ -67,6 +107,9 @@ func (i DocumentIngestor) Ingest(ctx context.Context, request DocumentIngestRequ
 	var memories []Memory
 	var consumed int64
 	for _, relative := range request.Paths {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		path, err := safeWorkspacePath(root, relative)
 		if err != nil {
 			return nil, err
@@ -96,6 +139,9 @@ func (i DocumentIngestor) Ingest(ctx context.Context, request DocumentIngestRequ
 		}
 	}
 	for _, rawURL := range request.URLs {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		if i.Research == nil {
 			return nil, errors.New("research engine is required for URL ingestion")
 		}
@@ -107,6 +153,10 @@ func (i DocumentIngestor) Ingest(ctx context.Context, request DocumentIngestRequ
 			if source.Error != "" {
 				return nil, errors.New(source.Error)
 			}
+			if consumed+int64(len(source.Text)) > request.MaxBytes {
+				return nil, errors.New("ingestion byte budget exceeded")
+			}
+			consumed += int64(len(source.Text))
 			for index, chunk := range chunkText(source.Text, request.ChunkSize, request.ChunkOverlap) {
 				memory, err := i.Context.AddMemoryContext(ctx, Memory{ProjectID: request.ProjectID, Kind: "web_chunk", Content: chunk, Source: source.URL + fmt.Sprintf("#chunk-%d", index+1), Confidence: 0.8})
 				if err != nil {
@@ -125,9 +175,9 @@ func readDocument(ctx context.Context, path string, limit int64) (string, error)
 	case ".pdf":
 		return readPDF(ctx, path, limit)
 	case ".docx":
-		return readDOCX(path, limit)
+		return readDOCX(ctx, path, limit)
 	case ".xlsx":
-		return readXLSX(path, limit)
+		return readXLSX(ctx, path, limit)
 	case ".png", ".jpg", ".jpeg", ".webp", ".gif":
 		return "", errors.New("image OCR requires a configured vision adapter")
 	}
@@ -172,13 +222,16 @@ func readLimitedFile(path string, limit int64) ([]byte, error) {
 	return data, nil
 }
 
-func readDOCX(path string, limit int64) (string, error) {
+func readDOCX(ctx context.Context, path string, limit int64) (string, error) {
 	archive, err := zip.OpenReader(path)
 	if err != nil {
 		return "", err
 	}
 	defer archive.Close()
 	for _, file := range archive.File {
+		if err := ctx.Err(); err != nil {
+			return "", err
+		}
 		if file.Name != "word/document.xml" {
 			continue
 		}
@@ -186,7 +239,7 @@ func readDOCX(path string, limit int64) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		data, err := io.ReadAll(io.LimitReader(reader, limit))
+		data, err := readLimitedReader(reader, limit)
 		_ = reader.Close()
 		if err != nil {
 			return "", err
@@ -196,7 +249,7 @@ func readDOCX(path string, limit int64) (string, error) {
 	return "", errors.New("docx document.xml not found")
 }
 
-func readXLSX(path string, limit int64) (string, error) {
+func readXLSX(ctx context.Context, path string, limit int64) (string, error) {
 	archive, err := zip.OpenReader(path)
 	if err != nil {
 		return "", err
@@ -204,6 +257,9 @@ func readXLSX(path string, limit int64) (string, error) {
 	defer archive.Close()
 	var builder strings.Builder
 	for _, file := range archive.File {
+		if err := ctx.Err(); err != nil {
+			return "", err
+		}
 		if !strings.HasPrefix(file.Name, "xl/worksheets/") && !strings.HasSuffix(file.Name, "sharedStrings.xml") {
 			continue
 		}
@@ -211,7 +267,7 @@ func readXLSX(path string, limit int64) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		data, err := io.ReadAll(io.LimitReader(reader, limit))
+		data, err := readLimitedReader(reader, limit-int64(builder.Len()))
 		_ = reader.Close()
 		if err != nil {
 			return "", err
@@ -226,6 +282,20 @@ func readXLSX(path string, limit int64) (string, error) {
 		return "", errors.New("xlsx contains no readable worksheets")
 	}
 	return builder.String(), nil
+}
+
+func readLimitedReader(reader io.Reader, limit int64) ([]byte, error) {
+	if limit < 0 {
+		return nil, errors.New("document byte budget exceeded")
+	}
+	data, err := io.ReadAll(io.LimitReader(reader, limit+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(data)) > limit {
+		return nil, errors.New("document exceeds byte budget")
+	}
+	return data, nil
 }
 
 func xmlText(data []byte) string {

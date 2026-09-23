@@ -103,6 +103,35 @@ func TestLoadRegistryRejectsUnsafeProviderURL(t *testing.T) {
 	}
 }
 
+func TestLoadRegistryAllowsExplicitLoopbackHTTPForLocalGateway(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "providers.json")
+	config := `{"providers":[{"name":"omniroute","type":"openai-compatible","base_url":"http://127.0.0.1:20128/v1","allow_private":true,"allow_insecure_loopback":true,"models":[{"id":"auto","capabilities":["chat","tools","coding"]}]}]}`
+	if err := os.WriteFile(path, []byte(config), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	r, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	model, ok := r.Model("omniroute/auto")
+	if !ok || !model.Available {
+		t.Fatalf("OmniRoute model = %#v, ok=%v", model, ok)
+	}
+}
+
+func TestLoadRegistryRejectsExplicitInsecureHTTPOutsideLoopback(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "providers.json")
+	config := `{"providers":[{"name":"omniroute","type":"openai-compatible","base_url":"http://example.com/v1","allow_private":true,"allow_insecure_loopback":true,"models":[{"id":"auto"}]}]}`
+	if err := os.WriteFile(path, []byte(config), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Load(path); err == nil {
+		t.Fatal("expected insecure external provider URL to be rejected")
+	}
+}
+
 func TestResolveNeverFallsBackForLocalOnly(t *testing.T) {
 	r := &Registry{models: map[string]Model{
 		"openai/gpt-test": {ID: "openai/gpt-test", Provider: "openai", Available: true},

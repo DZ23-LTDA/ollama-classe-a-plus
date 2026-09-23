@@ -57,6 +57,8 @@ type DeviceStore struct {
 	pairings map[string]PairingRequest
 }
 
+var ErrDeviceForbidden = errors.New("device is outside the active organization")
+
 func NewDeviceStore(root string) (*DeviceStore, error) {
 	store := &DeviceStore{root: root, devices: map[string]Device{}, tokens: map[string]string{}, pairings: map[string]PairingRequest{}}
 	if strings.TrimSpace(root) == "" {
@@ -103,13 +105,16 @@ func (s *DeviceStore) CompletePairing(code, name, platform, userID, organization
 	if !ok || pairing.UsedAt != nil || time.Now().UTC().After(pairing.ExpiresAt) {
 		return Device{}, "", errors.New("invalid, expired, or already used pairing code")
 	}
+	if strings.TrimSpace(organizationID) != "" && strings.TrimSpace(pairing.OrganizationID) != "" && normalizedOrganizationID(pairing.OrganizationID) != normalizedOrganizationID(organizationID) {
+		return Device{}, "", ErrDeviceForbidden
+	}
 	now := time.Now().UTC()
 	pairing.UsedAt = &now
 	s.pairings[hash] = pairing
 	if userID == "" {
 		userID = pairing.UserID
 	}
-	if organizationID == "" {
+	if strings.TrimSpace(organizationID) == "" {
 		organizationID = pairing.OrganizationID
 	}
 	token, err := randomDeviceSecret(32)
@@ -141,6 +146,13 @@ func (s *DeviceStore) Heartbeat(deviceID, token string, capabilities []DeviceCap
 	return device, s.persistLocked()
 }
 
+func (s *DeviceStore) HeartbeatForOrganization(deviceID, token string, capabilities []DeviceCapability, organizationID string) (Device, error) {
+	if _, err := s.GetForOrganization(deviceID, organizationID); err != nil {
+		return Device{}, err
+	}
+	return s.Heartbeat(deviceID, token, capabilities)
+}
+
 func (s *DeviceStore) Revoke(deviceID string) (Device, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -156,12 +168,26 @@ func (s *DeviceStore) Revoke(deviceID string) (Device, error) {
 	return device, s.persistLocked()
 }
 
+func (s *DeviceStore) RevokeForOrganization(deviceID, organizationID string) (Device, error) {
+	if _, err := s.GetForOrganization(deviceID, organizationID); err != nil {
+		return Device{}, err
+	}
+	return s.Revoke(deviceID)
+}
+
 func (s *DeviceStore) List() []Device {
+	return s.ListForOrganization("local")
+}
+
+func (s *DeviceStore) ListForOrganization(organizationID string) []Device {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	result := make([]Device, 0, len(s.devices))
 	now := time.Now().UTC()
 	for _, device := range s.devices {
+		if normalizedOrganizationID(device.OrganizationID) != normalizedOrganizationID(organizationID) {
+			continue
+		}
 		if device.Status == DeviceOnline && now.Sub(device.LastSeen) > 2*time.Minute {
 			device.Status = DeviceOffline
 		}
@@ -177,6 +203,17 @@ func (s *DeviceStore) Get(deviceID string) (Device, error) {
 	device, ok := s.devices[deviceID]
 	if !ok {
 		return Device{}, os.ErrNotExist
+	}
+	return device, nil
+}
+
+func (s *DeviceStore) GetForOrganization(deviceID, organizationID string) (Device, error) {
+	device, err := s.Get(deviceID)
+	if err != nil {
+		return Device{}, err
+	}
+	if normalizedOrganizationID(device.OrganizationID) != normalizedOrganizationID(organizationID) {
+		return Device{}, ErrDeviceForbidden
 	}
 	return device, nil
 }

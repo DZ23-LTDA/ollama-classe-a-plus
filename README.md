@@ -1,26 +1,20 @@
-<p align="center">
-  <a href="https://github.com/DZ23-LTDA/ollama-classe-a-plus">
-    <strong>Ollama Classe A+</strong>
-  </a>
-</p>
-
 # Ollama Classe A+
 
 > **Uma distribuição agentic local-first para modelos, automações, pesquisa, builders e operação segura.**
 
-Este repositório público reúne a base Ollama DZ23 e a evolução agentic do projeto. O manual completo, os contratos, a configuração e a política de atualização estão em [`docs/CLASS_A_PLUS_GUIDE.md`](docs/CLASS_A_PLUS_GUIDE.md).
+Este é o fork público mantido por [DZ23-LTDA](https://github.com/DZ23-LTDA), baseado no Ollama e preservando a licença MIT e os avisos de atribuição upstream. O projeto adiciona superfícies agentic próprias; não é o instalador, serviço hospedado ou distribuição oficial do Ollama. O manual completo, os contratos, a configuração e a política de atualização estão em [`docs/CLASS_A_PLUS_GUIDE.md`](docs/CLASS_A_PLUS_GUIDE.md).
 
-### Visão rápida — captura Home da branch de desenvolvimento
+### Visão rápida — capturas reais atualizadas em 2026-09-22
 
-![Home do Ollama Classe A+](docs/images/screens/class-a-plus-home.png)
+![Home atual do shell Classe A+](docs/images/screens/class-a-plus-home.png)
 
-> **Proveniência:** esta imagem foi fornecida pelo mantenedor e representa a captura da Home na branch de desenvolvimento `feat/manus-parity-omniroute`; ela é publicada aqui somente como documentação visual e **não significa que essa implementação esteja integrada à `main`**. SHA-256 do arquivo: `0291a918e1af8ea282721ea4b4f126c7d9ceb95c983299da964d1e9461b235bf`. Ela usa dados demonstrativos locais e não comprova credenciais, contas externas, dispositivos, deploy ou homologação. Consulte a [proveniência dos assets](docs/images/ASSET_PROVENANCE.md) antes de interpretar qualquer imagem em `docs/images/` como tela do produto.
+![Agentic Console atual](docs/images/screens/class-a-plus-agentic.png)
 
-![Mission Console do Classe A+](docs/images/screens/agentic-console.png)
+![Settings e Agentic Control Center atuais](docs/images/screens/class-a-plus-settings.png)
 
-> **Proveniência:** esta é uma captura real da rota `/agentic`, publicada na `main` como documentação do estado visual observado durante o desenvolvimento. Ela usa dados demonstrativos locais e não representa um release instalável nem comprova credenciais, contas externas, dispositivos, deploy ou homologação.
+![Company OS atual](docs/images/screens/class-a-plus-company.png)
 
-Para conhecer o estado das telas planejadas de configuração, builder e mobile, veja a [galeria visual](docs/CLASS_A_PLUS_GUIDE.md#telas-e-estado-visual). Mockups conceituais são identificados como conceito e não são apresentados como funcionalidades concluídas.
+As imagens acima foram recapturadas com Chromium contra o Vite dev e o servidor Ollama local em `127.0.0.1:3001`, sem provider externo. A captura mostra a implementação e dados sandbox locais; não comprova credenciais, contas, dispositivos, deploys ou integrações externas conectadas. A [galeria complementar](docs/CLASS_A_PLUS_GUIDE.md#telas-e-estado-visual) inclui Projetos, Biblioteca, Agendado, Skills, Plugins e Tarefas. Para conhecer a árvore completa, as telas planejadas de builder/mobile e os limites de cada integração, veja a [árvore de produto](docs/agentic/PRODUCT_TREE.md), a [matriz de paridade](docs/agentic/PARITY_MATRIX.md), a [integração HarnessRouter](docs/agentic/HARNESSROUTER.md) e a [documentação Company OS](docs/agentic/COMPANY_OS.md). Mockups conceituais são identificados como conceito dentro da própria imagem; eles não são apresentados como funcionalidades concluídas. A rodada mais recente também reforçou autenticação fail-closed, allowlists MCP, lifecycle de plugins/skills, contenção de symlink, approvals auditáveis e DLP.
 
 | Recurso | Documento |
 |---|---|
@@ -28,69 +22,71 @@ Para conhecer o estado das telas planejadas de configuração, builder e mobile,
 | Arquitetura do runtime | [`agentic/ARCHITECTURE.md`](docs/agentic/ARCHITECTURE.md) |
 | API e endpoints | [`agentic/API.md`](docs/agentic/API.md) |
 | Integrações, OAuth, SAML, MCP e deploy | [`agentic/INTEGRATIONS.md`](docs/agentic/INTEGRATIONS.md) |
+| HarnessRouter, UHP, Codex/Claude Code plugáveis | [`agentic/HARNESSROUTER.md`](docs/agentic/HARNESSROUTER.md) + [`dz23-harnessrouter.json`](examples/dz23-harnessrouter.json) |
+| Composio Connect MCP e toolkits OAuth | [`agentic/COMPOSIO.md`](docs/agentic/COMPOSIO.md) + [`dz23-composio-connect.json`](examples/dz23-composio-connect.json) |
+| xAI/Grok API e Responses | [`agentic/XAI_GROK.md`](docs/agentic/XAI_GROK.md) + [`dz23-xai.json`](examples/dz23-xai.json) |
+| Company OS: empresa, KPIs, Growth OS, afiliados, catálogo, pedidos e guardrails | [`agentic/COMPANY_OS.md`](docs/agentic/COMPANY_OS.md) |
+| Agentes departamentais, Grok Live, Social OS e Evaluation OS | [`agentic/COMPANY_OS.md`](docs/agentic/COMPANY_OS.md) + [`agentic/XAI_GROK.md`](docs/agentic/XAI_GROK.md) + [`agentic/EVALUATION.md`](docs/agentic/EVALUATION.md) |
+| Smoke operacional de Growth OS e Builder | [`smoke-company-growth.sh`](scripts/smoke-company-growth.sh) + [`smoke-builder.sh`](scripts/smoke-builder.sh) |
+| Desktop Commander local e Remote MCP | [`agentic/DESKTOP_COMMANDER_REMOTE.md`](docs/agentic/DESKTOP_COMMANDER_REMOTE.md) + [`dz23-desktop-commander-remote.json`](examples/dz23-desktop-commander-remote.json) |
 | Roadmap e status por fase | [`agentic/ROADMAP.md`](docs/agentic/ROADMAP.md) |
+| Árvore Manus observável + Classe A+ unificado | [`agentic/PRODUCT_TREE.md`](docs/agentic/PRODUCT_TREE.md) |
+| Matriz de paridade e evidências | [`agentic/PARITY_MATRIX.md`](docs/agentic/PARITY_MATRIX.md) |
+| Referências de harnesses, capacidades e decisões de integração | [`HARNESS_CAPABILITY_MATRIX.md`](audit/HARNESS_CAPABILITY_MATRIX.md) |
+| Proteção contra regressões upstream | [`UPSTREAM_POLICY.md`](UPSTREAM_POLICY.md) + [`check-class-a-plus-integrity.sh`](scripts/check-class-a-plus-integrity.sh) |
+| Hardening, findings e gates de release | [`FINAL_THREE_AGENT_REVIEW.md`](audit/FINAL_THREE_AGENT_REVIEW.md) |
+| Prontidão, smoke de APIs e pendências externas | [`READINESS_2026-09-22.md`](docs/agentic/READINESS_2026-09-22.md) |
 
-## Compilar e executar este fork
+Start building with open models.
 
-O Ollama Classe A+ **não publica neste momento um instalador assinado, uma imagem Docker oficial ou um pacote binário versionado próprio**. Por isso, comandos como `ollama.com/install.sh`, downloads do domínio `ollama.com`, `ollama/ollama` no Docker Hub e pacotes `ollama` de SDK não instalam este fork. O caminho reproduzível abaixo compila o código deste repositório.
+## Build and run this fork
 
-### Linux, macOS e Windows (build de desenvolvimento)
-
-Requisitos: Git, Go na versão indicada em [`go.mod`](go.mod), Node.js/npm para a interface web e as ferramentas nativas exigidas pelo backend em cada sistema operacional.
+The public repository currently distributes source code, not a signed Classe A+ installer, release binary, Docker image, or app-store package. Build the revision you have checked out so the executable and agentic runtime come from this fork:
 
 ```shell
 git clone https://github.com/DZ23-LTDA/ollama-classe-a-plus.git
 cd ollama-classe-a-plus
-
-# A main é a linha pública de documentação; esta branch contém a evolução agentic em revisão.
-git switch feat/manus-parity-omniroute
-
-go build -o ./bin/ollama-classe-a-plus .
+go version  # Go version required by go.mod
+mkdir -p bin
+go build -trimpath -o bin/ollama-classe-a-plus .
 OLLAMA_HOST=127.0.0.1:11434 ./bin/ollama-classe-a-plus serve
 ```
 
-Em outro terminal, para levantar a interface em modo de desenvolvimento:
+The equivalent helpers are `scripts/install.sh` on Unix-like systems and `scripts/install.ps1` on Windows. They build the checked-out source locally and never download `ollama.com` installers or official upstream binaries. They require Go and do not install models or configure external providers.
+
+In a second terminal, run the web operator surface from source:
 
 ```shell
-cd ollama-classe-a-plus/app/ui/app
-npm ci
-npm run dev -- --host 127.0.0.1
+cd app/ui/app
+npm ci --no-audit --no-fund
+npm run dev
 ```
 
-O frontend de desenvolvimento consulta o servidor agentic local em `http://127.0.0.1:3001` conforme [`src/lib/config.ts`](app/ui/app/src/lib/config.ts); ajuste a configuração local caso o backend esteja em outra porta. O build acima valida o motor, mas não substitui empacotamento, assinatura, instalador, atualização ou rollback.
+The local web development configuration uses the agentic API at `http://127.0.0.1:3001` when the development server is configured for that port. A source build is not evidence of a signed release, production deployment, external OAuth, provider account, or physical-device validation. Those remain `BLOCKED_BY_EXTERNAL_DEPENDENCY` until the maintainer supplies the required signing keys, release workflow, accounts and test environments.
 
-> **BLOCKED_BY_EXTERNAL_DEPENDENCY:** instaladores assinados, artefatos de release, auto-update, rollback verificável, imagens Docker publicadas e validação física em Linux/macOS/Windows ainda exigem pipeline de release, chaves, máquinas e homologação do mantenedor. Não existe neste README uma promessa desses artefatos.
+### Upstream compatibility references
 
-### Bibliotecas e documentação upstream compatíveis
+The inherited Ollama CLI/API and integration pages remain available for compatibility and attribution. Links to `ollama.com`, `docs.ollama.com`, upstream libraries, Docker Hub, or upstream communities describe the upstream project; they do **not** install or publish this fork. Use the source-build instructions above for Classe A+.
 
-Os SDKs e a documentação do ecossistema Ollama podem ser usados quando o contrato compatível for suficiente, mas eles são dependências upstream e não distribuem o binário Classe A+:
+## Get started
 
-- [ollama-python](https://github.com/ollama/ollama-python)
-- [ollama-js](https://github.com/ollama/ollama-js)
-- [documentação upstream de API](https://docs.ollama.com/api)
-
-## Primeiros passos
-
-Depois de iniciar o servidor compilado, a API local pode ser exercitada com o CLI do binário:
-
-```shell
-./bin/ollama-classe-a-plus --help
-./bin/ollama-classe-a-plus agent --help
+```
+./bin/ollama-classe-a-plus
 ```
 
-O runtime agentic expõe as rotas versionadas sob `/api/agent/v1`. Providers, conectores, MCP, OAuth, SSO, mídia, deploy e automações externas são opt-in, ficam sob responsabilidade do operador e não recebem credenciais deste repositório.
+You'll be prompted to run a model or connect Ollama to your existing agents or applications such as `Claude Code`, `OpenClaw`, `OpenCode` , `Codex`, `Copilot`,  and more.
 
-### Integrações de desenvolvimento
+### Coding
 
 To launch a specific integration:
 
-```shell
+```
 ./bin/ollama-classe-a-plus launch claude
 ```
 
-As integrações documentadas incluem [Claude Code](https://docs.ollama.com/integrations/claude-code), [Codex](https://docs.ollama.com/integrations/codex), [Copilot CLI](https://docs.ollama.com/integrations/copilot-cli), [DeepSeek Harness](https://docs.ollama.com/integrations/deepseek-harness), [Droid](https://docs.ollama.com/integrations/droid) e [OpenCode](https://docs.ollama.com/integrations/opencode). Essas páginas são referências de compatibilidade do ecossistema upstream; não significam que as contas, CLIs ou serviços externos estejam incluídos ou homologados neste fork.
+Supported integrations include [Claude Code](https://docs.ollama.com/integrations/claude-code), [Codex](https://docs.ollama.com/integrations/codex), [Copilot CLI](https://docs.ollama.com/integrations/copilot-cli), [DeepSeek Harness](https://docs.ollama.com/integrations/deepseek-harness), [Droid](https://docs.ollama.com/integrations/droid), and [OpenCode](https://docs.ollama.com/integrations/opencode).
 
-### Assistentes e modelos
+### AI assistant
 
 Use [OpenClaw](https://docs.ollama.com/integrations/openclaw) to turn Ollama into a personal AI assistant across WhatsApp, Telegram, Slack, Discord, and more:
 
@@ -98,15 +94,15 @@ Use [OpenClaw](https://docs.ollama.com/integrations/openclaw) to turn Ollama int
 ./bin/ollama-classe-a-plus launch openclaw
 ```
 
-### Conversar com um modelo local
+### Chat with a model
 
-Run and chat with [Gemma 4](https://ollama.com/library/gemma4):
+Run and chat with a model already available in your local Ollama-compatible model store:
 
 ```
-./bin/ollama-classe-a-plus run gemma4
+./bin/ollama-classe-a-plus run <modelo-local>
 ```
 
-Consulte a [biblioteca upstream de modelos](https://ollama.com/library) somente para escolher um modelo compatível; o catálogo, os downloads e os termos desse serviço não são publicados nem operados pelo Classe A+. Veja o [guia do projeto](docs/CLASS_A_PLUS_GUIDE.md) para os limites locais e de segurança.
+See the [upstream model library](https://ollama.com/library) only as a compatibility reference; model availability, licensing and downloads are operator responsibilities. The [Classe A+ guide](docs/CLASS_A_PLUS_GUIDE.md) is the canonical source-build documentation.
 
 ## REST API
 
@@ -123,7 +119,7 @@ curl http://localhost:11434/api/chat -d '{
 }'
 ```
 
-Veja a [API do motor compatível](https://docs.ollama.com/api) para os endpoints herdados e a [API agentic do Classe A+](docs/agentic/API.md) para missões, approvals, artifacts e integrações.
+See the [API documentation](https://docs.ollama.com/api) for all endpoints.
 
 ### DZ23 multi-provider mode
 
@@ -131,15 +127,15 @@ This fork can expose explicitly configured API and CLI providers beside local mo
 
 ### DZ23 agentic runtime
 
-O fork inclui um runtime agentic com missões persistentes, planos validados, tools com approval, isolamento de workspace, manifests de artifacts, histórico de eventos, recovery, fila persistente com retries/dead-letter/replay, persistência PostgreSQL e workers Redis opcionais, SSE, traces locais e OTLP, orquestração multiagente, pesquisa com citações/cache/robots/SSRF guard, Browser Operator Playwright, pairing de companions, transporte TLS/mTLS, lifecycle MCP stdio, memória semântica, ingestão documental, connectors HTTP, schedules/webhooks, métricas, MFA/OIDC/SAML adapters, RBAC, colaboração, adapters multimodais, OCR local quando instalado, canvas visual, exportadores e builders locais. Os adapters de deploy para Vercel, Netlify e generic existem como contratos controlados, mas **deploy externo, credenciais, approval operacional, health check e rollback ainda exigem configuração e smoke autorizado do operador**. Configure `OLLAMA_AGENT_ROOT`, opcionalmente `OLLAMA_AGENT_STORE`, `OLLAMA_AGENT_DATABASE_URL`, `OLLAMA_AGENT_REDIS_URL`, `OLLAMA_AGENT_OTLP_ENDPOINT`, `OLLAMA_AGENT_MODEL`, `OLLAMA_AGENT_EMBED_MODEL`, `OLLAMA_AGENT_CONNECTORS`, `OLLAMA_AGENT_DEPLOYMENTS`, `OLLAMA_AGENT_MCP`, `OLLAMA_AGENT_AUTH_STORE`, `OLLAMA_AGENT_AUTH_REQUIRED`, `OLLAMA_AGENT_AUTH_SSO_PUBLIC`, `OLLAMA_AGENT_MEDIA_BASE_URL` e `OLLAMA_AGENT_MEDIA_API_KEY`, então use a API ou a CLI:
+The fork now includes an agentic runtime with persistent missions, validated plans, approval-gated tools, workspace isolation, artifact manifests, event history, recovery-aware execution, a persistent queue with retries/dead-letter/replay, optional PostgreSQL persistence and Redis workers, SSE events, local and OTLP traces, a multiagent orchestrator with specialist roles and synthesis, deep research with citations/cache/robots policy/SSRF guard, Playwright Browser Operator, Linux/macOS/Windows Desktop companion pairing, TLS 1.3/mTLS WebSocket transport with reloadable server certificates, MCP stdio lifecycle, semantic memory, PDF/DOCX/XLSX ingestion, HTTP connectors, scheduler/webhooks, Prometheus metrics, MFA TOTP with recovery codes, OIDC discovery/userinfo provisioning, SAML SP metadata/AuthnRequest/ACS, optional encrypted OAuth credentials, organization/RBAC boundaries with forced PostgreSQL RLS, collaboration comments/presence, multimodal provider adapters, local OCR when Tesseract is installed, visual component canvas with bindings/events and persistent undo/redo, PDF/DOCX/PPTX exports, and builders for websites/apps/games/slides/dashboards. Deployment adapters for Vercel, Netlify and generic gateways are present with local fixtures and server-side approvals; real provider accounts, billing, health checks and rollback remain operator-owned and unhomologated. Configure `OLLAMA_AGENT_ROOT`, optionally set `OLLAMA_AGENT_STORE`, `OLLAMA_AGENT_DATABASE_URL`, `OLLAMA_AGENT_REDIS_URL`, `OLLAMA_AGENT_OTLP_ENDPOINT`, `OLLAMA_AGENT_MODEL`, `OLLAMA_AGENT_EMBED_MODEL`, `OLLAMA_AGENT_CONNECTORS`, `OLLAMA_AGENT_DEPLOYMENTS`, `OLLAMA_AGENT_MCP`, `OLLAMA_AGENT_AUTH_STORE`, `OLLAMA_AGENT_AUTH_REQUIRED`, `OLLAMA_AGENT_AUTH_SSO_PUBLIC`, `OLLAMA_AGENT_MEDIA_BASE_URL` and `OLLAMA_AGENT_MEDIA_API_KEY`, then use the API or the CLI:
 
 ```shell
-ollama agent create --objective "inspecionar o workspace" --auto-run
+./bin/ollama-classe-a-plus agent create --objective "inspecionar o workspace" --auto-run
 ```
 
-Read [the agentic architecture](docs/agentic/ARCHITECTURE.md), [the integrations guide](docs/agentic/INTEGRATIONS.md), [the executable roadmap](docs/agentic/ROADMAP.md), [the API guide](docs/agentic/API.md), the [phase 7 delivery note](docs/agentic/PHASE7_DELIVERY.md), the [phase 8 delivery note](docs/agentic/PHASE8_DELIVERY.md), and the [harness comparison synthesis](docs/agentic/HARNESS_COMPARISON_SYNTHESIS.md). The Web Agentic Console and an Expo mobile client are included as operator surfaces. Provider credentials, EAS signing, external OAuth/OIDC/SAML configuration, Tesseract installation and hosting credentials remain deployment responsibilities; the code does not execute an external publish without explicit approval.
+Read [the product tree](docs/agentic/PRODUCT_TREE.md), [the parity matrix](docs/agentic/PARITY_MATRIX.md), [the agentic architecture](docs/agentic/ARCHITECTURE.md), [the integrations guide](docs/agentic/INTEGRATIONS.md), [the executable roadmap](docs/agentic/ROADMAP.md), [the API guide](docs/agentic/API.md), the [phase 7 delivery note](docs/agentic/PHASE7_DELIVERY.md), the [phase 8 delivery note](docs/agentic/PHASE8_DELIVERY.md), and the [harness comparison synthesis](docs/agentic/HARNESS_COMPARISON_SYNTHESIS.md). The Web Agentic Console and an Expo mobile client are included as operator surfaces. Provider credentials, EAS signing, external OAuth/OIDC/SAML configuration, Tesseract installation and hosting credentials remain deployment responsibilities; the code does not execute an external publish without explicit approval.
 
-### SDKs upstream compatíveis (não instalam o fork)
+### Python (cliente upstream compatível)
 
 ```
 pip install ollama
@@ -157,7 +153,7 @@ response = chat(model='gemma4', messages=[
 print(response.message.content)
 ```
 
-### JavaScript
+### JavaScript (cliente upstream compatível)
 
 ```
 npm i ollama
@@ -177,21 +173,17 @@ console.log(response.message.content);
 
 - [llama.cpp](https://github.com/ggml-org/llama.cpp) project founded by Georgi Gerganov.
 
-## Documentação
+## Documentation
 
-- [Guia do Classe A+](docs/CLASS_A_PLUS_GUIDE.md)
-- [Arquitetura agentic](docs/agentic/ARCHITECTURE.md)
-- [API agentic](docs/agentic/API.md)
-- [Integrações e limites](docs/agentic/INTEGRATIONS.md)
-- [CLI de compatibilidade](https://docs.ollama.com/cli)
-- [REST API de compatibilidade](https://docs.ollama.com/api)
-- [Importação de modelos upstream](https://docs.ollama.com/import)
-- [Modelfile upstream](https://docs.ollama.com/modelfile)
-- [Build upstream de referência](https://github.com/ollama/ollama/blob/main/docs/development.md)
+- [CLI reference](https://docs.ollama.com/cli)
+- [REST API reference](https://docs.ollama.com/api)
+- [Importing models](https://docs.ollama.com/import)
+- [Modelfile reference](https://docs.ollama.com/modelfile)
+- [Building from source](https://github.com/ollama/ollama/blob/main/docs/development.md)
 
-## Integrações comunitárias upstream
+## Community Integrations
 
-> A lista abaixo foi herdada como referência do ecossistema Ollama. Esses projetos não fazem parte do Classe A+, não são instalados por este repositório e não têm contas conectadas ou homologação implícita.
+> Want to add your project? Open a pull request.
 
 ### Chat Interfaces
 

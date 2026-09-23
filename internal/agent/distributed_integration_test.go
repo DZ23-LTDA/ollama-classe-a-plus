@@ -102,6 +102,42 @@ func TestDistributedRedisRetriesDeadLetterReplay(t *testing.T) {
 	}
 }
 
+func TestDistributedRedisClaimIsIdempotentAndReclaimsExpiredLease(t *testing.T) {
+	redisURL := os.Getenv("OLLAMA_AGENT_TEST_REDIS_URL")
+	if redisURL == "" {
+		t.Skip("OLLAMA_AGENT_TEST_REDIS_URL is not configured")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	queue, err := OpenRedisQueue(ctx, redisURL, "ollama:lease-integration:"+uuid.NewString())
+	if err != nil {
+		t.Fatal(err)
+	}
+	missionID := "mis_" + uuid.NewString()
+	first, err := queue.Enqueue(missionID, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := queue.Enqueue(missionID, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if second.ID != first.ID {
+		t.Fatalf("duplicate Redis enqueue: first=%+v second=%+v", first, second)
+	}
+	claimed, ok, err := queue.Claim("worker-a", time.Now().UTC())
+	if err != nil || !ok || claimed.ID != first.ID {
+		t.Fatalf("first claim failed: job=%+v ok=%v err=%v", claimed, ok, err)
+	}
+	if _, err := queue.do(context.Background(), "ZADD", queue.leaseKey(), "0", first.ID); err != nil {
+		t.Fatal(err)
+	}
+	reclaimed, ok, err := queue.Claim("worker-b", time.Now().UTC().Add(time.Minute))
+	if err != nil || !ok || reclaimed.ID != first.ID || reclaimed.Attempts != 2 || reclaimed.WorkerID != "worker-b" {
+		t.Fatalf("expired lease was not reclaimed: job=%+v ok=%v err=%v", reclaimed, ok, err)
+	}
+}
+
 func TestDistributedOTLPCollector(t *testing.T) {
 	endpoint := os.Getenv("OLLAMA_AGENT_TEST_OTLP_ENDPOINT")
 	if endpoint == "" {

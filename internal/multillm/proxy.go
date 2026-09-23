@@ -110,6 +110,12 @@ func (g *Gateway) Middleware() gin.HandlerFunc {
 			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "provider does not support this API path"})
 			return
 		}
+		if provider.Type == ProviderTypeOpenAICompatible && model.HarnessID != "" {
+			if err := injectHarnessMetadata(envelope, model.HarnessID); err != nil {
+				c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "invalid request metadata"})
+				return
+			}
+		}
 		if provider.Type == ProviderTypeCLI {
 			if err := g.executeCLI(c, provider, model, envelope); err != nil {
 				slog.Warn("DZ23 CLI request failed", "provider", provider.Name, "error", err)
@@ -163,6 +169,22 @@ func (g *Gateway) Middleware() gin.HandlerFunc {
 		}
 		c.Abort()
 	}
+}
+
+func injectHarnessMetadata(envelope map[string]json.RawMessage, harnessID string) error {
+	metadata := make(map[string]any)
+	if raw, ok := envelope["metadata"]; ok && len(raw) > 0 && string(raw) != "null" {
+		if err := json.Unmarshal(raw, &metadata); err != nil {
+			return err
+		}
+	}
+	metadata["harness_id"] = strings.TrimSpace(harnessID)
+	encoded, err := json.Marshal(metadata)
+	if err != nil {
+		return err
+	}
+	envelope["metadata"] = encoded
+	return nil
 }
 
 func (g *Gateway) executeCLI(c *gin.Context, provider Provider, model Model, envelope map[string]json.RawMessage) error {

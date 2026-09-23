@@ -106,6 +106,120 @@ func TestProxyRoutesConfiguredModelAndRedactsClientAuthorization(t *testing.T) {
 	}
 }
 
+func TestProxyRoutesLocalOmniRouteGateway(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	var gotPath, gotModel, gotAuthorization string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		gotAuthorization = r.Header.Get("Authorization")
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		gotModel, _ = body["model"].(string)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"omniroute-test","choices":[{"message":{"role":"assistant","content":"local gateway answer"},"finish_reason":"stop"}]}`))
+	}))
+	defer upstream.Close()
+
+	t.Setenv("OMNIROUTE_TEST_KEY", "omniroute-secret")
+	r := &Registry{
+		providers: map[string]Provider{"omniroute": {
+			Name:                  "omniroute",
+			Type:                  ProviderTypeOpenAICompatible,
+			BaseURL:               upstream.URL + "/v1",
+			APIKeyEnv:             "OMNIROUTE_TEST_KEY",
+			AllowPrivate:          true,
+			AllowInsecureLoopback: true,
+		}},
+		models: map[string]Model{"omniroute/auto": {ID: "omniroute/auto", UpstreamID: "auto", Provider: "omniroute", Available: true}},
+	}
+	router := gin.New()
+	router.Use(NewGateway(r, nil).Middleware())
+	router.POST("/v1/chat/completions", func(c *gin.Context) { t.Fatal("request was not proxied") })
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"omniroute/auto","messages":[{"role":"user","content":"hello"}]}`))
+	req.RemoteAddr = "127.0.0.1:12345"
+	req.Header.Set("Authorization", "Bearer client-secret")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK || gotPath != "/v1/chat/completions" || gotModel != "auto" {
+		t.Fatalf("status=%d path=%q model=%q body=%s", rec.Code, gotPath, gotModel, rec.Body.String())
+	}
+	if gotAuthorization != "Bearer omniroute-secret" {
+		t.Fatalf("upstream authorization = %q", gotAuthorization)
+	}
+}
+
+func TestProxyInjectsHarnessRouterMetadata(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	var metadata map[string]any
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		metadata, _ = body["metadata"].(map[string]any)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"harnessrouter-test","object":"response","status":"completed"}`))
+	}))
+	defer upstream.Close()
+
+	r := &Registry{
+		providers: map[string]Provider{"harnessrouter": {Name: "harnessrouter", Type: ProviderTypeOpenAICompatible, BaseURL: upstream.URL + "/v1", Paths: []string{"/v1/responses"}, AllowPrivate: true, AllowInsecureLoopback: true}},
+		models:    map[string]Model{"harnessrouter/codex": {ID: "harnessrouter/codex", UpstreamID: "gpt-test", HarnessID: "codex", Provider: "harnessrouter", Available: true}},
+	}
+	router := gin.New()
+	router.Use(NewGateway(r, nil).Middleware())
+	router.POST("/v1/responses", func(c *gin.Context) { t.Fatal("request was not proxied") })
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(`{"model":"harnessrouter/codex","metadata":{"trace_id":"trace-test"},"input":"hello"}`))
+	request.RemoteAddr = "127.0.0.1:12345"
+	router.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+	if metadata["harness_id"] != "codex" || metadata["trace_id"] != "trace-test" {
+		t.Fatalf("metadata=%v", metadata)
+	}
+}
+
+func TestProxyPassesThroughResponsesProvider(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	var gotModel, gotAuthorization string
+	upstream := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotModel = ""
+		gotAuthorization = r.Header.Get("Authorization")
+		if r.URL.Path != "/v1/responses" {
+			t.Fatalf("path = %q", r.URL.Path)
+		}
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		gotModel, _ = body["model"].(string)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"resp-xai-test","object":"response","status":"completed","output":[]}`))
+	}))
+	defer upstream.Close()
+	t.Setenv("XAI_TEST_KEY", "xai-secret")
+	r := &Registry{
+		providers: map[string]Provider{"xai": {Name: "xai", Type: ProviderTypeOpenAICompatible, BaseURL: upstream.URL + "/v1", APIKeyEnv: "XAI_TEST_KEY", Paths: []string{"/v1/responses"}, AllowPrivate: true}},
+		models:    map[string]Model{"xai/grok-4.7": {ID: "xai/grok-4.7", UpstreamID: "grok-4.7", Provider: "xai", Available: true}},
+	}
+	router := gin.New()
+	router.Use(NewGateway(r, upstream.Client()).Middleware())
+	router.POST("/v1/responses", func(c *gin.Context) { t.Fatal("request was not proxied") })
+	request := httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(`{"model":"xai/grok-4.7","input":"hello","tools":[{"type":"web_search"}]}`))
+	request.RemoteAddr = "127.0.0.1:12345"
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusOK || gotModel != "grok-4.7" || gotAuthorization != "Bearer xai-secret" {
+		t.Fatalf("status=%d model=%q authorization=%q body=%s", recorder.Code, gotModel, gotAuthorization, recorder.Body.String())
+	}
+}
+
 func TestCLIProviderRequiresExplicitExecutionAndReturnsCompletion(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	t.Setenv("DZ23_CLI_HELPER", "1")
@@ -330,5 +444,38 @@ func TestAnthropicProviderTranslatesNativeChat(t *testing.T) {
 	router.ServeHTTP(recorder, request)
 	if recorder.Code != http.StatusOK || gotPath != "/v1/messages" || gotModel != "claude-test" || gotSystem != "be concise" || !strings.Contains(recorder.Body.String(), `"content":"anthropic answer"`) {
 		t.Fatalf("status=%d path=%q model=%q system=%q body=%s", recorder.Code, gotPath, gotModel, gotSystem, recorder.Body.String())
+	}
+}
+
+func TestProxyTranslatesOpenAIStreamingSession(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	var gotAuthorization string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuthorization = r.Header.Get("Authorization")
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = io.WriteString(w, "data: {\"choices\":[{\"delta\":{\"content\":\"chunk-one\"}}]}\n\n")
+		_, _ = io.WriteString(w, "data: {\"choices\":[{\"delta\":{\"content\":\" chunk-two\"},\"finish_reason\":\"stop\"}]}\n\n")
+		_, _ = io.WriteString(w, "data: [DONE]\n\n")
+	}))
+	defer upstream.Close()
+	t.Setenv("STREAM_KEY", "stream-secret")
+	t.Setenv("GATEWAY_KEY", "gateway-secret")
+	registry := &Registry{
+		providers:        map[string]Provider{"stream": {Name: "stream", Type: ProviderTypeOpenAICompatible, BaseURL: upstream.URL + "/v1", APIKeyEnv: "STREAM_KEY", Paths: []string{"/api/chat"}, AllowPrivate: true, AllowInsecureLoopback: true}},
+		models:           map[string]Model{"stream/model": {ID: "stream/model", UpstreamID: "stream-model", Provider: "stream", Available: true}},
+		gatewayAPIKeyEnv: "GATEWAY_KEY",
+	}
+	router := gin.New()
+	router.Use(NewGateway(registry, upstream.Client()).Middleware())
+	router.POST("/api/chat", func(c *gin.Context) { t.Fatal("stream request was not proxied") })
+	req := httptest.NewRequest(http.MethodPost, "/api/chat", strings.NewReader(`{"model":"stream/model","stream":true,"messages":[{"role":"user","content":"hello"}]}`))
+	req.Header.Set("Authorization", "Bearer gateway-secret")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK || gotAuthorization != "Bearer stream-secret" {
+		t.Fatalf("status=%d authorization=%q body=%s", rec.Code, gotAuthorization, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "chunk-one") || !strings.Contains(rec.Body.String(), "chunk-two") || !strings.Contains(rec.Body.String(), `"done":true`) {
+		t.Fatalf("translated stream missing expected chunks: %s", rec.Body.String())
 	}
 }

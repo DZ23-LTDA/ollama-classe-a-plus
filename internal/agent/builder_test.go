@@ -3,6 +3,7 @@ package agent
 import (
 	"archive/zip"
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -56,6 +57,73 @@ func TestBuilderRejectsTraversal(t *testing.T) {
 	}
 	if _, err := service.Create(context.Background(), BuilderSpec{Name: "bad", Kind: BuilderWebsite, Files: map[string]string{"../secret": "no"}}); err == nil {
 		t.Fatal("path traversal accepted")
+	}
+	if _, err := service.Create(context.Background(), BuilderSpec{Name: "missing-entry", Kind: BuilderWebsite, Entry: "app.html", Files: map[string]string{"index.html": "ok"}}); err == nil {
+		t.Fatal("missing builder entry accepted")
+	}
+}
+
+func TestBuilderOrganizationScopeRejectsCrossTenantAccess(t *testing.T) {
+	service, err := NewBuilderService(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	project, err := service.Create(context.Background(), BuilderSpec{Name: "Tenant A", OrganizationID: "org-a", Kind: BuilderWebsite})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.GetForOrganization(project.ID, "org-b"); !errors.Is(err, ErrBuilderForbidden) {
+		t.Fatalf("cross-tenant get err=%v, want ErrBuilderForbidden", err)
+	}
+	if projects := service.ListForOrganization("org-b"); len(projects) != 0 {
+		t.Fatalf("cross-tenant list returned %d projects", len(projects))
+	}
+	if got, err := service.GetForOrganization(project.ID, "org-a"); err != nil || got.OrganizationID != "org-a" {
+		t.Fatalf("same-tenant get=%+v err=%v", got, err)
+	}
+}
+
+func TestBuilderTemplateEscapesName(t *testing.T) {
+	service, err := NewBuilderService(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	project, err := service.Create(context.Background(), BuilderSpec{Name: `<script>alert(1)</script>`, Kind: BuilderWebsite})
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join(project.Root, project.Entry))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), "<script>alert(1)</script>") {
+		t.Fatal("builder template embedded raw HTML in title")
+	}
+}
+
+func TestBuilderPreviewRejectsSymlinkEntry(t *testing.T) {
+	root := t.TempDir()
+	service, err := NewBuilderService(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	project, err := service.Create(context.Background(), BuilderSpec{Name: "Symlink", Kind: BuilderWebsite})
+	if err != nil {
+		t.Fatal(err)
+	}
+	outside := filepath.Join(t.TempDir(), "outside.html")
+	if err := os.WriteFile(outside, []byte("outside"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	entry := filepath.Join(project.Root, project.Entry)
+	if err := os.Remove(entry); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, entry); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+	if _, _, err := service.Preview(context.Background(), project.ID); err == nil {
+		t.Fatal("preview followed symlink outside builder root")
 	}
 }
 

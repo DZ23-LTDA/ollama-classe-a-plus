@@ -1,5 +1,9 @@
 name: dz23-agentic-quality
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
 on:
   pull_request:
     paths:
@@ -14,7 +18,6 @@ on:
       - '.github/workflows/dz23-agentic-quality.yaml'
   push:
     branches:
-      - 'feat/**'
       - main
 
 permissions:
@@ -31,10 +34,22 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+      - name: Install Browser Operator dependencies
+        run: |
+          python3 -m pip install --user --break-system-packages playwright
+          python3 -m playwright install --with-deps chromium
+          browser_path="$(python3 -c 'from playwright.sync_api import sync_playwright; p=sync_playwright().start(); print(p.chromium.executable_path); p.stop()')"
+          if [ ! -x "$browser_path" ] && [ -x /usr/bin/chromium ]; then browser_path=/usr/bin/chromium; fi
+          test -x "$browser_path"
+          echo "OLLAMA_AGENT_BROWSER_EXECUTABLE=$browser_path" >> "$GITHUB_ENV"
       - run: go mod verify
       - run: gofmt -l internal/agent server/companion_ws.go server/agent_routes.go | tee /tmp/gofmt.txt && test ! -s /tmp/gofmt.txt
+      - run: ./scripts/check-class-a-plus-integrity.sh
+      - run: bash -n scripts/smoke-company-os.sh && python3 -m json.tool examples/dz23-desktop-commander-mcp.json >/dev/null && python3 -m json.tool examples/dz23-desktop-commander-remote.json >/dev/null
       - run: CGO_ENABLED=0 go test ./internal/agent -count=1
       - run: CGO_ENABLED=1 go test ./server -count=1
+      - run: CGO_ENABLED=1 go test ./... -count=1
+      - run: CGO_ENABLED=1 go vet ./...
       - run: CGO_ENABLED=1 go build -o dist/ollama-agentic .
       - uses: actions/upload-artifact@v4
         with:
@@ -50,48 +65,96 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - name: Start distributed dependencies
-        run: docker compose -f deploy/docker-compose.agentic.yml up -d --wait
-      - name: Run integration tests
-        env:
-          OLLAMA_AGENT_TEST_POSTGRES_URL: postgres://ollama_app:change-me-local-only@127.0.0.1:5432/ollama_agent?sslmode=disable
-          OLLAMA_AGENT_TEST_REDIS_URL: redis://127.0.0.1:6379/0
-          OLLAMA_AGENT_TEST_OTLP_ENDPOINT: http://127.0.0.1:4318/v1/traces
-          OLLAMA_AGENT_OTLP_ALLOW_INSECURE: '1'
-        run: CGO_ENABLED=0 go test -tags integration ./internal/agent -run TestDistributed -count=1 -v
+      - name: Start dependencies and run integration tests
+        run: |
+          set -euo pipefail
+          postgres_password="$(openssl rand -hex 24)"
+          redis_password="$(openssl rand -hex 24)"
+          tenant_password="$(openssl rand -hex 24)"
+          export OLLAMA_AGENT_POSTGRES_PASSWORD="$postgres_password"
+          export OLLAMA_AGENT_REDIS_PASSWORD="$redis_password"
+          docker compose -f deploy/docker-compose.agentic.yml up -d --wait
+
+          # The Compose bootstrap role owns the database and is a superuser by
+          # design. Use a separate role for tenant-scoped RLS operations.
+          role_exists="$(docker compose -f deploy/docker-compose.agentic.yml exec -T postgres \
+            psql -Atq -U ollama_agent -d ollama_agent \
+            -c "SELECT 1 FROM pg_roles WHERE rolname = 'ollama_agent_test'")"
+          if [ "$role_exists" = "1" ]; then
+            docker compose -f deploy/docker-compose.agentic.yml exec -T postgres \
+              psql -v ON_ERROR_STOP=1 -U ollama_agent -d ollama_agent \
+              -c "ALTER ROLE ollama_agent_test WITH LOGIN PASSWORD '$tenant_password'"
+          else
+            docker compose -f deploy/docker-compose.agentic.yml exec -T postgres \
+              psql -v ON_ERROR_STOP=1 -U ollama_agent -d ollama_agent \
+              -c "CREATE ROLE ollama_agent_test LOGIN PASSWORD '$tenant_password'"
+          fi
+          docker compose -f deploy/docker-compose.agentic.yml exec -T postgres \
+            psql -v ON_ERROR_STOP=1 -U ollama_agent -d ollama_agent <<'SQL'
+          GRANT CONNECT ON DATABASE ollama_agent TO ollama_agent_test;
+          GRANT USAGE, CREATE ON SCHEMA public TO ollama_agent_test;
+          SQL
+
+          export OLLAMA_AGENT_TEST_POSTGRES_URL="postgres://ollama_agent_test:${tenant_password}@127.0.0.1:5432/ollama_agent?sslmode=disable"
+          export OLLAMA_AGENT_TEST_REDIS_URL="redis://:${redis_password}@127.0.0.1:6379/0"
+          export OLLAMA_AGENT_TEST_OTLP_ENDPOINT="http://127.0.0.1:4318/v1/traces"
+          export OLLAMA_AGENT_OTLP_ALLOW_INSECURE=1
+          CGO_ENABLED=0 go test -tags integration ./internal/agent -run TestDistributed -count=1 -v
       - name: Dump dependency logs on failure
         if: failure()
         run: docker compose -f deploy/docker-compose.agentic.yml logs --no-color
       - name: Stop distributed dependencies
         if: always()
-        run: docker compose -f deploy/docker-compose.agentic.yml down -v
+        run: |
+          export OLLAMA_AGENT_POSTGRES_PASSWORD=cleanup-placeholder
+          export OLLAMA_AGENT_REDIS_PASSWORD=cleanup-placeholder
+          docker compose -f deploy/docker-compose.agentic.yml down -v
 
   web-and-mobile:
-    name: Web and mobile typechecks
+    name: Web and mobile quality
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: apps/mobile-agentic/package-lock.json
       - name: Mobile typecheck
         working-directory: apps/mobile-agentic
         run: npm ci --no-audit --no-fund && npm run typecheck
+      - name: Mobile production dependency audit
+        working-directory: apps/mobile-agentic
+        run: npm audit --omit=dev --audit-level=high
+      - name: Mobile offline policy regression
+        working-directory: apps/mobile-agentic
+        run: npm run test:policy
       - name: Web dependency install
         working-directory: app/ui/app
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
       - name: Web typecheck
         working-directory: app/ui/app
         run: ./node_modules/.bin/tsc --noEmit
+      - name: Web production dependency audit
+        working-directory: app/ui/app
+        run: npm audit --omit=dev --audit-level=high
+      - name: Web lint
+        working-directory: app/ui/app
+        run: npm run lint
+      - name: Web tests
+        working-directory: app/ui/app
+        run: npm test -- --run
+      - name: Web production build
+        working-directory: app/ui/app
+        run: npm run build
+      - name: Screenshot provenance manifest
+        working-directory: app/ui/app
+        run: npm run screens:verify
 
   sbom:
     name: Generate SBOM
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: anchore/sbom-action@v0
+      - uses: anchore/sbom-action@006b7ce8314066bdf1765b4500370d40fa6917a3 # v0.24.2
         with:
           path: .
           format: cyclonedx-json

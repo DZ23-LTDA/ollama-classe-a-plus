@@ -1,0 +1,21 @@
+{
+  "gateway_api_key_env": "OLLAMA_DZ23_GATEWAY_KEY",
+  "providers": [
+    {
+      "name": "omniroute",
+      "type": "openai-compatible",
+      "base_url": "http://127.0.0.1:20128/v1",
+      "api_key_env": "OMNIROUTE_API_KEY",
+      "allow_private": true,
+      "allow_insecure_loopback": true,
+      "paths": ["/v1/chat/completions", "/v1/responses"],
+      "priority": 85,
+      "models": [
+        {
+          "id": "auto",
+          "capabilities": ["chat", "tools", "coding", "reasoning"]
+        }
+      ]
+    }
+  ]
+}

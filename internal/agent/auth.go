@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"math/big"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -30,6 +31,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+)
+
+var (
+	ErrOAuthCredentialConflict = errors.New("oauth credential changed during refresh")
+	ErrOAuthCredentialRevoked  = errors.New("oauth credential is revoked")
 )
 
 type User struct {
@@ -92,14 +98,15 @@ type OAuthState struct {
 }
 
 type OAuthCredential struct {
-	ID                     string    `json:"id"`
-	UserID                 string    `json:"user_id"`
-	OrganizationID         string    `json:"organization_id"`
-	Provider               string    `json:"provider"`
-	AccessTokenCiphertext  string    `json:"access_token_ciphertext"`
-	RefreshTokenCiphertext string    `json:"refresh_token_ciphertext,omitempty"`
-	ExpiresAt              time.Time `json:"expires_at,omitempty"`
-	UpdatedAt              time.Time `json:"updated_at"`
+	ID                     string     `json:"id"`
+	UserID                 string     `json:"user_id"`
+	OrganizationID         string     `json:"organization_id"`
+	Provider               string     `json:"provider"`
+	AccessTokenCiphertext  string     `json:"access_token_ciphertext"`
+	RefreshTokenCiphertext string     `json:"refresh_token_ciphertext,omitempty"`
+	ExpiresAt              time.Time  `json:"expires_at,omitempty"`
+	UpdatedAt              time.Time  `json:"updated_at"`
+	RevokedAt              *time.Time `json:"revoked_at,omitempty"`
 }
 
 type AuthStore struct {
@@ -111,18 +118,40 @@ type AuthStore struct {
 	tokens        map[string]AccessToken
 	oauthStates   map[string]OAuthState
 	credentials   map[string]OAuthCredential
-	mfaUsed       map[string]int64
+	mfaAttempts   map[string]MFAAttemptState
+}
+
+const (
+	mfaFailureLimit   = 5
+	mfaFailureWindow  = 5 * time.Minute
+	mfaLockoutPeriod  = 15 * time.Minute
+	mfaStateRetention = 24 * time.Hour
+)
+
+type MFAAttemptState struct {
+	Failures      int       `json:"failures"`
+	WindowStarted time.Time `json:"window_started"`
+	LockedUntil   time.Time `json:"locked_until,omitempty"`
+	LastAttemptAt time.Time `json:"last_attempt_at"`
+}
+
+type MFAThrottleError struct {
+	RetryAfter time.Duration
+}
+
+func (e *MFAThrottleError) Error() string {
+	return "mfa verification temporarily locked"
 }
 
 func NewAuthStore(root string) (*AuthStore, error) {
-	store := &AuthStore{root: strings.TrimSpace(root), users: map[string]User{}, organizations: map[string]Organization{}, memberships: map[string]Membership{}, tokens: map[string]AccessToken{}, oauthStates: map[string]OAuthState{}, credentials: map[string]OAuthCredential{}, mfaUsed: map[string]int64{}}
+	store := &AuthStore{root: strings.TrimSpace(root), users: map[string]User{}, organizations: map[string]Organization{}, memberships: map[string]Membership{}, tokens: map[string]AccessToken{}, oauthStates: map[string]OAuthState{}, credentials: map[string]OAuthCredential{}, mfaAttempts: map[string]MFAAttemptState{}}
 	if store.root == "" {
 		return store, nil
 	}
 	if err := os.MkdirAll(store.root, 0o700); err != nil {
 		return nil, err
 	}
-	for name, target := range map[string]any{"users": &store.users, "organizations": &store.organizations, "memberships": &store.memberships, "tokens": &store.tokens, "oauth-states": &store.oauthStates, "credentials": &store.credentials} {
+	for name, target := range map[string]any{"users": &store.users, "organizations": &store.organizations, "memberships": &store.memberships, "tokens": &store.tokens, "oauth-states": &store.oauthStates, "credentials": &store.credentials, "mfa-attempts": &store.mfaAttempts} {
 		path := filepathJoin(store.root, name+".json")
 		if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
 			continue
@@ -130,6 +159,9 @@ func NewAuthStore(root string) (*AuthStore, error) {
 		if err := readJSON(path, target); err != nil {
 			return nil, err
 		}
+	}
+	if store.mfaAttempts == nil {
+		store.mfaAttempts = map[string]MFAAttemptState{}
 	}
 	return store, nil
 }
@@ -290,21 +322,119 @@ func (s *AuthStore) VerifyMFA(userID, code string, now time.Time) error {
 	}
 	counter := now.UTC().Unix() / 30
 	for offset := int64(-1); offset <= 1; offset++ {
-		matched := counter + offset
-		if hmac.Equal([]byte(code), []byte(totpCode(secret, matched))) {
-			// Reject replay: a TOTP counter can only be accepted once per user,
-			// so a code captured within its ±1 window cannot be reused.
-			s.mu.Lock()
-			if last, ok := s.mfaUsed[userID]; ok && matched <= last {
-				s.mu.Unlock()
-				return errors.New("mfa code was already used")
-			}
-			s.mfaUsed[userID] = matched
-			s.mu.Unlock()
+		if hmac.Equal([]byte(code), []byte(totpCode(secret, counter+offset))) {
 			return nil
 		}
 	}
 	return errors.New("invalid mfa code")
+}
+
+func (s *AuthStore) VerifyMFAWithThrottle(userID, code, clientKey string, now time.Time) error {
+	if now.IsZero() {
+		now = time.Now().UTC()
+	}
+	now = now.UTC()
+	key := mfaAttemptKey(userID, clientKey)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if throttle := s.mfaThrottleLocked(key, now); throttle != nil {
+		return throttle
+	}
+	user, ok := s.users[userID]
+	if !ok {
+		return os.ErrNotExist
+	}
+	if !user.MFAEnabled {
+		return nil
+	}
+	secret, err := decryptCredential(user.MFASecretCiphertext)
+	if err == nil {
+		err = verifyTOTP(secret, code, now)
+	}
+	if err != nil {
+		return s.recordMFAFailureLocked(key, now, err)
+	}
+	if err := s.clearMFAFailureLocked(key); err != nil {
+		return err
+	}
+	return nil
+}
+
+func verifyTOTP(secret, code string, now time.Time) error {
+	code = strings.TrimSpace(code)
+	if len(code) != 6 {
+		return errors.New("mfa code must have six digits")
+	}
+	if _, err := strconv.Atoi(code); err != nil {
+		return errors.New("mfa code must contain digits")
+	}
+	counter := now.Unix() / 30
+	for offset := int64(-1); offset <= 1; offset++ {
+		if hmac.Equal([]byte(code), []byte(totpCode(secret, counter+offset))) {
+			return nil
+		}
+	}
+	return errors.New("invalid mfa code")
+}
+
+func mfaAttemptKey(userID, clientKey string) string {
+	return strings.TrimSpace(userID) + ":" + hashSecret(strings.TrimSpace(clientKey))
+}
+
+func (s *AuthStore) mfaThrottleLocked(key string, now time.Time) *MFAThrottleError {
+	state, ok := s.mfaAttempts[key]
+	if !ok {
+		return nil
+	}
+	if state.LockedUntil.After(now) {
+		return &MFAThrottleError{RetryAfter: state.LockedUntil.Sub(now)}
+	}
+	if !state.LockedUntil.IsZero() || (!state.LastAttemptAt.IsZero() && now.Sub(state.LastAttemptAt) > mfaStateRetention) {
+		delete(s.mfaAttempts, key)
+	}
+	if !state.WindowStarted.IsZero() && now.Sub(state.WindowStarted) >= mfaFailureWindow {
+		delete(s.mfaAttempts, key)
+	}
+	return nil
+}
+
+func (s *AuthStore) recordMFAFailureLocked(key string, now time.Time, cause error) error {
+	previous, hadPrevious := s.mfaAttempts[key]
+	state := previous
+	if state.WindowStarted.IsZero() || now.Sub(state.WindowStarted) >= mfaFailureWindow {
+		state = MFAAttemptState{WindowStarted: now}
+	}
+	state.Failures++
+	state.LastAttemptAt = now
+	if state.Failures >= mfaFailureLimit {
+		state.LockedUntil = now.Add(mfaLockoutPeriod)
+	}
+	s.mfaAttempts[key] = state
+	if err := s.persistLocked(); err != nil {
+		if hadPrevious {
+			s.mfaAttempts[key] = previous
+		} else {
+			delete(s.mfaAttempts, key)
+		}
+		return err
+	}
+	if state.LockedUntil.After(now) {
+		return &MFAThrottleError{RetryAfter: state.LockedUntil.Sub(now)}
+	}
+	return cause
+}
+
+func (s *AuthStore) clearMFAFailureLocked(key string) error {
+	previous, ok := s.mfaAttempts[key]
+	if !ok {
+		return nil
+	}
+	delete(s.mfaAttempts, key)
+	if err := s.persistLocked(); err != nil {
+		s.mfaAttempts[key] = previous
+		return err
+	}
+	return nil
 }
 
 func (s *AuthStore) GenerateRecoveryCodes(userID string) (User, []string, error) {
@@ -338,12 +468,50 @@ func (s *AuthStore) GenerateRecoveryCodes(userID string) (User, []string, error)
 }
 
 func (s *AuthStore) VerifyRecoveryCode(userID, code string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := s.verifyRecoveryCodeLocked(userID, code); err != nil {
+		return err
+	}
+	return s.persistLocked()
+}
+
+func (s *AuthStore) VerifyRecoveryCodeWithThrottle(userID, code, clientKey string, now time.Time) error {
+	if now.IsZero() {
+		now = time.Now().UTC()
+	}
+	now = now.UTC()
+	key := mfaAttemptKey(userID, clientKey)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if throttle := s.mfaThrottleLocked(key, now); throttle != nil {
+		return throttle
+	}
+	previousUser, userExists := s.users[userID]
+	if err := s.verifyRecoveryCodeLocked(userID, code); err != nil {
+		return s.recordMFAFailureLocked(key, now, err)
+	}
+	previousAttempt, hadAttempt := s.mfaAttempts[key]
+	delete(s.mfaAttempts, key)
+	if err := s.persistLocked(); err != nil {
+		if userExists {
+			s.users[userID] = previousUser
+		}
+		if hadAttempt {
+			s.mfaAttempts[key] = previousAttempt
+		} else {
+			delete(s.mfaAttempts, key)
+		}
+		return err
+	}
+	return nil
+}
+
+func (s *AuthStore) verifyRecoveryCodeLocked(userID, code string) error {
 	code = normalizeRecoveryCode(code)
 	if code == "" {
 		return errors.New("recovery code is required")
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	user, ok := s.users[userID]
 	if !ok {
 		return os.ErrNotExist
@@ -377,7 +545,7 @@ func (s *AuthStore) VerifyRecoveryCode(userID, code string) error {
 		}
 	}
 	s.users[userID] = user
-	return s.persistLocked()
+	return nil
 }
 
 func normalizeRecoveryCode(value string) string {
@@ -429,9 +597,9 @@ func (s *AuthStore) CreateOAuthState(provider, redirectURI, codeVerifier, userID
 
 func (s *AuthStore) CreateOAuthStateWithNonce(provider, redirectURI, codeVerifier, nonce, userID string, ttl time.Duration) (string, OAuthState, error) {
 	provider = strings.TrimSpace(provider)
-	parsed, err := url.Parse(strings.TrimSpace(redirectURI))
-	if err != nil || parsed.Scheme == "" || parsed.Host == "" || parsed.User != nil {
-		return "", OAuthState{}, errors.New("redirect_uri must be an absolute URL")
+	canonicalRedirectURI, err := validateOAuthRedirectSyntax(redirectURI, false)
+	if err != nil {
+		return "", OAuthState{}, err
 	}
 	if len(codeVerifier) < 43 || len(codeVerifier) > 128 {
 		return "", OAuthState{}, errors.New("code_verifier must be PKCE length")
@@ -443,7 +611,7 @@ func (s *AuthStore) CreateOAuthStateWithNonce(provider, redirectURI, codeVerifie
 	if err != nil {
 		return "", OAuthState{}, err
 	}
-	state := OAuthState{Hash: hashSecret(raw), Provider: provider, RedirectURI: redirectURI, CodeVerifier: codeVerifier, Nonce: strings.TrimSpace(nonce), UserID: userID, ExpiresAt: time.Now().UTC().Add(ttl)}
+	state := OAuthState{Hash: hashSecret(raw), Provider: provider, RedirectURI: canonicalRedirectURI, CodeVerifier: codeVerifier, Nonce: strings.TrimSpace(nonce), UserID: userID, ExpiresAt: time.Now().UTC().Add(ttl)}
 	s.mu.Lock()
 	s.oauthStates[state.Hash] = state
 	err = s.persistLocked()
@@ -511,7 +679,7 @@ func (s *AuthStore) OAuthAccessTokenForOrganization(organizationID, provider str
 	s.mu.RLock()
 	var selected OAuthCredential
 	for _, credential := range s.credentials {
-		if credential.OrganizationID == organizationID && credential.Provider == provider && credential.UpdatedAt.After(selected.UpdatedAt) {
+		if credential.RevokedAt == nil && credential.OrganizationID == organizationID && credential.Provider == provider && credential.UpdatedAt.After(selected.UpdatedAt) {
 			selected = credential
 		}
 	}
@@ -529,13 +697,47 @@ func (s *AuthStore) OAuthAccessTokenForOrganization(organizationID, provider str
 	return token, selected, nil
 }
 
+func (s *AuthStore) HasOAuthCredentialForOrganization(organizationID, provider string) bool {
+	organizationID = strings.TrimSpace(organizationID)
+	provider = strings.TrimSpace(provider)
+	if s == nil || organizationID == "" || provider == "" {
+		return false
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, credential := range s.credentials {
+		if credential.OrganizationID == organizationID && credential.Provider == provider && credential.RevokedAt == nil {
+			return true
+		}
+	}
+	return false
+}
+
 func (s *AuthStore) RefreshOAuthCredential(ctx context.Context, provider OAuthProvider, credentialID string, client *http.Client) (OAuthCredential, error) {
+	return s.refreshOAuthCredential(ctx, "", provider, credentialID, client)
+}
+
+func (s *AuthStore) RefreshOAuthCredentialForOrganization(ctx context.Context, organizationID string, provider OAuthProvider, credentialID string, client *http.Client) (OAuthCredential, error) {
+	return s.refreshOAuthCredential(ctx, strings.TrimSpace(organizationID), provider, credentialID, client)
+}
+
+func (s *AuthStore) refreshOAuthCredential(ctx context.Context, organizationID string, provider OAuthProvider, credentialID string, client *http.Client) (OAuthCredential, error) {
 	s.mu.RLock()
 	credential, ok := s.credentials[credentialID]
 	s.mu.RUnlock()
 	if !ok {
 		return OAuthCredential{}, os.ErrNotExist
 	}
+	if credential.Provider != provider.Name {
+		return OAuthCredential{}, errors.New("oauth credential provider mismatch")
+	}
+	if organizationID != "" && credential.OrganizationID != organizationID {
+		return OAuthCredential{}, errors.New("oauth credential is outside the active organization")
+	}
+	if credential.RevokedAt != nil {
+		return OAuthCredential{}, ErrOAuthCredentialRevoked
+	}
+	originalUpdatedAt := credential.UpdatedAt
 	refresh, err := decryptCredential(credential.RefreshTokenCiphertext)
 	if err != nil {
 		return OAuthCredential{}, err
@@ -547,7 +749,8 @@ func (s *AuthStore) RefreshOAuthCredential(ctx context.Context, provider OAuthPr
 		client = http.DefaultClient
 	}
 	form := url.Values{"grant_type": {"refresh_token"}, "refresh_token": {refresh}, "client_id": {os.Getenv(provider.ClientIDEnv)}, "client_secret": {os.Getenv(provider.SecretEnv)}}
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, provider.TokenURL, strings.NewReader(form.Encode()))
+	client = oauthClient(client)
+	request, err := oauthRequest(ctx, http.MethodPost, provider.TokenURL, strings.NewReader(form.Encode()))
 	if err != nil {
 		return OAuthCredential{}, err
 	}
@@ -583,10 +786,59 @@ func (s *AuthStore) RefreshOAuthCredential(ctx context.Context, provider OAuthPr
 	}
 	credential.UpdatedAt = time.Now().UTC()
 	s.mu.Lock()
+	current, currentOK := s.credentials[credential.ID]
+	if !currentOK || !current.UpdatedAt.Equal(originalUpdatedAt) {
+		s.mu.Unlock()
+		return OAuthCredential{}, ErrOAuthCredentialConflict
+	}
+	if current.RevokedAt != nil {
+		s.mu.Unlock()
+		return OAuthCredential{}, ErrOAuthCredentialRevoked
+	}
 	s.credentials[credential.ID] = credential
 	err = s.persistLocked()
 	s.mu.Unlock()
 	return credential, err
+}
+
+func (s *AuthStore) RevokeOAuthCredentialForOrganization(ctx context.Context, organizationID, credentialID string, provider OAuthProvider, client *http.Client) error {
+	organizationID = strings.TrimSpace(organizationID)
+	credentialID = strings.TrimSpace(credentialID)
+	s.mu.RLock()
+	credential, ok := s.credentials[credentialID]
+	s.mu.RUnlock()
+	if !ok {
+		return os.ErrNotExist
+	}
+	if credential.OrganizationID != organizationID || credential.Provider != provider.Name {
+		return errors.New("oauth credential is outside the active organization")
+	}
+	if credential.RevokedAt != nil {
+		return ErrOAuthCredentialRevoked
+	}
+	originalUpdatedAt := credential.UpdatedAt
+	if strings.TrimSpace(provider.RevocationURL) != "" {
+		access, err := decryptCredential(credential.AccessTokenCiphertext)
+		if err != nil {
+			return err
+		}
+		if err := provider.Revoke(ctx, client, access); err != nil {
+			return err
+		}
+	}
+	now := time.Now().UTC()
+	s.mu.Lock()
+	current, currentOK := s.credentials[credential.ID]
+	if !currentOK || !current.UpdatedAt.Equal(originalUpdatedAt) {
+		s.mu.Unlock()
+		return ErrOAuthCredentialConflict
+	}
+	current.RevokedAt = &now
+	current.UpdatedAt = now
+	s.credentials[current.ID] = current
+	err := s.persistLocked()
+	s.mu.Unlock()
+	return err
 }
 
 func (s *AuthStore) Users() []User {
@@ -657,6 +909,7 @@ func (s *AuthStore) persistLocked() error {
 		"tokens":        s.tokens,
 		"oauth-states":  s.oauthStates,
 		"credentials":   s.credentials,
+		"mfa-attempts":  s.mfaAttempts,
 	} {
 		if err := writeJSONAtomic(filepathJoin(s.root, name+".json"), value); err != nil {
 			return err
@@ -770,45 +1023,149 @@ func filepathJoin(root, name string) string {
 // OAuthProvider validates the provider configuration and exchanges an authorization code
 // through a caller-supplied HTTP client. Secrets are read only from environment variables.
 type OAuthProvider struct {
-	Name         string `json:"name"`
-	AuthorizeURL string `json:"authorize_url"`
-	TokenURL     string `json:"token_url"`
-	UserInfoURL  string `json:"userinfo_url,omitempty"`
-	IssuerURL    string `json:"issuer_url,omitempty"`
-	Audience     string `json:"audience,omitempty"`
-	ClientIDEnv  string `json:"client_id_env"`
-	SecretEnv    string `json:"secret_env"`
+	Name                  string   `json:"name"`
+	AuthorizeURL          string   `json:"authorize_url"`
+	TokenURL              string   `json:"token_url"`
+	RevocationURL         string   `json:"revocation_url,omitempty"`
+	UserInfoURL           string   `json:"userinfo_url,omitempty"`
+	IssuerURL             string   `json:"issuer_url,omitempty"`
+	Audience              string   `json:"audience,omitempty"`
+	ClientIDEnv           string   `json:"client_id_env"`
+	SecretEnv             string   `json:"secret_env"`
+	RedirectURIs          []string `json:"redirect_uris,omitempty"`
+	AllowLoopbackRedirect bool     `json:"allow_loopback_redirect,omitempty"`
+}
+
+func (p OAuthProvider) ValidateRedirectURI(raw string) error {
+	_, err := p.NormalizeRedirectURI(raw)
+	return err
+}
+
+func (p OAuthProvider) NormalizeRedirectURI(raw string) (string, error) {
+	canonical, err := validateOAuthRedirectSyntax(raw, p.AllowLoopbackRedirect)
+	if err != nil {
+		return "", err
+	}
+	if len(p.RedirectURIs) == 0 {
+		return "", errors.New("oauth redirect URI allowlist is required")
+	}
+	for _, allowed := range p.RedirectURIs {
+		allowedCanonical, allowedErr := validateOAuthRedirectSyntax(allowed, p.AllowLoopbackRedirect)
+		if allowedErr == nil && allowedCanonical == canonical {
+			return canonical, nil
+		}
+	}
+	return "", errors.New("oauth redirect URI is not allowlisted")
+}
+
+func validateOAuthRedirectSyntax(raw string, allowLoopbackHTTP bool) (string, error) {
+	value := strings.TrimSpace(raw)
+	u, err := url.Parse(value)
+	if err != nil || u.Scheme == "" || u.Host == "" || u.User != nil || u.Fragment != "" || u.Opaque != "" {
+		return "", errors.New("oauth redirect URI must be an absolute URL without userinfo or fragment")
+	}
+	if u.Scheme != "https" && !(allowLoopbackHTTP && u.Scheme == "http" && isLoopbackHost(u.Hostname())) {
+		return "", errors.New("oauth redirect URI must use HTTPS or explicitly allowed loopback HTTP")
+	}
+	return u.String(), nil
 }
 
 func (p OAuthProvider) Validate() error {
-	for _, raw := range []string{p.AuthorizeURL, p.TokenURL} {
+	for _, redirectURI := range p.RedirectURIs {
+		if _, err := validateOAuthRedirectSyntax(redirectURI, p.AllowLoopbackRedirect); err != nil {
+			return err
+		}
+	}
+	for _, raw := range []string{p.AuthorizeURL, p.TokenURL, p.RevocationURL} {
 		if strings.TrimSpace(raw) == "" {
 			continue
 		}
-		u, err := url.Parse(raw)
-		if err != nil || u.Scheme != "https" || u.Host == "" {
-			return errors.New("oauth endpoints must use https")
+		if err := validateOAuthEndpointURL(raw); err != nil {
+			return err
 		}
 	}
 	if strings.TrimSpace(p.IssuerURL) != "" {
-		u, err := url.Parse(p.IssuerURL)
-		if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil {
-			return errors.New("oauth issuer endpoint must use https")
+		if err := validateOAuthEndpointURL(p.IssuerURL); err != nil {
+			return err
 		}
 	}
 	if strings.TrimSpace(p.IssuerURL) == "" && (strings.TrimSpace(p.AuthorizeURL) == "" || strings.TrimSpace(p.TokenURL) == "") {
 		return errors.New("oauth authorize and token endpoints or an issuer are required")
 	}
 	if p.UserInfoURL != "" {
-		u, err := url.Parse(p.UserInfoURL)
-		if err != nil || u.Scheme != "https" || u.Host == "" {
-			return errors.New("oauth userinfo endpoint must use https")
+		if err := validateOAuthEndpointURL(p.UserInfoURL); err != nil {
+			return err
 		}
 	}
 	if os.Getenv(p.ClientIDEnv) == "" || os.Getenv(p.SecretEnv) == "" {
 		return errors.New("oauth client credentials are not configured")
 	}
 	return nil
+}
+
+func validateOAuthEndpointURL(raw string) error {
+	u, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || u.Fragment != "" || u.Opaque != "" {
+		return errors.New("oauth endpoints must use HTTPS without credentials or fragment")
+	}
+	return nil
+}
+
+type oauthLoopbackContextKey struct{}
+
+func oauthClient(base *http.Client) *http.Client {
+	if base == nil {
+		base = http.DefaultClient
+	}
+	client := *base
+	client.CheckRedirect = func(_ *http.Request, _ []*http.Request) error { return errors.New("oauth redirects are disabled") }
+	switch transport := base.Transport.(type) {
+	case nil:
+		safe := http.DefaultTransport.(*http.Transport).Clone()
+		safe.Proxy = nil
+		safe.DialContext = oauthDialContext
+		client.Transport = safe
+	case *http.Transport:
+		safe := transport.Clone()
+		safe.Proxy = nil
+		safe.DialContext = oauthDialContext
+		client.Transport = safe
+	default:
+		safe := http.DefaultTransport.(*http.Transport).Clone()
+		safe.Proxy = nil
+		safe.DialContext = oauthDialContext
+		client.Transport = safe
+	}
+	return &client
+}
+
+func oauthRequest(ctx context.Context, method, rawURL string, body io.Reader) (*http.Request, error) {
+	parsed, err := url.Parse(rawURL)
+	if err != nil || parsed.Host == "" || parsed.User != nil || parsed.Fragment != "" {
+		return nil, errors.New("oauth endpoint URL is invalid")
+	}
+	requestContext := context.WithValue(ctx, oauthLoopbackContextKey{}, isLoopbackHost(parsed.Hostname()))
+	return http.NewRequestWithContext(requestContext, method, parsed.String(), body)
+}
+
+func oauthDialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	conn, err := (&net.Dialer{Timeout: 15 * time.Second}).DialContext(ctx, network, address)
+	if err != nil {
+		return nil, err
+	}
+	if loopback, _ := ctx.Value(oauthLoopbackContextKey{}).(bool); loopback {
+		return conn, nil
+	}
+	remote, _, splitErr := net.SplitHostPort(conn.RemoteAddr().String())
+	if splitErr != nil {
+		_ = conn.Close()
+		return nil, errors.New("oauth connected address is invalid")
+	}
+	if ip := net.ParseIP(strings.Trim(remote, "[]")); ip != nil && (ip.IsPrivate() || ip.IsLoopback() || ip.IsUnspecified() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsMulticast()) {
+		_ = conn.Close()
+		return nil, errors.New("oauth destination connected to a private address")
+	}
+	return conn, nil
 }
 
 type OIDCDiscovery struct {
@@ -824,10 +1181,8 @@ func (p OAuthProvider) Discover(ctx context.Context, client *http.Client) (OIDCD
 	if issuer == "" {
 		return OIDCDiscovery{}, errors.New("oidc issuer is not configured")
 	}
-	if client == nil {
-		client = http.DefaultClient
-	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, issuer+"/.well-known/openid-configuration", nil)
+	client = oauthClient(client)
+	request, err := oauthRequest(ctx, http.MethodGet, issuer+"/.well-known/openid-configuration", nil)
 	if err != nil {
 		return OIDCDiscovery{}, err
 	}
@@ -846,10 +1201,21 @@ func (p OAuthProvider) Discover(ctx context.Context, client *http.Client) (OIDCD
 	if strings.TrimRight(discovery.Issuer, "/") != issuer || discovery.AuthorizationEndpoint == "" || discovery.TokenEndpoint == "" || discovery.JWKSURI == "" {
 		return OIDCDiscovery{}, errors.New("oidc discovery issuer or required endpoints are invalid")
 	}
+	for _, endpoint := range []string{discovery.AuthorizationEndpoint, discovery.TokenEndpoint, discovery.JWKSURI} {
+		if err := validateOAuthEndpointURL(endpoint); err != nil {
+			return OIDCDiscovery{}, err
+		}
+	}
+	if discovery.UserInfoEndpoint != "" {
+		if err := validateOAuthEndpointURL(discovery.UserInfoEndpoint); err != nil {
+			return OIDCDiscovery{}, err
+		}
+	}
 	return discovery, nil
 }
 
 func (p OAuthProvider) ValidateIDToken(ctx context.Context, client *http.Client, rawToken, expectedNonce string) (map[string]any, error) {
+	client = oauthClient(client)
 	parts := strings.Split(strings.TrimSpace(rawToken), ".")
 	if len(parts) != 3 {
 		return nil, errors.New("id_token must be a compact JWT")
@@ -876,10 +1242,7 @@ func (p OAuthProvider) ValidateIDToken(ctx context.Context, client *http.Client,
 	if err != nil {
 		return nil, err
 	}
-	if client == nil {
-		client = http.DefaultClient
-	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, discovery.JWKSURI, nil)
+	request, err := oauthRequest(ctx, http.MethodGet, discovery.JWKSURI, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -980,10 +1343,8 @@ func (p OAuthProvider) FetchUserInfo(ctx context.Context, client *http.Client, a
 	if endpoint == "" {
 		return nil, errors.New("oauth userinfo endpoint is not configured")
 	}
-	if client == nil {
-		client = http.DefaultClient
-	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	client = oauthClient(client)
+	request, err := oauthRequest(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -1032,11 +1393,9 @@ func (p OAuthProvider) ExchangeCode(ctx context.Context, client *http.Client, co
 	if err := p.Validate(); err != nil {
 		return nil, err
 	}
-	if client == nil {
-		client = http.DefaultClient
-	}
+	client = oauthClient(client)
 	form := url.Values{"grant_type": {"authorization_code"}, "code": {code}, "redirect_uri": {redirectURI}, "client_id": {os.Getenv(p.ClientIDEnv)}, "client_secret": {os.Getenv(p.SecretEnv)}, "code_verifier": {codeVerifier}}
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, p.TokenURL, strings.NewReader(form.Encode()))
+	request, err := oauthRequest(ctx, http.MethodPost, p.TokenURL, strings.NewReader(form.Encode()))
 	if err != nil {
 		return nil, err
 	}
@@ -1054,4 +1413,41 @@ func (p OAuthProvider) ExchangeCode(ctx context.Context, client *http.Client, co
 		return nil, fmt.Errorf("oauth token exchange failed with status %d", response.StatusCode)
 	}
 	return payload, nil
+}
+
+func (p OAuthProvider) Revoke(ctx context.Context, client *http.Client, accessToken string) error {
+	if err := p.Validate(); err != nil {
+		return err
+	}
+	if strings.TrimSpace(p.RevocationURL) == "" {
+		return errors.New("oauth revocation endpoint is not configured")
+	}
+	if strings.TrimSpace(accessToken) == "" {
+		return errors.New("oauth access token is required for revocation")
+	}
+	if client == nil {
+		client = http.DefaultClient
+	}
+	client = oauthClient(client)
+	form := url.Values{
+		"token":           {accessToken},
+		"token_type_hint": {"access_token"},
+		"client_id":       {os.Getenv(p.ClientIDEnv)},
+		"client_secret":   {os.Getenv(p.SecretEnv)},
+	}
+	request, err := oauthRequest(ctx, http.MethodPost, p.RevocationURL, strings.NewReader(form.Encode()))
+	if err != nil {
+		return err
+	}
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	response, err := client.Do(request)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+	_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 1<<20))
+	if response.StatusCode/100 != 2 {
+		return fmt.Errorf("oauth revocation failed with status %d", response.StatusCode)
+	}
+	return nil
 }

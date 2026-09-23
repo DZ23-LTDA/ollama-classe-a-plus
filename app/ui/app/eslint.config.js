@@ -8,7 +8,9 @@ import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist"] },
+  // Generated from Go types; the generator owns its broad transport shapes.
+  // Product TypeScript remains fully linted below.
+  { ignores: ["dist", "codegen/gotypes.gen.ts"] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],

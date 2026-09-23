@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { Settings as SettingsType } from "@/gotypes";
-import { applySettingsDefaults } from "./Settings";
+import { applySettingsDefaults } from "./settingsUtils";
 
 function currentSettings(overrides: Partial<SettingsType> = {}) {
   return new SettingsType({

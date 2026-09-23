@@ -1,8 +1,19 @@
-import { Message as MessageType, DownloadEvent, ErrorEvent } from "@/gotypes";
+import {
+  Message as MessageType,
+  DownloadEvent,
+  ErrorEvent,
+  ToolCall,
+} from "@/gotypes";
 import React from "react";
 import Message from "./Message";
 import Downloading from "./Downloading";
 import { ErrorMessage } from "./ErrorMessage";
+
+type BrowserToolResult = { page_stack: string[] };
+type MessageWithToolCalls = MessageType & {
+  tool_calls?: ToolCall[];
+  tool_call?: ToolCall;
+};
 
 export default function MessageList({
   messages,
@@ -23,7 +34,7 @@ export default function MessageList({
   onEditMessage?: (content: string, index: number) => void | Promise<void>;
   editingMessageIndex?: number;
   error?: ErrorEvent | null;
-  browserToolResult?: any;
+  browserToolResult?: BrowserToolResult;
 }) {
   const [showDots, setShowDots] = React.useState(false);
   const isDownloadingModel = downloadProgress && !downloadProgress.done;
@@ -54,9 +65,9 @@ export default function MessageList({
     const queries: (string | undefined)[] = [];
     let lastQuery: string | undefined = undefined;
     for (let i = 0; i < messages.length; i++) {
-      const m: any = messages[i] as any;
-      const toolCalls: any[] | undefined = Array.isArray(m?.tool_calls)
-        ? (m.tool_calls as any[])
+      const m = messages[i] as MessageWithToolCalls;
+      const toolCalls: ToolCall[] | undefined = Array.isArray(m?.tool_calls)
+        ? m.tool_calls
         : m?.tool_call
           ? [m.tool_call]
           : undefined;

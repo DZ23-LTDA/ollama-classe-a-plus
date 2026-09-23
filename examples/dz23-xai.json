@@ -1,0 +1,23 @@
+{
+  "gateway_api_key_env": "OLLAMA_DZ23_GATEWAY_KEY",
+  "providers": [
+    {
+      "name": "xai",
+      "type": "openai-compatible",
+      "base_url": "https://api.x.ai/v1",
+      "api_key_env": "XAI_API_KEY",
+      "paths": [
+        "/v1/responses",
+        "/v1/chat/completions"
+      ],
+      "priority": 92,
+      "models": [
+        {
+          "id": "grok-4.7",
+          "capabilities": ["chat", "tools", "coding", "reasoning"],
+          "priority": 30
+        }
+      ]
+    }
+  ]
+}

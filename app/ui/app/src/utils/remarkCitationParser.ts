@@ -1,6 +1,17 @@
 import { visit } from "unist-util-visit";
 import type { Root, RootContent } from "mdast";
 
+function citationCursor(node: unknown): string | undefined {
+  if (typeof node !== "object" || node === null) return undefined;
+  const candidate = node as {
+    type?: unknown;
+    data?: { hProperties?: { cursor?: unknown } };
+  };
+  if (candidate.type !== "custom-citation") return undefined;
+  const cursor = candidate.data?.hProperties?.cursor;
+  return typeof cursor === "string" ? cursor : undefined;
+}
+
 export default function remarkMyDelimiter() {
   return (tree: Root) => {
     // First pass: convert citations to nodes
@@ -83,15 +94,14 @@ export default function remarkMyDelimiter() {
         index !== undefined &&
         index > 0
       ) {
-        const currentNode = node as any;
-        const prevNode = parent.children[index - 1] as any;
+        const currentCursor = citationCursor(node);
+        const previousCursor = citationCursor(parent.children[index - 1]);
 
         // Check if both nodes are citations with the same cursor
         if (
-          currentNode.type === "custom-citation" &&
-          prevNode.type === "custom-citation" &&
-          currentNode.data?.hProperties?.cursor ===
-            prevNode.data?.hProperties?.cursor
+          currentCursor !== undefined &&
+          previousCursor !== undefined &&
+          currentCursor === previousCursor
         ) {
           // Remove the current duplicate citation
           parent.children.splice(index, 1);

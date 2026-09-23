@@ -65,7 +65,11 @@ func (browserOperatorTool) Execute(ctx context.Context, toolContext ToolContext,
 	}
 	deadline, cancel := context.WithTimeout(ctx, 90*time.Second)
 	defer cancel()
-	command := exec.CommandContext(deadline, "/usr/bin/python3", tempName)
+	pythonExecutable, err := browserPythonExecutable()
+	if err != nil {
+		return ToolResult{}, err
+	}
+	command := exec.CommandContext(deadline, pythonExecutable, tempName)
 	command.Stdin = bytes.NewReader(requestData)
 	command.Env = append(os.Environ(), "OLLAMA_AGENT_BROWSER_ROOT="+filepath.Join(toolContext.Workspace, ".browser"))
 	var stdout, stderr bytes.Buffer
@@ -78,7 +82,11 @@ func (browserOperatorTool) Execute(ctx context.Context, toolContext ToolContext,
 				return ToolResult{Value: failure}, fmt.Errorf("browser operator: %v", failure["error"])
 			}
 		}
-		return ToolResult{Value: map[string]any{"stderr": stderr.String()}}, err
+		message := strings.TrimSpace(stderr.String())
+		if message != "" {
+			return ToolResult{Value: map[string]any{"stderr": message}}, fmt.Errorf("browser operator: %w: %s", err, message)
+		}
+		return ToolResult{Value: map[string]any{"stderr": message}}, err
 	}
 	var result map[string]any
 	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
@@ -88,4 +96,13 @@ func (browserOperatorTool) Execute(ctx context.Context, toolContext ToolContext,
 		return ToolResult{Value: result}, fmt.Errorf("browser operator: %v", result["error"])
 	}
 	return ToolResult{Value: result}, nil
+}
+
+func browserPythonExecutable() (string, error) {
+	for _, candidate := range []string{"python3", "python"} {
+		if executable, err := exec.LookPath(candidate); err == nil {
+			return executable, nil
+		}
+	}
+	return "", errors.New("browser operator requires python3 or python on PATH")
 }

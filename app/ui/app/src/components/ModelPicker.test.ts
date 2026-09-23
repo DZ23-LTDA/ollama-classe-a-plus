@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Model } from "@/gotypes";
-import { modelGroup } from "./ModelPicker";
+import { modelGroup } from "./modelPickerUtils";
 
 describe("modelGroup", () => {
   it("separates local, router, and remote provider models", () => {

@@ -11,18 +11,55 @@
 // Import Routes
 
 import { Route as rootRoute } from './routes/__root'
+import { Route as TasksImport } from './routes/tasks'
+import { Route as SkillsImport } from './routes/skills'
 import { Route as SettingsImport } from './routes/settings'
+import { Route as ScheduledImport } from './routes/scheduled'
+import { Route as ProjectsImport } from './routes/projects'
+import { Route as PluginsImport } from './routes/plugins'
 import { Route as OnboardingImport } from './routes/onboarding'
+import { Route as LibraryImport } from './routes/library'
 import { Route as ConnectImport } from './routes/connect'
+import { Route as CompanyImport } from './routes/company'
 import { Route as AgenticImport } from './routes/agentic'
 import { Route as IndexImport } from './routes/index'
 import { Route as CChatIdImport } from './routes/c.$chatId'
 
 // Create/Update Routes
 
+const TasksRoute = TasksImport.update({
+  id: '/tasks',
+  path: '/tasks',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const SkillsRoute = SkillsImport.update({
+  id: '/skills',
+  path: '/skills',
+  getParentRoute: () => rootRoute,
+} as any)
+
 const SettingsRoute = SettingsImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const ScheduledRoute = ScheduledImport.update({
+  id: '/scheduled',
+  path: '/scheduled',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const ProjectsRoute = ProjectsImport.update({
+  id: '/projects',
+  path: '/projects',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const PluginsRoute = PluginsImport.update({
+  id: '/plugins',
+  path: '/plugins',
   getParentRoute: () => rootRoute,
 } as any)
 
@@ -32,9 +69,21 @@ const OnboardingRoute = OnboardingImport.update({
   getParentRoute: () => rootRoute,
 } as any)
 
+const LibraryRoute = LibraryImport.update({
+  id: '/library',
+  path: '/library',
+  getParentRoute: () => rootRoute,
+} as any)
+
 const ConnectRoute = ConnectImport.update({
   id: '/connect',
   path: '/connect',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const CompanyRoute = CompanyImport.update({
+  id: '/company',
+  path: '/company',
   getParentRoute: () => rootRoute,
 } as any)
 
@@ -74,11 +123,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AgenticImport
       parentRoute: typeof rootRoute
     }
+    '/company': {
+      id: '/company'
+      path: '/company'
+      fullPath: '/company'
+      preLoaderRoute: typeof CompanyImport
+      parentRoute: typeof rootRoute
+    }
     '/connect': {
       id: '/connect'
       path: '/connect'
       fullPath: '/connect'
       preLoaderRoute: typeof ConnectImport
+      parentRoute: typeof rootRoute
+    }
+    '/library': {
+      id: '/library'
+      path: '/library'
+      fullPath: '/library'
+      preLoaderRoute: typeof LibraryImport
       parentRoute: typeof rootRoute
     }
     '/onboarding': {
@@ -88,11 +151,46 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OnboardingImport
       parentRoute: typeof rootRoute
     }
+    '/plugins': {
+      id: '/plugins'
+      path: '/plugins'
+      fullPath: '/plugins'
+      preLoaderRoute: typeof PluginsImport
+      parentRoute: typeof rootRoute
+    }
+    '/projects': {
+      id: '/projects'
+      path: '/projects'
+      fullPath: '/projects'
+      preLoaderRoute: typeof ProjectsImport
+      parentRoute: typeof rootRoute
+    }
+    '/scheduled': {
+      id: '/scheduled'
+      path: '/scheduled'
+      fullPath: '/scheduled'
+      preLoaderRoute: typeof ScheduledImport
+      parentRoute: typeof rootRoute
+    }
     '/settings': {
       id: '/settings'
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsImport
+      parentRoute: typeof rootRoute
+    }
+    '/skills': {
+      id: '/skills'
+      path: '/skills'
+      fullPath: '/skills'
+      preLoaderRoute: typeof SkillsImport
+      parentRoute: typeof rootRoute
+    }
+    '/tasks': {
+      id: '/tasks'
+      path: '/tasks'
+      fullPath: '/tasks'
+      preLoaderRoute: typeof TasksImport
       parentRoute: typeof rootRoute
     }
     '/c/$chatId': {
@@ -110,18 +208,32 @@ declare module '@tanstack/react-router' {
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/agentic': typeof AgenticRoute
+  '/company': typeof CompanyRoute
   '/connect': typeof ConnectRoute
+  '/library': typeof LibraryRoute
   '/onboarding': typeof OnboardingRoute
+  '/plugins': typeof PluginsRoute
+  '/projects': typeof ProjectsRoute
+  '/scheduled': typeof ScheduledRoute
   '/settings': typeof SettingsRoute
+  '/skills': typeof SkillsRoute
+  '/tasks': typeof TasksRoute
   '/c/$chatId': typeof CChatIdRoute
 }
 
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/agentic': typeof AgenticRoute
+  '/company': typeof CompanyRoute
   '/connect': typeof ConnectRoute
+  '/library': typeof LibraryRoute
   '/onboarding': typeof OnboardingRoute
+  '/plugins': typeof PluginsRoute
+  '/projects': typeof ProjectsRoute
+  '/scheduled': typeof ScheduledRoute
   '/settings': typeof SettingsRoute
+  '/skills': typeof SkillsRoute
+  '/tasks': typeof TasksRoute
   '/c/$chatId': typeof CChatIdRoute
 }
 
@@ -129,9 +241,16 @@ export interface FileRoutesById {
   __root__: typeof rootRoute
   '/': typeof IndexRoute
   '/agentic': typeof AgenticRoute
+  '/company': typeof CompanyRoute
   '/connect': typeof ConnectRoute
+  '/library': typeof LibraryRoute
   '/onboarding': typeof OnboardingRoute
+  '/plugins': typeof PluginsRoute
+  '/projects': typeof ProjectsRoute
+  '/scheduled': typeof ScheduledRoute
   '/settings': typeof SettingsRoute
+  '/skills': typeof SkillsRoute
+  '/tasks': typeof TasksRoute
   '/c/$chatId': typeof CChatIdRoute
 }
 
@@ -140,19 +259,46 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/agentic'
+    | '/company'
     | '/connect'
+    | '/library'
     | '/onboarding'
+    | '/plugins'
+    | '/projects'
+    | '/scheduled'
     | '/settings'
+    | '/skills'
+    | '/tasks'
     | '/c/$chatId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/agentic' | '/connect' | '/onboarding' | '/settings' | '/c/$chatId'
+  to:
+    | '/'
+    | '/agentic'
+    | '/company'
+    | '/connect'
+    | '/library'
+    | '/onboarding'
+    | '/plugins'
+    | '/projects'
+    | '/scheduled'
+    | '/settings'
+    | '/skills'
+    | '/tasks'
+    | '/c/$chatId'
   id:
     | '__root__'
     | '/'
     | '/agentic'
+    | '/company'
     | '/connect'
+    | '/library'
     | '/onboarding'
+    | '/plugins'
+    | '/projects'
+    | '/scheduled'
     | '/settings'
+    | '/skills'
+    | '/tasks'
     | '/c/$chatId'
   fileRoutesById: FileRoutesById
 }
@@ -160,18 +306,32 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AgenticRoute: typeof AgenticRoute
+  CompanyRoute: typeof CompanyRoute
   ConnectRoute: typeof ConnectRoute
+  LibraryRoute: typeof LibraryRoute
   OnboardingRoute: typeof OnboardingRoute
+  PluginsRoute: typeof PluginsRoute
+  ProjectsRoute: typeof ProjectsRoute
+  ScheduledRoute: typeof ScheduledRoute
   SettingsRoute: typeof SettingsRoute
+  SkillsRoute: typeof SkillsRoute
+  TasksRoute: typeof TasksRoute
   CChatIdRoute: typeof CChatIdRoute
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AgenticRoute: AgenticRoute,
+  CompanyRoute: CompanyRoute,
   ConnectRoute: ConnectRoute,
+  LibraryRoute: LibraryRoute,
   OnboardingRoute: OnboardingRoute,
+  PluginsRoute: PluginsRoute,
+  ProjectsRoute: ProjectsRoute,
+  ScheduledRoute: ScheduledRoute,
   SettingsRoute: SettingsRoute,
+  SkillsRoute: SkillsRoute,
+  TasksRoute: TasksRoute,
   CChatIdRoute: CChatIdRoute,
 }
 
@@ -187,9 +347,16 @@ export const routeTree = rootRoute
       "children": [
         "/",
         "/agentic",
+        "/company",
         "/connect",
+        "/library",
         "/onboarding",
+        "/plugins",
+        "/projects",
+        "/scheduled",
         "/settings",
+        "/skills",
+        "/tasks",
         "/c/$chatId"
       ]
     },
@@ -199,14 +366,35 @@ export const routeTree = rootRoute
     "/agentic": {
       "filePath": "agentic.tsx"
     },
+    "/company": {
+      "filePath": "company.tsx"
+    },
     "/connect": {
       "filePath": "connect.tsx"
+    },
+    "/library": {
+      "filePath": "library.tsx"
     },
     "/onboarding": {
       "filePath": "onboarding.tsx"
     },
+    "/plugins": {
+      "filePath": "plugins.tsx"
+    },
+    "/projects": {
+      "filePath": "projects.tsx"
+    },
+    "/scheduled": {
+      "filePath": "scheduled.tsx"
+    },
     "/settings": {
       "filePath": "settings.tsx"
+    },
+    "/skills": {
+      "filePath": "skills.tsx"
+    },
+    "/tasks": {
+      "filePath": "tasks.tsx"
     },
     "/c/$chatId": {
       "filePath": "c.$chatId.tsx"

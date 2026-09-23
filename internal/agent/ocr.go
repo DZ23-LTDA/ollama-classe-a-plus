@@ -35,6 +35,9 @@ func OCRLocal(ctx context.Context, workspace, inputPath, language string) (Media
 	if len(language) > 64 || strings.ContainsAny(language, " ;|&\n\r\t") {
 		return MediaResult{}, errors.New("invalid OCR language")
 	}
+	if err := validateMediaOutputDirectory(workspace, ".agent-media"); err != nil {
+		return MediaResult{}, err
+	}
 	command := exec.CommandContext(ctx, "tesseract", input, "stdout", "-l", language)
 	var output bytes.Buffer
 	command.Stdout = &limitedWriter{writer: &output, limit: 8 << 20}
@@ -46,8 +49,8 @@ func OCRLocal(ctx context.Context, workspace, inputPath, language string) (Media
 	if text == "" {
 		return MediaResult{}, errors.New("OCR returned no text")
 	}
-	path := filepath.Join(workspace, ".agent-media", "ocr-result.txt")
-	if err := writeLimitedFile(path, []byte(text+"\n"), 8<<20); err != nil {
+	path, err := writeMediaFile(workspace, filepath.ToSlash(filepath.Join(".agent-media", "ocr-result.txt")), []byte(text+"\n"), 8<<20)
+	if err != nil {
 		return MediaResult{}, err
 	}
 	artifact, err := BuildArtifactManifest(workspace, "", "", filepath.Base(path), filepath.ToSlash(filepath.Join(".agent-media", filepath.Base(path))))

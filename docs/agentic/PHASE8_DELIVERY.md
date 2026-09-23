@@ -2,7 +2,7 @@
 
 Esta fase adiciona um `DeploymentManager` provider-agnostic, configurável por `OLLAMA_AGENT_DEPLOYMENTS`, com adapters para Vercel, Netlify e um endpoint genérico. O manager coleta apenas arquivos regulares dentro da raiz do builder, rejeita symlinks, limita o workspace a 2.000 arquivos e 50 MiB, ordena os arquivos para payloads reproduzíveis, bloqueia redirects e exige HTTPS fora de loopback.
 
-A API expõe `GET /api/agent/v1/deployments` para listar providers sem tokens e `POST /api/agent/v1/builders/:id/deploy/:provider` para publicar um builder. A operação exige `approved: true` no corpo, usa o nome e a raiz do projeto já persistido e lê tokens somente de variáveis de ambiente do servidor. A publicação local anterior permanece disponível e não depende de credenciais.
+A API expõe `GET /api/agent/v1/deployments` para listar providers sem tokens. O deploy externo usa uma solicitação de approval, decisão owner/admin com nonce e consumo CAS em `POST /api/agent/v1/builders/:id/deploy/:provider`; o booleano `approved: true` enviado diretamente pelo cliente não autoriza a operação. O fluxo usa o nome e a raiz do projeto já persistido e lê tokens somente de variáveis de ambiente do servidor. A publicação local anterior permanece disponível e não depende de credenciais.
 
 O adapter Vercel envia arquivos base64 a `/v13/deployments`. O adapter Netlify cria o site, calcula digests SHA-1, cria o deploy e envia os bytes de cada arquivo. O adapter genérico envia `{name,target,files}` a `/deploy`, permitindo conectar um gateway próprio, AWS, Cloudflare ou outro serviço sem incluir SDKs específicos no núcleo.
 

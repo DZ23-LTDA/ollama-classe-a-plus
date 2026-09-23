@@ -42,6 +42,22 @@ def save_session_state(path, page):
         path.write_text(json.dumps({"url": page.url}, ensure_ascii=False), encoding="utf-8")
 
 
+def browser_executable():
+    configured = os.environ.get("OLLAMA_AGENT_BROWSER_EXECUTABLE", "").strip()
+    candidates = [configured, "/usr/bin/chromium", "/usr/bin/chromium-browser", "/usr/bin/google-chrome"]
+    for candidate in candidates:
+        if candidate and pathlib.Path(candidate).is_file():
+            return candidate
+    try:
+        with sync_playwright() as playwright:
+            managed = pathlib.Path(playwright.chromium.executable_path)
+        if managed.is_file():
+            return str(managed)
+    except Exception:
+        pass
+    fail("no Chromium executable is available; install Playwright Chromium or set OLLAMA_AGENT_BROWSER_EXECUTABLE")
+
+
 def page_result(session_id, page, state_path, **extra):
     result = {"session_id": session_id, "url": page.url, "title": page.title()}
     result.update(extra)
@@ -58,9 +74,7 @@ def main(request):
     user_dir = root / "sessions" / session_id
     user_dir.mkdir(parents=True, mode=0o700, exist_ok=True)
     state_path = user_dir / "state.json"
-    executable = os.environ.get("OLLAMA_AGENT_BROWSER_EXECUTABLE", "/usr/bin/chromium")
-    if not pathlib.Path(executable).exists():
-        fail("configured Chromium executable does not exist")
+    executable = browser_executable()
 
     with sync_playwright() as playwright:
         browser_context = playwright.chromium.launch_persistent_context(

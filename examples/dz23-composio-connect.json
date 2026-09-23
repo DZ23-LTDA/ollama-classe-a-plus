@@ -1,0 +1,16 @@
+[
+  {
+    "id": "composio-connect",
+    "url": "https://connect.composio.dev/mcp",
+    "headers_env": {
+      "x-consumer-api-key": "COMPOSIO_CONSUMER_API_KEY"
+    },
+    "allowed_methods": [
+      "initialize",
+      "notifications/initialized",
+      "tools/list",
+      "tools/call"
+    ],
+    "timeout_seconds": 45
+  }
+]
