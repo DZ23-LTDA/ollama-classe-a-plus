@@ -517,3 +517,10 @@ A mudança foi validada com testes normal/race do loader e gates Go completos em
 A auditoria do último loader de plugins encontrou `json.Unmarshal` em `LoadSkillsForOrganization`. O commit `86300900` substituiu esse caminho por decoder com `DisallowUnknownFields` e verificação explícita de EOF. O loader falha fechado para manifestos com campos desconhecidos ou segundo documento JSON, sem aceitar autoridade de `trusted`/`enabled`.
 
 Foram aprovados testes normal/race do ContextStore e o gate completo Go em integrity, todos os pacotes, vet, build e diff. A proteção é local de parsing e não equivale a attestation de skill, conexão upstream ou isolamento físico.
+
+
+## Addendum P1 — logout local idempotente — 2026-09-22
+
+A revisão de auth identificou que o handler de logout tratava o modo local como se houvesse sempre bearer e AuthStore. O commit `0ea1039a` faz early return `204` quando `auth_required=false`; o modo autenticado continua exigindo bearer e revoga o hash correspondente. Há regressão para `agentAPI{authRequired:false}` sem store e teste de revogação autenticada.
+
+Os testes normal/race do handler e os gates Go completos passaram. O ajuste é interno ao runtime e não prova logout, refresh ou revogação em IdP/conta externa.

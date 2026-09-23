@@ -2262,3 +2262,10 @@ O gate completo após a mudança passou em integrity, `CGO_ENABLED=1 go test ./.
 O commit `8630090062c437c1de1fc3f8e779c3963f57c58a` endureceu `ContextStore.LoadSkillsForOrganization`. Manifestos de skills agora usam `DisallowUnknownFields` e exigem EOF após o documento principal; `trusted` e `enabled` continuam derivados pelo servidor. Regressões cobrem campo desconhecido e documento trailing, além dos testes de persistência e trust fail-closed existentes.
 
 O gate completo pós-mudança passou em integrity, `CGO_ENABLED=1 go test ./... -count=1 -timeout=900s`, vet, build e diff. Com isso, connectors, MCP, Remote MCP e skills têm parsing estrito tanto no bootstrap/persistência aplicável quanto nas regressões. O head de código foi publicado; a documentação deste checkpoint será o próximo commit.
+
+
+## Hardening P1 de logout local — 2026-09-22
+
+A auditoria de auth encontrou que `POST /api/agent/v1/auth/logout` exigia um Bearer e acessava o AuthStore mesmo quando `auth_required=false`. O commit `0ea1039aba7d50014d7422cd40b69355e8451ed7` torna o endpoint idempotente no modo local: retorna `204 No Content` sem sessão e sem AuthStore. No modo autenticado, a revogação Bearer continua obrigatória e não muda de escopo.
+
+Foi adicionada regressão local, além do teste existente que prova revogação do bearer. Testes normal/race específicos passaram e os gates Go completos passaram em integrity, todos os pacotes, vet, build e diff. O contrato não declara que logout local revoga conta externa; ele apenas encerra a ausência de sessão do runtime local.

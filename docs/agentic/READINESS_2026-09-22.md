@@ -449,3 +449,10 @@ Esse hardening melhora parsing e previsibilidade local. Ele não transforma o ma
 O commit `86300900` completa a política de parsing seguro para skills. O loader de manifestos rejeita campos desconhecidos e JSON trailing antes de aplicar qualquer entrada. A confiança continua fail-closed: o payload não pode promover `trusted`, e o servidor deriva `enabled`.
 
 Com essa mudança, a família de plugins — connectors, MCP, Remote MCP e skills — possui regressões para campos desconhecidos/trailing nos caminhos relevantes. Os gates Go completos passaram em integrity, testes, vet, build e diff. O produto segue preview/local RC em hardening e não afirma upstream, OAuth, hardware, sandbox físico ou produção.
+
+
+## Addendum de logout local e revogação autenticada — 2026-09-22
+
+O commit `0ea1039a` corrigiu o contrato de `POST /api/agent/v1/auth/logout`. Com `auth_required=false`, o endpoint agora é idempotente e retorna `204` sem exigir bearer ou AuthStore. Com auth requerida, o middleware autentica primeiro e o handler revoga o bearer apresentado; o teste existente continua cobrindo que o token revogado não autentica novamente.
+
+A correção evita um falso requisito de sessão no modo local e um possível acesso a store ausente. Testes normal/race e gates Go completos passaram. Isso cobre somente a sessão do runtime local; não é logout ou revogação de contas OAuth externas. A classificação continua preview/local RC em hardening.

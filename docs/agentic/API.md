@@ -351,3 +351,10 @@ Remote MCP aceita `id`, `url`, `token_env`, `headers_env`, `allowed_methods` e `
 Skills aceitam `id`, `version`, `description`, `scopes` e `tools`. `trusted` e `enabled` são estados derivados do servidor; o request com qualquer um desses estados como `true` é rejeitado. O runtime persiste o manifest em `OLLAMA_AGENT_STORE/context/skills/<id>.json`, sempre com `trusted=false`, para permitir revisão/approval explícita.
 
 Sem `OLLAMA_AGENT_MCP` ou `OLLAMA_AGENT_REMOTE_MCP`, os managers padrão usam `OLLAMA_AGENT_STORE/mcp.json` e `remote-mcp.json`. Quando o operador define um arquivo estático por variável de ambiente, ele é carregado como bootstrap e mutations posteriores ficam apenas no manager da execução; a API não afirma ter editado o arquivo externo. Registrar é uma operação de configuração local: não equivale a OAuth consentido, conta conectada, smoke de upstream ou ação externa executada.
+
+
+## Logout e escopo de sessão
+
+`POST /api/agent/v1/auth/logout` tem dois comportamentos explícitos. Quando `auth_required=false`, é uma operação local idempotente e responde `204 No Content` mesmo sem bearer; não há sessão remota para revogar. Quando `auth_required=true`, o middleware exige bearer válido e o handler marca o hash do token como revogado, respondendo `204`. Tokens ausentes, inválidos ou expirados continuam retornando `401` no modo autenticado.
+
+Esse endpoint revoga somente o token do runtime agentic. Não revoga automaticamente tokens OAuth de connectors, sessões de IdP ou contas de terceiros; cada credential/provider possui seu fluxo separado de refresh/revoke e requer homologação externa.

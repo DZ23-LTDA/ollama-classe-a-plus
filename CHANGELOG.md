@@ -407,3 +407,8 @@ O loader de `OLLAMA_AGENT_CONNECTORS` agora usa o decoder estrito compartilhado,
 ## Unreleased — strict skill manifest parsing — 2026-09-22
 
 O loader de skills agora rejeita campos desconhecidos e JSON trailing com regressões dedicadas. A família de plugins passa a ter parsing estrito nos loaders de connectors, MCP, Remote MCP e skills. Os gates Go completos passaram.
+
+
+## Unreleased — local auth logout hardening — 2026-09-22
+
+`POST /api/agent/v1/auth/logout` agora retorna `204` sem exigir bearer quando `auth_required=false`, evitando dependência indevida do AuthStore. Em modo autenticado, a revogação de bearer permanece estrita. Testes normal/race e gates Go completos passaram.
