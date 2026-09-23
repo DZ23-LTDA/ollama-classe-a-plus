@@ -729,3 +729,26 @@ O capturador passou a registrar bytes e SHA-256; `docs/images/screens/class-a-pl
 Evidência local: `go build -trimpath`, `sh -n scripts/install.sh`, `npm run screens:verify`, `npm run lint`, `npm test -- --run` (22 arquivos/205 testes), `npm run build`, YAML, integrity, diff check e scan básico de segredos passaram. Parsing PowerShell não foi executado neste Linux porque `pwsh` não está instalado: `BLOCKED_BY_EXTERNAL_DEPENDENCY`. Os checks públicos do head foram iniciados e estavam `in_progress`/`queued` na última consulta; não são declarados verdes.
 
 O produto continua **FIXING / preview-local RC em hardening — não finalizado e não production-ready**. A PR principal permanece aberta, e a PR documental #5 permanece aberta aguardando autorização específica de merge.
+
+
+## Addendum de estados de interação da UI — 2026-09-23
+
+O head `79a0b06e` torna falhas do AgenticConsole observáveis para tecnologias assistivas: o erro recebe `role="alert"`, `aria-live="assertive"`, `aria-atomic` e foco programático. O Product Workspace agora diferencia carregamento de erro, oferece retry acessível e aplica pending por recurso nas mutações de projetos, schedules, plugins, connectors, MCPs e skills. Botões destrutivos receberam labels descritivos, tooltip e estado disabled durante a operação.
+
+Evidência local: lint web sem erros ou warnings; typecheck; suíte Vitest com 22 arquivos e 206 testes; build Vite; teste focal do alerta acessível; guardrail Classe A+, YAML, diff check e scan básico de segredos passaram. O build continua emitindo apenas o aviso informativo de chunks grandes. A CI pública do head foi disparada e estava `queued`/`in_progress` na consulta inicial; isso não é evidência de CI verde.
+
+
+## Addendum de reprodutibilidade de CI e presets — 2026-09-23
+
+O head `f81722e5` fixa `tscriptify` em `v0.2.0`, o preset próprio do Desktop Commander em `0.2.51` e o action de attestation por SHA imutável `96b4a1ef7235a096b17240c259729fdd70c83d45` (v2). O guard de integridade foi atualizado para exigir esse SHA. Nenhum workflow contém mais `@latest`, `@main` ou `@master`; referências `@latest` que permanecem em páginas de integração herdadas não são usadas por workflows nem pelos presets do fork.
+
+Evidência local: instalação de `tscriptify@v0.2.0`, parsing JSON do preset, YAML, guardrail Classe A+ e diff check passaram. A CI pública do head foi consultada uma vez e estava `queued`; a PR #1 continua aberta, com `mergeStateStatus=UNSTABLE`, sem merge automático.
+
+
+## Addendum de dependências Go e auditoria de vulnerabilidades — 2026-09-23
+
+O head `677c3dbc` atualiza o módulo para Go `1.26.6` e corrige as dependências alcançáveis apontadas pelo `govulncheck`, incluindo gRPC, `x/image`, `x/text`, `x/crypto`, pgx, goxmldsig e a família OpenTelemetry. O `go.mod` agora orienta a mesma versão patch-level corrigida que os workflows `setup-go` obtêm por `go-version-file`.
+
+Evidência local: `GOTOOLCHAIN=go1.26.6 /tmp/govulncheck ./...` terminou com `No vulnerabilities found` e zero vulnerabilidades alcançáveis; o relatório ainda informa sete vulnerabilidades em pacotes importados e cinco em módulos exigidos que não são alcançáveis pelos caminhos analisados, portanto isso não equivale a uma declaração de risco zero em todas as dependências. `go mod verify`, `CGO_ENABLED=1 go test ./... -count=1 -timeout=900s`, `go vet ./...` e `go build -trimpath` passaram. `npm audit --omit=dev` também retornou zero vulnerabilidades para web e mobile.
+
+O produto segue **FIXING / preview-local RC em hardening — não finalizado e não production-ready**. A CI pública do novo head ainda precisa concluir, e homologações de múltiplos sistemas, providers, IdP/OAuth, sandbox host, dispositivos, releases assinados e serviços externos continuam pendentes ou `BLOCKED_BY_EXTERNAL_DEPENDENCY`.
