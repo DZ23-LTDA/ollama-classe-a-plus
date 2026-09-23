@@ -773,3 +773,10 @@ Evidência local: regressões de colaboração, Plan/Run/Cancel, queue e runtime
 O head `c43e02e6` completa a transação local do CollaborationStore. `AddComment` e `SetPresence` restauram o snapshot anterior quando qualquer write atômico falha, e o carregamento continua rejeitando ledgers corrompidos. O AgentOrchestrator agora retorna o snapshot efetivamente persistido quando a persistência final falha, em vez de devolver ao caller um estado que não está no ledger.
 
 Evidência local: testes focados de colaboração e orchestrator, race, vet, guardrail de integridade e diff check passaram. A CI pública do head foi consultada uma vez e estava `queued`. O produto continua **FIXING / preview-local RC em hardening — não finalizado e não production-ready**.
+
+
+## Addendum de persistência de traces — 2026-09-23
+
+O head `a25e1a37` torna o encerramento de spans local transacional. Quando `spans.json` não pode ser escrito, `SpanHandle.End` restaura o span em memória para o estado anterior e registra a falha com IDs não sensíveis; o trace não é apresentado como encerrado quando o ledger não confirma a gravação.
+
+Evidência local: testes focados e race do TraceStore, CollaborationStore, AgentOrchestrator e JobQueue passaram; `go vet ./internal/agent ./server`, guardrail de integridade e diff check passaram. A CI pública do head foi consultada uma vez e estava `queued`. O produto segue **FIXING / preview-local RC em hardening — não finalizado e não production-ready**.
