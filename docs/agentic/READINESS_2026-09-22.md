@@ -642,3 +642,12 @@ Terceiro, webhook de schedule compara a organização ativa com a organização 
 Evidência local deste head: `CGO_ENABLED=0 go test ./internal/agent -count=1 -timeout=300s` passou; os testes HTTP novos de deploy/webhook passaram com `CGO_ENABLED=1`, incluindo `-race` para os três fluxos de segurança; `CGO_ENABLED=1 go vet ./internal/agent ./server` passou; `git diff --check` e scan de segredos dos arquivos alterados passaram. O guardrail de integridade e os gates UI/mobile/full-release ainda não foram executados neste novo head.
 
 Na primeira consulta após o push, a CI pública do PR #1 estava `queued`/`in_progress`. O PR permanece aberto, sem merge automático. O estado continua **FIXING / preview-local RC em hardening — não finalizado e não production-ready**. Deploy real, rollback provider-specific, OAuth/IdP, Redis/Postgres/OTLP distribuídos, hardware, instaladores assinados, lojas e homologação externa continuam pendentes ou `BLOCKED_BY_EXTERNAL_DEPENDENCY`.
+
+
+## Addendum de throttling MFA — 2026-09-23
+
+O head `93e091e2` adiciona proteção server-side para tentativas repetidas de MFA. TOTP e recovery code passam por uma janela persistente por usuário e peer remoto: cinco falhas em cinco minutos abrem lockout de 15 minutos, respostas protegidas durante o lockout retornam `429 Too Many Requests` com `Retry-After`, e o estado é carregado de `mfa-attempts.json` após restart. Um TOTP válido após o período limpa a janela; recovery codes continuam one-time.
+
+Evidência local: testes unitários de AuthStore e recovery passaram; o teste HTTP do middleware confirmou quatro `401`, quinto `429` com `Retry-After` e lockout preservado após reload; o cenário passou também com `-race`; `CGO_ENABLED=0 go test ./internal/agent`, `CGO_ENABLED=1 go vet ./internal/agent ./server` e `git diff --check` passaram. O rate limiter é durável no store local, mas não é ainda um coordenador distribuído com locking/lease entre múltiplas instâncias ou uma política de IP real atrás de proxy.
+
+A CI pública precisa concluir para este novo head. O produto continua **FIXING / preview-local RC em hardening — não finalizado e não production-ready**; MFA/SSO/IdP distribuídos, Redis/Postgres/OTLP, providers, hardware, instaladores e homologações externas permanecem pendentes ou `BLOCKED_BY_EXTERNAL_DEPENDENCY`.
