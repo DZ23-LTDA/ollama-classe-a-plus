@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { agentFetch, listProjects, type AgentProject } from "@/lib/agenticClient";
+import { getModels } from "@/api";
+import type { Model } from "@/gotypes";
 
 type Mission = {
   id: string;
@@ -30,6 +32,8 @@ export default function AgenticConsole() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [provider, setProvider] = useState("ollama-local");
+  const [selectedModel, setSelectedModel] = useState("");
+  const [availableModels, setAvailableModels] = useState<Model[]>([]);
   const [allowWorkspaceWrite, setAllowWorkspaceWrite] = useState(false);
   const [projectID, setProjectID] = useState("");
   const [projects, setProjects] = useState<AgentProject[]>([]);
@@ -39,13 +43,33 @@ export default function AgenticConsole() {
   const [researchURLs, setResearchURLs] = useState("");
   const [research, setResearch] = useState<ResearchReport | null>(null);
 
-  const providerModels: Record<string, string> = {
-    "ollama-local": "",
-    claude: "anthropic/claude-sonnet-4-5",
-    codex: "codex/cli",
-    omniroute: "omniroute/auto",
-    automatic: "auto/coding",
-  };
+  const providerChoices = useMemo(() => {
+    const choices = new Map<string, { label: string; models: string[] }>();
+    choices.set("ollama-local", { label: "Ollama local", models: [] });
+    for (const model of availableModels) {
+      const identifier = model.model?.trim();
+      if (!identifier || identifier.startsWith("auto/") || identifier === "local/private") continue;
+      const providerID = model.provider?.trim() || (identifier.includes("/") ? identifier.split("/", 1)[0] : "ollama-local");
+      const choice = choices.get(providerID) ?? { label: providerID, models: [] };
+      if (!choice.models.includes(identifier)) choice.models.push(identifier);
+      choices.set(providerID, choice);
+    }
+    return [...choices.entries()].map(([id, choice]) => ({ id, ...choice }));
+  }, [availableModels]);
+
+  const selectedProviderChoice = providerChoices.find((choice) => choice.id === provider) ?? providerChoices[0];
+
+  useEffect(() => {
+    const current = providerChoices.find((choice) => choice.id === provider);
+    if (!current) {
+      setProvider("ollama-local");
+      setSelectedModel("");
+    } else if (current.models.length > 0 && !current.models.includes(selectedModel)) {
+      setSelectedModel(current.models[0]);
+    } else if (current.models.length === 0 && selectedModel) {
+      setSelectedModel("");
+    }
+  }, [providerChoices, provider, selectedModel]);
 
   const load = async (missionId?: string, orchestrationId?: string) => {
     try {
@@ -72,6 +96,7 @@ export default function AgenticConsole() {
 
   useEffect(() => {
     void listProjects().then((result) => setProjects(result.projects)).catch(() => setProjects([]));
+    void getModels("").then(setAvailableModels).catch(() => setAvailableModels([]));
     const requestedObjective = new URLSearchParams(window.location.search).get("objective");
     if (requestedObjective) setObjective(requestedObjective);
   }, []);
@@ -82,7 +107,7 @@ export default function AgenticConsole() {
     if (!objective.trim()) return;
     setBusy(true); setError("");
     try {
-      const created = await api<Mission>("/api/agent/v1/missions", { method: "POST", body: JSON.stringify({ objective, provider, model: providerModels[provider], project_id: projectID || undefined, capabilities: allowWorkspaceWrite ? ["workspace:read", "workspace:write"] : ["workspace:read"], auto_run: false }) });
+      const created = await api<Mission>("/api/agent/v1/missions", { method: "POST", body: JSON.stringify({ objective, provider, model: selectedModel || undefined, project_id: projectID || undefined, capabilities: allowWorkspaceWrite ? ["workspace:read", "workspace:write"] : ["workspace:read"], auto_run: false }) });
       setMission(created); setObjective(""); await load(created.id, orchestration?.id);
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Falha ao criar missão"); } finally { setBusy(false); }
   };
@@ -124,7 +149,7 @@ export default function AgenticConsole() {
     <main className="flex h-full min-h-0 flex-col gap-5 overflow-y-auto p-6">
       <header><p className="text-xs font-medium uppercase tracking-[0.18em] text-neutral-500">DZ23 Agentic Runtime</p><h1 className="mt-1 text-2xl font-semibold text-neutral-900 dark:text-neutral-100">Mission Console</h1><p className="mt-2 max-w-3xl text-sm text-neutral-600 dark:text-neutral-400">Planeje, orquestre, pesquise, aprove, execute e observe operações com a mesma trilha persistente usada pela API local.</p></header>
 
-      <section className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-950"><label className="text-sm font-medium text-neutral-800 dark:text-neutral-200" htmlFor="agent-objective">Nova tarefa</label><div className="mt-3 flex flex-col gap-3"><textarea id="agent-objective" value={objective} onChange={(event) => setObjective(event.target.value)} placeholder="Descreva o que você quer construir, pesquisar, revisar ou automatizar" className="min-h-20 w-full resize-y rounded-xl border border-neutral-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-neutral-500 dark:border-neutral-700" /><div className="flex flex-col gap-2 sm:flex-row"><label className="flex flex-1 flex-col gap-1 text-[11px] text-neutral-500">Motor<select aria-label="Motor" value={provider} onChange={(event) => setProvider(event.target.value)} className="h-10 rounded-xl border border-neutral-300 bg-transparent px-3 text-sm text-neutral-800 outline-none dark:border-neutral-700 dark:text-neutral-200"><option value="ollama-local">Ollama local (conectado)</option><option value="claude" disabled>Claude / Anthropic (não conectado)</option><option value="codex" disabled>Codex CLI (não conectado)</option><option value="omniroute" disabled>OmniRoute local (não conectado)</option><option value="automatic" disabled>Roteamento automático (não configurado)</option></select></label><label className="flex flex-1 flex-col gap-1 text-[11px] text-neutral-500">Projeto<select value={projectID} onChange={(event) => setProjectID(event.target.value)} className="h-10 rounded-xl border border-neutral-300 bg-transparent px-3 text-sm text-neutral-800 outline-none dark:border-neutral-700 dark:text-neutral-200"><option value="">Sem projeto</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label><label className="flex items-center gap-2 self-end rounded-xl border border-neutral-300 px-3 py-2 text-xs text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"><input type="checkbox" checked={allowWorkspaceWrite} onChange={(event) => setAllowWorkspaceWrite(event.target.checked)} />Permitir escrita</label><button type="button" disabled={busy || !objective.trim()} onClick={() => void createMission()} className="h-10 self-end rounded-xl bg-neutral-900 px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40 dark:bg-neutral-100 dark:text-neutral-900">Criar missão</button></div><p className="text-[11px] text-neutral-500">Motor selecionado: <span className="font-mono">{provider}</span>. A missão começa somente com leitura; habilite “Permitir escrita” quando a tarefa precisar alterar arquivos. O servidor valida o grant e exige approval para efeitos de escrita.</p></div>{error && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/30 dark:text-red-300">{error}</p>}</section>
+      <section className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-950"><label className="text-sm font-medium text-neutral-800 dark:text-neutral-200" htmlFor="agent-objective">Nova tarefa</label><div className="mt-3 flex flex-col gap-3"><textarea id="agent-objective" value={objective} onChange={(event) => setObjective(event.target.value)} placeholder="Descreva o que você quer construir, pesquisar, revisar ou automatizar" className="min-h-20 w-full resize-y rounded-xl border border-neutral-300 bg-transparent px-3 py-2 text-sm outline-none focus:border-neutral-500 dark:border-neutral-700" /><div className="flex flex-col gap-2 sm:flex-row"><label className="flex flex-1 flex-col gap-1 text-[11px] text-neutral-500">Motor<select aria-label="Motor" value={provider} onChange={(event) => { const nextProvider = event.target.value; setProvider(nextProvider); setSelectedModel(providerChoices.find((choice) => choice.id === nextProvider)?.models[0] ?? ""); }} className="h-10 rounded-xl border border-neutral-300 bg-transparent px-3 text-sm text-neutral-800 outline-none dark:border-neutral-700 dark:text-neutral-200">{providerChoices.map((choice) => <option key={choice.id} value={choice.id}>{choice.label}{choice.id === "ollama-local" ? " (local)" : " (configurado)"}</option>)}</select></label>{selectedProviderChoice && selectedProviderChoice.models.length > 0 && <label className="flex flex-1 flex-col gap-1 text-[11px] text-neutral-500">Modelo<select aria-label="Modelo" value={selectedModel} onChange={(event) => setSelectedModel(event.target.value)} className="h-10 rounded-xl border border-neutral-300 bg-transparent px-3 text-sm text-neutral-800 outline-none dark:border-neutral-700 dark:text-neutral-200">{selectedProviderChoice.models.map((model) => <option key={model} value={model}>{model}</option>)}</select></label>}<label className="flex flex-1 flex-col gap-1 text-[11px] text-neutral-500">Projeto<select value={projectID} onChange={(event) => setProjectID(event.target.value)} className="h-10 rounded-xl border border-neutral-300 bg-transparent px-3 text-sm text-neutral-800 outline-none dark:border-neutral-700 dark:text-neutral-200"><option value="">Sem projeto</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label><label className="flex items-center gap-2 self-end rounded-xl border border-neutral-300 px-3 py-2 text-xs text-neutral-600 dark:border-neutral-700 dark:text-neutral-300"><input type="checkbox" checked={allowWorkspaceWrite} onChange={(event) => setAllowWorkspaceWrite(event.target.checked)} />Permitir escrita</label><button type="button" disabled={busy || !objective.trim()} onClick={() => void createMission()} className="h-10 self-end rounded-xl bg-neutral-900 px-4 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40 dark:bg-neutral-100 dark:text-neutral-900">Criar missão</button></div><p className="text-[11px] text-neutral-500">Motor selecionado: <span className="font-mono">{provider}</span>{selectedModel ? ` · ${selectedModel}` : ""}. Providers remotos só aparecem quando o catálogo os publica; a missão falha fechado se não houver adapter/credencial. A missão começa somente com leitura; habilite “Permitir escrita” quando a tarefa precisar alterar arquivos. O servidor valida o grant e exige approval para efeitos de escrita.</p></div>{error && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/30 dark:text-red-300">{error}</p>}</section>
 
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">{[["Criadas", metrics.missions_created], ["Concluídas", metrics.missions_completed], ["Retries", metrics.retries], ["Tools", metrics.tool_calls]].map(([label, value]) => <div key={label} className="rounded-xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-950"><p className="text-xs text-neutral-500">{label}</p><p className="mt-1 text-2xl font-semibold text-neutral-900 dark:text-neutral-100">{value ?? 0}</p></div>)}</section>
 
