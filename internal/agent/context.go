@@ -1,10 +1,12 @@
 package agent
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"os"
 	"path/filepath"
@@ -356,8 +358,17 @@ func (s *ContextStore) LoadSkillsForOrganization(dir, organizationID string) err
 			return err
 		}
 		var manifest SkillManifest
-		if err := json.Unmarshal(data, &manifest); err != nil {
+		decoder := json.NewDecoder(bytes.NewReader(data))
+		decoder.DisallowUnknownFields()
+		if err := decoder.Decode(&manifest); err != nil {
 			return fmt.Errorf("skill %s: %w", entry.Name(), err)
+		}
+		var extra any
+		if err := decoder.Decode(&extra); err != io.EOF {
+			if err == nil {
+				return fmt.Errorf("skill %s contains trailing JSON", entry.Name())
+			}
+			return fmt.Errorf("skill %s trailing JSON: %w", entry.Name(), err)
 		}
 		if strings.TrimSpace(manifest.ID) == "" || strings.TrimSpace(manifest.Version) == "" {
 			return fmt.Errorf("skill %s has no id or version", entry.Name())

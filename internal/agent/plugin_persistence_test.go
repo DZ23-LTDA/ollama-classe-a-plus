@@ -178,3 +178,25 @@ func TestPersistentRemoteMCPManagerRejectsTrailingJSON(t *testing.T) {
 		t.Fatal("expected trailing JSON rejection")
 	}
 }
+
+func TestLoadSkillsRejectsUnknownAndTrailingJSON(t *testing.T) {
+	unknownDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(unknownDir, "unknown.json"), []byte(`{"id":"unknown","version":"1","unexpected":true}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	store, err := NewContextStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.LoadSkillsForOrganization(unknownDir, "org-a"); err == nil {
+		t.Fatal("expected unknown skill field rejection")
+	}
+
+	trailingDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(trailingDir, "trailing.json"), []byte(`{} {}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.LoadSkillsForOrganization(trailingDir, "org-a"); err == nil {
+		t.Fatal("expected trailing skill JSON rejection")
+	}
+}
