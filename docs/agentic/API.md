@@ -379,3 +379,8 @@ O limite de transporte do `decodeJSON` é 4 MiB por request. Bodies maiores são
 
 
 `POST /api/agent/v1/auth/dev/token` é apenas uma rota de desenvolvimento: requer `OLLAMA_AGENT_AUTH_DEV=true` e peer loopback. Seu body também respeita o limite de 4 MiB, campos conhecidos e documento JSON único; a rota não deve ser exposta como onboarding de produção.
+
+
+## Deployments
+
+O adapter de deployment aceita HTTPS para serviços externos e HTTP somente em loopback. O root do workspace não pode ser symlink; redirects são bloqueados; a conexão padrão verifica o endereço IP real após o DNS e rejeita destinos privados não-loopback. O smoke local usa um servidor fixture. Configurar Vercel, Netlify, AWS, Cloudflare ou outro serviço não significa conta validada, domínio publicado, billing autorizado ou rollback testado.

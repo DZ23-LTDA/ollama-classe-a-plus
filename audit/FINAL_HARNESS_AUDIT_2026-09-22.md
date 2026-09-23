@@ -566,3 +566,10 @@ Esse é um limite de transporte comum, não substitui limites de domínio como p
 O endpoint de emissão de token de desenvolvimento era o único caminho encontrado usando `ShouldBindJSON` fora do helper. O commit `6d00127a` o migrou para `decodeJSON`, mantendo a proteção de flag + loopback e adicionando limite, `DisallowUnknownFields` e EOF. O teste confirma que campo inesperado é rejeitado antes de qualquer criação.
 
 Testes normal/race e gates Go completos passaram. A rota continua deliberadamente limitada ao desenvolvimento local e não representa fluxo de provisionamento de produção.
+
+
+## Addendum P1 — deploy adapter SSRF e workspace — 2026-09-23
+
+A revisão do deploy encontrou dois riscos locais: root symlink podia fazer o coletor operar fora da raiz declarada, e o client padrão não verificava o IP real após resolução DNS. O commit `58cc1f40` corrige ambos. A conexão distingue loopback explícito de endpoint externo e bloqueia IP privado, link-local, multicast, unspecified e loopback não autorizado.
+
+Fixture genérico, symlink root, localhost e dial privado têm regressões normal/race. Os gates Go completos passaram. Não há evidência de deploy em provedor real, conta, domínio, billing, publicação ou rollback externo.

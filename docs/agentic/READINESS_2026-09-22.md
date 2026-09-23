@@ -498,3 +498,10 @@ Esse limite é um guardrail de transporte; endpoints continuam sujeitos a valida
 O endpoint de desenvolvimento `POST /api/agent/v1/auth/dev/token` foi alinhado ao `decodeJSON` no commit `6d00127a`. Ele agora compartilha limite de 4 MiB, rejeição de campos desconhecidos e EOF. A emissão continua exposta somente com flag de desenvolvimento explícita e peer loopback.
 
 A regressão normal/race e os gates Go completos passaram. Esse endpoint continua sendo uma ferramenta de desenvolvimento local, não onboarding de produção ou autenticação externa.
+
+
+## Addendum de deploy seguro e não validado externamente — 2026-09-23
+
+O commit `58cc1f40` adicionou proteção ao adapter de deploy. Roots symlink são rejeitados, redirects são desabilitados e a conexão padrão bloqueia endereços privados depois do DNS para endpoints externos. HTTP permanece permitido somente para loopback; serviços remotos precisam de HTTPS.
+
+O adapter possui smoke determinístico com servidor fixture e limites de arquivo, mas não houve deploy real. Vercel, Netlify, AWS, Cloudflare e outros continuam dependentes de credenciais, contas, permissões, custos, aprovação e rollback do operador. O produto permanece preview/local RC em hardening.

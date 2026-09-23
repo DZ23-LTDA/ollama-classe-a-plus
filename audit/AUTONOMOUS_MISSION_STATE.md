@@ -2311,3 +2311,10 @@ A regressão cobre body acima do limite, além dos casos de campo desconhecido, 
 A revisão transversal do parser descobriu que `POST /api/agent/v1/auth/dev/token` usava `ShouldBindJSON` diretamente. O commit `6d00127af3341c32b3246c963be324db89f0e3e5` migrou o handler para `decodeJSON`, portanto o endpoint também recebe o limite de 4 MiB, rejeita campos desconhecidos e exige EOF. O gate de segurança do endpoint permanece: flag `OLLAMA_AGENT_AUTH_DEV=true` e peer loopback real.
 
 Regressão normal/race confirma rejeição de campo inesperado antes de criar usuário/organização. Gates Go completos passaram em integrity, todos os pacotes, vet, build e diff.
+
+
+## Hardening P1 do adapter de deploy — 2026-09-23
+
+O commit `58cc1f40e478dba5b1b87dc452e172e86b9b2f42` endureceu o adapter de deployments. O workspace raiz agora rejeita symlink; redirects continuam bloqueados; o client padrão remove proxy, marca explicitamente endpoints loopback e rejeita o IP privado real após a conexão para hosts não-loopback. A configuração HTTP local aceita `localhost`, `127.0.0.1` e `::1`; endpoints externos exigem HTTPS.
+
+Regressões cobrem deploy genérico fixture, root symlink, localhost HTTP e dial para endereço privado. Testes normal/race e gates Go completos passaram em integrity, todos os pacotes, vet, build e diff. Nenhum deploy Vercel, Netlify, AWS, Cloudflare ou outro foi executado; esses estados continuam `configured/available`, não `upstream validated`.

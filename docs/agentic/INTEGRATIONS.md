@@ -141,3 +141,10 @@ O lifecycle persistente agora cobre três classes. MCP stdio é um manifest loca
 O estado **registrado** significa que a configuração passou pelas validações. O estado **persistido** significa que o runtime padrão escreveu o manifest no DataRoot. Isso não significa que um processo MCP foi iniciado com sucesso, que um endpoint remoto respondeu, que um token existe ou que uma skill tem código confiável. `credential_configured` e estado OAuth continuam separados de upstream smoke. O modo de bootstrap por `OLLAMA_AGENT_MCP`/`OLLAMA_AGENT_REMOTE_MCP` permanece estático e é documentado como tal.
 
 A tela Plugins permite o cadastro sem receber tokens, passwords ou conteúdo de credenciais. Para Desktop Commander, Composio, Google Workspace, GitHub, Woovi/OpenPix, fiscal/NF-e, redes sociais e marketplaces, o produto fornece contratos e pontos de configuração, mas uma conta real exige provisionamento seguro, scopes mínimos, consentimento, approval e homologação do serviço. Nenhum adapter é reportado como conectado por ter sido apenas registrado.
+
+
+## Deploy: adapter local versus publicação externa
+
+O runtime possui adapter local para generic, Vercel e Netlify com coleta limitada do workspace, referências de token por nome de variável, HTTPS obrigatório para endpoints remotos, redirects bloqueados, root sem symlink e verificação do endereço conectado. O smoke automatizado usa servidor fixture e não representa publicação externa.
+
+**Configured** significa que o manifest foi aceito e o token é referenciado por nome de ambiente. **Upstream validated** exigiria chamada real autorizada, projeto/conta válidos, resposta redigida, evidência de URL/status, aprovação de custo e caminho de rollback. Vercel, Netlify, AWS, Cloudflare e demais destinos continuam `available/configurable`; nenhuma conta ou publicação externa está conectada ou homologada.

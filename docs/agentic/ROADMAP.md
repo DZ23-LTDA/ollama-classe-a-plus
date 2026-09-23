@@ -396,3 +396,10 @@ O próximo trabalho independente é endurecer o storage/authorization distribuí
 O runtime passou a separar claramente portabilidade de isolamento forte. Em Linux, `sandbox.exec` mantém os caminhos best-effort e strict já existentes. Em macOS e Windows, o modo best-effort executa Python/Node pelo processo disponível, aplica timeout/output bounds e encerra o processo no cancelamento, mas retorna explicitamente que a rede não está isolada. O modo strict continua Linux-only e falha fechado fora do executor com cgroup v2 delegado.
 
 Esse avanço remove uma quebra de execução multiplataforma sem transformar compilação cruzada em homologação física. Permanecem como trabalho externo a validação real em Windows/macOS, sandbox forte de host, AppArmor/SELinux, isolamento de dispositivos, assinaturas, installers e distribuição.
+
+
+## Incremento 2026-09-23 — deploy adapter seguro
+
+O adapter de deploy agora possui coleta de workspace sem root symlink, limites de arquivos/tamanho, redirects desativados e verificação do IP conectado após DNS. Esse caminho está pronto para smoke local determinístico e permanece separado de publicação externa.
+
+O próximo gate externo continua exigindo credenciais do operador, contas de provedor, domínio ou projeto, aprovação, custos, smoke reversível, logs, rollback e confirmação de estado. Nenhum desses requisitos é considerado concluído pelo adapter local.
