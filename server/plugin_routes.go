@@ -56,6 +56,14 @@ func writePluginLifecycleError(c *gin.Context, err error) {
 	writeAgentError(c, status, err)
 }
 
+func writePluginRegistrationError(c *gin.Context, err error) {
+	status := http.StatusBadRequest
+	if errors.Is(err, agent.ErrPluginOrganizationScope) {
+		status = http.StatusForbidden
+	}
+	writeAgentError(c, status, err)
+}
+
 func (a *agentAPI) enableConnector(c *gin.Context)  { a.connectorLifecycle(c, true, false) }
 func (a *agentAPI) disableConnector(c *gin.Context) { a.connectorLifecycle(c, false, false) }
 func (a *agentAPI) removeConnector(c *gin.Context)  { a.connectorLifecycle(c, false, true) }
@@ -121,6 +129,33 @@ func (a *agentAPI) connectorLifecycle(c *gin.Context, enabled, remove bool) {
 func (a *agentAPI) enableMCP(c *gin.Context)  { a.mcpLifecycle(c, true, false) }
 func (a *agentAPI) disableMCP(c *gin.Context) { a.mcpLifecycle(c, false, false) }
 func (a *agentAPI) removeMCP(c *gin.Context)  { a.mcpLifecycle(c, false, true) }
+
+func (a *agentAPI) registerMCP(c *gin.Context) {
+	if !a.requirePluginAdmin(c) {
+		return
+	}
+	var input agent.MCPServerConfig
+	if err := decodeJSON(c, &input); err != nil {
+		writeAgentError(c, http.StatusBadRequest, err)
+		return
+	}
+	var err error
+	if a.authRequired {
+		err = a.runtime.RegisterMCPForOrganization(agentOrganizationID(c), input)
+	} else {
+		if input.OrganizationID != "" {
+			writeAgentError(c, http.StatusBadRequest, errors.New("organization_id is not accepted without authenticated organization scope"))
+			return
+		}
+		err = a.runtime.RegisterMCP(input)
+	}
+	if err != nil {
+		writePluginRegistrationError(c, err)
+		return
+	}
+	pluginCatalog(c, a)
+}
+
 func (a *agentAPI) mcpLifecycle(c *gin.Context, enabled, remove bool) {
 	if !a.requirePluginAdmin(c) {
 		return
@@ -150,6 +185,33 @@ func (a *agentAPI) mcpLifecycle(c *gin.Context, enabled, remove bool) {
 func (a *agentAPI) enableRemoteMCP(c *gin.Context)  { a.remoteMCPLifecycle(c, true, false) }
 func (a *agentAPI) disableRemoteMCP(c *gin.Context) { a.remoteMCPLifecycle(c, false, false) }
 func (a *agentAPI) removeRemoteMCP(c *gin.Context)  { a.remoteMCPLifecycle(c, false, true) }
+
+func (a *agentAPI) registerRemoteMCP(c *gin.Context) {
+	if !a.requirePluginAdmin(c) {
+		return
+	}
+	var input agent.RemoteMCPServerConfig
+	if err := decodeJSON(c, &input); err != nil {
+		writeAgentError(c, http.StatusBadRequest, err)
+		return
+	}
+	var err error
+	if a.authRequired {
+		err = a.runtime.RegisterRemoteMCPForOrganization(agentOrganizationID(c), input)
+	} else {
+		if input.OrganizationID != "" {
+			writeAgentError(c, http.StatusBadRequest, errors.New("organization_id is not accepted without authenticated organization scope"))
+			return
+		}
+		err = a.runtime.RegisterRemoteMCP(input)
+	}
+	if err != nil {
+		writePluginRegistrationError(c, err)
+		return
+	}
+	pluginCatalog(c, a)
+}
+
 func (a *agentAPI) remoteMCPLifecycle(c *gin.Context, enabled, remove bool) {
 	if !a.requirePluginAdmin(c) {
 		return
@@ -179,6 +241,37 @@ func (a *agentAPI) remoteMCPLifecycle(c *gin.Context, enabled, remove bool) {
 func (a *agentAPI) enableSkill(c *gin.Context)  { a.skillLifecycle(c, true, false) }
 func (a *agentAPI) disableSkill(c *gin.Context) { a.skillLifecycle(c, false, false) }
 func (a *agentAPI) removeSkill(c *gin.Context)  { a.skillLifecycle(c, false, true) }
+
+func (a *agentAPI) registerSkill(c *gin.Context) {
+	if !a.requirePluginAdmin(c) {
+		return
+	}
+	var input agent.SkillManifest
+	if err := decodeJSON(c, &input); err != nil {
+		writeAgentError(c, http.StatusBadRequest, err)
+		return
+	}
+	if input.Trusted || input.Enabled {
+		writeAgentError(c, http.StatusBadRequest, errors.New("skill trusted and enabled state are server-derived"))
+		return
+	}
+	var err error
+	if a.authRequired {
+		err = a.runtime.RegisterSkillForOrganization(agentOrganizationID(c), input)
+	} else {
+		if input.OrganizationID != "" {
+			writeAgentError(c, http.StatusBadRequest, errors.New("organization_id is not accepted without authenticated organization scope"))
+			return
+		}
+		err = a.runtime.RegisterSkill(input)
+	}
+	if err != nil {
+		writePluginRegistrationError(c, err)
+		return
+	}
+	pluginCatalog(c, a)
+}
+
 func (a *agentAPI) skillLifecycle(c *gin.Context, enabled, remove bool) {
 	if !a.requirePluginAdmin(c) {
 		return

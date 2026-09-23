@@ -280,6 +280,13 @@ func (r *Runtime) SetMCPEnabled(id string, enabled bool) error {
 	return r.mcp.SetEnabled(id, enabled)
 }
 
+func (r *Runtime) RegisterMCP(config MCPServerConfig) error {
+	if r.mcp == nil {
+		return errors.New("MCP manager is unavailable")
+	}
+	return r.mcp.Register(config)
+}
+
 func (r *Runtime) RemoveMCP(id string) error {
 	if r.mcp == nil {
 		return errors.New("MCP manager is unavailable")
@@ -294,6 +301,13 @@ func (r *Runtime) SetRemoteMCPEnabled(id string, enabled bool) error {
 	return r.remoteMCP.SetEnabled(id, enabled)
 }
 
+func (r *Runtime) RegisterRemoteMCP(config RemoteMCPServerConfig) error {
+	if r.remoteMCP == nil {
+		return errors.New("remote MCP manager is unavailable")
+	}
+	return r.remoteMCP.Register(config)
+}
+
 func (r *Runtime) RemoveRemoteMCP(id string) error {
 	if r.remoteMCP == nil {
 		return errors.New("remote MCP manager is unavailable")
@@ -306,6 +320,13 @@ func (r *Runtime) SetSkillEnabled(id string, enabled bool) error {
 		return errors.New("context store is unavailable")
 	}
 	return r.context.SetSkillEnabled(id, enabled)
+}
+
+func (r *Runtime) RegisterSkill(manifest SkillManifest) error {
+	if r.context == nil {
+		return errors.New("context store is unavailable")
+	}
+	return r.context.RegisterSkill(manifest)
 }
 
 func (r *Runtime) RemoveSkill(id string) error {
@@ -1053,6 +1074,13 @@ func (r *Runtime) SetMCPEnabledForOrganization(organizationID, id string, enable
 	return r.mcp.SetEnabledForOrganization(organizationID, id, enabled)
 }
 
+func (r *Runtime) RegisterMCPForOrganization(organizationID string, config MCPServerConfig) error {
+	if r.mcp == nil {
+		return errors.New("MCP manager is unavailable")
+	}
+	return r.mcp.RegisterForOrganization(organizationID, config)
+}
+
 func (r *Runtime) RemoveMCPForOrganization(organizationID, id string) error {
 	if r.mcp == nil {
 		return errors.New("MCP manager is unavailable")
@@ -1074,6 +1102,13 @@ func (r *Runtime) SetRemoteMCPEnabledForOrganization(organizationID, id string, 
 	return r.remoteMCP.SetEnabledForOrganization(organizationID, id, enabled)
 }
 
+func (r *Runtime) RegisterRemoteMCPForOrganization(organizationID string, config RemoteMCPServerConfig) error {
+	if r.remoteMCP == nil {
+		return errors.New("remote MCP manager is unavailable")
+	}
+	return r.remoteMCP.RegisterForOrganization(organizationID, config)
+}
+
 func (r *Runtime) RemoveRemoteMCPForOrganization(organizationID, id string) error {
 	if r.remoteMCP == nil {
 		return errors.New("remote MCP manager is unavailable")
@@ -1093,6 +1128,13 @@ func (r *Runtime) SetSkillEnabledForOrganization(organizationID, id string, enab
 		return errors.New("context store is unavailable")
 	}
 	return r.context.SetSkillEnabledForOrganization(organizationID, id, enabled)
+}
+
+func (r *Runtime) RegisterSkillForOrganization(organizationID string, manifest SkillManifest) error {
+	if r.context == nil {
+		return errors.New("context store is unavailable")
+	}
+	return r.context.RegisterSkillForOrganization(organizationID, manifest)
 }
 
 func (r *Runtime) RemoveSkillForOrganization(organizationID, id string) error {

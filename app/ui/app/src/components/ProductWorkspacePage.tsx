@@ -15,6 +15,9 @@ import {
 	listSchedules,
 	listSkills,
 	registerConnector,
+	registerMCP,
+	registerRemoteMCP,
+	registerSkill,
 	setConnectorEnabled,
 	setMCPEnabled,
 	setSkillEnabled,
@@ -78,6 +81,18 @@ export function ProductWorkspacePage({ kind }: { kind: ProductPageKind }) {
 	const [newConnectorOAuthProvider, setNewConnectorOAuthProvider] = useState("");
 	const [newConnectorMethods, setNewConnectorMethods] = useState("GET");
 	const [newConnectorPathPrefix, setNewConnectorPathPrefix] = useState("/");
+	const [newMCPID, setNewMCPID] = useState("");
+	const [newMCPCommand, setNewMCPCommand] = useState("");
+	const [newMCPMethods, setNewMCPMethods] = useState("tools/list");
+	const [newRemoteMCPID, setNewRemoteMCPID] = useState("");
+	const [newRemoteMCPURL, setNewRemoteMCPURL] = useState("");
+	const [newRemoteMCPTokenEnv, setNewRemoteMCPTokenEnv] = useState("");
+	const [newRemoteMCPMethods, setNewRemoteMCPMethods] = useState("tools/list");
+	const [newSkillID, setNewSkillID] = useState("");
+	const [newSkillVersion, setNewSkillVersion] = useState("1.0.0");
+	const [newSkillDescription, setNewSkillDescription] = useState("");
+	const [newSkillScopes, setNewSkillScopes] = useState("");
+	const [newSkillTools, setNewSkillTools] = useState("");
   const [mcpServers, setMcpServers] = useState<AgentMCPServer[]>([]);
   const [cliCount, setCliCount] = useState(0);
   const [projectName, setProjectName] = useState("");
@@ -190,10 +205,40 @@ export function ProductWorkspacePage({ kind }: { kind: ProductPageKind }) {
 				setNewConnectorID(""); setNewConnectorProvider(""); setNewConnectorBaseURL(""); setNewConnectorTokenEnv(""); setNewConnectorOAuthProvider("");
 				setNotice("Connector registrado no tenant atual. O runtime mantém apenas referências de credencial; o valor deve existir no ambiente do servidor ou no OAuth autorizado.");
 				await refresh();
-			} catch (cause) { setNotice(cause instanceof Error ? cause.message : "Falha ao registrar connector."); }
-		};
+				} catch (cause) { setNotice(cause instanceof Error ? cause.message : "Falha ao registrar connector."); }
+			};
 
-		const renderContent = () => {
+			const createNewMCP = async () => {
+				if (!newMCPID.trim() || !newMCPCommand.trim()) return;
+				try {
+					await registerMCP({ id: newMCPID.trim(), command: newMCPCommand.trim(), allowed_methods: newMCPMethods.split(",").map((method) => method.trim()).filter(Boolean) });
+					setNewMCPID(""); setNewMCPCommand("");
+					setNotice("MCP stdio registrado. O executável é validado e executado somente no host/workspace permitido pelo servidor.");
+					await refresh();
+				} catch (cause) { setNotice(cause instanceof Error ? cause.message : "Falha ao registrar MCP stdio."); }
+			};
+
+			const createNewRemoteMCP = async () => {
+				if (!newRemoteMCPID.trim() || !newRemoteMCPURL.trim()) return;
+				try {
+					await registerRemoteMCP({ id: newRemoteMCPID.trim(), url: newRemoteMCPURL.trim(), ...(newRemoteMCPTokenEnv.trim() ? { token_env: newRemoteMCPTokenEnv.trim() } : {}), allowed_methods: newRemoteMCPMethods.split(",").map((method) => method.trim()).filter(Boolean) });
+					setNewRemoteMCPID(""); setNewRemoteMCPURL(""); setNewRemoteMCPTokenEnv("");
+					setNotice("Remote MCP registrado. O endpoint deve passar HTTPS/SSRF/DNS pinning; tokens permanecem no ambiente do servidor.");
+					await refresh();
+				} catch (cause) { setNotice(cause instanceof Error ? cause.message : "Falha ao registrar Remote MCP."); }
+			};
+
+			const createNewSkill = async () => {
+				if (!newSkillID.trim() || !newSkillVersion.trim()) return;
+				try {
+					await registerSkill({ id: newSkillID.trim(), version: newSkillVersion.trim(), description: newSkillDescription.trim(), scopes: newSkillScopes.split(",").map((scope) => scope.trim()).filter(Boolean), tools: newSkillTools.split(",").map((tool) => tool.trim()).filter(Boolean) });
+					setNewSkillID(""); setNewSkillDescription(""); setNewSkillScopes(""); setNewSkillTools("");
+					setNotice("Manifesto de skill registrado como não confiável e habilitado pelo servidor para revisão/approval.");
+					await refresh();
+				} catch (cause) { setNotice(cause instanceof Error ? cause.message : "Falha ao registrar skill."); }
+			};
+
+			const renderContent = () => {
     if (loading) return <div className="rounded-xl border border-dashed border-neutral-300 px-6 py-12 text-center text-sm text-neutral-500 dark:border-neutral-700">Consultando contratos agentic…</div>;
     if (kind === "projects") return <div className="space-y-3">{projects.length ? projects.map((project) => <ResourceRow key={project.id} onDelete={() => void removeProject(project)}><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="font-medium text-neutral-900 dark:text-white">{editingProject === project.id ? <input autoFocus value={editingProjectName} onChange={(event) => setEditingProjectName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void saveProject(project); if (event.key === "Escape") setEditingProject(null); }} className="h-8 rounded-lg border border-neutral-300 bg-transparent px-2 text-sm dark:border-neutral-700" /> : project.name}</p><p className="mt-1 text-xs text-neutral-500">{project.root || "workspace local gerenciado"} · atualizado {new Date(project.updated_at).toLocaleString()}</p></div>{editingProject === project.id ? <button onClick={() => void saveProject(project)} className="rounded-lg bg-neutral-900 px-3 py-2 text-xs text-white dark:bg-white dark:text-neutral-900">Salvar</button> : <button onClick={() => { setEditingProject(project.id); setEditingProjectName(project.name); }} className="rounded-lg border border-neutral-200 px-3 py-2 text-xs dark:border-neutral-700">Editar</button>}</div></ResourceRow>) : <EmptyState message="Crie um projeto para manter instruções, arquivos e contexto entre missões." action="Criar projeto" onAction={() => document.getElementById("new-project-name")?.focus()} />}</div>;
     if (kind === "tasks") return missions.length ? <div className="space-y-3">{missions.map((mission) => <ResourceRow key={mission.id}><Link to="/agentic" className="block"><div className="flex flex-wrap items-center justify-between gap-2"><p className="font-medium text-neutral-900 dark:text-white">{mission.objective}</p><span className="rounded-full bg-neutral-100 px-2 py-1 text-[10px] font-medium dark:bg-neutral-800">{mission.state}</span></div><p className="mt-1 text-xs text-neutral-500">{mission.id} · {mission.plan?.length ?? 0} passos · {mission.artifacts?.length ?? 0} artifacts · {mission.model || "modelo padrão"}</p></Link></ResourceRow>)}</div> : <EmptyState message="As missões criadas no Agentic Console aparecerão aqui com timeline e artifacts." action="Nova tarefa" onAction={() => window.location.assign("/agentic")} />;
@@ -204,7 +249,7 @@ export function ProductWorkspacePage({ kind }: { kind: ProductPageKind }) {
 				<div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="text-sm font-semibold text-neutral-900 dark:text-white">Registrar connector seguro</h3><p className="mt-1 max-w-2xl text-xs leading-5 text-neutral-600 dark:text-neutral-300">Cadastre endpoint, operações e referências de credencial. O valor do token nunca é aceito nesta tela; use uma variável de ambiente do servidor ou o identificador de um OAuth já autorizado.</p></div><span className="rounded-full bg-white px-2.5 py-1 text-[10px] text-violet-700 dark:bg-neutral-900 dark:text-violet-300">owner/admin</span></div>
 				<div className="mt-4 grid gap-3 md:grid-cols-2"><label className="text-xs text-neutral-600 dark:text-neutral-300">ID<input value={newConnectorID} onChange={(event) => setNewConnectorID(event.target.value)} placeholder="github-prod" className="mt-1 h-10 w-full rounded-xl border border-neutral-300 bg-white px-3 text-sm dark:border-neutral-700 dark:bg-neutral-900" /></label><label className="text-xs text-neutral-600 dark:text-neutral-300">Provider<input value={newConnectorProvider} onChange={(event) => setNewConnectorProvider(event.target.value)} placeholder="GitHub" className="mt-1 h-10 w-full rounded-xl border border-neutral-300 bg-white px-3 text-sm dark:border-neutral-700 dark:bg-neutral-900" /></label><label className="text-xs text-neutral-600 dark:text-neutral-300 md:col-span-2">Base URL HTTPS<input value={newConnectorBaseURL} onChange={(event) => setNewConnectorBaseURL(event.target.value)} placeholder="https://api.example.com" className="mt-1 h-10 w-full rounded-xl border border-neutral-300 bg-white px-3 text-sm dark:border-neutral-700 dark:bg-neutral-900" /></label><label className="text-xs text-neutral-600 dark:text-neutral-300">Nome da variável de token (opcional)<input value={newConnectorTokenEnv} onChange={(event) => setNewConnectorTokenEnv(event.target.value)} placeholder="OLLAMA_GITHUB_TOKEN" className="mt-1 h-10 w-full rounded-xl border border-neutral-300 bg-white px-3 text-sm dark:border-neutral-700 dark:bg-neutral-900" /></label><label className="text-xs text-neutral-600 dark:text-neutral-300">ID do provider OAuth (opcional)<input value={newConnectorOAuthProvider} onChange={(event) => setNewConnectorOAuthProvider(event.target.value)} placeholder="github" className="mt-1 h-10 w-full rounded-xl border border-neutral-300 bg-white px-3 text-sm dark:border-neutral-700 dark:bg-neutral-900" /></label><label className="text-xs text-neutral-600 dark:text-neutral-300">Métodos permitidos<input value={newConnectorMethods} onChange={(event) => setNewConnectorMethods(event.target.value)} placeholder="GET,POST" className="mt-1 h-10 w-full rounded-xl border border-neutral-300 bg-white px-3 text-sm dark:border-neutral-700 dark:bg-neutral-900" /></label><label className="text-xs text-neutral-600 dark:text-neutral-300">Prefixo de caminho<input value={newConnectorPathPrefix} onChange={(event) => setNewConnectorPathPrefix(event.target.value)} placeholder="/v1" className="mt-1 h-10 w-full rounded-xl border border-neutral-300 bg-white px-3 text-sm dark:border-neutral-700 dark:bg-neutral-900" /></label></div>
 				<button type="button" onClick={() => void createNewConnector()} disabled={!newConnectorID.trim() || !newConnectorProvider.trim() || !newConnectorBaseURL.trim()} className="mt-4 rounded-xl bg-violet-700 px-4 py-2.5 text-xs font-medium text-white disabled:cursor-not-allowed disabled:opacity-40">Registrar no tenant atual</button>
-			</section><section>
+				</section><section className="rounded-2xl border border-neutral-200/80 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900"><div><h3 className="text-sm font-semibold text-neutral-900 dark:text-white">Registrar MCP e skills</h3><p className="mt-1 text-xs leading-5 text-neutral-500 dark:text-neutral-400">O cadastro grava somente manifestos. MCP local usa executável absoluto validado; Remote MCP usa HTTPS/SSRF/DNS pinning; skills começam não confiáveis. Não cole tokens nesta tela.</p></div><div className="mt-4 grid gap-4 lg:grid-cols-3"><div className="rounded-xl border border-neutral-200 p-3 dark:border-neutral-700"><p className="text-xs font-medium text-neutral-700 dark:text-neutral-200">MCP stdio</p><input value={newMCPID} onChange={(event) => setNewMCPID(event.target.value)} placeholder="ID" className="mt-2 h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-2 text-xs dark:border-neutral-700" /><input value={newMCPCommand} onChange={(event) => setNewMCPCommand(event.target.value)} placeholder="/absolute/path/executable" className="mt-2 h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-2 text-xs dark:border-neutral-700" /><input value={newMCPMethods} onChange={(event) => setNewMCPMethods(event.target.value)} placeholder="tools/list,tools/call" className="mt-2 h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-2 text-xs dark:border-neutral-700" /><button type="button" onClick={() => void createNewMCP()} disabled={!newMCPID.trim() || !newMCPCommand.trim()} className="mt-3 rounded-lg bg-neutral-900 px-3 py-2 text-[10px] text-white disabled:opacity-40 dark:bg-white dark:text-neutral-900">Registrar MCP local</button></div><div className="rounded-xl border border-neutral-200 p-3 dark:border-neutral-700"><p className="text-xs font-medium text-neutral-700 dark:text-neutral-200">Remote MCP</p><input value={newRemoteMCPID} onChange={(event) => setNewRemoteMCPID(event.target.value)} placeholder="ID" className="mt-2 h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-2 text-xs dark:border-neutral-700" /><input value={newRemoteMCPURL} onChange={(event) => setNewRemoteMCPURL(event.target.value)} placeholder="https://mcp.example.com" className="mt-2 h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-2 text-xs dark:border-neutral-700" /><input value={newRemoteMCPTokenEnv} onChange={(event) => setNewRemoteMCPTokenEnv(event.target.value)} placeholder="TOKEN_ENV (opcional)" className="mt-2 h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-2 text-xs dark:border-neutral-700" /><input value={newRemoteMCPMethods} onChange={(event) => setNewRemoteMCPMethods(event.target.value)} placeholder="tools/list" className="mt-2 h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-2 text-xs dark:border-neutral-700" /><button type="button" onClick={() => void createNewRemoteMCP()} disabled={!newRemoteMCPID.trim() || !newRemoteMCPURL.trim()} className="mt-3 rounded-lg bg-neutral-900 px-3 py-2 text-[10px] text-white disabled:opacity-40 dark:bg-white dark:text-neutral-900">Registrar Remote MCP</button></div><div className="rounded-xl border border-neutral-200 p-3 dark:border-neutral-700"><p className="text-xs font-medium text-neutral-700 dark:text-neutral-200">Skill manifest</p><input value={newSkillID} onChange={(event) => setNewSkillID(event.target.value)} placeholder="ID" className="mt-2 h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-2 text-xs dark:border-neutral-700" /><input value={newSkillVersion} onChange={(event) => setNewSkillVersion(event.target.value)} placeholder="Versão" className="mt-2 h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-2 text-xs dark:border-neutral-700" /><input value={newSkillDescription} onChange={(event) => setNewSkillDescription(event.target.value)} placeholder="Descrição" className="mt-2 h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-2 text-xs dark:border-neutral-700" /><input value={newSkillScopes} onChange={(event) => setNewSkillScopes(event.target.value)} placeholder="Scopes separados por vírgula" className="mt-2 h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-2 text-xs dark:border-neutral-700" /><input value={newSkillTools} onChange={(event) => setNewSkillTools(event.target.value)} placeholder="Tools separados por vírgula" className="mt-2 h-9 w-full rounded-lg border border-neutral-300 bg-transparent px-2 text-xs dark:border-neutral-700" /><button type="button" onClick={() => void createNewSkill()} disabled={!newSkillID.trim() || !newSkillVersion.trim()} className="mt-3 rounded-lg bg-neutral-900 px-3 py-2 text-[10px] text-white disabled:opacity-40 dark:bg-white dark:text-neutral-900">Registrar skill</button></div></div></section><section>
 			<div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
 				<div><h3 className="text-sm font-semibold text-neutral-900 dark:text-white">Aplicativos e conectores</h3><p className="mt-1 text-xs leading-5 text-neutral-500 dark:text-neutral-400">Catálogo amplo de apps, APIs e MCPs. O botão de configuração nunca inventa uma conexão: cada provider exige OAuth, API key ou homologação própria.</p></div><span className="rounded-full bg-neutral-100 px-2.5 py-1 text-[10px] text-neutral-500 dark:bg-neutral-800 dark:text-neutral-300">{connectorCatalog.length} disponíveis no catálogo</span>
 			</div>

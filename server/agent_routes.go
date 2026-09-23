@@ -151,11 +151,11 @@ func newDefaultAgentRuntime() (*agent.Runtime, error) {
 	if err != nil {
 		return nil, err
 	}
-	mcp, err := loadAgentMCP()
+	mcp, err := loadAgentMCP(storeRoot)
 	if err != nil {
 		return nil, err
 	}
-	remoteMCP, err := loadAgentRemoteMCP()
+	remoteMCP, err := loadAgentRemoteMCP(storeRoot)
 	if err != nil {
 		return nil, err
 	}
@@ -255,10 +255,17 @@ func loadAgentMedia() (*agent.MediaManager, error) {
 	})
 }
 
-func loadAgentMCP() (*agent.MCPManager, error) {
+func loadAgentMCP(storeRoots ...string) (*agent.MCPManager, error) {
+	storeRoot := ""
+	if len(storeRoots) > 0 {
+		storeRoot = strings.TrimSpace(storeRoots[0])
+	}
 	configPath := strings.TrimSpace(os.Getenv("OLLAMA_AGENT_MCP"))
 	if configPath == "" {
-		return nil, nil
+		if storeRoot == "" {
+			return nil, nil
+		}
+		return agent.NewPersistentMCPManager(filepath.Join(storeRoot, "mcp.json"))
 	}
 	data, err := os.ReadFile(configPath)
 	if err != nil {
@@ -277,10 +284,17 @@ func loadAgentMCP() (*agent.MCPManager, error) {
 	return manager, nil
 }
 
-func loadAgentRemoteMCP() (*agent.RemoteMCPManager, error) {
+func loadAgentRemoteMCP(storeRoots ...string) (*agent.RemoteMCPManager, error) {
+	storeRoot := ""
+	if len(storeRoots) > 0 {
+		storeRoot = strings.TrimSpace(storeRoots[0])
+	}
 	configPath := strings.TrimSpace(os.Getenv("OLLAMA_AGENT_REMOTE_MCP"))
 	if configPath == "" {
-		return nil, nil
+		if storeRoot == "" {
+			return nil, nil
+		}
+		return agent.NewPersistentRemoteMCPManager(filepath.Join(storeRoot, "remote-mcp.json"))
 	}
 	data, err := os.ReadFile(configPath)
 	if err != nil {
@@ -378,15 +392,18 @@ func (a *agentAPI) register(r *gin.Engine) {
 	group.POST("/connectors/:id/disable", a.disableConnector)
 	group.DELETE("/connectors/:id", a.removeConnector)
 	group.GET("/mcp", a.mcp)
+	group.POST("/mcp", a.registerMCP)
 	group.POST("/mcp/:id/enable", a.enableMCP)
 	group.POST("/mcp/:id/disable", a.disableMCP)
 	group.DELETE("/mcp/:id", a.removeMCP)
 	group.POST("/remote-mcp/:id/enable", a.enableRemoteMCP)
 	group.POST("/remote-mcp/:id/disable", a.disableRemoteMCP)
 	group.DELETE("/remote-mcp/:id", a.removeRemoteMCP)
+	group.POST("/remote-mcp", a.registerRemoteMCP)
 	group.GET("/jobs", a.jobs)
 	group.POST("/jobs/:id/replay", a.replayJob)
 	group.GET("/skills", a.skills)
+	group.POST("/skills", a.registerSkill)
 	group.POST("/skills/:id/enable", a.enableSkill)
 	group.POST("/skills/:id/disable", a.disableSkill)
 	group.DELETE("/skills/:id", a.removeSkill)

@@ -17,13 +17,14 @@ import (
 )
 
 type ContextStore struct {
-	mu        sync.RWMutex
-	root      string
-	projects  map[string]Project
-	memories  map[string][]Memory
-	skills    map[string]SkillManifest
-	schedules map[string]Schedule
-	embedder  Embedder
+	mu         sync.RWMutex
+	root       string
+	projects   map[string]Project
+	memories   map[string][]Memory
+	skills     map[string]SkillManifest
+	skillPaths map[string]string
+	schedules  map[string]Schedule
+	embedder   Embedder
 }
 
 type Embedder interface {
@@ -32,7 +33,7 @@ type Embedder interface {
 
 func NewContextStore(root string) (*ContextStore, error) {
 	if strings.TrimSpace(root) == "" {
-		return &ContextStore{projects: map[string]Project{}, memories: map[string][]Memory{}, skills: map[string]SkillManifest{}, schedules: map[string]Schedule{}}, nil
+		return &ContextStore{projects: map[string]Project{}, memories: map[string][]Memory{}, skills: map[string]SkillManifest{}, skillPaths: map[string]string{}, schedules: map[string]Schedule{}}, nil
 	}
 	if err := os.MkdirAll(filepath.Join(root, "projects"), 0o700); err != nil {
 		return nil, err
@@ -43,7 +44,10 @@ func NewContextStore(root string) (*ContextStore, error) {
 	if err := os.MkdirAll(filepath.Join(root, "schedules"), 0o700); err != nil {
 		return nil, err
 	}
-	store := &ContextStore{root: root, projects: map[string]Project{}, memories: map[string][]Memory{}, skills: map[string]SkillManifest{}, schedules: map[string]Schedule{}}
+	if err := os.MkdirAll(filepath.Join(root, "skills"), 0o700); err != nil {
+		return nil, err
+	}
+	store := &ContextStore{root: root, projects: map[string]Project{}, memories: map[string][]Memory{}, skills: map[string]SkillManifest{}, skillPaths: map[string]string{}, schedules: map[string]Schedule{}}
 	projectEntries, err := os.ReadDir(filepath.Join(root, "projects"))
 	if err != nil {
 		return nil, err
@@ -86,6 +90,25 @@ func NewContextStore(root string) (*ContextStore, error) {
 			return nil, err
 		}
 		store.schedules[schedule.ID] = schedule
+	}
+	skillEntries, err := os.ReadDir(filepath.Join(root, "skills"))
+	if err != nil {
+		return nil, err
+	}
+	for _, entry := range skillEntries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
+			continue
+		}
+		var manifest SkillManifest
+		if err := readJSON(filepath.Join(root, "skills", entry.Name()), &manifest); err != nil {
+			return nil, err
+		}
+		if err := validateSkillManifest(&manifest); err != nil {
+			return nil, fmt.Errorf("skill %s: %w", entry.Name(), err)
+		}
+		manifest.Trusted = false
+		store.skills[manifest.ID] = manifest
+		store.skillPaths[manifest.ID] = filepath.Join(root, "skills", entry.Name())
 	}
 	return store, nil
 }
@@ -355,6 +378,94 @@ func (s *ContextStore) LoadSkillsForOrganization(dir, organizationID string) err
 	return nil
 }
 
+func validateSkillManifest(manifest *SkillManifest) error {
+	manifest.ID = strings.TrimSpace(manifest.ID)
+	manifest.Version = strings.TrimSpace(manifest.Version)
+	manifest.OrganizationID = strings.TrimSpace(manifest.OrganizationID)
+	manifest.Description = strings.TrimSpace(manifest.Description)
+	if manifest.ID == "" || manifest.Version == "" {
+		return errors.New("skill id and version are required")
+	}
+	if len(manifest.ID) > 120 || strings.ContainsAny(manifest.ID, "/\\\x00\r\n") {
+		return errors.New("skill id is invalid")
+	}
+	if len(manifest.Version) > 64 || len(manifest.Description) > 4000 {
+		return errors.New("skill manifest field is too long")
+	}
+	return nil
+}
+
+func (s *ContextStore) RegisterSkill(manifest SkillManifest) error {
+	return s.registerSkill(manifest, "")
+}
+
+func (s *ContextStore) RegisterSkillForOrganization(organizationID string, manifest SkillManifest) error {
+	organizationID = strings.TrimSpace(organizationID)
+	if organizationID == "" {
+		return errors.New("skill organization scope is required")
+	}
+	if supplied := strings.TrimSpace(manifest.OrganizationID); supplied != "" && supplied != organizationID {
+		return ErrPluginOrganizationScope
+	}
+	manifest.OrganizationID = organizationID
+	return s.registerSkill(manifest, organizationID)
+}
+
+func (s *ContextStore) registerSkill(manifest SkillManifest, organizationID string) error {
+	manifest.Trusted = false
+	manifest.Enabled = true
+	if err := validateSkillManifest(&manifest); err != nil {
+		return err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if organizationID != "" {
+		if existing, ok := s.skills[manifest.ID]; ok && !pluginOwnedByOrganization(existing.OrganizationID, organizationID) {
+			return ErrPluginOrganizationScope
+		}
+	}
+	if s.skillPaths == nil {
+		s.skillPaths = map[string]string{}
+	}
+	path := s.skillPaths[manifest.ID]
+	if path == "" && s.root != "" {
+		path = filepath.Join(s.root, "skills", manifest.ID+".json")
+		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+			return err
+		}
+	}
+	previous, existed := s.skills[manifest.ID]
+	previousPath := s.skillPaths[manifest.ID]
+	s.skills[manifest.ID] = manifest
+	if path != "" {
+		s.skillPaths[manifest.ID] = path
+		if err := writeJSONAtomic(path, manifest); err != nil {
+			if existed {
+				s.skills[manifest.ID] = previous
+			} else {
+				delete(s.skills, manifest.ID)
+			}
+			if previousPath != "" {
+				s.skillPaths[manifest.ID] = previousPath
+			} else {
+				delete(s.skillPaths, manifest.ID)
+			}
+			return fmt.Errorf("persist skill manifest: %w", err)
+		}
+	}
+	return nil
+}
+
+func (s *ContextStore) persistSkillLocked(id string) error {
+	path := s.skillPaths[id]
+	if path == "" {
+		return nil
+	}
+	manifest := s.skills[id]
+	manifest.Trusted = false
+	return writeJSONAtomic(path, manifest)
+}
+
 func (s *ContextStore) Skills() []SkillManifest {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -391,6 +502,11 @@ func (s *ContextStore) SetSkillEnabled(id string, enabled bool) error {
 	}
 	skill.Enabled = enabled
 	s.skills[id] = skill
+	if err := s.persistSkillLocked(id); err != nil {
+		skill.Enabled = !skill.Enabled
+		s.skills[id] = skill
+		return fmt.Errorf("persist skill manifest: %w", err)
+	}
 	return nil
 }
 
@@ -407,6 +523,11 @@ func (s *ContextStore) SetSkillEnabledForOrganization(organizationID, id string,
 	}
 	skill.Enabled = enabled
 	s.skills[id] = skill
+	if err := s.persistSkillLocked(id); err != nil {
+		skill.Enabled = !skill.Enabled
+		s.skills[id] = skill
+		return fmt.Errorf("persist skill manifest: %w", err)
+	}
 	return nil
 }
 
@@ -414,10 +535,20 @@ func (s *ContextStore) RemoveSkill(id string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	id = strings.TrimSpace(id)
-	if _, ok := s.skills[id]; !ok {
+	skill, ok := s.skills[id]
+	if !ok {
 		return fmt.Errorf("skill %q is not registered", id)
 	}
 	delete(s.skills, id)
+	path := s.skillPaths[id]
+	delete(s.skillPaths, id)
+	if path != "" {
+		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+			s.skills[id] = skill
+			s.skillPaths[id] = path
+			return fmt.Errorf("remove skill manifest: %w", err)
+		}
+	}
 	return nil
 }
 
@@ -433,6 +564,15 @@ func (s *ContextStore) RemoveSkillForOrganization(organizationID, id string) err
 		return ErrPluginOrganizationScope
 	}
 	delete(s.skills, id)
+	path := s.skillPaths[id]
+	delete(s.skillPaths, id)
+	if path != "" {
+		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+			s.skills[id] = skill
+			s.skillPaths[id] = path
+			return fmt.Errorf("remove skill manifest: %w", err)
+		}
+	}
 	return nil
 }
 

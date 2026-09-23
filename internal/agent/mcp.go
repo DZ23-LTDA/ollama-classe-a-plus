@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -29,15 +30,60 @@ type MCPServerConfig struct {
 }
 
 type MCPManager struct {
-	mu      sync.RWMutex
-	servers map[string]*MCPServer
+	mu          sync.RWMutex
+	servers     map[string]*MCPServer
+	persistPath string
 }
 
 func NewMCPManager() *MCPManager {
 	return &MCPManager{servers: make(map[string]*MCPServer)}
 }
 
+func NewPersistentMCPManager(manifestPath string) (*MCPManager, error) {
+	manifestPath = strings.TrimSpace(manifestPath)
+	manager := NewMCPManager()
+	if manifestPath == "" {
+		return manager, nil
+	}
+	data, err := os.ReadFile(manifestPath)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return nil, err
+	}
+	if err == nil && len(strings.TrimSpace(string(data))) > 0 {
+		decoder := json.NewDecoder(bytes.NewReader(data))
+		decoder.DisallowUnknownFields()
+		var configs []MCPServerConfig
+		if err := decoder.Decode(&configs); err != nil {
+			return nil, fmt.Errorf("decode MCP manifest: %w", err)
+		}
+		for _, config := range configs {
+			if err := manager.Register(config); err != nil {
+				return nil, fmt.Errorf("load MCP server %q: %w", config.ID, err)
+			}
+		}
+	}
+	manager.persistPath = manifestPath
+	return manager, nil
+}
+
 func (m *MCPManager) Register(config MCPServerConfig) error {
+	return m.register(config, "")
+}
+
+func (m *MCPManager) RegisterForOrganization(organizationID string, config MCPServerConfig) error {
+	organizationID = strings.TrimSpace(organizationID)
+	if organizationID == "" {
+		return errors.New("MCP organization scope is required")
+	}
+	if supplied := strings.TrimSpace(config.OrganizationID); supplied != "" && supplied != organizationID {
+		return ErrPluginOrganizationScope
+	}
+	config.OrganizationID = organizationID
+	return m.register(config, organizationID)
+}
+
+func (m *MCPManager) register(config MCPServerConfig, organizationID string) error {
+	config.OrganizationID = strings.TrimSpace(config.OrganizationID)
 	if strings.TrimSpace(config.ID) == "" || strings.TrimSpace(config.Command) == "" {
 		return errors.New("MCP server id and command are required")
 	}
@@ -88,11 +134,45 @@ func (m *MCPManager) Register(config MCPServerConfig) error {
 	config.WorkingDirectory = workingDirectory.path
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if old := m.servers[config.ID]; old != nil {
+	if organizationID != "" {
+		if existing := m.servers[config.ID]; existing != nil && !pluginOwnedByOrganization(existing.config.OrganizationID, organizationID) {
+			return ErrPluginOrganizationScope
+		}
+	}
+	old := m.servers[config.ID]
+	if old != nil {
 		_ = old.Stop()
 	}
 	m.servers[config.ID] = &MCPServer{config: config, allowedMethods: allowed, cleanupDirectory: workingDirectory.cleanup}
+	if err := m.persistLocked(); err != nil {
+		delete(m.servers, config.ID)
+		if old != nil {
+			m.servers[config.ID] = old
+		}
+		return fmt.Errorf("persist MCP manifest: %w", err)
+	}
 	return nil
+}
+
+func (m *MCPManager) persistLocked() error {
+	if strings.TrimSpace(m.persistPath) == "" {
+		return nil
+	}
+	configs := make([]MCPServerConfig, 0, len(m.servers))
+	for _, server := range m.servers {
+		config := server.config
+		if server.cleanupDirectory {
+			config.WorkingDirectory = ""
+		}
+		config.Args = append([]string(nil), config.Args...)
+		config.EnvironmentVars = append([]string(nil), config.EnvironmentVars...)
+		configs = append(configs, config)
+	}
+	sort.Slice(configs, func(i, j int) bool { return configs[i].ID < configs[j].ID })
+	if err := os.MkdirAll(filepath.Dir(m.persistPath), 0o700); err != nil {
+		return err
+	}
+	return writeJSONAtomic(m.persistPath, configs)
 }
 
 func (m *MCPManager) StopAll() {
@@ -143,6 +223,10 @@ func (m *MCPManager) SetEnabled(id string, enabled bool) error {
 	if !enabled {
 		_ = server.Stop()
 	}
+	if err := m.persistLocked(); err != nil {
+		server.config.Disabled = !server.config.Disabled
+		return fmt.Errorf("persist MCP manifest: %w", err)
+	}
 	return nil
 }
 
@@ -160,6 +244,10 @@ func (m *MCPManager) SetEnabledForOrganization(organizationID, id string, enable
 	if !enabled {
 		_ = server.Stop()
 	}
+	if err := m.persistLocked(); err != nil {
+		server.config.Disabled = !server.config.Disabled
+		return fmt.Errorf("persist MCP manifest: %w", err)
+	}
 	return nil
 }
 
@@ -173,6 +261,10 @@ func (m *MCPManager) Remove(id string) error {
 	}
 	_ = server.Stop()
 	delete(m.servers, id)
+	if err := m.persistLocked(); err != nil {
+		m.servers[id] = server
+		return fmt.Errorf("persist MCP manifest: %w", err)
+	}
 	return nil
 }
 
@@ -189,6 +281,10 @@ func (m *MCPManager) RemoveForOrganization(organizationID, id string) error {
 	}
 	_ = server.Stop()
 	delete(m.servers, id)
+	if err := m.persistLocked(); err != nil {
+		m.servers[id] = server
+		return fmt.Errorf("persist MCP manifest: %w", err)
+	}
 	return nil
 }
 

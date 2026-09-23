@@ -12,6 +12,8 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -36,10 +38,11 @@ type RemoteMCPServerConfig struct {
 }
 
 type RemoteMCPManager struct {
-	mu      sync.RWMutex
-	client  *http.Client
-	servers map[string]RemoteMCPServerConfig
-	nextID  int64
+	mu          sync.RWMutex
+	client      *http.Client
+	servers     map[string]RemoteMCPServerConfig
+	nextID      int64
+	persistPath string
 }
 
 func NewRemoteMCPManager() *RemoteMCPManager {
@@ -68,8 +71,52 @@ func NewRemoteMCPManager() *RemoteMCPManager {
 	}
 }
 
+func NewPersistentRemoteMCPManager(manifestPath string) (*RemoteMCPManager, error) {
+	manifestPath = strings.TrimSpace(manifestPath)
+	manager := NewRemoteMCPManager()
+	if manifestPath == "" {
+		return manager, nil
+	}
+	data, err := os.ReadFile(manifestPath)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return nil, err
+	}
+	if err == nil && len(strings.TrimSpace(string(data))) > 0 {
+		decoder := json.NewDecoder(bytes.NewReader(data))
+		decoder.DisallowUnknownFields()
+		var configs []RemoteMCPServerConfig
+		if err := decoder.Decode(&configs); err != nil {
+			return nil, fmt.Errorf("decode remote MCP manifest: %w", err)
+		}
+		for _, config := range configs {
+			if err := manager.Register(config); err != nil {
+				return nil, fmt.Errorf("load remote MCP server %q: %w", config.ID, err)
+			}
+		}
+	}
+	manager.persistPath = manifestPath
+	return manager, nil
+}
+
 func (m *RemoteMCPManager) Register(config RemoteMCPServerConfig) error {
+	return m.register(config, "")
+}
+
+func (m *RemoteMCPManager) RegisterForOrganization(organizationID string, config RemoteMCPServerConfig) error {
+	organizationID = strings.TrimSpace(organizationID)
+	if organizationID == "" {
+		return errors.New("remote MCP organization scope is required")
+	}
+	if supplied := strings.TrimSpace(config.OrganizationID); supplied != "" && supplied != organizationID {
+		return ErrPluginOrganizationScope
+	}
+	config.OrganizationID = organizationID
+	return m.register(config, organizationID)
+}
+
+func (m *RemoteMCPManager) register(config RemoteMCPServerConfig, organizationID string) error {
 	config.ID = strings.TrimSpace(config.ID)
+	config.OrganizationID = strings.TrimSpace(config.OrganizationID)
 	config.URL = strings.TrimSpace(config.URL)
 	if config.ID == "" || config.URL == "" {
 		return errors.New("remote MCP id and url are required")
@@ -114,8 +161,39 @@ func (m *RemoteMCPManager) Register(config RemoteMCPServerConfig) error {
 	config.AllowedMethods = allowed
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if organizationID != "" {
+		if existing, ok := m.servers[config.ID]; ok && !pluginOwnedByOrganization(existing.OrganizationID, organizationID) {
+			return ErrPluginOrganizationScope
+		}
+	}
+	previous, existed := m.servers[config.ID]
 	m.servers[config.ID] = config
+	if err := m.persistLocked(); err != nil {
+		if existed {
+			m.servers[config.ID] = previous
+		} else {
+			delete(m.servers, config.ID)
+		}
+		return fmt.Errorf("persist remote MCP manifest: %w", err)
+	}
 	return nil
+}
+
+func (m *RemoteMCPManager) persistLocked() error {
+	if strings.TrimSpace(m.persistPath) == "" {
+		return nil
+	}
+	configs := make([]RemoteMCPServerConfig, 0, len(m.servers))
+	for _, config := range m.servers {
+		config.HeadersEnv = mapsClone(config.HeadersEnv)
+		config.AllowedMethods = append([]string(nil), config.AllowedMethods...)
+		configs = append(configs, config)
+	}
+	sort.Slice(configs, func(i, j int) bool { return configs[i].ID < configs[j].ID })
+	if err := os.MkdirAll(filepath.Dir(m.persistPath), 0o700); err != nil {
+		return err
+	}
+	return writeJSONAtomic(m.persistPath, configs)
 }
 
 func remoteMCPLoopback(host string) bool {
@@ -302,6 +380,11 @@ func (m *RemoteMCPManager) SetEnabled(id string, enabled bool) error {
 	}
 	config.Disabled = !enabled
 	m.servers[id] = config
+	if err := m.persistLocked(); err != nil {
+		config.Disabled = !config.Disabled
+		m.servers[id] = config
+		return fmt.Errorf("persist remote MCP manifest: %w", err)
+	}
 	return nil
 }
 
@@ -318,6 +401,11 @@ func (m *RemoteMCPManager) SetEnabledForOrganization(organizationID, id string, 
 	}
 	config.Disabled = !enabled
 	m.servers[id] = config
+	if err := m.persistLocked(); err != nil {
+		config.Disabled = !config.Disabled
+		m.servers[id] = config
+		return fmt.Errorf("persist remote MCP manifest: %w", err)
+	}
 	return nil
 }
 
@@ -325,10 +413,15 @@ func (m *RemoteMCPManager) Remove(id string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	id = strings.TrimSpace(id)
-	if _, ok := m.servers[id]; !ok {
+	config, ok := m.servers[id]
+	if !ok {
 		return fmt.Errorf("remote MCP server %q is not registered", id)
 	}
 	delete(m.servers, id)
+	if err := m.persistLocked(); err != nil {
+		m.servers[id] = config
+		return fmt.Errorf("persist remote MCP manifest: %w", err)
+	}
 	return nil
 }
 
@@ -344,6 +437,10 @@ func (m *RemoteMCPManager) RemoveForOrganization(organizationID, id string) erro
 		return ErrPluginOrganizationScope
 	}
 	delete(m.servers, id)
+	if err := m.persistLocked(); err != nil {
+		m.servers[id] = config
+		return fmt.Errorf("persist remote MCP manifest: %w", err)
+	}
 	return nil
 }
 
