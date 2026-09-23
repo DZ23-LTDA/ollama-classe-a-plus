@@ -354,7 +354,11 @@ func (m *MediaManager) materializeEntry(ctx context.Context, workspace, prefix, 
 		if err != nil {
 			return "", "", err
 		}
-		response, err := m.client().Do(request)
+		downloadClient, err := pinnedClient(ctx, m.client(), rawURL)
+		if err != nil {
+			return "", "", err
+		}
+		response, err := downloadClient.Do(request)
 		if err != nil {
 			return "", "", err
 		}

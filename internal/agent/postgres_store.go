@@ -159,21 +159,30 @@ func (s *PostgresStore) ListMissions() ([]Mission, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	var missions []Mission
+	// Drain every id before issuing per-mission queries: database/sql runs a
+	// transaction on a single connection, so calling getMissionTx while these
+	// rows are still open fails with "conn busy: another query is running".
+	var ids []string
 	for rows.Next() {
 		var id string
 		if err := rows.Scan(&id); err != nil {
+			rows.Close()
 			return nil, err
 		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return nil, err
+	}
+	rows.Close()
+	var missions []Mission
+	for _, id := range ids {
 		mission, err := s.getMissionTx(tx, id)
 		if err != nil {
 			return nil, err
 		}
 		missions = append(missions, mission)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, err

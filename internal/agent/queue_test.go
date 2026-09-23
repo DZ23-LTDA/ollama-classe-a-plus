@@ -28,7 +28,7 @@ func TestJobQueueRetriesDeadLettersAndReplays(t *testing.T) {
 	retry := queue.jobs[job.ID]
 	retry.AvailableAt = time.Now().UTC()
 	queue.jobs[job.ID] = retry
-	_ = queue.persistLocked(retry, false)
+	_ = queue.persistLocked(retry)
 	queue.mu.Unlock()
 	claimed, ok, err = queue.Claim("worker-2", time.Now().UTC())
 	if err != nil || !ok {

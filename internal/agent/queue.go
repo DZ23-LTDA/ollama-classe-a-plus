@@ -86,7 +86,7 @@ func (q *JobQueue) Enqueue(missionID string, maxAttempts int) (QueueJob, error) 
 	job := QueueJob{ID: "job_" + uuid.NewString(), MissionID: missionID, Status: QueuePending, MaxAttempts: maxAttempts, AvailableAt: now, CreatedAt: now, UpdatedAt: now}
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	if err := q.persistLocked(job, true); err != nil {
+	if err := q.persistLocked(job); err != nil {
 		return QueueJob{}, err
 	}
 	q.signal()
@@ -119,7 +119,7 @@ func (q *JobQueue) Claim(workerID string, now time.Time) (QueueJob, bool, error)
 	locked := now
 	candidate.LockedAt = &locked
 	candidate.UpdatedAt = now
-	if err := q.persistLocked(candidate, false); err != nil {
+	if err := q.persistLocked(candidate); err != nil {
 		return QueueJob{}, false, err
 	}
 	return candidate, true, nil
@@ -135,7 +135,7 @@ func (q *JobQueue) Ack(jobID string) error {
 	job.Status = QueueSucceeded
 	job.WorkerID = ""
 	job.UpdatedAt = time.Now().UTC()
-	return q.persistLocked(job, false)
+	return q.persistLocked(job)
 }
 
 func (q *JobQueue) Nack(jobID string, runErr error) (QueueJob, error) {
@@ -153,7 +153,7 @@ func (q *JobQueue) Nack(jobID string, runErr error) (QueueJob, error) {
 	job.UpdatedAt = time.Now().UTC()
 	if job.Attempts >= job.MaxAttempts {
 		job.Status = QueueDeadLetter
-		return job, q.persistLocked(job, false)
+		return job, q.persistLocked(job)
 	}
 	job.Status = QueuePending
 	backoff := time.Duration(1<<(job.Attempts-1)) * time.Second
@@ -161,7 +161,7 @@ func (q *JobQueue) Nack(jobID string, runErr error) (QueueJob, error) {
 		backoff = 5 * time.Minute
 	}
 	job.AvailableAt = time.Now().UTC().Add(backoff)
-	return job, q.persistLocked(job, false)
+	return job, q.persistLocked(job)
 }
 
 func (q *JobQueue) Replay(jobID string) (QueueJob, error) {
@@ -181,7 +181,7 @@ func (q *JobQueue) Replay(jobID string) (QueueJob, error) {
 	job.LockedAt = nil
 	job.AvailableAt = time.Now().UTC()
 	job.UpdatedAt = time.Now().UTC()
-	if err := q.persistLocked(job, false); err != nil {
+	if err := q.persistLocked(job); err != nil {
 		return QueueJob{}, err
 	}
 	q.signal()
@@ -236,12 +236,8 @@ func (q *JobQueue) Start(ctx context.Context, workerID string, handler func(cont
 	}()
 }
 
-func (q *JobQueue) persistLocked(job QueueJob, add bool) error {
-	if add {
-		q.jobs[job.ID] = job
-	} else {
-		q.jobs[job.ID] = job
-	}
+func (q *JobQueue) persistLocked(job QueueJob) error {
+	q.jobs[job.ID] = job
 	if q.root == "" {
 		return nil
 	}

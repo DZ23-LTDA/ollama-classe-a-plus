@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	goruntime "runtime"
 	"strings"
 	"testing"
 	"time"
@@ -146,6 +147,12 @@ func TestContextStorePersistsProjectAndMemory(t *testing.T) {
 }
 
 func TestSandboxExecRunsIsolatedPython(t *testing.T) {
+	if goruntime.GOOS != "linux" {
+		t.Skip("sandbox.exec relies on Linux user namespaces (unshare); skipping on " + goruntime.GOOS)
+	}
+	if _, err := os.Stat("/usr/bin/python3"); err != nil {
+		t.Skip("python3 interpreter is unavailable; skipping sandbox test")
+	}
 	root := t.TempDir()
 	runtime, err := NewRuntime(RuntimeConfig{Store: NewMemoryStore(), WorkspaceRoot: root, Planner: fixedPlanner{steps: []Step{{ID: "step_1", Kind: "sandbox.exec", Title: "run", Risk: RiskWrite, RequiresApproval: true, State: StepPending, Input: map[string]any{"language": "python", "code": "print(2 + 2)"}}}}})
 	if err != nil {
@@ -192,6 +199,9 @@ func TestScheduleClaimIsIdempotent(t *testing.T) {
 }
 
 func TestBrowserOperatorNavigateAndSnapshot(t *testing.T) {
+	if _, err := os.Stat("/usr/bin/python3"); err != nil {
+		t.Skip("browser operator requires /usr/bin/python3 (Playwright helper); skipping")
+	}
 	t.Setenv("OLLAMA_AGENT_BROWSER_ALLOW_PRIVATE", "1")
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/html")

@@ -151,7 +151,16 @@ func (e *ResearchEngine) fetch(ctx context.Context, rawURL string, maxBytes int6
 		return result
 	}
 	request.Header.Set("User-Agent", "ollama-dz23-research/1")
-	response, err := e.client().Do(request)
+	fetchClient := e.client()
+	if !(e.AllowHTTPForTests && parsed.Scheme == "http") {
+		pinned, err := pinnedClient(ctx, fetchClient, rawURL)
+		if err != nil {
+			result.Error = err.Error()
+			return result
+		}
+		fetchClient = pinned
+	}
+	response, err := fetchClient.Do(request)
 	if err != nil {
 		result.Error = err.Error()
 		return result
@@ -190,7 +199,9 @@ func (e *ResearchEngine) allowedByRobots(ctx context.Context, target *url.URL) b
 		robotsURL := key + "/robots.txt"
 		request, err := http.NewRequestWithContext(ctx, http.MethodGet, robotsURL, nil)
 		if err != nil {
-			return false
+			// robots.txt is advisory: when it cannot be fetched or built we fail
+			// open (allow), consistently with the client.Do error path below.
+			return true
 		}
 		response, err := e.client().Do(request)
 		if err != nil {
