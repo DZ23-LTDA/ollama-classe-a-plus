@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha1"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -31,9 +32,23 @@ type DeployConfig struct {
 }
 
 type DeploymentRequest struct {
-	Name   string
-	Root   string
-	Target string
+	Name           string
+	Root           string
+	Target         string
+	ManifestSHA256 string
+}
+
+type DeploymentManifestEntry struct {
+	Path   string `json:"path"`
+	Size   int64  `json:"size"`
+	SHA256 string `json:"sha256,omitempty"`
+	Reason string `json:"reason,omitempty"`
+}
+
+type DeploymentManifest struct {
+	SHA256   string                    `json:"sha256"`
+	Included []DeploymentManifestEntry `json:"included"`
+	Excluded []DeploymentManifestEntry `json:"excluded"`
 }
 
 type DeploymentResult struct {
@@ -198,12 +213,15 @@ func (m *DeploymentManager) Deploy(ctx context.Context, providerID string, reque
 	if !ok {
 		return DeploymentResult{}, fmt.Errorf("deployment provider %q is not registered", providerID)
 	}
-	files, err := collectDeployFiles(request.Root)
+	files, manifest, err := collectDeploySnapshot(request.Root)
 	if err != nil {
 		return DeploymentResult{}, err
 	}
 	if len(files) == 0 {
 		return DeploymentResult{}, errors.New("deployment workspace has no files")
+	}
+	if expected := strings.TrimSpace(request.ManifestSHA256); expected != "" && !strings.EqualFold(expected, manifest.SHA256) {
+		return DeploymentResult{}, errors.New("deployment workspace changed after approval")
 	}
 	var result DeploymentResult
 	switch config.Provider {
@@ -235,19 +253,30 @@ type deployFile struct {
 }
 
 func collectDeployFiles(root string) ([]deployFile, error) {
+	files, _, err := collectDeploySnapshot(root)
+	return files, err
+}
+
+func BuildDeploymentManifest(root string) (DeploymentManifest, error) {
+	_, manifest, err := collectDeploySnapshot(root)
+	return manifest, err
+}
+
+func collectDeploySnapshot(root string) ([]deployFile, DeploymentManifest, error) {
 	root, err := filepath.Abs(strings.TrimSpace(root))
 	if err != nil || root == "." || root == string(filepath.Separator) {
-		return nil, errors.New("invalid deployment root")
+		return nil, DeploymentManifest{}, errors.New("invalid deployment root")
 	}
 	info, err := os.Stat(root)
 	if err != nil || !info.IsDir() {
-		return nil, errors.New("deployment root is not a directory")
+		return nil, DeploymentManifest{}, errors.New("deployment root is not a directory")
 	}
 	rootInfo, err := os.Lstat(root)
 	if err != nil || rootInfo.Mode()&os.ModeSymlink != 0 {
-		return nil, errors.New("deployment root must not be a symlink")
+		return nil, DeploymentManifest{}, errors.New("deployment root must not be a symlink")
 	}
 	var files []deployFile
+	manifest := DeploymentManifest{Included: []DeploymentManifestEntry{}, Excluded: []DeploymentManifestEntry{}}
 	var total int64
 	err = filepath.Walk(root, func(path string, info os.FileInfo, walkErr error) error {
 		if walkErr != nil {
@@ -265,6 +294,12 @@ func collectDeployFiles(root string) ([]deployFile, error) {
 		}
 		relative = filepath.ToSlash(relative)
 		if info.IsDir() {
+			if relative != "." {
+				if reason := deploymentPathExclusionReason(relative); reason != "" {
+					manifest.Excluded = append(manifest.Excluded, DeploymentManifestEntry{Path: relative, Reason: reason})
+					return filepath.SkipDir
+				}
+			}
 			if deploymentPathContainsPrivateDirectory(relative) {
 				return filepath.SkipDir
 			}
@@ -273,7 +308,8 @@ func collectDeployFiles(root string) ([]deployFile, error) {
 		if !info.Mode().IsRegular() {
 			return errors.New("deployment workspace contains a non-regular file")
 		}
-		if !deploymentPathIsPublic(relative) {
+		if reason := deploymentPathExclusionReason(relative); reason != "" {
+			manifest.Excluded = append(manifest.Excluded, DeploymentManifestEntry{Path: relative, Size: info.Size(), Reason: reason})
 			return nil
 		}
 		if len(files) >= 2000 || total+info.Size() > 50<<20 {
@@ -284,14 +320,27 @@ func collectDeployFiles(root string) ([]deployFile, error) {
 			return err
 		}
 		files = append(files, deployFile{Path: relative, Data: data})
+		digest := sha256.Sum256(data)
+		manifest.Included = append(manifest.Included, DeploymentManifestEntry{Path: relative, Size: int64(len(data)), SHA256: hex.EncodeToString(digest[:])})
 		total += int64(len(data))
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, DeploymentManifest{}, err
 	}
 	sort.Slice(files, func(i, j int) bool { return files[i].Path < files[j].Path })
-	return files, nil
+	sort.Slice(manifest.Included, func(i, j int) bool { return manifest.Included[i].Path < manifest.Included[j].Path })
+	sort.Slice(manifest.Excluded, func(i, j int) bool { return manifest.Excluded[i].Path < manifest.Excluded[j].Path })
+	manifestPayload, err := json.Marshal(struct {
+		Included []DeploymentManifestEntry `json:"included"`
+		Excluded []DeploymentManifestEntry `json:"excluded"`
+	}{Included: manifest.Included, Excluded: manifest.Excluded})
+	if err != nil {
+		return nil, DeploymentManifest{}, err
+	}
+	manifestDigest := sha256.Sum256(manifestPayload)
+	manifest.SHA256 = hex.EncodeToString(manifestDigest[:])
+	return files, manifest, nil
 }
 
 func deploymentPathContainsPrivateDirectory(relative string) bool {
@@ -305,19 +354,23 @@ func deploymentPathContainsPrivateDirectory(relative string) bool {
 }
 
 func deploymentPathIsPublic(relative string) bool {
+	return deploymentPathExclusionReason(relative) == ""
+}
+
+func deploymentPathExclusionReason(relative string) string {
 	if deploymentPathContainsPrivateDirectory(relative) {
-		return false
+		return "private-directory"
 	}
 	base := strings.ToLower(filepath.Base(relative))
 	if base == ".env" || strings.HasPrefix(base, ".env.") || strings.HasSuffix(base, ".pem") || strings.HasSuffix(base, ".key") || strings.HasSuffix(base, ".crt") || strings.HasSuffix(base, ".p12") || strings.HasSuffix(base, ".pfx") {
-		return false
+		return "private-extension"
 	}
 	for _, marker := range []string{"secret", "credential", "password", "token", "apikey", "api_key", "backup", "dump", "log"} {
 		if strings.Contains(base, marker) {
-			return false
+			return "private-name-marker"
 		}
 	}
-	return true
+	return ""
 }
 
 func (m *DeploymentManager) request(ctx context.Context, config DeployConfig, method, endpoint string, body []byte, contentType string) (map[string]any, error) {

@@ -35,6 +35,7 @@ type DeploymentApproval struct {
 	BuilderID      string    `json:"builder_id"`
 	Provider       string    `json:"provider"`
 	Target         string    `json:"target,omitempty"`
+	ManifestSHA256 string    `json:"manifest_sha256"`
 	RequestedBy    string    `json:"requested_by"`
 	DecidedBy      string    `json:"decided_by,omitempty"`
 	Reason         string    `json:"reason,omitempty"`
@@ -86,19 +87,20 @@ func NewDeploymentApprovalStore(root string) (*DeploymentApprovalStore, error) {
 	return store, nil
 }
 
-func (s *DeploymentApprovalStore) Request(organizationID, builderID, provider, target, actorID string) (DeploymentApproval, error) {
+func (s *DeploymentApprovalStore) Request(organizationID, builderID, provider, target, manifestSHA256, actorID string) (DeploymentApproval, error) {
 	if s == nil {
 		return DeploymentApproval{}, errors.New("deployment approval store is unavailable")
 	}
 	organizationID = strings.TrimSpace(organizationID)
 	builderID = strings.TrimSpace(builderID)
 	provider = strings.ToLower(strings.TrimSpace(provider))
+	manifestSHA256 = strings.ToLower(strings.TrimSpace(manifestSHA256))
 	actorID = strings.TrimSpace(actorID)
-	if organizationID == "" || builderID == "" || provider == "" || actorID == "" {
-		return DeploymentApproval{}, errors.New("organization, builder, provider and actor are required")
+	if organizationID == "" || builderID == "" || provider == "" || manifestSHA256 == "" || actorID == "" {
+		return DeploymentApproval{}, errors.New("organization, builder, provider, manifest hash and actor are required")
 	}
 	now := time.Now().UTC()
-	approval := DeploymentApproval{ID: "dapr_" + uuid.NewString(), OrganizationID: organizationID, BuilderID: builderID, Provider: provider, Target: strings.TrimSpace(target), RequestedBy: actorID, Nonce: uuid.NewString(), Status: DeploymentApprovalPending, CreatedAt: now, ExpiresAt: now.Add(15 * time.Minute)}
+	approval := DeploymentApproval{ID: "dapr_" + uuid.NewString(), OrganizationID: organizationID, BuilderID: builderID, Provider: provider, Target: strings.TrimSpace(target), ManifestSHA256: manifestSHA256, RequestedBy: actorID, Nonce: uuid.NewString(), Status: DeploymentApprovalPending, CreatedAt: now, ExpiresAt: now.Add(15 * time.Minute)}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.approvals[approval.ID] = approval
@@ -154,7 +156,7 @@ func (s *DeploymentApprovalStore) Decide(id, organizationID, builderID, provider
 	return approval, nil
 }
 
-func (s *DeploymentApprovalStore) Consume(id, organizationID, builderID, provider, target, nonce string) (DeploymentApproval, error) {
+func (s *DeploymentApprovalStore) Consume(id, organizationID, builderID, provider, target, manifestSHA256, nonce string) (DeploymentApproval, error) {
 	if s == nil {
 		return DeploymentApproval{}, errors.New("deployment approval store is unavailable")
 	}
@@ -169,6 +171,9 @@ func (s *DeploymentApprovalStore) Consume(id, organizationID, builderID, provide
 	}
 	if approval.Target != strings.TrimSpace(target) {
 		return DeploymentApproval{}, errors.New("deployment target does not match approval")
+	}
+	if approval.ManifestSHA256 != strings.ToLower(strings.TrimSpace(manifestSHA256)) {
+		return DeploymentApproval{}, errors.New("deployment manifest does not match approval")
 	}
 	if strings.TrimSpace(nonce) == "" || nonce != approval.Nonce {
 		return DeploymentApproval{}, ErrDeploymentApprovalNonce

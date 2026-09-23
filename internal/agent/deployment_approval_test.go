@@ -2,6 +2,7 @@ package agent
 
 import (
 	"errors"
+	"strings"
 	"testing"
 )
 
@@ -11,7 +12,7 @@ func TestDeploymentApprovalPersistsAcrossRestartAndConsumesOnce(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	requested, err := store.Request("org_a", "bld_a", "self", "staging", "operator_a")
+	requested, err := store.Request("org_a", "bld_a", "self", "staging", "manifest-a", "operator_a")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -29,14 +30,17 @@ func TestDeploymentApprovalPersistsAcrossRestartAndConsumesOnce(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	consumed, err := reloaded.Consume(requested.ID, "org_a", "bld_a", "self", "staging", requested.Nonce)
+	if _, err := reloaded.Consume(requested.ID, "org_a", "bld_a", "self", "staging", "manifest-b", requested.Nonce); err == nil || !strings.Contains(err.Error(), "manifest") {
+		t.Fatalf("manifest mismatch error = %v", err)
+	}
+	consumed, err := reloaded.Consume(requested.ID, "org_a", "bld_a", "self", "staging", "manifest-a", requested.Nonce)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if consumed.Status != DeploymentApprovalConsumed || consumed.DecidedBy != "operator_a" {
 		t.Fatalf("consumed approval = %+v", consumed)
 	}
-	if _, err := reloaded.Consume(requested.ID, "org_a", "bld_a", "self", "staging", requested.Nonce); !errors.Is(err, ErrDeploymentApprovalConflict) {
+	if _, err := reloaded.Consume(requested.ID, "org_a", "bld_a", "self", "staging", "manifest-a", requested.Nonce); !errors.Is(err, ErrDeploymentApprovalConflict) {
 		t.Fatalf("replay consume error = %v", err)
 	}
 }
@@ -46,7 +50,7 @@ func TestDeploymentApprovalRejectsWrongTenantAndNonce(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	approval, err := store.Request("org_a", "bld_a", "self", "production", "operator_a")
+	approval, err := store.Request("org_a", "bld_a", "self", "production", "manifest-a", "operator_a")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -126,7 +126,7 @@ grep -q 'MCP command must be an absolute executable path' internal/agent/mcp.go
 	grep -q 'workflow_dispatch:' .github/workflows/test.yaml
 	grep -q 'run_native_matrix:' .github/workflows/test.yaml
 	grep -q 'github.event_name == '\''workflow_dispatch'\'' && inputs.run_native_matrix == true' .github/workflows/test.yaml
-	grep -q 'media destination connected to a private address' internal/agent/media.go
+	grep -q 'media destination resolves to a private address' internal/agent/media.go
 grep -q 'validateMediaMagic' internal/agent/media.go
 grep -q 'TestMediaMaterializeRejectsRedirectAndInvalidMagic' internal/agent/media_test.go
 grep -q 'connector response payload exceeds limit' internal/agent/connectors.go

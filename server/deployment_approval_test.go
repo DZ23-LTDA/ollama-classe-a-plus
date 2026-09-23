@@ -93,7 +93,11 @@ func TestDeploymentApprovalRequiresAdminAndNonceBeforeProviderCall(t *testing.T)
 	}
 	api := &agentAPI{runtime: runtime, authRequired: true}
 
-	approval, err := approvals.Request("local", project.ID, "self", "staging", "operator")
+	manifest, err := agent.BuildDeploymentManifest(project.Root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	approval, err := approvals.Request("local", project.ID, "self", "staging", manifest.SHA256, "operator")
 	if err != nil {
 		t.Fatal(err)
 	}

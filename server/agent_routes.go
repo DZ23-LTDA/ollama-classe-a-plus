@@ -2226,12 +2226,17 @@ func (a *agentAPI) deployBuilder(c *gin.Context) {
 		writeAgentError(c, statusForAgentError(err), err)
 		return
 	}
-	approval, err := a.runtime.DeploymentApprovals().Consume(request.ApprovalID, companyOrganizationID(c), project.ID, c.Param("provider"), request.Target, request.Nonce)
+	manifest, err := agent.BuildDeploymentManifest(project.Root)
 	if err != nil {
 		writeAgentError(c, statusForAgentError(err), err)
 		return
 	}
-	result, err := manager.Deploy(c.Request.Context(), c.Param("provider"), agent.DeploymentRequest{Name: project.Name, Root: project.Root, Target: request.Target})
+	approval, err := a.runtime.DeploymentApprovals().Consume(request.ApprovalID, companyOrganizationID(c), project.ID, c.Param("provider"), request.Target, manifest.SHA256, request.Nonce)
+	if err != nil {
+		writeAgentError(c, statusForAgentError(err), err)
+		return
+	}
+	result, err := manager.Deploy(c.Request.Context(), c.Param("provider"), agent.DeploymentRequest{Name: project.Name, Root: project.Root, Target: request.Target, ManifestSHA256: manifest.SHA256})
 	if err != nil {
 		var deploymentErr *agent.DeploymentError
 		if errors.As(err, &deploymentErr) && (result.Status == "partial" || result.Status == "unknown") {
@@ -2279,12 +2284,17 @@ func (a *agentAPI) requestDeploymentApproval(c *gin.Context) {
 		writeAgentError(c, http.StatusBadRequest, err)
 		return
 	}
-	approval, err := a.runtime.DeploymentApprovals().Request(companyOrganizationID(c), project.ID, provider, request.Target, agentActorID(c))
+	manifest, err := agent.BuildDeploymentManifest(project.Root)
 	if err != nil {
 		writeAgentError(c, statusForAgentError(err), err)
 		return
 	}
-	c.JSON(http.StatusCreated, approval)
+	approval, err := a.runtime.DeploymentApprovals().Request(companyOrganizationID(c), project.ID, provider, request.Target, manifest.SHA256, agentActorID(c))
+	if err != nil {
+		writeAgentError(c, statusForAgentError(err), err)
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"approval": approval, "manifest": manifest})
 }
 
 func (a *agentAPI) decideDeploymentApproval(c *gin.Context) {

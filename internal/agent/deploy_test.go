@@ -198,6 +198,74 @@ func TestDeploymentPackageExcludesPrivateFiles(t *testing.T) {
 	}
 }
 
+func TestBuildDeploymentManifestReportsIncludedExcludedAndHash(t *testing.T) {
+	root := t.TempDir()
+	for name, content := range map[string]string{
+		"index.html": "<h1>public</h1>",
+		".env":       "SYNTHETIC_PRIVATE=1",
+	} {
+		if err := os.WriteFile(filepath.Join(root, name), []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.MkdirAll(filepath.Join(root, ".git"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	manifest, err := BuildDeploymentManifest(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if manifest.SHA256 == "" || len(manifest.Included) != 1 || manifest.Included[0].Path != "index.html" {
+		t.Fatalf("manifest included=%+v hash=%q", manifest.Included, manifest.SHA256)
+	}
+	if len(manifest.Excluded) != 2 {
+		t.Fatalf("manifest excluded=%+v", manifest.Excluded)
+	}
+	for _, entry := range manifest.Excluded {
+		if entry.Reason == "" {
+			t.Fatalf("excluded entry has no reason: %+v", entry)
+		}
+	}
+	files, err := collectDeployFiles(root)
+	if err != nil || len(files) != 1 {
+		t.Fatalf("collect files=%+v err=%v", files, err)
+	}
+}
+
+func TestDeploymentManagerRejectsChangedManifestBeforeProvider(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "index.html")
+	if err := os.WriteFile(path, []byte("before"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	manifest, err := BuildDeploymentManifest(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var requests int
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"dep_should_not_exist"}`))
+	}))
+	defer server.Close()
+	manager := NewDeploymentManager()
+	manager.client = server.Client()
+	if err := manager.Register(DeployConfig{ID: "self", Provider: "generic", BaseURL: server.URL}); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("after"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_, err = manager.Deploy(context.Background(), "self", DeploymentRequest{Name: "site", Root: root, ManifestSHA256: manifest.SHA256})
+	if err == nil || !strings.Contains(err.Error(), "changed after approval") {
+		t.Fatalf("expected changed-manifest rejection, got %v", err)
+	}
+	if requests != 0 {
+		t.Fatalf("provider requests=%d, want zero", requests)
+	}
+}
+
 func TestDeploymentDialRejectsPrivateResolvedAddressBeforeTCP(t *testing.T) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
