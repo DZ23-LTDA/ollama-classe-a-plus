@@ -660,3 +660,12 @@ O head `785cbf3b` remove o downgrade perigoso de `rediss://`: enquanto não exis
 Evidência local: suíte completa `CGO_ENABLED=0 go test ./internal/agent -count=1 -timeout=300s`, race `CGO_ENABLED=1 go test -race ./internal/agent -count=1 -timeout=300s`, `CGO_ENABLED=1 go vet ./internal/agent ./server`, testes focados rediss/scripts e `git diff --check` passaram. O teste distribuído real `go test -tags integration ./internal/agent -run TestDistributedRedisRetriesDeadLetterReplay` foi executado e ficou `SKIP` porque `OLLAMA_AGENT_TEST_REDIS_URL` não está configurado; portanto Redis real, TLS Redis, múltiplos workers, fencing e perda/reconexão continuam `BLOCKED_BY_EXTERNAL_DEPENDENCY`.
 
 A CI pública do novo head ainda precisa concluir. O produto continua **FIXING / preview-local RC em hardening — não finalizado e não production-ready**.
+
+
+## Addendum de rollback dos stores persistentes — 2026-09-23
+
+O head `44628055` torna mutations persistentes fail-safe em três camadas locais. `JSONStore` restaura mission/event em memória quando `writeJSONAtomic` falha; `ContextStore` restaura project, memory e schedules em updates/deletes com falha; `CompanyStore` usa snapshot profundo e restaura Update/mutate, inclusive quando a pausa por budget não consegue ser persistida, sem descartar o erro de filesystem.
+
+Evidência local: regressões de fault injection para JSONStore, ContextStore e CompanyStore passaram; a suíte completa `CGO_ENABLED=0 go test ./internal/agent -count=1 -timeout=300s`, race `CGO_ENABLED=1 go test -race ./internal/agent -count=1 -timeout=300s`, `CGO_ENABLED=1 go vet ./internal/agent ./server` e `git diff --check` passaram. A garantia cobre uma instância e o writer atômico local; locking distribuído, NFS/FS remoto e falhas de energia ainda exigem ambiente de homologação e permanecem `BLOCKED_BY_EXTERNAL_DEPENDENCY`.
+
+A CI pública do head atual continua pendente até concluir. O produto segue **FIXING / preview-local RC em hardening — não finalizado e não production-ready**.
