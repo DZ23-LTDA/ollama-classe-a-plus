@@ -517,31 +517,31 @@ func (a *agentAPI) authMiddleware(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "organization scope mismatch"})
 		return
 	}
-		if user.MFAEnabled {
-			mfaCode := strings.TrimSpace(c.GetHeader("X-Ollama-MFA-Code"))
-			recoveryCode := strings.TrimSpace(c.GetHeader("X-Ollama-MFA-Recovery-Code"))
-			var mfaErr error
-			if recoveryCode != "" {
-				mfaErr = a.auth.VerifyRecoveryCodeWithThrottle(user.ID, recoveryCode, c.Request.RemoteAddr, time.Now().UTC())
-			} else {
-				mfaErr = a.auth.VerifyMFAWithThrottle(user.ID, mfaCode, c.Request.RemoteAddr, time.Now().UTC())
-			}
-			if mfaErr != nil {
-				var throttle *agent.MFAThrottleError
-				if errors.As(mfaErr, &throttle) {
-					retryAfter := int64(throttle.RetryAfter / time.Second)
-					if throttle.RetryAfter%time.Second != 0 {
-						retryAfter++
-					}
-					if retryAfter < 1 {
-						retryAfter = 1
-					}
-					c.Header("Retry-After", strconv.FormatInt(retryAfter, 10))
-					c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{"error": "mfa verification temporarily locked"})
-					return
+	if user.MFAEnabled {
+		mfaCode := strings.TrimSpace(c.GetHeader("X-Ollama-MFA-Code"))
+		recoveryCode := strings.TrimSpace(c.GetHeader("X-Ollama-MFA-Recovery-Code"))
+		var mfaErr error
+		if recoveryCode != "" {
+			mfaErr = a.auth.VerifyRecoveryCodeWithThrottle(user.ID, recoveryCode, c.Request.RemoteAddr, time.Now().UTC())
+		} else {
+			mfaErr = a.auth.VerifyMFAWithThrottle(user.ID, mfaCode, c.Request.RemoteAddr, time.Now().UTC())
+		}
+		if mfaErr != nil {
+			var throttle *agent.MFAThrottleError
+			if errors.As(mfaErr, &throttle) {
+				retryAfter := int64(throttle.RetryAfter / time.Second)
+				if throttle.RetryAfter%time.Second != 0 {
+					retryAfter++
 				}
-				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "mfa verification required"})
+				if retryAfter < 1 {
+					retryAfter = 1
+				}
+				c.Header("Retry-After", strconv.FormatInt(retryAfter, 10))
+				c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{"error": "mfa verification temporarily locked"})
 				return
+			}
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "mfa verification required"})
+			return
 		}
 	}
 	action := "read"
@@ -1713,12 +1713,12 @@ func (a *agentAPI) createOrchestration(c *gin.Context) {
 		writeAgentError(c, http.StatusBadRequest, err)
 		return
 	}
-		if request.AutoRun {
-			go func(id, organizationID string) {
-				if _, err := a.runtime.Orchestrator().RunForOrganization(context.Background(), id, organizationID); err != nil {
-					slog.Error("agent orchestration autorun failed", "job_id", id, "organization_id", organizationID, "error", err)
-				}
-			}(job.ID, organizationID)
+	if request.AutoRun {
+		go func(id, organizationID string) {
+			if _, err := a.runtime.Orchestrator().RunForOrganization(context.Background(), id, organizationID); err != nil {
+				slog.Error("agent orchestration autorun failed", "job_id", id, "organization_id", organizationID, "error", err)
+			}
+		}(job.ID, organizationID)
 		c.JSON(http.StatusAccepted, job)
 		return
 	}
@@ -1740,12 +1740,12 @@ func (a *agentAPI) runOrchestration(c *gin.Context) {
 	if err != nil {
 		writeAgentError(c, statusForAgentError(err), err)
 		return
+	}
+	go func(id, organizationID string) {
+		if _, err := a.runtime.Orchestrator().RunForOrganization(context.Background(), id, organizationID); err != nil {
+			slog.Error("agent orchestration run failed", "job_id", id, "organization_id", organizationID, "error", err)
 		}
-		go func(id, organizationID string) {
-			if _, err := a.runtime.Orchestrator().RunForOrganization(context.Background(), id, organizationID); err != nil {
-				slog.Error("agent orchestration run failed", "job_id", id, "organization_id", organizationID, "error", err)
-			}
-		}(job.ID, organizationID)
+	}(job.ID, organizationID)
 	c.JSON(http.StatusAccepted, gin.H{"id": job.ID, "state": agent.OrchestrationRunning})
 }
 
