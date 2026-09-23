@@ -531,3 +531,8 @@ O commit `883a17e2` adicionou compensações para Enqueue, Claim, retry e Replay
 ## Unreleased — Redis delayed-job requeue compensation — 2026-09-23
 
 O commit `b1aaebfd` restaura jobs delayed quando `moveDue` não consegue completar o `LPUSH` para pending após remover o item do sorted set.
+
+
+## Unreleased — Settings screenshot capture guard — 2026-09-23
+
+O alias histórico `docs/images/screens/settings.png` foi atualizado para a captura funcional de Settings. O capturador agora rejeita páginas com conteúdo insuficiente e screenshots PNG anormalmente pequenos, evitando evidência visual branca ou incompleta.

@@ -624,3 +624,8 @@ O commit `883a17e2` adicionou compensações para evitar chaves e IDs órfãos q
 ## Addendum de moveDue Redis — 2026-09-23
 
 O commit `b1aaebfd` também restaura jobs no sorted set quando a promoção para pending falha após o `ZREM`. A correção passou testes focados normais/race; não houve homologação contra Redis real nesta sessão.
+
+
+## Addendum de screenshot Settings e captura observável — 2026-09-23
+
+A captura histórica `docs/images/screens/settings.png` foi corrigida para usar a mesma tela funcional de Settings registrada em `class-a-plus-settings.png`. O processo de captura também passou a falhar fechado quando `body`/`main` têm conteúdo insuficiente ou quando o arquivo PNG fica abaixo do orçamento mínimo de 16 KiB. O estado continua preview/local RC; essa correção não comprova providers externos, contas, dispositivos, deploy ou homologação.

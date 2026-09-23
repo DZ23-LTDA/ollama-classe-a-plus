@@ -675,3 +675,8 @@ A revisão do adapter Redis encontrou sequências em que um `SET` ou `ZADD` post
 ## Addendum P1 — moveDue Redis sem perda best-effort — 2026-09-23
 
 A revisão complementar encontrou a última janela de perda em `moveDue`: `ZREM` seguido de `LPUSH` podia retirar o job delayed sem colocá-lo no pending. O commit `b1aaebfd` recoloca o ID no sorted set em caso de falha do segundo comando. O smoke real ainda exige Redis de homologação.
+
+
+## Addendum P1 — screenshot Settings branco e captura fail-closed — 2026-09-23
+
+A revisão de ativos encontrou dois nomes de screenshot para Settings. A série `class-a-plus-settings.png` estava preenchida, mas `settings.png` permanecia com 8.2 KB e aparência quase totalmente branca. O alias agora corresponde à captura funcional, e o capturador exige texto mínimo em `body`/`main` e arquivo PNG de pelo menos 16 KiB. O teste de Settings e o build UI passaram; a CI do commit `0b0710cf` ainda estava pendente no momento do registro.

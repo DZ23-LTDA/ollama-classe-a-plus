@@ -2440,3 +2440,8 @@ Integrity, YAML, `CGO_ENABLED=1 go test ./...`, vet, build, race do queue e o te
 ## Complemento de moveDue Redis — 2026-09-23
 
 O commit `b1aaebfdb4ad7ad753591402ad47a220fcd67fdd` fecha o caso restante de `moveDue`: se o `ZREM` for confirmado mas o `LPUSH pending` falhar, o ID é recolocado no sorted set delayed. Testes normais/race focados e integrity passaram; o smoke Redis real segue bloqueado por ausência de endpoint configurado.
+
+
+## Correção de screenshot Settings e captura fail-closed — 2026-09-23
+
+A auditoria visual encontrou que `docs/images/screens/settings.png` era um arquivo histórico quase vazio de 8.2 KB, embora a implementação de Settings e a captura atual `class-a-plus-settings.png` estivessem funcionais. O alias foi substituído pela captura funcional, com checksum `89420370b9d3c7317a2c5d7c51bb9f8d4eba914a6d7b7bf829c855c909902e72`. O capturador agora exige conteúdo mínimo em `body`/`main` e rejeita PNG menor que 16 KiB, evitando publicar uma tela branca silenciosamente. Testes de `Settings`, build UI, Node syntax, integrity e YAML passaram. Commit publicado: `0b0710cfe9d646c859aed8c624fb19fe1ac3cd43`; CI remota iniciou com checks pendentes.
