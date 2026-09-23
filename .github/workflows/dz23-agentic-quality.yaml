@@ -118,6 +118,9 @@ jobs:
       - name: Mobile typecheck
         working-directory: apps/mobile-agentic
         run: npm ci --no-audit --no-fund && npm run typecheck
+      - name: Mobile offline policy regression
+        working-directory: apps/mobile-agentic
+        run: npm run test:policy
       - name: Web dependency install
         working-directory: app/ui/app
         run: npm ci --no-audit --no-fund
