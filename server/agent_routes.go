@@ -1132,11 +1132,20 @@ func (a *agentAPI) prometheus(c *gin.Context) {
 }
 
 func (a *agentAPI) connectors(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"connectors": a.runtime.ConnectorsForOrganization(agentOrganizationID(c))})
+	organizationID := agentOrganizationID(c)
+	if !a.authRequired && organizationID == "" {
+		c.JSON(http.StatusOK, gin.H{"connectors": a.runtime.Connectors()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"connectors": a.runtime.ConnectorsForOrganization(organizationID)})
 }
 
 func (a *agentAPI) mcp(c *gin.Context) {
 	organizationID := agentOrganizationID(c)
+	if !a.authRequired && organizationID == "" {
+		c.JSON(http.StatusOK, gin.H{"servers": a.runtime.MCPServers(), "remote_servers": a.runtime.RemoteMCPServers()})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"servers": a.runtime.MCPServersForOrganization(organizationID), "remote_servers": a.runtime.RemoteMCPServersForOrganization(organizationID)})
 }
 
@@ -1163,7 +1172,12 @@ func (a *agentAPI) tools(c *gin.Context) {
 }
 
 func (a *agentAPI) skills(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"skills": a.context.SkillsForOrganization(agentOrganizationID(c))})
+	organizationID := agentOrganizationID(c)
+	if !a.authRequired && organizationID == "" {
+		c.JSON(http.StatusOK, gin.H{"skills": a.context.Skills()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"skills": a.context.SkillsForOrganization(organizationID)})
 }
 
 func (a *agentAPI) schedules(c *gin.Context) {
