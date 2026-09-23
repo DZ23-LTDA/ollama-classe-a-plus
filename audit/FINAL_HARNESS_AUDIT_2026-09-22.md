@@ -640,3 +640,8 @@ Evidência do slice: testes Go normais e race de `internal/agent` e `server`, Vi
 ## Addendum de gates completos do candidato Tel-Agent — 2026-09-23
 
 O head `55dfa325` passou localmente o conjunto completo de integrity, YAML, Go com CGO, vet, build, UI, mobile, audits e diff (`FULL_LOCAL_GATES=PASS`). A consulta pública seguinte confirmou vários jobs remotos em sucesso, enquanto jobs Go e test/race da matriz upstream ainda estavam em execução. A conclusão correta é **localmente validado e publicado; CI remota ainda pendente**, sem converter essa evidência em homologação externa ou production-ready.
+
+
+## Addendum P1 — idempotência e retry do Tel-Agent — 2026-09-23
+
+A jornada Tel-Agent inicialmente mutava Company sem uma chave de retry HTTP, o que permitiria duplicar backlog ou rascunho após timeout ambíguo. O commit `d67e7a79` usa o ledger idempotente já existente, limita a chave, armazena apenas digest de input e vincula o replay ao ID da exchange persistida. Testes cobrem replay normal/race, conflito `409`, HTTP e restart. O runner local completo passou; CI remota e homologação externa permanecem pendentes.

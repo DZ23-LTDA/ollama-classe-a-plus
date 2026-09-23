@@ -417,3 +417,8 @@ O cliente de deployment resolve A/AAAA antes do TCP. Todos os endereços retorna
 A resposta contém `company`, `exchange` e, para leitura, `report`. Cada exchange inclui `channel: tel-agent.text`, actor, organization, operação, status, retorno, recurso criado quando aplicável e indicação de approval. `campaign.draft` sempre permanece sandbox e gera approval pendente; não publica campanha nem chama provedor externo.
 
 `GET /api/agent/v1/companies/:id/tel-agent/history` retorna as últimas 100 trocas persistidas para o tenant e informa `telephony: not_configured`. Mensagens são limitadas a 2048 bytes e passam por redaction DLP antes da persistência. O canal textual não comprova OAuth, telefonia, WhatsApp, SMS, SIP ou qualquer conta externa ativa.
+
+
+### Idempotência do Tel-Agent
+
+`POST /api/agent/v1/companies/:id/tel-agent` aceita opcionalmente `Idempotency-Key` no header, com no máximo 128 bytes. O corpo não pode declarar a chave. Para `report.read`, `backlog.create` e `campaign.draft`, o servidor grava apenas um digest do input e associa a chave ao resultado. Repetir a mesma chave com o mesmo payload retorna a exchange já criada sem duplicar backlog, campanha ou approval; reutilizar a chave com payload diferente responde `409 Conflict`. O ledger sobrevive ao restart do store. A UI gera e conserva a chave durante retries, mas não a exibe.

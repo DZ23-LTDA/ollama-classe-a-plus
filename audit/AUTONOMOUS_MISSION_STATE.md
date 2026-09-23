@@ -2393,3 +2393,10 @@ Classificação: **IMPLEMENTADO, TESTADO, PUBLICADO; não homologado externament
 Após a publicação documental, o runner absoluto `FULL_LOCAL_GATES=PASS` foi concluído no head `55dfa325d1f270284169f4d99beb4f539f38bd54`: integrity, YAML, `CGO_ENABLED=1 go test ./... -count=1 -timeout=900s`, `go vet`, build Go, `npm ci`/Vitest/build/audit de produção da UI, `npm ci`/typecheck/audit de produção mobile e `git diff --check` passaram. Avisos de chunks Vite grandes e pacotes npm deprecated não produziram falha nem foram tratados como vulnerabilidades.
 
 A conferência pública do mesmo SHA encontrou SBOM, serviços distribuídos, Web/Mobile, integrity, mudanças, patches e go_mod_tidy concluídos com sucesso; jobs Go e a matriz upstream ainda estavam `in_progress`, sem falha observada naquele instante. Portanto, a prova local é completa, mas a CI remota permanece pendente até seus jobs terminarem.
+
+
+## P1 de idempotência do Tel-Agent — 2026-09-23
+
+O commit `d67e7a7910d850aa69953ed3be3b6ba40ed57bfa` fecha retries duplicados no canal Tel-Agent. O endpoint aceita `Idempotency-Key` somente pelo header, limita a chave a 128 bytes, deriva fingerprint sem persistir a mensagem original e usa o ledger Company existente. Um replay retorna a mesma exchange/recurso sem nova mutação; o mesmo header com payload diferente falha com conflito `409`; o vínculo de resultado permanece disponível após restart do `CompanyStore`. A UI gera uma chave opaca por operação e a mantém enquanto uma falha pode ser repetida, limpando-a somente após sucesso.
+
+Regressões normais e race de `internal/agent` e `server` passaram, incluindo replay HTTP `200`, conflito HTTP `409` e restart. Depois do commit, o runner absoluto completo também terminou `FULL_LOCAL_GATES=PASS`: integrity, YAML, Go test/vet/build, UI Vitest/build/audit, mobile typecheck/audit e diff. A CI pública do novo SHA iniciou sem falha observada, mas ainda estava em execução; não é considerada totalmente verde.
