@@ -718,3 +718,14 @@ O head `5a94f524` remove o envio de push em goroutine com erro descartado. Event
 Evidência local: regressões de persistência/restart, lease/backoff, entrega a fixture HTTPS local e retenção após resposta provider `502` passaram; a suíte completa `CGO_ENABLED=1 go test ./internal/agent -count=1 -timeout=300s`, race do pacote agent, `go vet ./internal/agent ./server`, guardrail de integridade, diff check e scan de segredos passaram. Isso comprova outbox e entrega local, não APNs/FCM, push em dispositivo, OAuth/conta externa ou worker distribuído; esses itens continuam `BLOCKED_BY_EXTERNAL_DEPENDENCY`.
 
 A CI pública do head precisa concluir. O produto permanece **FIXING / preview-local RC em hardening — não finalizado e não production-ready**.
+
+
+## Addendum de distribuição do fork, proveniência visual e release guard — 2026-09-23
+
+O head `6724c6f0` torna a identidade de distribuição do fork explícita. `README.md`, `CLASS_A_PLUS_GUIDE.md`, `scripts/install.sh` e `scripts/install.ps1` agora orientam clone/build local do repositório DZ23-LTDA e não baixam `ollama.com`, instaladores upstream, modelos ou imagens Docker. Os scripts foram reduzidos a builders locais e não são instaladores assinados.
+
+O capturador passou a registrar bytes e SHA-256; `docs/images/screens/class-a-plus-capture-manifest.json` foi versionado e `npm run screens:verify` falha quando um PNG diverge do manifesto. A CI web/mobile executa esse gate. O SBOM action foi fixado no commit `006b7ce8314066bdf1765b4500370d40fa6917a3` (v0.24.2). O workflow de release herdado deixou de disparar por tags `v*`: agora é manual, exige input explícito `enable_release=true`, variável de repositório `OLLAMA_ENABLE_RELEASE=true` e versão semver; isso não habilita release por si só e não prova assinatura, provenance, rollback, distribuição ou store review.
+
+Evidência local: `go build -trimpath`, `sh -n scripts/install.sh`, `npm run screens:verify`, `npm run lint`, `npm test -- --run` (22 arquivos/205 testes), `npm run build`, YAML, integrity, diff check e scan básico de segredos passaram. Parsing PowerShell não foi executado neste Linux porque `pwsh` não está instalado: `BLOCKED_BY_EXTERNAL_DEPENDENCY`. Os checks públicos do head foram iniciados e estavam `in_progress`/`queued` na última consulta; não são declarados verdes.
+
+O produto continua **FIXING / preview-local RC em hardening — não finalizado e não production-ready**. A PR principal permanece aberta, e a PR documental #5 permanece aberta aguardando autorização específica de merge.
