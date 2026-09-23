@@ -25,6 +25,7 @@ func newObjectScopeTestAPI(t *testing.T) (*agentAPI, agent.Project, agent.Projec
 	runtime, err := agent.NewRuntime(agent.RuntimeConfig{
 		Context:       contextStore,
 		Collaboration: collaboration,
+		Planner:       agent.RulePlanner{},
 		WorkspaceRoot: root,
 	})
 	if err != nil {

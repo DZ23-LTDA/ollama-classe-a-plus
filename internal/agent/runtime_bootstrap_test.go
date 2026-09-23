@@ -2,6 +2,8 @@ package agent
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -73,5 +75,38 @@ func TestRuntimeUsesLocalModelResolver(t *testing.T) {
 	}
 	if mission.Model != "qwen3-coder:latest" {
 		t.Fatalf("mission model = %q", mission.Model)
+	}
+}
+
+func TestRuntimeBindsMissionToProjectOrganizationAndWorkspace(t *testing.T) {
+	contextStore, err := NewContextStore("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := t.TempDir()
+	projectRoot := filepath.Join(root, "project")
+	if err := os.MkdirAll(projectRoot, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	project, err := contextStore.CreateProject("Private", projectRoot, "org_a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	runtime, err := NewRuntime(RuntimeConfig{Context: contextStore, Planner: RulePlanner{}, WorkspaceRoot: root})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runtime.CreateMission(context.Background(), CreateMissionRequest{Objective: "cross tenant", ProjectID: project.ID, OrganizationID: "org_b"}); err == nil || !strings.Contains(err.Error(), "outside the active organization") {
+		t.Fatalf("organization mismatch error = %v", err)
+	}
+	if _, err := runtime.CreateMission(context.Background(), CreateMissionRequest{Objective: "outside project", ProjectID: project.ID, Workspace: root, OrganizationID: "org_a"}); err == nil || !strings.Contains(err.Error(), "inside the selected project") {
+		t.Fatalf("workspace mismatch error = %v", err)
+	}
+	mission, err := runtime.CreateMission(context.Background(), CreateMissionRequest{Objective: "bound project", ProjectID: project.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if mission.OrganizationID != "org_a" || mission.Workspace != projectRoot {
+		t.Fatalf("mission binding = %+v", mission)
 	}
 }

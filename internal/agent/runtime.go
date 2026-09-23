@@ -83,7 +83,7 @@ func NewRuntime(config RuntimeConfig) (*Runtime, error) {
 	}
 	planner := config.Planner
 	if planner == nil {
-		planner = RulePlanner{}
+		planner = UnconfiguredPlanner{}
 	}
 	tools := config.Tools
 	if tools == nil {
@@ -353,9 +353,44 @@ func (r *Runtime) CreateMission(ctx context.Context, request CreateMissionReques
 	if provider == "" {
 		provider = "ollama-local"
 	}
-	workspace, err := r.resolveWorkspace(request.Workspace)
+	projectID := strings.TrimSpace(request.ProjectID)
+	organizationID := strings.TrimSpace(request.OrganizationID)
+	var project Project
+	var err error
+	if projectID != "" {
+		if r.context == nil {
+			return Mission{}, errors.New("context store is required for project missions")
+		}
+		project, err = r.context.GetProject(projectID)
+		if err != nil {
+			return Mission{}, err
+		}
+		if organizationID != "" && project.OrganizationID != "" && project.OrganizationID != organizationID {
+			return Mission{}, errors.New("project is outside the active organization")
+		}
+		if project.OrganizationID != "" {
+			organizationID = project.OrganizationID
+		}
+	}
+	requestedWorkspace := strings.TrimSpace(request.Workspace)
+	if projectID != "" && requestedWorkspace == "" {
+		requestedWorkspace = strings.TrimSpace(project.Root)
+	}
+	workspace, err := r.resolveWorkspace(requestedWorkspace)
 	if err != nil {
 		return Mission{}, err
+	}
+	if projectID != "" {
+		projectRoot, rootErr := filepath.Abs(strings.TrimSpace(project.Root))
+		if rootErr != nil {
+			return Mission{}, rootErr
+		}
+		if strings.TrimSpace(project.Root) == "" || !isWithin(projectRoot, workspace) {
+			return Mission{}, errors.New("mission workspace must be inside the selected project")
+		}
+		if rootErr := rejectSymlinkComponents(projectRoot, workspace); rootErr != nil {
+			return Mission{}, fmt.Errorf("mission project workspace is not safe: %w", rootErr)
+		}
 	}
 	capabilities := normalizeMissionCapabilities(request.Capabilities)
 	if len(capabilities) == 0 {
@@ -366,7 +401,7 @@ func (r *Runtime) CreateMission(ctx context.Context, request CreateMissionReques
 		return Mission{}, err
 	}
 	now := time.Now().UTC()
-	mission := Mission{ID: "mis_" + uuid.NewString(), Version: 1, Objective: objective, Provider: provider, Model: strings.TrimSpace(request.Model), Workspace: workspace, ProjectID: strings.TrimSpace(request.ProjectID), OrganizationID: strings.TrimSpace(request.OrganizationID), Capabilities: capabilities, AutoRun: request.AutoRun, State: MissionPlanning, CreatedAt: now, UpdatedAt: now}
+	mission := Mission{ID: "mis_" + uuid.NewString(), Version: 1, Objective: objective, Provider: provider, Model: strings.TrimSpace(request.Model), Workspace: workspace, ProjectID: projectID, OrganizationID: organizationID, Capabilities: capabilities, AutoRun: request.AutoRun, State: MissionPlanning, CreatedAt: now, UpdatedAt: now}
 	if err := r.store.PutMission(mission); err != nil {
 		return Mission{}, err
 	}

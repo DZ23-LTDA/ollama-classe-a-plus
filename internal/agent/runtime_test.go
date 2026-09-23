@@ -150,7 +150,7 @@ func TestRuntimeRequiresApprovalBeforeWritingAndBuildsArtifact(t *testing.T) {
 }
 
 func TestWorkspaceToolsRejectTraversal(t *testing.T) {
-	runtime, err := NewRuntime(RuntimeConfig{Store: NewMemoryStore(), WorkspaceRoot: t.TempDir()})
+	runtime, err := NewRuntime(RuntimeConfig{Store: NewMemoryStore(), Planner: RulePlanner{}, WorkspaceRoot: t.TempDir()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -177,7 +177,7 @@ func TestWorkspaceToolsRejectSymlinkEscape(t *testing.T) {
 	if err := os.Symlink(outside, filepath.Join(root, "linked")); err != nil {
 		t.Skipf("symlink unavailable on this platform: %v", err)
 	}
-	runtime, err := NewRuntime(RuntimeConfig{Store: NewMemoryStore(), WorkspaceRoot: root})
+	runtime, err := NewRuntime(RuntimeConfig{Store: NewMemoryStore(), Planner: RulePlanner{}, WorkspaceRoot: root})
 	if err != nil {
 		t.Fatal(err)
 	}
