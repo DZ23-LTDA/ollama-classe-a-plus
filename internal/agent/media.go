@@ -294,24 +294,59 @@ func rejectMediaRedirect(_ *http.Request, _ []*http.Request) error {
 }
 
 func mediaDialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	return mediaDialContextWithResolver(ctx, network, address, net.DefaultResolver.LookupIPAddr)
+}
+
+func mediaDialContextWithResolver(ctx context.Context, network, address string, lookup func(context.Context, string) ([]net.IPAddr, error)) (net.Conn, error) {
 	dialer := &net.Dialer{Timeout: 15 * time.Second}
-	conn, err := dialer.DialContext(ctx, network, address)
-	if err != nil {
-		return nil, err
+	host, port, err := net.SplitHostPort(address)
+	if err != nil || host == "" || port == "" {
+		return nil, errors.New("media destination address is invalid")
 	}
-	if mediaLoopbackContext(ctx) {
-		return conn, nil
+	var addresses []net.IPAddr
+	if ip := net.ParseIP(strings.Trim(host, "[]")); ip != nil {
+		addresses = []net.IPAddr{{IP: ip}}
+	} else {
+		if lookup == nil {
+			return nil, errors.New("media destination resolver is unavailable")
+		}
+		addresses, err = lookup(ctx, host)
+		if err != nil {
+			return nil, fmt.Errorf("media destination lookup failed: %w", err)
+		}
 	}
-	remote, _, splitErr := net.SplitHostPort(conn.RemoteAddr().String())
-	if splitErr != nil {
-		_ = conn.Close()
-		return nil, errors.New("media connected address is invalid")
+	if len(addresses) == 0 {
+		return nil, errors.New("media destination has no addresses")
 	}
-	if ip := net.ParseIP(strings.Trim(remote, "[]")); ip != nil && mediaPrivateIP(ip) {
-		_ = conn.Close()
-		return nil, errors.New("media destination connected to a private address")
+	if !mediaLoopbackContext(ctx) {
+		for _, resolved := range addresses {
+			if mediaPrivateIP(resolved.IP) {
+				return nil, errors.New("media destination resolves to a private address")
+			}
+		}
 	}
-	return conn, nil
+	var lastErr error
+	for _, resolved := range addresses {
+		if network == "tcp4" && resolved.IP.To4() == nil {
+			continue
+		}
+		if network == "tcp6" && resolved.IP.To4() != nil {
+			continue
+		}
+		target := net.JoinHostPort(resolved.IP.String(), port)
+		if resolved.Zone != "" {
+			target = net.JoinHostPort(resolved.IP.String()+"%"+resolved.Zone, port)
+		}
+		conn, dialErr := dialer.DialContext(ctx, network, target)
+		if dialErr == nil {
+			return conn, nil
+		}
+		lastErr = dialErr
+	}
+	if lastErr != nil {
+		return nil, lastErr
+	}
+	return nil, errors.New("media destination has no address for requested network")
 }
 
 func mediaPrivateIP(ip net.IP) bool {

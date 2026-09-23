@@ -110,7 +110,7 @@ func TestMediaDownloadLimitsAndRejectsPrivateActualAddress(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer listener.Close()
-	accepted := make(chan struct{})
+	accepted := make(chan struct{}, 1)
 	go func() {
 		conn, acceptErr := listener.Accept()
 		if acceptErr == nil {
@@ -119,9 +119,43 @@ func TestMediaDownloadLimitsAndRejectsPrivateActualAddress(t *testing.T) {
 		close(accepted)
 	}()
 	_, err = mediaDialContext(context.Background(), "tcp", listener.Addr().String())
-	<-accepted
 	if err == nil || !strings.Contains(err.Error(), "private") {
 		t.Fatalf("expected private media dial rejection, got %v", err)
+	}
+	select {
+	case <-accepted:
+		t.Fatal("private media destination received TCP before refusal")
+	case <-time.After(200 * time.Millisecond):
+	}
+}
+
+func TestMediaDialRejectsPrivateResolvedAddressBeforeTCP(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	accepted := make(chan struct{}, 1)
+	go func() {
+		conn, acceptErr := listener.Accept()
+		if acceptErr == nil {
+			_ = conn.Close()
+		}
+		close(accepted)
+	}()
+	lookup := func(context.Context, string) ([]net.IPAddr, error) {
+		return []net.IPAddr{{IP: net.ParseIP("127.0.0.1")}, {IP: net.ParseIP("203.0.113.8")}}, nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	_, err = mediaDialContextWithResolver(ctx, "tcp", "media.example:"+portOf(listener.Addr().String()), lookup)
+	if err == nil || !strings.Contains(err.Error(), "private") {
+		t.Fatalf("expected pre-resolution private rejection, got %v", err)
+	}
+	select {
+	case <-accepted:
+		t.Fatal("resolved private media destination received TCP")
+	case <-time.After(200 * time.Millisecond):
 	}
 }
 
