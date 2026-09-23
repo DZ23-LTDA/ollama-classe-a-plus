@@ -545,3 +545,10 @@ Os testes normal/race e gates Go completos passaram. O achado foi de controle de
 O caminho anterior invocava `unshare` mesmo fora do Linux; strict já falhava fechado, mas best-effort não era portátil. O commit `b4c4c243` adicionou resolução de interpretador e execução por processo em macOS/Windows. Esse caminho mantém timeout, limite de output e kill, mas declara `network_isolation=not-enforced`. O descriptor foi versionado para refletir a diferença.
 
 A cobertura inclui testes normal/race, gates Go completos e compilação cruzada Darwin/Windows de `internal/agent`. A evidência não equivale a execução física nesses sistemas, nem a sandbox forte, AppArmor/SELinux ou homologação de dispositivo.
+
+
+## Addendum P1 — request JSON strict até EOF — 2026-09-23
+
+O helper `decodeJSON` permitia que um body começando com JSON válido contivesse outro documento posterior. O commit `f06891fc` adicionou segunda leitura e exige EOF, mantendo `DisallowUnknownFields`. A regressão centralizada cobre trailing object, campo desconhecido e whitespace válido.
+
+Testes normal/race e gates Go completos passaram. O efeito alcança todos os endpoints que chamam o helper, mas não altera as políticas de autorização ou a necessidade de approval.

@@ -477,3 +477,10 @@ A regressão cobre `trusted.example:8443`, `trusted.example.evil:8443` e ausênc
 O commit `b4c4c243` tornou `sandbox.exec` utilizável fora do Linux sem vender isolamento inexistente. macOS e Windows resolvem o interpretador disponível e executam em processo best-effort, com timeout, limite de saída e encerramento no cancelamento. A resposta marca `network_isolation=not-enforced`. No Linux, o caminho best-effort conserva a tentativa de namespaces; `strict` continua exigindo Linux, cgroup v2 delegado, namespaces, no-new-privs e seccomp, falhando fechado fora desse ambiente.
 
 Os testes normal/race, gates Go completos e compilações de `internal/agent` para Darwin e Windows passaram. Isso não substitui testes físicos, AppArmor/SELinux, homologação de host ou isolamento forte do operador. O produto continua preview/local RC em hardening.
+
+
+## Addendum de request JSON estrito — 2026-09-23
+
+O commit `f06891fc` tornou `decodeJSON` estrito até o fim do body. Além de `DisallowUnknownFields`, o helper agora rejeita um segundo documento JSON ou dados inválidos depois do primeiro. Isso se aplica transversalmente aos handlers que reutilizam o parser agentic.
+
+As regressões normal/race e os gates Go completos passaram. Esse hardening reduz ambiguidade de requests, mas não substitui auth, approval, DLP, SSRF ou validações específicas de cada recurso. O estado continua preview/local RC em hardening.

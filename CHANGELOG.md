@@ -427,3 +427,8 @@ A allowlist `scheme://host:*` agora aceita somente portas variáveis no host exa
 ## Unreleased — portable best-effort sandbox — 2026-09-23
 
 O `sandbox.exec` agora resolve Python/Node por plataforma. macOS e Windows usam processo best-effort com timeout, output limitado e cancelamento; a resposta informa `network_isolation=not-enforced`. Strict permanece Linux-only e fail-closed. Gates Go completos e compilações Darwin/Windows do pacote agentic passaram.
+
+
+## Unreleased — strict agentic request JSON — 2026-09-23
+
+O helper `decodeJSON` agora rejeita trailing JSON depois do primeiro documento, além de campos desconhecidos. A proteção vale para todos os handlers que o reutilizam. Testes normal/race e gates Go completos passaram.

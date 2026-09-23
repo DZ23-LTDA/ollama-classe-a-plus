@@ -368,3 +368,8 @@ Mutations agentic com `Origin` presente são aceitas somente quando a origem est
 ## Allowlist de Origin com portas variáveis
 
 Para permitir portas variáveis em um host, use `https://host.example:*`. Esse formato compara scheme e hostname exatos e exige uma porta no header `Origin`; ele não permite subdomínios parecidos. Wildcards de esquema como `app://*` seguem sendo explícitos e separados. Userinfo, path, query e fragment não são aceitos no formato de porta variável.
+
+
+## Bodies JSON
+
+Os handlers agentic que usam `decodeJSON` aceitam exatamente um documento JSON. Campos desconhecidos são rejeitados e qualquer segundo objeto, array ou conteúdo inválido após o primeiro produz `400`. Whitespace final é permitido. Essa regra é complementar à autorização, approval e validação específica do endpoint.

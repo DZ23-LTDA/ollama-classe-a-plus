@@ -2290,3 +2290,10 @@ Regressões cobrem porta válida, hostname parecido e ausência de porta. Testes
 O commit `b4c4c243c43939b1fbbf81155226acee636be2ba` corrigiu uma lacuna multiplataforma: o caminho comum sempre tentava `unshare`, embora strict fosse Linux-only. O sandbox agora resolve Python/Node conforme o sistema e, em macOS/Windows, usa processo best-effort com timeout, limite de stdout/stderr e kill no cancelamento. O resultado declara `execution_isolation=best-effort-platform-process`, `resource_limits=context-timeout-output-bounded` e `network_isolation=not-enforced`. Strict continua recusado fora de Linux e não há downgrade silencioso.
 
 Testes normais/race do sandbox passaram. O gate completo Go passou em integrity, todos os pacotes, vet, build e diff. Também foram compilados os testes de `internal/agent` para `GOOS=darwin` e `GOOS=windows` com `CGO_ENABLED=0`. Isso é prova de compilação multiplataforma, não homologação física de sistemas, dispositivos ou isolamento host.
+
+
+## Hardening P1 do decoder JSON HTTP — 2026-09-23
+
+A auditoria encontrou que `decodeJSON` já rejeitava campos desconhecidos, mas aceitava um segundo documento após o primeiro. O commit `f06891fc02397aca33ae4eaa04397911120f7d9c` exige EOF depois do único documento decodificado. Como dezenas de handlers de agentic reutilizam esse helper, a correção cobre connectors, plugins, Company OS, schedules, OAuth actions, missions e demais mutações que passam pelo parser comum.
+
+Foram adicionados testes para segundo objeto, campo desconhecido e whitespace válido. Testes normal/race e gates Go completos passaram em integrity, todos os pacotes, vet, build e diff. A mudança é de parsing de request; autorização, approval e dependências externas continuam sendo verificadas separadamente.
