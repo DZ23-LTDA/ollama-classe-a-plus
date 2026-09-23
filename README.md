@@ -12,9 +12,9 @@ Este repositório público reúne a base Ollama DZ23 e a evolução agentic do p
 
 ### Visão rápida
 
-![Mission Console atual](docs/images/screens/agentic-console.png)
+![Home do Ollama Classe A+ — versão em desenvolvimento](docs/images/screens/class-a-plus-home.png)
 
-O Mission Console acima é uma captura real da rota `/agentic` com dados demonstrativos controlados. Para conhecer as telas planejadas de configuração, builder e mobile, veja a [galeria visual](docs/CLASS_A_PLUS_GUIDE.md#telas-e-estado-visual). Mockups conceituais são identificados como conceito dentro da própria imagem; eles não são apresentados como funcionalidades concluídas.
+A imagem acima representa a Home da versão em desenvolvimento do Ollama Classe A+; ela não é uma declaração de que todas as jornadas, integrações ou telas estejam integradas à `main`. Para conhecer o Mission Console e as telas planejadas de configuração, builder e mobile, veja a [galeria visual](docs/CLASS_A_PLUS_GUIDE.md#telas-e-estado-visual). Mockups conceituais são identificados como conceito dentro da própria imagem; eles não são apresentados como funcionalidades concluídas.
 
 | Recurso | Documento |
 |---|---|
