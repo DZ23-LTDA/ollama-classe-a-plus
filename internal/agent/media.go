@@ -82,6 +82,26 @@ func safeMediaWorkspaceRoot(workspace string) (string, error) {
 	return root, nil
 }
 
+func openMediaWorkspaceRoot(workspace string) (*os.Root, string, error) {
+	root, err := safeMediaWorkspaceRoot(workspace)
+	if err != nil {
+		return nil, "", err
+	}
+	rootHandle, err := os.OpenRoot(root)
+	if err != nil {
+		return nil, "", err
+	}
+	return rootHandle, root, nil
+}
+
+func mediaRelativePath(root, path string) (string, error) {
+	relative, err := filepath.Rel(root, path)
+	if err != nil || relative == "." || filepath.IsAbs(relative) || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+		return "", errors.New("media path escapes workspace")
+	}
+	return filepath.ToSlash(relative), nil
+}
+
 func safeMediaInputPath(workspace, inputPath string) (string, os.FileInfo, error) {
 	root, err := safeMediaWorkspaceRoot(workspace)
 	if err != nil {
@@ -105,6 +125,161 @@ func safeMediaInputPath(workspace, inputPath string) (string, os.FileInfo, error
 		return "", nil, errors.New("media input must be a regular file")
 	}
 	return input, info, nil
+}
+
+func openSafeMediaInput(workspace, inputPath string) (*os.Root, *os.File, string, os.FileInfo, error) {
+	rootHandle, root, err := openMediaWorkspaceRoot(workspace)
+	if err != nil {
+		return nil, nil, "", nil, err
+	}
+	input, _, err := safeMediaInputPath(root, inputPath)
+	if err != nil {
+		_ = rootHandle.Close()
+		return nil, nil, "", nil, err
+	}
+	relative, err := mediaRelativePath(root, input)
+	if err != nil {
+		_ = rootHandle.Close()
+		return nil, nil, "", nil, err
+	}
+	file, err := rootHandle.Open(relative)
+	if err != nil {
+		_ = rootHandle.Close()
+		return nil, nil, "", nil, err
+	}
+	openedInfo, err := file.Stat()
+	if err != nil || !openedInfo.Mode().IsRegular() {
+		_ = file.Close()
+		_ = rootHandle.Close()
+		if err != nil {
+			return nil, nil, "", nil, err
+		}
+		return nil, nil, "", nil, errors.New("media input must be a regular file")
+	}
+	return rootHandle, file, relative, openedInfo, nil
+}
+
+func writeMediaFile(workspace, relativePath string, data []byte, limit int64) (string, error) {
+	if int64(len(data)) > limit {
+		return "", errors.New("media payload exceeds limit")
+	}
+	root, rootPath, err := openMediaWorkspaceRoot(workspace)
+	if err != nil {
+		return "", err
+	}
+	defer root.Close()
+	if err := rejectMediaOutputSymlinks(root, relativePath); err != nil {
+		return "", err
+	}
+	if err := root.MkdirAll(filepath.ToSlash(filepath.Dir(relativePath)), 0o700); err != nil {
+		return "", err
+	}
+	file, err := root.OpenFile(filepath.ToSlash(relativePath), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
+	if err != nil {
+		return "", err
+	}
+	if _, err := file.Write(data); err != nil {
+		_ = file.Close()
+		return "", err
+	}
+	if err := file.Close(); err != nil {
+		return "", err
+	}
+	return filepath.Join(rootPath, filepath.FromSlash(relativePath)), nil
+}
+
+func rejectMediaOutputSymlinks(root *os.Root, relativePath string) error {
+	clean := filepath.ToSlash(filepath.Clean(relativePath))
+	parts := strings.Split(clean, "/")
+	current := ""
+	for _, part := range parts {
+		if part == "" || part == "." {
+			continue
+		}
+		if current == "" {
+			current = part
+		} else {
+			current += "/" + part
+		}
+		info, err := root.Lstat(current)
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("media output path contains a symlink: %s", current)
+		}
+	}
+	return nil
+}
+
+func validateMediaOutputPath(workspace, relativePath string) error {
+	root, _, err := openMediaWorkspaceRoot(workspace)
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+	return rejectMediaOutputSymlinks(root, relativePath)
+}
+
+func validateMediaOutputDirectory(workspace, relativePath string) error {
+	root, _, err := openMediaWorkspaceRoot(workspace)
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+	info, err := root.Lstat(filepath.ToSlash(relativePath))
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("media output directory contains a symlink: %s", relativePath)
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("media output path is not a directory: %s", relativePath)
+	}
+	return nil
+}
+
+func readMediaFile(ctx context.Context, reader io.Reader, limit int64) ([]byte, error) {
+	if limit <= 0 {
+		return nil, errors.New("media payload limit is invalid")
+	}
+	var data bytes.Buffer
+	buffer := make([]byte, 32<<10)
+	remaining := limit + 1
+	for remaining > 0 {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		chunkSize := int64(len(buffer))
+		if chunkSize > remaining {
+			chunkSize = remaining
+		}
+		n, err := reader.Read(buffer[:chunkSize])
+		if n > 0 {
+			_, _ = data.Write(buffer[:n])
+			remaining -= int64(n)
+			if int64(data.Len()) > limit {
+				return nil, errors.New("media payload exceeds limit")
+			}
+		}
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				return data.Bytes(), nil
+			}
+			return nil, err
+		}
+		if n == 0 {
+			return nil, errors.New("media reader returned no progress")
+		}
+	}
+	return nil, errors.New("media payload exceeds limit")
 }
 
 func NewMediaManager(provider MediaProvider) (*MediaManager, error) {
@@ -172,6 +347,9 @@ func (m *MediaManager) GenerateImage(ctx context.Context, workspace, prompt, mod
 	if model == "" {
 		model = m.Provider.ImageModel
 	}
+	if err := validateMediaOutputDirectory(workspace, ".agent-media"); err != nil {
+		return MediaResult{}, err
+	}
 	payload, err := m.postJSON(ctx, "/images/generations", map[string]any{"model": model, "prompt": prompt, "n": 1, "response_format": "b64_json"})
 	if err != nil {
 		return MediaResult{}, err
@@ -197,6 +375,9 @@ func (m *MediaManager) GenerateVideo(ctx context.Context, workspace, prompt, mod
 	}
 	if model == "" {
 		model = m.Provider.VideoModel
+	}
+	if err := validateMediaOutputDirectory(workspace, ".agent-media"); err != nil {
+		return MediaResult{}, err
 	}
 	payload, err := m.postJSON(ctx, "/videos/generations", map[string]any{"model": model, "prompt": prompt})
 	if err != nil {
@@ -224,16 +405,16 @@ func (m *MediaManager) GenerateSpeech(ctx context.Context, workspace, text, voic
 	if model == "" {
 		model = m.Provider.SpeechModel
 	}
+	if err := validateMediaOutputDirectory(workspace, ".agent-media"); err != nil {
+		return MediaResult{}, err
+	}
 	body, err := m.postBytes(ctx, "/audio/speech", map[string]any{"model": model, "input": text, "voice": voice, "response_format": "wav"})
 	if err != nil {
 		return MediaResult{}, err
 	}
-	workspace, err = safeMediaWorkspaceRoot(workspace)
+	relativePath := filepath.ToSlash(filepath.Join(".agent-media", "speech-"+strconv.FormatInt(time.Now().UnixNano(), 10)+".wav"))
+	path, err := writeMediaFile(workspace, relativePath, body, 100<<20)
 	if err != nil {
-		return MediaResult{}, err
-	}
-	path := filepath.Join(workspace, ".agent-media", "speech-"+strconv.FormatInt(time.Now().UnixNano(), 10)+".wav")
-	if err := writeLimitedFile(path, body, 100<<20); err != nil {
 		return MediaResult{}, err
 	}
 	artifact, err := BuildArtifactManifest(workspace, "", "", filepath.Base(path), filepath.ToSlash(filepath.Join(".agent-media", filepath.Base(path))))
@@ -247,25 +428,30 @@ func (m *MediaManager) Transcribe(ctx context.Context, workspace, inputPath, mod
 	if strings.TrimSpace(inputPath) == "" {
 		return MediaResult{}, errors.New("audio input is required")
 	}
-	inputPath, info, err := safeMediaInputPath(workspace, inputPath)
+	rootHandle, file, relativeInput, info, err := openSafeMediaInput(workspace, inputPath)
 	if err != nil {
 		return MediaResult{}, err
 	}
+	defer rootHandle.Close()
+	defer file.Close()
 	if info.Size() > 100<<20 {
 		return MediaResult{}, errors.New("audio input exceeds 100 MiB")
 	}
-	file, err := os.Open(inputPath)
+	transcriptRelative := filepath.ToSlash(filepath.Join(".agent-media", "transcript-"+strconv.FormatInt(time.Now().UnixNano(), 10)+".txt"))
+	if err := validateMediaOutputDirectory(workspace, ".agent-media"); err != nil {
+		return MediaResult{}, err
+	}
+	audio, err := readMediaFile(ctx, file, 100<<20)
 	if err != nil {
 		return MediaResult{}, err
 	}
-	defer file.Close()
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)
-	part, err := writer.CreateFormFile("file", filepath.Base(inputPath))
+	part, err := writer.CreateFormFile("file", filepath.Base(relativeInput))
 	if err != nil {
 		return MediaResult{}, err
 	}
-	if _, err := io.CopyN(part, file, 100<<20); err != nil && !errors.Is(err, io.EOF) {
+	if _, err := part.Write(audio); err != nil {
 		return MediaResult{}, err
 	}
 	if model == "" {
@@ -291,11 +477,8 @@ func (m *MediaManager) Transcribe(ctx context.Context, workspace, inputPath, mod
 		return MediaResult{}, err
 	}
 	text, _ := payload["text"].(string)
-	transcriptPath := filepath.Join(workspace, ".agent-media", "transcript-"+strconv.FormatInt(time.Now().UnixNano(), 10)+".txt")
-	if err := os.MkdirAll(filepath.Dir(transcriptPath), 0o700); err != nil {
-		return MediaResult{}, err
-	}
-	if err := os.WriteFile(transcriptPath, []byte(text+"\n"), 0o600); err != nil {
+	transcriptPath, err := writeMediaFile(workspace, transcriptRelative, []byte(text+"\n"), 4<<20)
+	if err != nil {
 		return MediaResult{}, err
 	}
 	artifact, err := BuildArtifactManifest(workspace, "", "", filepath.Base(transcriptPath), filepath.ToSlash(filepath.Join(".agent-media", filepath.Base(transcriptPath))))
@@ -311,16 +494,22 @@ func (m *MediaManager) AnalyzeImage(ctx context.Context, workspace, inputPath, p
 	if strings.TrimSpace(inputPath) == "" || strings.TrimSpace(prompt) == "" {
 		return MediaResult{}, errors.New("image input and vision prompt are required")
 	}
-	input, _, err := safeMediaInputPath(workspace, inputPath)
+	rootHandle, file, _, info, err := openSafeMediaInput(workspace, inputPath)
 	if err != nil {
 		return MediaResult{}, err
 	}
-	data, err := os.ReadFile(input)
-	if err != nil {
-		return MediaResult{}, err
-	}
-	if len(data) > 25<<20 {
+	defer rootHandle.Close()
+	defer file.Close()
+	if info.Size() > 25<<20 {
 		return MediaResult{}, errors.New("image input exceeds 25 MiB")
+	}
+	visionRelative := filepath.ToSlash(filepath.Join(".agent-media", "vision-"+strconv.FormatInt(time.Now().UnixNano(), 10)+".txt"))
+	if err := validateMediaOutputDirectory(workspace, ".agent-media"); err != nil {
+		return MediaResult{}, err
+	}
+	data, err := readMediaFile(ctx, file, 25<<20)
+	if err != nil {
+		return MediaResult{}, err
 	}
 	if model == "" {
 		model = m.Provider.ImageModel
@@ -347,8 +536,8 @@ func (m *MediaManager) AnalyzeImage(ctx context.Context, workspace, inputPath, p
 	if strings.TrimSpace(text) == "" {
 		return MediaResult{}, errors.New("vision provider returned no text")
 	}
-	output := filepath.Join(workspace, ".agent-media", "vision-"+strconv.FormatInt(time.Now().UnixNano(), 10)+".txt")
-	if err := writeLimitedFile(output, []byte(text+"\n"), 4<<20); err != nil {
+	output, err := writeMediaFile(workspace, visionRelative, []byte(text+"\n"), 4<<20)
+	if err != nil {
 		return MediaResult{}, err
 	}
 	artifact, err := BuildArtifactManifest(workspace, "", "", filepath.Base(output), filepath.ToSlash(filepath.Join(".agent-media", filepath.Base(output))))
@@ -367,25 +556,19 @@ func GenerateTone(workspace string, frequency float64, duration time.Duration) (
 	}
 	const sampleRate = 8000
 	samples := int(duration.Seconds() * sampleRate)
-	path := filepath.Join(workspace, ".agent-media", "tone-"+strconv.FormatInt(time.Now().UnixNano(), 10)+".wav")
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-		return MediaResult{}, err
-	}
 	data := make([]byte, samples*2)
 	for i := range samples {
 		sample := int16(12000 * sin(2*3.141592653589793*frequency*float64(i)/sampleRate))
 		data[i*2] = byte(sample)
 		data[i*2+1] = byte(sample >> 8)
 	}
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_EXCL, 0o600)
+	var wav bytes.Buffer
+	if err := writeWAVHeader(&wav, len(data), sampleRate); err != nil {
+		return MediaResult{}, err
+	}
+	_, _ = wav.Write(data)
+	path, err := writeMediaFile(workspace, filepath.ToSlash(filepath.Join(".agent-media", "tone-"+strconv.FormatInt(time.Now().UnixNano(), 10)+".wav")), wav.Bytes(), 100<<20)
 	if err != nil {
-		return MediaResult{}, err
-	}
-	defer file.Close()
-	if err := writeWAVHeader(file, len(data), sampleRate); err != nil {
-		return MediaResult{}, err
-	}
-	if _, err := file.Write(data); err != nil {
 		return MediaResult{}, err
 	}
 	artifact, err := BuildArtifactManifest(workspace, "", "", filepath.Base(path), filepath.ToSlash(filepath.Join(".agent-media", filepath.Base(path))))
@@ -499,8 +682,9 @@ func (m *MediaManager) materializeEntry(ctx context.Context, workspace, prefix, 
 	if mediaType == "" || mediaType == "application/octet-stream" {
 		mediaType = mediaTypeForExtension(extension)
 	}
-	path := filepath.Join(workspace, ".agent-media", prefix+"-"+strconv.FormatInt(time.Now().UnixNano(), 10)+extension)
-	if err := writeLimitedFile(path, data, 100<<20); err != nil {
+	relativePath := filepath.ToSlash(filepath.Join(".agent-media", prefix+"-"+strconv.FormatInt(time.Now().UnixNano(), 10)+extension))
+	path, err := writeMediaFile(workspace, relativePath, data, 100<<20)
+	if err != nil {
 		return "", "", err
 	}
 	if mediaType == "" {
@@ -574,16 +758,6 @@ func decodeResponse(response *http.Response) (map[string]any, error) {
 		return nil, fmt.Errorf("media request failed with status %d: %s", response.StatusCode, limitError(string(body), 1000))
 	}
 	return payload, nil
-}
-
-func writeLimitedFile(path string, data []byte, limit int64) error {
-	if int64(len(data)) > limit {
-		return errors.New("media payload exceeds limit")
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-		return err
-	}
-	return os.WriteFile(path, data, 0o600)
 }
 
 func readLimitedMediaBody(reader io.Reader, limit int64) ([]byte, error) {

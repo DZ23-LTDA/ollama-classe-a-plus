@@ -11,11 +11,21 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestDeploymentManagerGenericProvider(t *testing.T) {
 	root := t.TempDir()
 	if err := os.WriteFile(filepath.Join(root, "index.html"), []byte("<h1>DZ23</h1>"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, ".env"), []byte("SYNTHETIC_PRIVATE=1"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, ".git"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, ".git", "config"), []byte("synthetic"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("DZ23_DEPLOY_TOKEN", "deploy-test-token")
@@ -88,19 +98,99 @@ func TestDeploymentDialRejectsPrivateConnectedAddress(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer listener.Close()
-	accepted := make(chan struct{})
+	accepted := make(chan bool, 1)
 	go func() {
 		conn, acceptErr := listener.Accept()
 		if acceptErr == nil && conn != nil {
 			_ = conn.Close()
+			accepted <- true
+			return
 		}
-		close(accepted)
+		accepted <- false
 	}()
 	_, err = deploymentDialContext(context.Background(), "tcp", listener.Addr().String())
-	<-accepted
 	if err == nil || !strings.Contains(err.Error(), "private") {
 		t.Fatalf("expected private deployment dial rejection, got %v", err)
 	}
+	select {
+	case contacted := <-accepted:
+		if contacted {
+			t.Fatal("private deployment destination received TCP before refusal")
+		}
+	case <-time.After(200 * time.Millisecond):
+	}
+}
+
+func TestDeploymentPackageExcludesPrivateFiles(t *testing.T) {
+	root := t.TempDir()
+	fixtures := map[string]string{
+		"index.html":      "<h1>public</h1>",
+		".env":            "SYNTHETIC_PRIVATE=1",
+		".env.production": "SYNTHETIC_PRIVATE=2",
+		"server.key":      "SYNTHETIC_PRIVATE=3",
+		"database.backup": "SYNTHETIC_PRIVATE=4",
+		"runtime.log":     "SYNTHETIC_PRIVATE=5",
+	}
+	for name, content := range fixtures {
+		if err := os.WriteFile(filepath.Join(root, name), []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.MkdirAll(filepath.Join(root, ".git"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, ".git", "config"), []byte("synthetic"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	files, err := collectDeployFiles(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) != 1 || files[0].Path != "index.html" {
+		t.Fatalf("public deployment files=%+v", files)
+	}
+}
+
+func TestDeploymentDialRejectsPrivateResolvedAddressBeforeTCP(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	accepted := make(chan bool, 1)
+	go func() {
+		conn, acceptErr := listener.Accept()
+		if acceptErr == nil && conn != nil {
+			_ = conn.Close()
+			accepted <- true
+			return
+		}
+		accepted <- false
+	}()
+	lookup := func(context.Context, string) ([]net.IPAddr, error) {
+		return []net.IPAddr{{IP: net.ParseIP("127.0.0.1")}, {IP: net.ParseIP("203.0.113.8")}}, nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	_, err = deploymentDialContextWithResolver(ctx, "tcp", "public.example:"+portOf(listener.Addr().String()), lookup)
+	if err == nil || !strings.Contains(err.Error(), "private") {
+		t.Fatalf("expected pre-resolution private rejection, got %v", err)
+	}
+	select {
+	case contacted := <-accepted:
+		if contacted {
+			t.Fatal("resolved private deployment destination received TCP")
+		}
+	case <-time.After(200 * time.Millisecond):
+	}
+}
+
+func portOf(address string) string {
+	_, port, err := net.SplitHostPort(address)
+	if err != nil {
+		panic(err)
+	}
+	return port
 }
 
 func TestDeploymentAllowsLocalhostHTTPConfiguration(t *testing.T) {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -160,4 +161,159 @@ func TestMediaTranscriptionRestrictsWorkspaceAndSize(t *testing.T) {
 	if _, err := manager.Transcribe(context.Background(), workspace, largeInput, ""); err == nil || !strings.Contains(err.Error(), "exceeds 100 MiB") {
 		t.Fatalf("expected audio size rejection, got %v", err)
 	}
+}
+
+func TestMediaOutputsRejectInternalSymlinkBeforeProvider(t *testing.T) {
+	providerRequests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		providerRequests++
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":[{"b64_json":"iVBORw0KGgo="}],"choices":[{"message":{"content":"unused"}}]}`))
+	}))
+	defer server.Close()
+	manager, err := NewMediaManager(MediaProvider{Name: "fixture", BaseURL: server.URL})
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager.Client = server.Client()
+	workspace, outside := t.TempDir(), t.TempDir()
+	if err := os.Symlink(outside, filepath.Join(workspace, ".agent-media")); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+	inputAudio := filepath.Join(workspace, "input.wav")
+	if err := os.WriteFile(inputAudio, []byte("wav"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	inputImage := filepath.Join(workspace, "input.png")
+	if err := os.WriteFile(inputImage, []byte("png"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	checks := []struct {
+		name string
+		call func() error
+	}{
+		{name: "image", call: func() error {
+			_, err := manager.GenerateImage(context.Background(), workspace, "fixture", "")
+			return err
+		}},
+		{name: "video", call: func() error {
+			_, err := manager.GenerateVideo(context.Background(), workspace, "fixture", "")
+			return err
+		}},
+		{name: "speech", call: func() error {
+			_, err := manager.GenerateSpeech(context.Background(), workspace, "fixture", "alloy", "")
+			return err
+		}},
+		{name: "transcription", call: func() error {
+			_, err := manager.Transcribe(context.Background(), workspace, inputAudio, "")
+			return err
+		}},
+		{name: "vision", call: func() error {
+			_, err := manager.AnalyzeImage(context.Background(), workspace, inputImage, "describe", "")
+			return err
+		}},
+		{name: "tone", call: func() error { _, err := GenerateTone(workspace, 440, time.Millisecond); return err }},
+	}
+	for _, check := range checks {
+		t.Run(check.name, func(t *testing.T) {
+			err := check.call()
+			if err == nil || !strings.Contains(err.Error(), "symlink") {
+				t.Fatalf("expected symlink rejection, got %v", err)
+			}
+		})
+	}
+	entries, err := os.ReadDir(outside)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("media output escaped workspace: %d files", len(entries))
+	}
+	if providerRequests != 0 {
+		t.Fatalf("provider was contacted before unsafe output destination was rejected: %d requests", providerRequests)
+	}
+}
+
+func TestWriteMediaFileAllowsSafeOutputAndRejectsPrivateComponents(t *testing.T) {
+	workspace := t.TempDir()
+	path, err := writeMediaFile(workspace, filepath.ToSlash(filepath.Join(".agent-media", "safe.txt")), []byte("fixture"), 64)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil || string(data) != "fixture" {
+		t.Fatalf("safe output=%q err=%v", data, err)
+	}
+	outside := t.TempDir()
+	if err := os.Symlink(outside, filepath.Join(workspace, "linked")); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+	if _, err := writeMediaFile(workspace, "linked/private.txt", []byte("blocked"), 64); err == nil || !strings.Contains(err.Error(), "symlink") {
+		t.Fatalf("expected symlink rejection, got %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(outside, "private.txt")); !os.IsNotExist(err) {
+		t.Fatalf("private output was created outside workspace: %v", err)
+	}
+}
+
+func TestAnalyzeImageRejectsLargeFileBeforeReadOrProvider(t *testing.T) {
+	providerRequests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		providerRequests++
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"unused"}}]}`))
+	}))
+	defer server.Close()
+	manager, err := NewMediaManager(MediaProvider{Name: "fixture", BaseURL: server.URL})
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager.Client = server.Client()
+	workspace := t.TempDir()
+	input := filepath.Join(workspace, "large.png")
+	file, err := os.OpenFile(input, os.O_CREATE|os.O_WRONLY, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Truncate(25<<20 + 1); err != nil {
+		_ = file.Close()
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	_, err = manager.AnalyzeImage(context.Background(), workspace, input, "describe", "vision")
+	if err == nil || !strings.Contains(err.Error(), "exceeds 25 MiB") {
+		t.Fatalf("expected pre-read size rejection, got %v", err)
+	}
+	if providerRequests != 0 {
+		t.Fatalf("vision provider was contacted for oversized input: %d requests", providerRequests)
+	}
+}
+
+func TestReadMediaFileHonorsCancellationAndBound(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	reads := 0
+	reader := strings.NewReader("should not be read")
+	wrapped := readerWithReadCounter{reader: reader, reads: &reads}
+	if _, err := readMediaFile(ctx, wrapped, 1024); err == nil || !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected cancellation, got %v", err)
+	}
+	if reads != 0 {
+		t.Fatalf("reader was consumed after cancellation: %d reads", reads)
+	}
+	if _, err := readMediaFile(context.Background(), strings.NewReader("12345"), 4); err == nil || !strings.Contains(err.Error(), "exceeds limit") {
+		t.Fatalf("expected bounded read rejection, got %v", err)
+	}
+}
+
+type readerWithReadCounter struct {
+	reader interface{ Read([]byte) (int, error) }
+	reads  *int
+}
+
+func (r readerWithReadCounter) Read(p []byte) (int, error) {
+	*r.reads++
+	return r.reader.Read(p)
 }

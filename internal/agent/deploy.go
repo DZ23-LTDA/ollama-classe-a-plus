@@ -71,24 +71,60 @@ func deploymentRequestContext(ctx context.Context, rawURL string) (context.Conte
 }
 
 func deploymentDialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	return deploymentDialContextWithResolver(ctx, network, address, net.DefaultResolver.LookupIPAddr)
+}
+
+func deploymentDialContextWithResolver(ctx context.Context, network, address string, lookup func(context.Context, string) ([]net.IPAddr, error)) (net.Conn, error) {
 	dialer := &net.Dialer{Timeout: 15 * time.Second}
-	conn, err := dialer.DialContext(ctx, network, address)
-	if err != nil {
-		return nil, err
-	}
 	if loopback, _ := ctx.Value(deploymentLoopbackContextKey{}).(bool); loopback {
-		return conn, nil
+		return dialer.DialContext(ctx, network, address)
 	}
-	remote, _, splitErr := net.SplitHostPort(conn.RemoteAddr().String())
-	if splitErr != nil {
-		_ = conn.Close()
-		return nil, errors.New("deployment connected address is invalid")
+	host, port, err := net.SplitHostPort(address)
+	if err != nil || host == "" || port == "" {
+		return nil, errors.New("deployment destination address is invalid")
 	}
-	if ip := net.ParseIP(strings.Trim(remote, "[]")); ip != nil && deploymentPrivateIP(ip) {
-		_ = conn.Close()
-		return nil, errors.New("deployment destination connected to a private address")
+	var addresses []net.IPAddr
+	if ip := net.ParseIP(strings.Trim(host, "[]")); ip != nil {
+		addresses = []net.IPAddr{{IP: ip}}
+	} else {
+		if lookup == nil {
+			return nil, errors.New("deployment destination resolver is unavailable")
+		}
+		addresses, err = lookup(ctx, host)
+		if err != nil {
+			return nil, fmt.Errorf("deployment destination lookup failed: %w", err)
+		}
 	}
-	return conn, nil
+	if len(addresses) == 0 {
+		return nil, errors.New("deployment destination has no addresses")
+	}
+	for _, address := range addresses {
+		if deploymentPrivateIP(address.IP) {
+			return nil, errors.New("deployment destination resolves to a private address")
+		}
+	}
+	var lastErr error
+	for _, address := range addresses {
+		if network == "tcp4" && address.IP.To4() == nil {
+			continue
+		}
+		if network == "tcp6" && address.IP.To4() != nil {
+			continue
+		}
+		target := net.JoinHostPort(address.IP.String(), port)
+		if address.Zone != "" {
+			target = net.JoinHostPort(address.IP.String()+"%"+address.Zone, port)
+		}
+		conn, dialErr := dialer.DialContext(ctx, network, target)
+		if dialErr == nil {
+			return conn, nil
+		}
+		lastErr = dialErr
+	}
+	if lastErr != nil {
+		return nil, lastErr
+	}
+	return nil, errors.New("deployment destination has no address for requested network")
 }
 
 func deploymentPrivateIP(ip net.IP) bool {
@@ -189,26 +225,36 @@ func collectDeployFiles(root string) ([]deployFile, error) {
 			return walkErr
 		}
 		if info.Mode()&os.ModeSymlink != 0 {
-			if info.IsDir() {
+			return nil
+		}
+		relative, err := filepath.Rel(root, path)
+		if err != nil || relative == "." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+			if relative == "." && path == root {
+				return nil
+			}
+			return errors.New("deployment path escaped root")
+		}
+		relative = filepath.ToSlash(relative)
+		if info.IsDir() {
+			if deploymentPathContainsPrivateDirectory(relative) {
 				return filepath.SkipDir
 			}
 			return nil
 		}
-		if info.IsDir() {
+		if !info.Mode().IsRegular() {
+			return errors.New("deployment workspace contains a non-regular file")
+		}
+		if !deploymentPathIsPublic(relative) {
 			return nil
 		}
 		if len(files) >= 2000 || total+info.Size() > 50<<20 {
 			return errors.New("deployment workspace exceeds file or size limit")
 		}
-		relative, err := filepath.Rel(root, path)
-		if err != nil || relative == "." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
-			return errors.New("deployment path escaped root")
-		}
 		data, err := os.ReadFile(path)
 		if err != nil {
 			return err
 		}
-		files = append(files, deployFile{Path: filepath.ToSlash(relative), Data: data})
+		files = append(files, deployFile{Path: relative, Data: data})
 		total += int64(len(data))
 		return nil
 	})
@@ -217,6 +263,32 @@ func collectDeployFiles(root string) ([]deployFile, error) {
 	}
 	sort.Slice(files, func(i, j int) bool { return files[i].Path < files[j].Path })
 	return files, nil
+}
+
+func deploymentPathContainsPrivateDirectory(relative string) bool {
+	for _, part := range strings.Split(filepath.ToSlash(relative), "/") {
+		switch strings.ToLower(part) {
+		case ".git", ".hg", ".svn", ".agent", ".ollama", ".secrets", "node_modules":
+			return true
+		}
+	}
+	return false
+}
+
+func deploymentPathIsPublic(relative string) bool {
+	if deploymentPathContainsPrivateDirectory(relative) {
+		return false
+	}
+	base := strings.ToLower(filepath.Base(relative))
+	if base == ".env" || strings.HasPrefix(base, ".env.") || strings.HasSuffix(base, ".pem") || strings.HasSuffix(base, ".key") || strings.HasSuffix(base, ".crt") || strings.HasSuffix(base, ".p12") || strings.HasSuffix(base, ".pfx") {
+		return false
+	}
+	for _, marker := range []string{"secret", "credential", "password", "token", "apikey", "api_key", "backup", "dump", "log"} {
+		if strings.Contains(base, marker) {
+			return false
+		}
+	}
+	return true
 }
 
 func (m *DeploymentManager) request(ctx context.Context, config DeployConfig, method, endpoint string, body []byte, contentType string) (map[string]any, error) {
