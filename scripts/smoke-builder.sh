@@ -13,6 +13,6 @@ archive=$(curl -fsS -X POST "$BASE/builders/$id/export" -H "$JSON" -d '{}')
 jq -e '(.archive_path | length) > 0' <<<"$archive" >/dev/null
 published=$(curl -fsS -X POST "$BASE/builders/$id/publish" -H "$JSON" -d '{}')
 jq -e '.project.status == "published" and (.published_path | length) > 0' <<<"$published" >/dev/null
-status=$(curl -sS -o /tmp/builder-deploy-approval.json -w '%{http_code}' -X POST "$BASE/builders/$id/deploy/generic" -H "$JSON" -d '{"target":"https://deploy.example.com/project","approved":false}')
-test "$status" = 428
+status=$(curl -sS -o /tmp/builder-deploy-approval.json -w '%{http_code}' -X POST "$BASE/builders/$id/deploy/generic" -H "$JSON" -d '{"target":"https://deploy.example.com/project","approved":true}')
+test "$status" = 400
 printf 'BUILDER_SMOKE=PASS project=%s\n' "$id"

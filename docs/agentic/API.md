@@ -237,7 +237,7 @@ Com um provider HTTPS compatível, use `POST /media/image`, `/media/video`, `/me
 
 `POST /builders/:id/visual` atualiza componentes, bindings, estilos e eventos do canvas. `POST /builders/:id/undo` e `POST /builders/:id/redo` alteram o histórico persistido, incrementam a versão e regeneram o preview. O histórico é limitado às últimas 50 alterações para impedir crescimento sem limite.
 
-`GET /deployments` lista somente os providers configurados sem tokens. `POST /builders/:id/deploy/:provider` empacota o workspace contido do projeto e chama Vercel, Netlify ou um deployer genérico declarado em `OLLAMA_AGENT_DEPLOYMENTS`. O corpo precisa conter `{"approved":true}`; sem essa aprovação explícita a API retorna `428 Precondition Required`. O token é lido exclusivamente de `token_env` no servidor. O adapter impõe limite de 2.000 arquivos, 50 MiB, redirects desabilitados e HTTPS fora de loopback.
+`GET /deployments` lista somente os providers configurados sem tokens. O fluxo externo usa `POST /builders/:id/deploy/:provider/approval` para solicitar uma aprovação, `POST /builders/:id/deploy/:provider/approval/:approval_id` para a decisão owner/admin com nonce e `POST /builders/:id/deploy/:provider` para consumir a approval uma única vez. O deploy empacota o workspace contido do projeto e chama Vercel, Netlify ou um deployer genérico declarado em `OLLAMA_AGENT_DEPLOYMENTS`; `approved=true` enviado diretamente ao deploy é rejeitado como campo desconhecido. O token é lido exclusivamente de `token_env` no servidor. O adapter impõe limite de 2.000 arquivos, 50 MiB, redirects desabilitados e HTTPS fora de loopback.
 
 ## Colaboração
 
