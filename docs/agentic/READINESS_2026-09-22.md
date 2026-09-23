@@ -817,3 +817,12 @@ A branch documental do PR #5 foi atualizada no head `605cd959` com a imagem Home
 Os bloqueios externos permanecem: instaladores assinados, imagens Docker publicadas, auto-update/rollback verificável, homologação física Windows/macOS/Linux/Android/iOS, contas OAuth/IdP/providers, Redis/PostgreSQL/OTLP operacionais e providers de deploy reais. Esses itens continuam `BLOCKED_BY_EXTERNAL_DEPENDENCY` com requisitos explicitados, não como funcionalidades homologadas.
 
 Evidência de referência: `https://github.com/DZ23-LTDA/ollama-classe-a-plus/pull/1`, `https://github.com/DZ23-LTDA/ollama-classe-a-plus/pull/5`.
+
+
+## Addendum de publicação Docker fail-closed — 2026-09-23
+
+O head `18059ba1` corrige um risco residual de identidade/distribuição: o workflow herdado `latest.yaml` não é mais acionado por release; ele só pode ser disparado manualmente com `enable_latest=true`, `OLLAMA_ENABLE_LATEST=true` e `DOCKER_REPO` explicitamente configurado no ambiente de release. Os scripts locais deixaram de assumir `ollama/ollama`: builds sem push usam o tag neutro `local/ollama-classe-a-plus`, pushes com esse placeholder falham antes do Docker e `tag_latest.sh` recusa tanto o upstream quanto o placeholder sem opt-in e registry do operador. O guard de integridade mantém essas invariantes.
+
+Evidência local: YAML, guardrail de integridade, `sh -n`, cenários negativos de `tag_latest.sh` e do push Docker sem registry explícito passaram. Nenhuma imagem foi construída, publicada ou autenticada em registry. A CI pública do head `18059ba1` foi consultada uma vez e estava `queued`/`in_progress`; não é CI verde.
+
+O produto continua **FIXING / preview-local RC em hardening — não finalizado e não production-ready**. A habilitação de registry, assinatura, SBOM/provenance operacional, smoke de pull e rollback ainda exige configuração e homologação externa pelo mantenedor (`BLOCKED_BY_EXTERNAL_DEPENDENCY`).
