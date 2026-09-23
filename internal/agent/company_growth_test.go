@@ -18,6 +18,9 @@ func TestCompanyGrowthLifecycleAndApprovals(t *testing.T) {
 	if err != nil || len(created.Campaigns) != 1 {
 		t.Fatalf("campaign create failed: %v", err)
 	}
+	if created.Campaigns[0].Mode != "sandbox" {
+		t.Fatalf("campaign mode=%q, want sandbox", created.Campaigns[0].Mode)
+	}
 	campaignID := created.Campaigns[0].ID
 	if _, err := store.LaunchCampaign(company.ID, campaignID); !errors.Is(err, ErrCompanyApprovalRequiredForExternal) {
 		t.Fatalf("expected campaign approval, got %v", err)
@@ -45,6 +48,9 @@ func TestCompanyGrowthLifecycleAndApprovals(t *testing.T) {
 	if err != nil || len(created.AffiliateLinks) != 1 {
 		t.Fatalf("affiliate link failed: %v", err)
 	}
+	if created.AffiliatePrograms[0].Mode != "sandbox" || created.AffiliateLinks[0].Mode != "sandbox" {
+		t.Fatalf("affiliate modes=%q/%q, want sandbox", created.AffiliatePrograms[0].Mode, created.AffiliateLinks[0].Mode)
+	}
 	if _, err := store.RecordAffiliateConversion(company.ID, created.AffiliateLinks[0].ID, 1200); err != nil {
 		t.Fatal(err)
 	}
@@ -57,6 +63,9 @@ func TestCompanyGrowthLifecycleAndApprovals(t *testing.T) {
 	created, err = store.CreateOrder(company.ID, CompanyOrder{ProductID: productID, CustomerRef: "customer-test", Quantity: 2})
 	if err != nil || len(created.Orders) != 1 || created.Orders[0].Status != "pending_approval" {
 		t.Fatalf("order create failed: %v", err)
+	}
+	if created.Orders[0].Mode != "sandbox" {
+		t.Fatalf("order mode=%q, want sandbox", created.Orders[0].Mode)
 	}
 	orderID := created.Orders[0].ID
 	if _, err := store.FulfillOrder(company.ID, orderID, "TRACK-001"); !errors.Is(err, ErrCompanyApprovalRequiredForExternal) {
@@ -80,8 +89,34 @@ func TestCompanyGrowthLifecycleAndApprovals(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if report.CampaignsActive != 1 || report.AffiliateConversions != 1 || report.FulfilledOrders != 1 || report.RevenueCents != 3600 {
+	if !report.SandboxOnly || report.CampaignsActive != 1 || report.AffiliateConversions != 1 || report.FulfilledOrders != 1 || report.RevenueCents != 3600 {
 		t.Fatalf("unexpected growth report: %+v", report)
+	}
+}
+
+func TestCompanyGrowthRejectsNonSandboxExecutionMode(t *testing.T) {
+	store, err := NewCompanyStore("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	company, err := store.Create(Company{OrganizationID: "org_local", Name: "External Guard"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	company, err = store.AddCampaign(company.ID, CompanyCampaign{Name: "Campaign", Objective: "Objective"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	company, err = store.mutate(company.ID, func(value *Company) error {
+		value.Campaigns[0].Mode = "external"
+		value.Campaigns[0].Approved = true
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.LaunchCampaign(company.ID, company.Campaigns[0].ID); !errors.Is(err, ErrCompanyGrowthExternalUnavailable) {
+		t.Fatalf("expected external growth rejection, got %v", err)
 	}
 }
 

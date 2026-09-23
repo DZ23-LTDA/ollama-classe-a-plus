@@ -16,6 +16,7 @@ type CompanyCampaign struct {
 	Name             string    `json:"name"`
 	Channel          string    `json:"channel"`
 	Objective        string    `json:"objective"`
+	Mode             string    `json:"mode"`
 	Status           string    `json:"status"`
 	DailyBudgetCents int64     `json:"daily_budget_cents"`
 	ApprovalRequired bool      `json:"approval_required"`
@@ -33,6 +34,7 @@ type CompanyAffiliateProgram struct {
 	ID               string    `json:"id"`
 	Name             string    `json:"name"`
 	Network          string    `json:"network"`
+	Mode             string    `json:"mode"`
 	Status           string    `json:"status"`
 	CommissionBps    int64     `json:"commission_bps"`
 	ApprovalRequired bool      `json:"approval_required"`
@@ -46,6 +48,7 @@ type CompanyAffiliateLink struct {
 	ProgramID    string    `json:"program_id"`
 	ProductID    string    `json:"product_id,omitempty"`
 	Destination  string    `json:"destination"`
+	Mode         string    `json:"mode"`
 	Clicks       int64     `json:"clicks"`
 	Conversions  int64     `json:"conversions"`
 	RevenueCents int64     `json:"revenue_cents"`
@@ -73,6 +76,7 @@ type CompanyOrder struct {
 	CustomerRef    string    `json:"customer_ref"`
 	Quantity       int64     `json:"quantity"`
 	TotalCents     int64     `json:"total_cents"`
+	Mode           string    `json:"mode"`
 	Status         string    `json:"status"`
 	Approved       bool      `json:"approved"`
 	TrackingCode   string    `json:"tracking_code,omitempty"`
@@ -82,6 +86,7 @@ type CompanyOrder struct {
 
 type CompanyGrowthReport struct {
 	Company              Company `json:"company"`
+	SandboxOnly          bool    `json:"sandbox_only"`
 	CampaignsTotal       int     `json:"campaigns_total"`
 	CampaignsActive      int     `json:"campaigns_active"`
 	AffiliatePrograms    int     `json:"affiliate_programs"`
@@ -98,8 +103,32 @@ var (
 	ErrCompanyProductNotFound             = errors.New("company product not found")
 	ErrCompanyOrderNotFound               = errors.New("company order not found")
 	ErrCompanyApprovalRequiredForExternal = errors.New("approval is required before external campaign or order action")
+	ErrCompanyGrowthExternalUnavailable   = errors.New("external growth action is not configured")
 	ErrCompanyInvalidExternalURL          = errors.New("external destination must use HTTPS")
 )
+
+func normalizeCompanyGrowthModes(company *Company) {
+	for index := range company.Campaigns {
+		if strings.TrimSpace(company.Campaigns[index].Mode) == "" {
+			company.Campaigns[index].Mode = "sandbox"
+		}
+	}
+	for index := range company.AffiliatePrograms {
+		if strings.TrimSpace(company.AffiliatePrograms[index].Mode) == "" {
+			company.AffiliatePrograms[index].Mode = "sandbox"
+		}
+	}
+	for index := range company.AffiliateLinks {
+		if strings.TrimSpace(company.AffiliateLinks[index].Mode) == "" {
+			company.AffiliateLinks[index].Mode = "sandbox"
+		}
+	}
+	for index := range company.Orders {
+		if strings.TrimSpace(company.Orders[index].Mode) == "" {
+			company.Orders[index].Mode = "sandbox"
+		}
+	}
+}
 
 func validateGrowthURL(value string) error {
 	parsed, err := url.Parse(strings.TrimSpace(value))
@@ -119,6 +148,7 @@ func (s *CompanyStore) AddCampaign(id string, campaign CompanyCampaign) (Company
 	if campaign.Channel == "" {
 		campaign.Channel = "content"
 	}
+	campaign.Mode = "sandbox"
 	if campaign.DailyBudgetCents < 0 {
 		return Company{}, errors.New("campaign budget cannot be negative")
 	}
@@ -156,6 +186,9 @@ func (s *CompanyStore) LaunchCampaign(id, campaignID string) (Company, error) {
 		}
 		for index := range company.Campaigns {
 			if company.Campaigns[index].ID == campaignID {
+				if company.Campaigns[index].Mode != "sandbox" {
+					return ErrCompanyGrowthExternalUnavailable
+				}
 				if !company.Campaigns[index].Approved {
 					return ErrCompanyApprovalRequiredForExternal
 				}
@@ -191,6 +224,7 @@ func (s *CompanyStore) AddAffiliateProgram(id string, program CompanyAffiliatePr
 		return Company{}, errors.New("affiliate commission must be between 0 and 10000 basis points")
 	}
 	program.ID = "aff_" + uuid.NewString()
+	program.Mode = "sandbox"
 	program.Status = "pending"
 	program.ApprovalRequired = true
 	program.Approved = false
@@ -222,12 +256,16 @@ func (s *CompanyStore) AddAffiliateLink(id string, link CompanyAffiliateLink) (C
 		return Company{}, ErrCompanyInvalidExternalURL
 	}
 	link.Destination = strings.TrimSpace(link.Destination)
+	link.Mode = "sandbox"
 	link.ID = "alink_" + uuid.NewString()
 	link.CreatedAt = time.Now().UTC()
 	link.UpdatedAt = link.CreatedAt
 	return s.mutate(id, func(company *Company) error {
 		for _, program := range company.AffiliatePrograms {
 			if program.ID == link.ProgramID {
+				if program.Mode != "sandbox" {
+					return ErrCompanyGrowthExternalUnavailable
+				}
 				if !program.Approved {
 					return ErrCompanyApprovalRequiredForExternal
 				}
@@ -313,6 +351,7 @@ func (s *CompanyStore) CreateOrder(id string, order CompanyOrder) (Company, erro
 				}
 				order.ID = "ord_" + uuid.NewString()
 				order.TotalCents = product.PriceCents * order.Quantity
+				order.Mode = "sandbox"
 				order.Status = "pending_approval"
 				order.Approved = false
 				order.CreatedAt = time.Now().UTC()
@@ -349,6 +388,9 @@ func (s *CompanyStore) FulfillOrder(id, orderID, trackingCode string) (Company, 
 		for orderIndex := range company.Orders {
 			order := &company.Orders[orderIndex]
 			if order.ID == orderID {
+				if order.Mode != "sandbox" {
+					return ErrCompanyGrowthExternalUnavailable
+				}
 				if order.Status == "fulfilled" {
 					return nil
 				}
@@ -381,7 +423,7 @@ func (s *CompanyStore) GrowthReport(id string) (CompanyGrowthReport, error) {
 	if err != nil {
 		return CompanyGrowthReport{}, err
 	}
-	report := CompanyGrowthReport{Company: company, CampaignsTotal: len(company.Campaigns), AffiliatePrograms: len(company.AffiliatePrograms), Products: len(company.Products)}
+	report := CompanyGrowthReport{Company: company, SandboxOnly: true, CampaignsTotal: len(company.Campaigns), AffiliatePrograms: len(company.AffiliatePrograms), Products: len(company.Products)}
 	for _, campaign := range company.Campaigns {
 		if campaign.Status == "active" {
 			report.CampaignsActive++

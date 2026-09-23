@@ -263,6 +263,7 @@ func NewCompanyStore(root string) (*CompanyStore, error) {
 			return nil, err
 		}
 		if company.ID != "" {
+			normalizeCompanyGrowthModes(&company)
 			store.companies[company.ID] = company
 		}
 	}
