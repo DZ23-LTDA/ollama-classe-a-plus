@@ -2228,6 +2228,16 @@ func (a *agentAPI) deployBuilder(c *gin.Context) {
 	}
 	result, err := manager.Deploy(c.Request.Context(), c.Param("provider"), agent.DeploymentRequest{Name: project.Name, Root: project.Root, Target: request.Target})
 	if err != nil {
+		var deploymentErr *agent.DeploymentError
+		if errors.As(err, &deploymentErr) && (result.Status == "partial" || result.Status == "unknown") {
+			c.JSON(http.StatusBadGateway, gin.H{
+				"error":      err.Error(),
+				"project":    project,
+				"approval":   approval,
+				"deployment": result,
+			})
+			return
+		}
 		writeAgentError(c, statusForAgentError(err), err)
 		return
 	}

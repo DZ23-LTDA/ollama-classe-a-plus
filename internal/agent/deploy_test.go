@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -74,6 +75,52 @@ func TestDeploymentManagerRejectsExternalHTTP(t *testing.T) {
 	manager := NewDeploymentManager()
 	if err := manager.Register(DeployConfig{ID: "unsafe", Provider: "generic", BaseURL: "http://example.com"}); err == nil {
 		t.Fatal("external HTTP deployment unexpectedly accepted")
+	}
+}
+
+func TestDeploymentManagerReportsNetlifyPartialState(t *testing.T) {
+	root := t.TempDir()
+	for name, content := range map[string]string{"a.txt": "first", "b.txt": "second"} {
+		if err := os.WriteFile(filepath.Join(root, name), []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var uploaded int
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/sites":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"id":"site_1"}`))
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/sites/site_1/deploys":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"id":"dep_1","url":"https://example.test/site_1","state":"building"}`))
+		case r.Method == http.MethodPut && strings.HasSuffix(r.URL.Path, "/a.txt"):
+			uploaded++
+			w.WriteHeader(http.StatusOK)
+		case r.Method == http.MethodPut && strings.HasSuffix(r.URL.Path, "/b.txt"):
+			w.WriteHeader(http.StatusBadGateway)
+			_, _ = w.Write([]byte(`provider upload failed`))
+		default:
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	manager := NewDeploymentManager()
+	manager.client = server.Client()
+	if err := manager.Register(DeployConfig{ID: "netlify", Provider: "netlify", BaseURL: server.URL}); err != nil {
+		t.Fatal(err)
+	}
+	result, err := manager.Deploy(context.Background(), "netlify", DeploymentRequest{Name: "site", Root: root})
+	if err == nil {
+		t.Fatal("partial Netlify deploy unexpectedly succeeded")
+	}
+	var deploymentErr *DeploymentError
+	if !errors.As(err, &deploymentErr) {
+		t.Fatalf("error=%T %v", err, err)
+	}
+	if result.Provider != "netlify" || result.Status != "partial" || result.DeploymentID != "dep_1" || result.Files != uploaded || uploaded != 1 {
+		t.Fatalf("partial result=%+v uploaded=%d", result, uploaded)
 	}
 }
 

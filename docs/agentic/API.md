@@ -399,7 +399,7 @@ Deploy externo não confia em `{"approved":true}` enviado pelo cliente. O fluxo 
 2. `POST /api/agent/v1/builders/:id/deploy/:provider/approval/:approval_id` decide a aprovação com `approved`, `reason` e `nonce`. Em auth-required, somente owner/admin podem decidir; o servidor compara tenant, builder, provider, estado pendente, expiração e nonce.
 3. `POST /api/agent/v1/builders/:id/deploy/:provider` exige `approval_id`, `nonce` e o mesmo `target`. O servidor consome a aprovação com uma transição CAS persistente antes de chamar o provider; replay, tenant mismatch, nonce incorreto ou a tentativa de usar o booleano cliente sem aprovação não chegam ao egress.
 
-O ledger local fica em `OLLAMA_AGENT_STORE/.agent-deployment-approvals` e sobrevive a restart. Se o provider falhar depois do consumo, a operação deve ser tratada como `unknown/partial` pelo operador; o código não inventa rollback universal de Vercel/Netlify/generic.
+O ledger local fica em `OLLAMA_AGENT_STORE/.agent-deployment-approvals` e sobrevive a restart. Se o provider falhar depois do consumo, o adapter preserva `deployment.status` como `partial` quando conhece um site/deployment e como `unknown` quando não consegue determinar o estado. A rota responde `502` com `project`, `approval`, `deployment` e erro sanitizado para permitir reconciliação manual; não há retry automático nem rollback universal de Vercel/Netlify/generic. Rollback e health-check provider-specific continuam dependentes de contas, contratos e homologação externa.
 
 
 ## Mídia

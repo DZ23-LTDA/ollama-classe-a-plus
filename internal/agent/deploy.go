@@ -44,6 +44,28 @@ type DeploymentResult struct {
 	Files        int    `json:"files"`
 }
 
+// DeploymentError preserves the provider state that is known when a deploy
+// fails after a remote side effect. Callers must not report the operation as a
+// clean failure when the provider may have created a site or deployment.
+type DeploymentError struct {
+	Result DeploymentResult
+	Err    error
+}
+
+func (e *DeploymentError) Error() string {
+	if e == nil || e.Err == nil {
+		return "deployment failed with unknown provider state"
+	}
+	return e.Err.Error()
+}
+
+func (e *DeploymentError) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+	return e.Err
+}
+
 type DeploymentManager struct {
 	configs map[string]DeployConfig
 	client  *http.Client
@@ -193,7 +215,14 @@ func (m *DeploymentManager) Deploy(ctx context.Context, providerID string, reque
 		result, err = m.deployGeneric(ctx, config, request, files)
 	}
 	if err != nil {
-		return DeploymentResult{}, err
+		result.Provider = config.Provider
+		if result.Status == "" {
+			result.Status = "unknown"
+		}
+		if result.Status == "unknown" && result.Files == 0 {
+			result.Files = len(files)
+		}
+		return result, &DeploymentError{Result: result, Err: err}
 	}
 	result.Provider = config.Provider
 	result.Files = len(files)
@@ -390,19 +419,27 @@ func (m *DeploymentManager) deployNetlify(ctx context.Context, config DeployConf
 	deployPayload, _ := json.Marshal(map[string]any{"files": digests})
 	deploy, err := m.request(ctx, config, http.MethodPost, "/api/v1/sites/"+url.PathEscape(siteID)+"/deploys", deployPayload, "application/json")
 	if err != nil {
-		return DeploymentResult{}, err
+		return DeploymentResult{DeploymentID: siteID, Status: "partial"}, fmt.Errorf("netlify deployment creation failed after site creation: %w", err)
 	}
 	deployID := firstString(deploy, "id", "deploy_id")
 	if deployID == "" {
-		return DeploymentResult{}, errors.New("netlify response has no deployment id")
+		return DeploymentResult{DeploymentID: siteID, Status: "partial"}, errors.New("netlify response has no deployment id after site/deploy side effects")
 	}
+	result := resultFromPayload(deploy)
+	result.Status = "partial"
+	result.Files = 0
 	for _, file := range files {
 		endpoint := "/api/v1/deploys/" + url.PathEscape(deployID) + "/files/" + url.PathEscape(file.Path)
 		if _, err := m.request(ctx, config, http.MethodPut, endpoint, file.Data, "application/octet-stream"); err != nil {
-			return DeploymentResult{}, err
+			return result, fmt.Errorf("netlify file upload failed after %d files: %w", result.Files, err)
 		}
+		result.Files++
 	}
-	return resultFromPayload(deploy), nil
+	result.Status = firstString(deploy, "status", "state")
+	if result.Status == "" {
+		result.Status = "accepted"
+	}
+	return result, nil
 }
 
 func encodeFiles(files []deployFile) []map[string]string {
