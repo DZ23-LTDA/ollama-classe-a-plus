@@ -69,6 +69,7 @@ func (q *RedisQueue) Enqueue(missionID string, maxAttempts int) (QueueJob, error
 		return QueueJob{}, err
 	}
 	if _, err := q.do(context.Background(), "LPUSH", q.pendingKey(), job.ID); err != nil {
+		_, _ = q.do(context.Background(), "DEL", q.jobKey(job.ID))
 		return QueueJob{}, err
 	}
 	return job, nil
@@ -91,13 +92,19 @@ func (q *RedisQueue) Claim(workerID string, now time.Time) (QueueJob, bool, erro
 	}
 	job, err := q.get(id)
 	if err != nil {
+		if _, ok := err.(osErrNotExist); !ok {
+			_, _ = q.do(context.Background(), "LPUSH", q.pendingKey(), id)
+		}
 		return QueueJob{}, false, err
 	}
 	if job.Status != QueuePending {
 		return QueueJob{}, false, nil
 	}
 	if job.AvailableAt.After(now) {
-		_, _ = q.do(context.Background(), "ZADD", q.delayedKey(), strconv.FormatInt(job.AvailableAt.UnixMilli(), 10), id)
+		if _, err := q.do(context.Background(), "ZADD", q.delayedKey(), strconv.FormatInt(job.AvailableAt.UnixMilli(), 10), id); err != nil {
+			_, _ = q.do(context.Background(), "LPUSH", q.pendingKey(), id)
+			return QueueJob{}, false, err
+		}
 		return QueueJob{}, false, nil
 	}
 	job.Status = QueueRunning
@@ -107,6 +114,7 @@ func (q *RedisQueue) Claim(workerID string, now time.Time) (QueueJob, bool, erro
 	job.LockedAt = &locked
 	job.UpdatedAt = now
 	if err := q.put(job); err != nil {
+		_, _ = q.do(context.Background(), "LPUSH", q.pendingKey(), id)
 		return QueueJob{}, false, err
 	}
 	return job, true, nil
@@ -135,6 +143,7 @@ func (q *RedisQueue) Nack(jobID string, runErr error) (QueueJob, error) {
 	if job.Status != QueueRunning {
 		return QueueJob{}, errors.New("job is not running")
 	}
+	previous := job
 	if runErr != nil {
 		job.LastError = limitError(runErr.Error(), 2000)
 	}
@@ -158,8 +167,13 @@ func (q *RedisQueue) Nack(jobID string, runErr error) (QueueJob, error) {
 	if err := q.put(job); err != nil {
 		return QueueJob{}, err
 	}
-	_, err = q.do(context.Background(), "ZADD", q.delayedKey(), strconv.FormatInt(job.AvailableAt.UnixMilli(), 10), job.ID)
-	return job, err
+	if _, err = q.do(context.Background(), "ZADD", q.delayedKey(), strconv.FormatInt(job.AvailableAt.UnixMilli(), 10), job.ID); err != nil {
+		if restoreErr := q.put(previous); restoreErr != nil {
+			return QueueJob{}, fmt.Errorf("queue retry scheduling failed: %v; state restore failed: %w", err, restoreErr)
+		}
+		return QueueJob{}, err
+	}
+	return job, nil
 }
 
 func (q *RedisQueue) Replay(jobID string) (QueueJob, error) {
@@ -170,6 +184,7 @@ func (q *RedisQueue) Replay(jobID string) (QueueJob, error) {
 	if job.Status != QueueDeadLetter && job.Status != QueueFailed {
 		return QueueJob{}, fmt.Errorf("job %s is not replayable", jobID)
 	}
+	previous := job
 	job.Status = QueuePending
 	job.Attempts = 0
 	job.LastError = ""
@@ -181,6 +196,11 @@ func (q *RedisQueue) Replay(jobID string) (QueueJob, error) {
 		return QueueJob{}, err
 	}
 	_, err = q.do(context.Background(), "LPUSH", q.pendingKey(), job.ID)
+	if err != nil {
+		if restoreErr := q.put(previous); restoreErr != nil {
+			return QueueJob{}, fmt.Errorf("queue replay enqueue failed: %v; state restore failed: %w", err, restoreErr)
+		}
+	}
 	return job, err
 }
 
