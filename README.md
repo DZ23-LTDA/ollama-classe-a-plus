@@ -6,7 +6,7 @@ Este é o fork público mantido por [DZ23-LTDA](https://github.com/DZ23-LTDA), b
 
 ### Visão rápida — capturas reais atualizadas em 2026-09-22
 
-![Home atual do shell Classe A+](docs/images/screens/class-a-plus-home.png)
+![Home atual do shell Classe A+](docs/images/screens/class-a-plus-home.png?v=2)
 
 ![Agentic Console atual](docs/images/screens/class-a-plus-agentic.png)
 
