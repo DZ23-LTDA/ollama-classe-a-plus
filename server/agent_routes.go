@@ -2337,7 +2337,17 @@ func decodeJSON(c *gin.Context, value any) error {
 	}
 	decoder := json.NewDecoder(c.Request.Body)
 	decoder.DisallowUnknownFields()
-	return decoder.Decode(value)
+	if err := decoder.Decode(value); err != nil {
+		return err
+	}
+	var extra any
+	if err := decoder.Decode(&extra); err != io.EOF {
+		if err == nil {
+			return errors.New("request body contains trailing JSON")
+		}
+		return err
+	}
+	return nil
 }
 
 func writeAgentError(c *gin.Context, status int, err error) {
