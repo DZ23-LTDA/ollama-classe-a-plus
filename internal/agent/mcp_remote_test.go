@@ -208,3 +208,39 @@ func TestRemoteMCPDialRejectsPrivateActualAddress(t *testing.T) {
 	case <-time.After(100 * time.Millisecond):
 	}
 }
+
+func TestRemoteMCPDialUsesApprovedIPWithoutSecondDNSLookup(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	accepted := make(chan error, 1)
+	go func() {
+		conn, acceptErr := listener.Accept()
+		if acceptErr == nil {
+			_ = conn.Close()
+		}
+		accepted <- acceptErr
+	}()
+	oldLookup := lookupRemoteMCPIPs
+	defer func() { lookupRemoteMCPIPs = oldLookup }()
+	lookups := 0
+	lookupRemoteMCPIPs = func(context.Context, string) ([]net.IP, error) {
+		lookups++
+		return nil, errors.New("second DNS lookup must not happen")
+	}
+	ctx := context.WithValue(context.Background(), remoteMCPLoopbackContextKey{}, true)
+	ctx = context.WithValue(ctx, remoteMCPApprovedIPsContextKey{}, []net.IP{net.ParseIP("127.0.0.1")})
+	conn, err := remoteMCPDialContext(ctx, "tcp", "mcp.example.test:"+strings.Split(listener.Addr().String(), ":")[1])
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = conn.Close()
+	if lookups != 0 {
+		t.Fatalf("DNS lookup count = %d, want zero after pinning", lookups)
+	}
+	if acceptErr := <-accepted; acceptErr != nil {
+		t.Fatal(acceptErr)
+	}
+}

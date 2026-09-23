@@ -20,6 +20,10 @@ import (
 
 var errRemoteMCPIDMismatch = errors.New("remote MCP response id does not match request")
 
+var lookupRemoteMCPIPs = func(ctx context.Context, host string) ([]net.IP, error) {
+	return net.DefaultResolver.LookupIP(ctx, "ip", host)
+}
+
 type RemoteMCPServerConfig struct {
 	ID             string            `json:"id"`
 	OrganizationID string            `json:"organization_id,omitempty"`
@@ -124,14 +128,44 @@ func remoteMCPLoopback(host string) bool {
 
 type remoteMCPLoopbackContextKey struct{}
 
+type remoteMCPApprovedIPsContextKey struct{}
+
 func remoteMCPDialContext(ctx context.Context, network, address string) (net.Conn, error) {
 	dialer := &net.Dialer{Timeout: 10 * time.Second}
 	host, port, err := net.SplitHostPort(address)
 	if err != nil {
 		return nil, errors.New("remote MCP destination is invalid")
 	}
+	if approved, pinned := ctx.Value(remoteMCPApprovedIPsContextKey{}).([]net.IP); pinned {
+		if len(approved) == 0 {
+			return nil, errors.New("remote MCP destination has no approved addresses")
+		}
+		var lastErr error
+		for _, ip := range approved {
+			if ip == nil || (!remoteMCPLoopbackContext(ctx) && remoteMCPPrivateIP(ip)) {
+				continue
+			}
+			conn, dialErr := dialer.DialContext(ctx, network, net.JoinHostPort(ip.String(), port))
+			if dialErr != nil {
+				lastErr = dialErr
+				continue
+			}
+			remote, _, splitErr := net.SplitHostPort(conn.RemoteAddr().String())
+			connected := net.ParseIP(strings.Trim(remote, "[]"))
+			if splitErr != nil || connected == nil || !remoteMCPContainsIP(approved, connected) {
+				_ = conn.Close()
+				lastErr = errors.New("remote MCP connected address was not approved")
+				continue
+			}
+			return conn, nil
+		}
+		if lastErr != nil {
+			return nil, lastErr
+		}
+		return nil, errors.New("remote MCP could not connect to an approved address")
+	}
 	if !remoteMCPLoopbackContext(ctx) {
-		addresses, err := net.DefaultResolver.LookupIP(ctx, "ip", host)
+		addresses, err := lookupRemoteMCPIPs(ctx, host)
 		if err != nil {
 			return nil, err
 		}
@@ -170,6 +204,39 @@ func remoteMCPLoopbackContext(ctx context.Context) bool {
 
 func remoteMCPPrivateIP(ip net.IP) bool {
 	return ip.IsLoopback() || ip.IsUnspecified() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsMulticast()
+}
+
+func remoteMCPContainsIP(values []net.IP, wanted net.IP) bool {
+	for _, value := range values {
+		if value != nil && value.Equal(wanted) {
+			return true
+		}
+	}
+	return false
+}
+
+func resolveRemoteMCPDestination(ctx context.Context, parsed *url.URL) ([]net.IP, error) {
+	if parsed == nil {
+		return nil, errors.New("remote MCP URL is required")
+	}
+	if remoteMCPLoopback(parsed.Hostname()) {
+		return nil, nil
+	}
+	addresses, err := lookupRemoteMCPIPs(ctx, parsed.Hostname())
+	if err != nil {
+		return nil, fmt.Errorf("resolve remote MCP host: %w", err)
+	}
+	if len(addresses) == 0 {
+		return nil, errors.New("remote MCP host resolved to no addresses")
+	}
+	approved := make([]net.IP, 0, len(addresses))
+	for _, address := range addresses {
+		if remoteMCPPrivateIP(address) {
+			return nil, errors.New("remote MCP host resolved to a private or link-local address")
+		}
+		approved = append(approved, append(net.IP(nil), address...))
+	}
+	return approved, nil
 }
 
 func remoteMCPURLAllowed(parsed *url.URL) bool {
@@ -321,6 +388,13 @@ func (m *RemoteMCPManager) CallForOrganization(ctx context.Context, organization
 		return nil, err
 	}
 	requestContext = context.WithValue(requestContext, remoteMCPLoopbackContextKey{}, remoteMCPLoopback(parsedURL.Hostname()))
+	if !remoteMCPLoopback(parsedURL.Hostname()) {
+		approved, resolveErr := resolveRemoteMCPDestination(requestContext, parsedURL)
+		if resolveErr != nil {
+			return nil, resolveErr
+		}
+		requestContext = context.WithValue(requestContext, remoteMCPApprovedIPsContextKey{}, approved)
+	}
 	req, err := http.NewRequestWithContext(requestContext, http.MethodPost, config.URL, bytes.NewReader(requestBody))
 	if err != nil {
 		return nil, err
