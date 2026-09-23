@@ -670,3 +670,8 @@ A revisão do queue encontrou que as transições de finalização não verifica
 ## Addendum P1 — compensações do RedisQueue — 2026-09-23
 
 A revisão do adapter Redis encontrou sequências em que um `SET` ou `ZADD` posterior poderia falhar depois da operação anterior, deixando job órfão no store ou fora de qualquer lista. O commit `883a17e2` adiciona compensações explícitas para os caminhos de Enqueue, Claim, Nack e Replay. O código passou os gates Go e o teste de integração compilável; não houve Redis real disponível, e a compensação não é declarada como atomicidade Lua.
+
+
+## Addendum P1 — moveDue Redis sem perda best-effort — 2026-09-23
+
+A revisão complementar encontrou a última janela de perda em `moveDue`: `ZREM` seguido de `LPUSH` podia retirar o job delayed sem colocá-lo no pending. O commit `b1aaebfd` recoloca o ID no sorted set em caso de falha do segundo comando. O smoke real ainda exige Redis de homologação.

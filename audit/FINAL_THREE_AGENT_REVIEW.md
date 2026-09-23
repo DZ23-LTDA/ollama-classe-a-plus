@@ -382,3 +382,8 @@ A revisão confirmou no commit `9d28cbc2` que jobs fora de `running` não podem 
 ## Addendum independente — compensações do RedisQueue — 2026-09-23
 
 A revisão confirmou no commit `883a17e2` compensações para falhas entre comandos Redis em Enqueue, Claim, retry e Replay. Gates Go completos passaram. O teste distribuído foi compilado/executado sem endpoint, portanto não houve evidência de conexão, lease ou recuperação multi-worker reais. O risco residual exige Redis de homologação e, para atomicidade forte, scripts/transações apropriados.
+
+
+## Addendum independente — moveDue Redis — 2026-09-23
+
+A revisão confirmou no commit `b1aaebfd` a compensação do caminho `ZREM`/`LPUSH` em `moveDue`, evitando perda best-effort de retries delayed. Testes locais focados passaram; Redis real, lease e fencing permanecem não homologados.

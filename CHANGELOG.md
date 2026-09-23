@@ -526,3 +526,8 @@ O commit `9d28cbc2` impede `Ack` e `Nack` fora de jobs `running` em queues local
 ## Unreleased — Redis queue failure compensation — 2026-09-23
 
 O commit `883a17e2` adicionou compensações para Enqueue, Claim, retry e Replay do RedisQueue quando comandos subsequentes falham. Gates Go passaram; o smoke Redis real continua não executado por falta de endpoint configurado.
+
+
+## Unreleased — Redis delayed-job requeue compensation — 2026-09-23
+
+O commit `b1aaebfd` restaura jobs delayed quando `moveDue` não consegue completar o `LPUSH` para pending após remover o item do sorted set.

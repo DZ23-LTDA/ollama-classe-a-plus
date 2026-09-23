@@ -2435,3 +2435,8 @@ Integrity, YAML, `CGO_ENABLED=1 go test ./...`, vet, build e race do queue passa
 O commit `883a17e29b8aa3bd1b1d08de3d75518974711c6e` reduz estados órfãos no adapter Redis. Enqueue remove a chave do job se o `LPUSH` falhar; claim devolve o ID ao pending quando não consegue ler ou persistir a transição; reencaminhamento restaura o snapshot `running` quando o `ZADD` falha; replay restaura o estado anterior quando o `LPUSH` falha. As compensações não são apresentadas como transação Redis atômica.
 
 Integrity, YAML, `CGO_ENABLED=1 go test ./...`, vet, build, race do queue e o teste com build tag de integração passaram. O teste distribuído foi executado sem `OLLAMA_AGENT_TEST_REDIS_URL` e, por isso, não abriu conexão real. A CI pública do SHA iniciou em jobs queued. Permanecem bloqueados por dependência externa o smoke Redis real, lease/fencing e recuperação multi-worker.
+
+
+## Complemento de moveDue Redis — 2026-09-23
+
+O commit `b1aaebfdb4ad7ad753591402ad47a220fcd67fdd` fecha o caso restante de `moveDue`: se o `ZREM` for confirmado mas o `LPUSH pending` falhar, o ID é recolocado no sorted set delayed. Testes normais/race focados e integrity passaram; o smoke Redis real segue bloqueado por ausência de endpoint configurado.

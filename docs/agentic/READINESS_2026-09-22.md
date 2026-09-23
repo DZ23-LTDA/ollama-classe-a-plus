@@ -619,3 +619,8 @@ O commit `9d28cbc2` faz `Ack` e `Nack` aceitarem somente jobs `running` nas impl
 ## Addendum de compensações Redis — 2026-09-23
 
 O commit `883a17e2` adicionou compensações para evitar chaves e IDs órfãos quando comandos Redis subsequentes falham. Os gates Go completos passaram e o teste de integração compilou, mas não houve conexão Redis real porque `OLLAMA_AGENT_TEST_REDIS_URL` não está configurado. O produto continua **preview/local RC em hardening**.
+
+
+## Addendum de moveDue Redis — 2026-09-23
+
+O commit `b1aaebfd` também restaura jobs no sorted set quando a promoção para pending falha após o `ZREM`. A correção passou testes focados normais/race; não houve homologação contra Redis real nesta sessão.

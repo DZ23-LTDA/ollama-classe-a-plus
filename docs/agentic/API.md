@@ -445,3 +445,6 @@ Um worker só pode concluir (`Ack`) ou devolver para retry/DLQ (`Nack`) um job q
 ### Compensação do adapter Redis
 
 O adapter Redis tenta desfazer operações multi-comando quando a etapa seguinte falha. Isso evita que Enqueue, Claim, retry ou Replay deixem somente uma parte do estado persistida. A compensação não substitui uma transação Lua/Redis atômica nem é evidência de lease distribuído; esses gates exigem um Redis de homologação configurado pelo operador.
+
+
+O movimento de jobs delayed para pending no adapter Redis também possui compensação: falha do `LPUSH` após `ZREM` recoloca o ID no sorted set. Esse comportamento é best-effort e deve ser validado em Redis de homologação antes de claims distribuídos.
