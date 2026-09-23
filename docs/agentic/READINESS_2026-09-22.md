@@ -651,3 +651,12 @@ O head `93e091e2` adiciona proteção server-side para tentativas repetidas de M
 Evidência local: testes unitários de AuthStore e recovery passaram; o teste HTTP do middleware confirmou quatro `401`, quinto `429` com `Retry-After` e lockout preservado após reload; o cenário passou também com `-race`; `CGO_ENABLED=0 go test ./internal/agent`, `CGO_ENABLED=1 go vet ./internal/agent ./server` e `git diff --check` passaram. O rate limiter é durável no store local, mas não é ainda um coordenador distribuído com locking/lease entre múltiplas instâncias ou uma política de IP real atrás de proxy.
 
 A CI pública precisa concluir para este novo head. O produto continua **FIXING / preview-local RC em hardening — não finalizado e não production-ready**; MFA/SSO/IdP distribuídos, Redis/Postgres/OTLP, providers, hardware, instaladores e homologações externas permanecem pendentes ou `BLOCKED_BY_EXTERNAL_DEPENDENCY`.
+
+
+## Addendum de claim/lease Redis e rediss fail-closed — 2026-09-23
+
+O head `785cbf3b` remove o downgrade perigoso de `rediss://`: enquanto não existe adapter TLS verificado com CA/server name/mTLS, a abertura é rejeitada antes de qualquer conexão. Para `redis://`, `Claim` agora usa script Lua para retirar, verificar e marcar o job como `running` atomicamente, incrementa attempts e cria lease de visibilidade de 15 minutos. Um reclaimer Lua devolve jobs `running` expirados ao pending antes de novos claims. O worker não descarta mais erros de claim, Ack, Nack e indexação dead-letter; eles vão para um canal bounded de observabilidade.
+
+Evidência local: suíte completa `CGO_ENABLED=0 go test ./internal/agent -count=1 -timeout=300s`, race `CGO_ENABLED=1 go test -race ./internal/agent -count=1 -timeout=300s`, `CGO_ENABLED=1 go vet ./internal/agent ./server`, testes focados rediss/scripts e `git diff --check` passaram. O teste distribuído real `go test -tags integration ./internal/agent -run TestDistributedRedisRetriesDeadLetterReplay` foi executado e ficou `SKIP` porque `OLLAMA_AGENT_TEST_REDIS_URL` não está configurado; portanto Redis real, TLS Redis, múltiplos workers, fencing e perda/reconexão continuam `BLOCKED_BY_EXTERNAL_DEPENDENCY`.
+
+A CI pública do novo head ainda precisa concluir. O produto continua **FIXING / preview-local RC em hardening — não finalizado e não production-ready**.
