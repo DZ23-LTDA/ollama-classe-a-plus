@@ -79,6 +79,13 @@ func NewPersistentConnectorManager(manifestPath string) (*ConnectorManager, erro
 		if err := decoder.Decode(&configs); err != nil {
 			return nil, fmt.Errorf("decode connector manifest: %w", err)
 		}
+		var extra any
+		if err := decoder.Decode(&extra); err != io.EOF {
+			if err == nil {
+				return nil, errors.New("connector manifest contains trailing JSON")
+			}
+			return nil, fmt.Errorf("decode connector manifest trailing data: %w", err)
+		}
 		for _, config := range configs {
 			if err := validateConnectorConfig(&config); err != nil {
 				return nil, fmt.Errorf("load connector %q: %w", config.ID, err)

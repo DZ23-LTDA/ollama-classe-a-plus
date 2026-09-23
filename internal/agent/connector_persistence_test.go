@@ -107,3 +107,13 @@ func TestRegisterRejectsEmptyOperationMethod(t *testing.T) {
 		t.Fatalf("expected empty method rejection, got %v", err)
 	}
 }
+
+func TestPersistentConnectorManagerRejectsTrailingJSON(t *testing.T) {
+	manifest := filepath.Join(t.TempDir(), "connectors.json")
+	if err := os.WriteFile(manifest, []byte("[] {}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := NewPersistentConnectorManager(manifest); err == nil {
+		t.Fatal("expected trailing JSON rejection")
+	}
+}
