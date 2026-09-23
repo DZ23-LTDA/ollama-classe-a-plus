@@ -2095,3 +2095,23 @@ limits:
   - auth/IdP distribuído, dispositivos físicos, push remoto, signing/provenance efetiva, rollback, stores e app review permanecem abertos
 next_action: continuar P0/P1 internos independentes; manter PR #1 aberto para revisão e não fazer merge automático em main
 ```
+
+
+## Verificação do checkpoint documental — 2026-09-22
+
+```yaml
+state: FIXING
+iteration: 42
+branch: feat/manus-parity-omniroute
+head_sha: b6a814d596af495a304203496451cfb36883053d
+functional_code_head: 0f95b6a1969462fb309e00e29813e8136d15f757
+delta: documentation-only checkpoint for V5 evidence and connector/API contracts
+remote_evidence:
+  - upstream test PR 35804952089: PASS
+  - class-a-plus-integrity PR 35804952127: PASS
+  - dz23-agentic-quality PR 35804952072: PASS
+  - dz23-multi-provider PR 35804952157: PASS
+pr_checks: 21 successful, 3 skipped, 0 failing, 0 pending
+classification: preview/local RC em hardening; NÃO final; NÃO production-ready
+next_action: manter PR #1 aberto; continuar somente slices P0/P1 independentes e validações externas autorizadas
+```
