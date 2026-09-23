@@ -794,3 +794,26 @@ Evidência local: teste de rollback do PushService, testes do push outbox, race,
 No head `3c0a5ec0`, a validação local final do backend passou com `GOTOOLCHAIN=go1.26.6 CGO_ENABLED=1 go test ./... -count=1 -timeout=900s`, cobrindo os pacotes `internal/agent` e `server` junto ao restante do módulo. Também passaram `go build -trimpath`, `go vet ./...` e `git diff --check`.
 
 Essa evidência é local e não substitui os runners públicos. Na última consulta, a CI do head estava `queued` nos gates Go, web/mobile, SBOM, superfícies Classe A+ e integrações PostgreSQL/Redis/OTLP. O produto permanece **FIXING / preview-local RC em hardening — não finalizado e não production-ready**.
+
+
+## Addendum de mídia, manifesto de deployment e supply chain — 2026-09-23
+
+O head `5280db9d` torna o dialer de mídia fail-closed antes do TCP: a resolução DNS é feita previamente, todos os endereços A/AAAA retornados são validados contra destinos privados e o socket só é criado para um endereço aprovado. A regressão usa resolvedor/listener controlados e não chama serviço externo. O head `6b1207c5` fecha a fronteira de deployment: o pedido de approval coleta um manifesto determinístico com arquivos incluídos, hashes SHA-256 e exclusões justificadas; o hash é persistido no approval e é comparado novamente no deploy. Alteração do workspace, replay, tenant/provider/target mismatch ou o booleano legado `approved=true` não chegam ao provider. O adapter conserva estados `partial`/`unknown` quando um provider já produziu efeito e falha depois.
+
+Evidência local do head `6b1207c5`: `CGO_ENABLED=1 go test ./internal/agent -count=1 -timeout=420s`, race dos testes de deployment/approval, testes HTTP de Builder/approval, `go vet ./internal/agent ./server`, YAML, guardrail de integridade e `git diff --check` passaram. Não houve provider real nem conta externa; rollback/health-check específicos continuam `BLOCKED_BY_EXTERNAL_DEPENDENCY`.
+
+## Addendum de auditoria de dependências web/mobile — 2026-09-23
+
+O head `75c6a1ae` atualiza a árvore web com `npm audit fix` **sem `--force`**, fixa um override explícito de `picomatch` transitive e adiciona à CI auditoria `npm audit --omit=dev --audit-level=high` para web e mobile. No candidato atual, a auditoria de produção encontrou `0 vulnerabilities` tanto na UI web quanto no app mobile; typecheck, política offline mobile, lint, typecheck, testes, build e verificação do manifesto de screenshots web passaram localmente.
+
+A auditoria completa da UI ainda reporta 7 advisories moderados somente no toolchain de desenvolvimento Vitest/Storybook (`@vitest/*`, `vitest` e `storybook`). A correção automática remanescente exige Vitest `5.0.1` como upgrade major, enquanto o `@storybook/addon-vitest` disponível declara peers Vitest 3/4; por isso nenhum `--force` foi aplicado e a migração major permanece pendente de uma slice própria com atualização coordenada e testes de Storybook. Isso não deve ser descrito como supply chain totalmente zerada.
+
+A CI pública foi consultada uma vez no head `75c6a1ae` e permanecia com jobs `queued`/`in_progress`, sem conclusão verde ou falha final. O produto segue **FIXING / preview-local RC em hardening — não finalizado e não production-ready**.
+
+## Addendum de documentação visual Home — 2026-09-23
+
+A branch documental do PR #5 foi atualizada no head `605cd959` com a imagem Home fornecida pelo mantenedor (`docs/images/screens/class-a-plus-home.png`, SHA-256 `0291a918e1af8ea282721ea4b4f126c7d9ceb95c983299da964d1e9461b235bf`). A legenda identifica expressamente a imagem como captura da branch de desenvolvimento `feat/manus-parity-omniroute` e declara que ela não prova integração na `main`. O PR #5 continua aberto e sem checks; sua integração requer autorização específica do mantenedor. O PR principal #1 também continua aberto e sem merge automático.
+
+Os bloqueios externos permanecem: instaladores assinados, imagens Docker publicadas, auto-update/rollback verificável, homologação física Windows/macOS/Linux/Android/iOS, contas OAuth/IdP/providers, Redis/PostgreSQL/OTLP operacionais e providers de deploy reais. Esses itens continuam `BLOCKED_BY_EXTERNAL_DEPENDENCY` com requisitos explicitados, não como funcionalidades homologadas.
+
+Evidência de referência: `https://github.com/DZ23-LTDA/ollama-classe-a-plus/pull/1`, `https://github.com/DZ23-LTDA/ollama-classe-a-plus/pull/5`.
