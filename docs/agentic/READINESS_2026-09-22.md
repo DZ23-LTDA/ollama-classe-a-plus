@@ -678,3 +678,12 @@ O head `d0a7ae6e` evita duplicação de jobs por missão: o queue local retorna 
 Evidência local: suíte completa agent, race, vet e diff check passaram; Redis 7 local foi iniciado sem credenciais externas e os testes `TestDistributedRedisRetriesDeadLetterReplay` e `TestDistributedRedisClaimIsIdempotentAndReclaimsExpiredLease` passaram, cobrindo retry/DLQ, enqueue idempotente e recuperação de lease expirado entre workers. Não houve uso de contas ou serviços externos. Fencing token, Redis TLS `rediss://`, múltiplas instâncias com locking distribuído e perda de conexão continuam `BLOCKED_BY_EXTERNAL_DEPENDENCY` para homologação real.
 
 A CI pública do novo head ainda precisa concluir. O produto segue **FIXING / preview-local RC em hardening — não finalizado e não production-ready**.
+
+
+## Addendum de connector credential fail-closed — 2026-09-23
+
+O head `55c805a0` corrige o caminho de egress dos connectors. Quando `TokenEnv` ou `OAuthProvider` é declarado e não resolve uma credencial, `CallForOrganization` retorna `connector credential is unavailable` antes de construir/enviar a requisição. A chamada não cai mais silenciosamente em HTTP sem `Authorization`.
+
+Evidência local: testes de catálogo, OAuth tenant-aware, lifecycle, redirect/payload bounds e a regressão `TestConnectorFailsClosedBeforeEgressWhenTokenEnvIsMissing` passaram; essa regressão usa `httptest` e confirmou zero requests ao server. A suíte completa agent, race focado, vet e diff check passaram. Credenciais reais, OAuth upstream, scopes e homologação de cada connector continuam pendentes ou `BLOCKED_BY_EXTERNAL_DEPENDENCY`.
+
+A CI pública do novo head precisa concluir. O produto permanece **FIXING / preview-local RC em hardening — não finalizado e não production-ready**.
