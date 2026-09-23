@@ -172,7 +172,12 @@ fi
 if grep -Rqi 'change-me-local-only' deploy; then echo 'fixed development credential found'; exit 1; fi
 grep -q 'Provider       string' internal/agent/types.go
 grep -q 'provider != "ollama-local"' internal/agent/runtime.go
-grep -q 'Claude / Anthropic (não conectado)' app/ui/app/src/components/AgenticConsole.tsx
+	grep -q 'const providerChoices = useMemo' app/ui/app/src/components/AgenticConsole.tsx
+	grep -q 'getModels("")' app/ui/app/src/components/AgenticConsole.tsx
+	if grep -q 'Claude / Anthropic (não conectado)' app/ui/app/src/components/AgenticConsole.tsx; then
+		echo "stale hardcoded provider alias detected" >&2
+		exit 1
+	fi
 grep -q 'TestRuntimeRejectsUnconfiguredMissionProvider' internal/agent/runtime_test.go
 	grep -q 'Empty release artifact' .github/workflows/release.yaml
 	grep -q 'actions/attest-build-provenance@v2' .github/workflows/release.yaml
