@@ -422,3 +422,8 @@ O middleware agentic agora aplica a política de `Origin` também sem auth beare
 ## Unreleased — strict Origin wildcard matching — 2026-09-23
 
 A allowlist `scheme://host:*` agora aceita somente portas variáveis no host exato; configurações não são mais interpretadas como prefixo arbitrário de domínio. Testes normal/race e gates Go completos passaram.
+
+
+## Unreleased — portable best-effort sandbox — 2026-09-23
+
+O `sandbox.exec` agora resolve Python/Node por plataforma. macOS e Windows usam processo best-effort com timeout, output limitado e cancelamento; a resposta informa `network_isolation=not-enforced`. Strict permanece Linux-only e fail-closed. Gates Go completos e compilações Darwin/Windows do pacote agentic passaram.

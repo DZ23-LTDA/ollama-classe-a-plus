@@ -389,3 +389,10 @@ Depois do lifecycle de connectors, o commit `96fd7edd` fechou o cadastro persist
 O endpoint MCP aplica a política de executável absoluto regular e workspace preparado; o endpoint Remote MCP conserva a allowlist de métodos, HTTPS, SSRF, resolução/pinning de endereços aprovados, redirects same-origin e env-only credentials. O endpoint de skills grava `Trusted=false` independentemente do input e exige revisão/approval para qualquer confiança futura. A UI Plugins expõe os três cadastros e mantém a diferença entre manifest registrado, credencial presente e upstream validado.
 
 O próximo trabalho independente é endurecer o storage/authorization distribuído e a homologação física do sandbox, não adicionar botões que simulem integração externa. Permanecem abertos: OAuth e refresh/revoke contra contas reais; egress/providers/social commerce/fiscal; isolamento físico host/device; Postgres/Redis/OTLP distribuídos; Windows/macOS/Linux/Android/iOS; GPU/native; signing, installers, rollback, stores, app review e deploy autorizado.
+
+
+## Incremento 2026-09-23 — sandbox best-effort portátil
+
+O runtime passou a separar claramente portabilidade de isolamento forte. Em Linux, `sandbox.exec` mantém os caminhos best-effort e strict já existentes. Em macOS e Windows, o modo best-effort executa Python/Node pelo processo disponível, aplica timeout/output bounds e encerra o processo no cancelamento, mas retorna explicitamente que a rede não está isolada. O modo strict continua Linux-only e falha fechado fora do executor com cgroup v2 delegado.
+
+Esse avanço remove uma quebra de execução multiplataforma sem transformar compilação cruzada em homologação física. Permanecem como trabalho externo a validação real em Windows/macOS, sandbox forte de host, AppArmor/SELinux, isolamento de dispositivos, assinaturas, installers e distribuição.

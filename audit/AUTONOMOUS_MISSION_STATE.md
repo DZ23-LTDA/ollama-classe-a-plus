@@ -2283,3 +2283,10 @@ Foi adicionada regressão de middleware local cross-site, além da matriz de `ag
 A revisão da política de origem encontrou que o matcher anterior tratava qualquer configuração terminada em `*` como prefixo livre. Uma allowlist malformada como `https://trusted.example*` poderia aceitar `https://trusted.example.evil`. O commit `4200607483bcd51f3d77e6a96ba46c5159839360` restringe `scheme://host:*` a porta variável no hostname exato, rejeita userinfo/path/query/fragment e preserva somente os wildcards de esquema explícitos como `app://*` e `file://*`.
 
 Regressões cobrem porta válida, hostname parecido e ausência de porta. Testes normal/race e gates Go completos passaram em integrity, todos os pacotes, vet, build e diff. A política local continua aplicando Origin a mutações sem bearer.
+
+
+## Portabilidade P1 do sandbox best-effort — 2026-09-23
+
+O commit `b4c4c243c43939b1fbbf81155226acee636be2ba` corrigiu uma lacuna multiplataforma: o caminho comum sempre tentava `unshare`, embora strict fosse Linux-only. O sandbox agora resolve Python/Node conforme o sistema e, em macOS/Windows, usa processo best-effort com timeout, limite de stdout/stderr e kill no cancelamento. O resultado declara `execution_isolation=best-effort-platform-process`, `resource_limits=context-timeout-output-bounded` e `network_isolation=not-enforced`. Strict continua recusado fora de Linux e não há downgrade silencioso.
+
+Testes normais/race do sandbox passaram. O gate completo Go passou em integrity, todos os pacotes, vet, build e diff. Também foram compilados os testes de `internal/agent` para `GOOS=darwin` e `GOOS=windows` com `CGO_ENABLED=0`. Isso é prova de compilação multiplataforma, não homologação física de sistemas, dispositivos ou isolamento host.

@@ -538,3 +538,10 @@ Os testes normal/race e os gates Go completos passaram. Esse controle reduz CSRF
 A implementação anterior usava prefix match para qualquer allowlist terminada em `*`. O commit `42006074` separa wildcard de porta (`:*`) de wildcard de esquema (`://*`) e valida o primeiro por URL, hostname exato e porta presente. Assim, `trusted.example.evil` não herda autorização de `trusted.example`.
 
 Os testes normal/race e gates Go completos passaram. O achado foi de controle de navegador e não deve ser confundido com autenticação distribuída ou prova de segurança física do host.
+
+
+## Addendum P1 — sandbox best-effort multiplataforma — 2026-09-23
+
+O caminho anterior invocava `unshare` mesmo fora do Linux; strict já falhava fechado, mas best-effort não era portátil. O commit `b4c4c243` adicionou resolução de interpretador e execução por processo em macOS/Windows. Esse caminho mantém timeout, limite de output e kill, mas declara `network_isolation=not-enforced`. O descriptor foi versionado para refletir a diferença.
+
+A cobertura inclui testes normal/race, gates Go completos e compilação cruzada Darwin/Windows de `internal/agent`. A evidência não equivale a execução física nesses sistemas, nem a sandbox forte, AppArmor/SELinux ou homologação de dispositivo.

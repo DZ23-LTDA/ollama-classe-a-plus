@@ -470,3 +470,10 @@ A regressão de middleware e os gates Go completos passaram. A proteção é uma
 O commit `42006074` corrigiu o matcher de allowlist. Wildcards terminados em `:*` agora significam somente qualquer porta do hostname exato; não há prefix match de domínio. Userinfo, path, query e fragment são rejeitados nesse formato. Os wildcards explícitos de esquema (`app://*`, `file://*` e equivalentes já suportados) permanecem limitados ao esquema configurado.
 
 A regressão cobre `trusted.example:8443`, `trusted.example.evil:8443` e ausência de porta. Os gates Go completos passaram. O estado permanece preview/local RC em hardening, sem claim de autenticação distribuída ou homologação de browser externo.
+
+
+## Addendum de portabilidade do sandbox — 2026-09-23
+
+O commit `b4c4c243` tornou `sandbox.exec` utilizável fora do Linux sem vender isolamento inexistente. macOS e Windows resolvem o interpretador disponível e executam em processo best-effort, com timeout, limite de saída e encerramento no cancelamento. A resposta marca `network_isolation=not-enforced`. No Linux, o caminho best-effort conserva a tentativa de namespaces; `strict` continua exigindo Linux, cgroup v2 delegado, namespaces, no-new-privs e seccomp, falhando fechado fora desse ambiente.
+
+Os testes normal/race, gates Go completos e compilações de `internal/agent` para Darwin e Windows passaram. Isso não substitui testes físicos, AppArmor/SELinux, homologação de host ou isolamento forte do operador. O produto continua preview/local RC em hardening.
