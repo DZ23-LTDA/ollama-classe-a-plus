@@ -519,3 +519,10 @@ Isso valida o comportamento do adapter e de um provider fixture local. Não vali
 O commit `a286c15a` tornou explícito o campo `mode: sandbox` em campaigns, afiliados e pedidos. O relatório expõe `sandbox_only=true`, e modos externos são recusados sem adapter validado. Approval, budget, inventory, idempotência e métricas continuam testáveis localmente.
 
 Isso não representa publicação em rede social, checkout, gateway de pagamento, pedido em marketplace, fulfillment, afiliado com comissão real ou emissão fiscal. Esses fluxos continuam bloqueados por credenciais, contas, escopos, homologação e smoke externo.
+
+
+## Addendum de safeConfig durável — 2026-09-23
+
+O commit `fda91625` faz o endpoint de configuração segura reconhecer connectors, MCP, mídia e deployments registrados nos managers persistentes, mesmo quando não existe variável de bootstrap. O teste confirma o estado configurado sem expor endpoint.
+
+`configured` continua significando apenas manifest/manager aceito. Não significa credencial presente, OAuth consentido, conta conectada, provider respondendo ou deploy publicado.

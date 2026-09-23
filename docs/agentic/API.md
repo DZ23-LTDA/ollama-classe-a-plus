@@ -394,3 +394,8 @@ O adapter de deployment aceita HTTPS para serviços externos e HTTP somente em l
 ## Company Growth OS
 
 Campaigns, affiliate programs/links e orders retornam `mode: "sandbox"`; o relatório de crescimento retorna `sandbox_only: true`. O runtime pode planejar, aprovar, registrar métricas, manter inventário e simular fulfillment local. Um modo diferente de sandbox retorna `external growth action is not configured` até existir adapter, connector, credencial e smoke autorizado. Esses endpoints não cobram, publicam, movimentam dinheiro, fazem pedido externo ou emitem NF-e.
+
+
+## Configuração segura
+
+`GET /api/agent/v1/config` considera tanto arquivos/env de bootstrap quanto manifests registrados nos managers duráveis. `connectors_configured`, `mcp_configured`, `media_configured` e `deployments_configured` indicam configuração aceita pelo Runtime. Esses booleanos não afirmam credencial presente, conta OAuth conectada, resposta upstream, publicação ou homologação.

@@ -2332,3 +2332,10 @@ Regressões cobrem provider TLS fixture, containment, symlink, arquivo grande, r
 O commit `a286c15a8c26eda227a695e42889f2ccde34ecea` adicionou `mode: sandbox` a campaigns, affiliate programs/links e orders. `CompanyGrowthReport` agora expõe `sandbox_only=true`; registros legados são normalizados ao carregar; qualquer modo diferente de sandbox falha com `ErrCompanyGrowthExternalUnavailable` até existir adapter upstream validado.
 
 O fluxo local preserva approval, orçamento, idempotência, inventário e métricas, mas não afirma campanha lançada, venda cobrada, fulfillment contratado ou conversão externa. Testes normal/race e gates Go completos passaram em integrity, todos os pacotes, vet, build e diff.
+
+
+## Correção P1 de safeConfig para manifests duráveis — 2026-09-23
+
+O commit `fda916253cf408336ce25024ccdb24983d2fe626` corrigiu o endpoint de configuração segura. Antes, `connectors_configured`, `mcp_configured`, `media_configured` e `deployments_configured` dependiam somente das variáveis de bootstrap e podiam reportar `false` depois de um registro persistente pelo lifecycle.
+
+Agora os campos combinam bootstrap estático com managers duráveis do Runtime. O teste registra um connector fixture, verifica `configured=true` e confirma que o endpoint não revela URL. A semântica continua restrita a configuração local; não é prova de credential presence, OAuth account ou upstream smoke. Testes normal/race e gates Go completos passaram.

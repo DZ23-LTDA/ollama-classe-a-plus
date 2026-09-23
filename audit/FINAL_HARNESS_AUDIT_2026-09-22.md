@@ -587,3 +587,10 @@ A cobertura normal/race inclui arquivo externo, symlink, arquivo sparse acima de
 A revisão do Company OS mostrou que campaigns e orders tinham estados genéricos (`active`, `fulfilled`) apesar de não executarem APIs externas. O commit `a286c15a` adicionou `mode`, normalização de legado e `sandbox_only`; qualquer modo não-sandbox é bloqueado com erro explícito. O fluxo continua útil para planejamento, approval, budget, inventário, idempotência e métricas locais.
 
 A mudança evita confundir simulação de venda/fulfillment com transação, marketplace, gateway, afiliado ou emissão fiscal real. Testes normal/race e gates Go completos passaram.
+
+
+## Addendum P1 — safeConfig e lifecycle durável — 2026-09-23
+
+A auditoria encontrou um false negative: depois do registro persistente, o endpoint de configuração só consultava env bootstrap. O commit `fda91625` passou a derivar o estado dos managers reais e mantém redaction. O teste usa fixture e verifica que a URL não aparece na resposta.
+
+A correção melhora observabilidade sem promover estados. `configured` não é `credential_configured`, `connected` ou `upstream validated`.
