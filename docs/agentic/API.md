@@ -358,3 +358,8 @@ Sem `OLLAMA_AGENT_MCP` ou `OLLAMA_AGENT_REMOTE_MCP`, os managers padrão usam `O
 `POST /api/agent/v1/auth/logout` tem dois comportamentos explícitos. Quando `auth_required=false`, é uma operação local idempotente e responde `204 No Content` mesmo sem bearer; não há sessão remota para revogar. Quando `auth_required=true`, o middleware exige bearer válido e o handler marca o hash do token como revogado, respondendo `204`. Tokens ausentes, inválidos ou expirados continuam retornando `401` no modo autenticado.
 
 Esse endpoint revoga somente o token do runtime agentic. Não revoga automaticamente tokens OAuth de connectors, sessões de IdP ou contas de terceiros; cada credential/provider possui seu fluxo separado de refresh/revoke e requer homologação externa.
+
+
+## Origin policy
+
+Mutations agentic com `Origin` presente são aceitas somente quando a origem está em `OLLAMA_ORIGINS` ou nos defaults loopback (`localhost`, `127.0.0.1`, `0.0.0.0`, HTTP/HTTPS e portas). Essa política é aplicada com ou sem bearer. GET/HEAD, OPTIONS e clientes nativos sem header `Origin` preservam o caminho compatível. A regra é uma proteção de navegador e não substitui autenticação ou mTLS.

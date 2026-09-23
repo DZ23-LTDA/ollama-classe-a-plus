@@ -2269,3 +2269,10 @@ O gate completo pós-mudança passou em integrity, `CGO_ENABLED=1 go test ./... 
 A auditoria de auth encontrou que `POST /api/agent/v1/auth/logout` exigia um Bearer e acessava o AuthStore mesmo quando `auth_required=false`. O commit `0ea1039aba7d50014d7422cd40b69355e8451ed7` torna o endpoint idempotente no modo local: retorna `204 No Content` sem sessão e sem AuthStore. No modo autenticado, a revogação Bearer continua obrigatória e não muda de escopo.
 
 Foi adicionada regressão local, além do teste existente que prova revogação do bearer. Testes normal/race específicos passaram e os gates Go completos passaram em integrity, todos os pacotes, vet, build e diff. O contrato não declara que logout local revoga conta externa; ele apenas encerra a ausência de sessão do runtime local.
+
+
+## Hardening P1 de Origin/CSRF no modo local — 2026-09-22
+
+A auditoria de auth identificou que `auth_required=false` pulava `agentOriginAllowed` e deixava mutações locais sem a política de origem, embora o serviço pudesse ser acessado por um navegador. O commit `79a1197e2e9e857090c32f22c290c1c457a35207` aplica a mesma verificação no ramo local. Origens loopback padrão (`localhost`, `127.0.0.1` e `0.0.0.0`, HTTP/HTTPS e portas) continuam permitidas; uma origem cross-site recebe `403` em métodos de mutação. Leituras, preflight e requests sem Origin preservam o comportamento compatível.
+
+Foi adicionada regressão de middleware local cross-site, além da matriz de `agentOriginAllowed`. Testes normal/race específicos e gates Go completos passaram em integrity, todos os pacotes, vet, build e diff. O modo local continua sem bearer por desenho, mas agora não trata ausência de autenticação como ausência de política de navegador.

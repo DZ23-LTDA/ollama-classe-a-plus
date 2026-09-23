@@ -412,3 +412,8 @@ O loader de skills agora rejeita campos desconhecidos e JSON trailing com regres
 ## Unreleased — local auth logout hardening — 2026-09-22
 
 `POST /api/agent/v1/auth/logout` agora retorna `204` sem exigir bearer quando `auth_required=false`, evitando dependência indevida do AuthStore. Em modo autenticado, a revogação de bearer permanece estrita. Testes normal/race e gates Go completos passaram.
+
+
+## Unreleased — local Origin policy hardening — 2026-09-22
+
+O middleware agentic agora aplica a política de `Origin` também sem auth bearer. Mutações cross-site recebem `403`; origens loopback padrão continuam permitidas. Testes normal/race e gates Go completos passaram.

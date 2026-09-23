@@ -456,3 +456,10 @@ Com essa mudança, a família de plugins — connectors, MCP, Remote MCP e skill
 O commit `0ea1039a` corrigiu o contrato de `POST /api/agent/v1/auth/logout`. Com `auth_required=false`, o endpoint agora é idempotente e retorna `204` sem exigir bearer ou AuthStore. Com auth requerida, o middleware autentica primeiro e o handler revoga o bearer apresentado; o teste existente continua cobrindo que o token revogado não autentica novamente.
 
 A correção evita um falso requisito de sessão no modo local e um possível acesso a store ausente. Testes normal/race e gates Go completos passaram. Isso cobre somente a sessão do runtime local; não é logout ou revogação de contas OAuth externas. A classificação continua preview/local RC em hardening.
+
+
+## Addendum de Origin/CSRF no modo local — 2026-09-22
+
+O commit `79a1197e` aplica `agentOriginAllowed` também quando `auth_required=false`. Isso mantém o uso local sem bearer, mas bloqueia mutações iniciadas por uma origem cross-site. Os defaults de loopback permanecem permitidos, e GET/HEAD, OPTIONS e requests sem Origin não são transformados em falhas de navegador.
+
+A regressão de middleware e os gates Go completos passaram. A proteção é uma barreira de navegador do runtime local; não substitui autenticação distribuída, IdP, mTLS ou homologação de host. O estado permanece preview/local RC em hardening.

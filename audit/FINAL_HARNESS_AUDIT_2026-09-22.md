@@ -524,3 +524,10 @@ Foram aprovados testes normal/race do ContextStore e o gate completo Go em integ
 A revisão de auth identificou que o handler de logout tratava o modo local como se houvesse sempre bearer e AuthStore. O commit `0ea1039a` faz early return `204` quando `auth_required=false`; o modo autenticado continua exigindo bearer e revoga o hash correspondente. Há regressão para `agentAPI{authRequired:false}` sem store e teste de revogação autenticada.
 
 Os testes normal/race do handler e os gates Go completos passaram. O ajuste é interno ao runtime e não prova logout, refresh ou revogação em IdP/conta externa.
+
+
+## Addendum P1 — Origin policy em local mode — 2026-09-22
+
+O ramo sem auth do middleware não aplicava `agentOriginAllowed`, o que deixava mutações locais sem a barreira de origem. O commit `79a1197e` corrige esse bypass. Loopback permanece aceito pelos defaults de `OLLAMA_ORIGINS`; `https://evil.example` em POST é rejeitado com `403`. A regressão cobre o middleware efetivo, não apenas a função isolada.
+
+Os testes normal/race e os gates Go completos passaram. Esse controle reduz CSRF de navegador no serviço local, mas não é uma substituição para autenticação distribuída, mTLS ou isolamento físico.
