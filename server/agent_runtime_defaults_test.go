@@ -26,12 +26,16 @@ func TestNewDefaultAgentRuntimeUsesDurableDefaults(t *testing.T) {
 	} {
 		t.Setenv(name, "")
 	}
+	configDir, err := os.UserConfigDir()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	runtime, err := newDefaultAgentRuntime()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.HasPrefix(runtime.WorkspaceRoot(), configHome+string(os.PathSeparator)) {
+	if !strings.HasPrefix(runtime.WorkspaceRoot(), filepath.Clean(configDir)+string(os.PathSeparator)) {
 		t.Fatalf("workspace default escaped XDG config directory: %q", runtime.WorkspaceRoot())
 	}
 	if filepath.Base(runtime.WorkspaceRoot()) != "workspaces" {

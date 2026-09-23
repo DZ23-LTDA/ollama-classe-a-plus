@@ -67,11 +67,11 @@ func (i DocumentIngestor) Ingest(ctx context.Context, request DocumentIngestRequ
 		if !rootInfo.IsDir() {
 			return nil, errors.New("ingestion workspace must be a directory")
 		}
-		canonicalRoot, canonicalErr := filepath.EvalSymlinks(root)
-		if canonicalErr != nil {
-			return nil, canonicalErr
+		rootLinkInfo, lstatErr := os.Lstat(root)
+		if lstatErr != nil {
+			return nil, lstatErr
 		}
-		if filepath.Clean(canonicalRoot) != filepath.Clean(root) {
+		if rootLinkInfo.Mode()&os.ModeSymlink != 0 {
 			return nil, errors.New("ingestion workspace must not be a symlink")
 		}
 		if err := rejectSymlinkComponents(projectRoot, root); err != nil {
