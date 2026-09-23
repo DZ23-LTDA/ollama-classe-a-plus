@@ -27,6 +27,10 @@ import type {
   ClaudeDesktopStatus,
   CodexDesktopStatus,
 } from "@/types/webview";
+import {
+  FIRST_MODEL_COMMAND,
+  shouldShowClaudeConnectedIntro,
+} from "./onboardingUtils";
 import { copyTextToClipboard } from "@/utils/clipboard";
 import {
   ArrowsRightLeftIcon,
@@ -41,8 +45,6 @@ import {
   type ReactNode,
 } from "react";
 
-export const FIRST_MODEL_COMMAND = "ollama";
-
 type ClaudeConnectPhase =
   | "idle"
   | "installing"
@@ -50,10 +52,6 @@ type ClaudeConnectPhase =
   | "connecting"
   | "launching"
   | "disconnecting";
-
-export function shouldShowClaudeConnectedIntro(status: ClaudeDesktopStatus) {
-  return status.connected && !status.startFailed && !status.used;
-}
 
 function setClaudeConnection(
   enabled: boolean,

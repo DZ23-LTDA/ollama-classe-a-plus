@@ -1,28 +1,10 @@
 import {
-  createContext,
-  useContext,
-  useState,
   useMemo,
+  useState,
   type ReactNode,
-  type Dispatch,
-  type SetStateAction,
 } from "react";
 import { DownloadEvent } from "@/gotypes";
-
-interface StreamingContextType {
-  streamingChatIds: Set<string>;
-  setStreamingChatIds: Dispatch<SetStateAction<Set<string>>>;
-  loadingChats: Set<string>;
-  setLoadingChats: Dispatch<SetStateAction<Set<string>>>;
-  abortControllers: Map<string, AbortController>;
-  setAbortControllers: Dispatch<SetStateAction<Map<string, AbortController>>>;
-  downloadProgress: Map<string, DownloadEvent>;
-  setDownloadProgress: Dispatch<SetStateAction<Map<string, DownloadEvent>>>;
-}
-
-const StreamingContext = createContext<StreamingContextType | undefined>(
-  undefined,
-);
+import { StreamingContext } from "./streamingContext";
 
 export function StreamingProvider({ children }: { children: ReactNode }) {
   const [streamingChatIds, setStreamingChatIds] = useState<Set<string>>(
@@ -55,14 +37,4 @@ export function StreamingProvider({ children }: { children: ReactNode }) {
       {children}
     </StreamingContext.Provider>
   );
-}
-
-export function useStreamingContext() {
-  const context = useContext(StreamingContext);
-  if (context === undefined) {
-    throw new Error(
-      "useStreamingContext must be used within a StreamingProvider",
-    );
-  }
-  return context;
 }

@@ -52,7 +52,10 @@ function ResourceList({ title, count, children }: { title: string; count: number
 
 export function AgenticControlCenter() {
   const { data: rawModels, isLoading: modelsLoading } = useQuery({ queryKey: ["agent-models"], queryFn: () => getModels(""), retry: false });
-  const models = Array.isArray(rawModels) ? rawModels : [];
+  const models = useMemo(
+    () => (Array.isArray(rawModels) ? rawModels : []),
+    [rawModels],
+  );
   const { data: safeConfig, isLoading: configLoading } = useQuery<SafeConfig>({
     queryKey: ["agent-safe-config"],
     queryFn: () => agentFetch<SafeConfig>("/api/agent/v1/config/safe"),

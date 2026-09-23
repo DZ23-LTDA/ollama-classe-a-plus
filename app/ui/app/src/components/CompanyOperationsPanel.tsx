@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   addCompanySocialAccount,
   approveCompanySocialDraft,
@@ -27,7 +27,7 @@ export function CompanyOperationsPanel({ company, onCompanyChange }: { company: 
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     try {
       const [socialReport, grokStatus] = await Promise.all([getCompanySocialReport(company.id), getGrokStatus()]);
       setSocial(socialReport);
@@ -35,8 +35,8 @@ export function CompanyOperationsPanel({ company, onCompanyChange }: { company: 
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Não foi possível carregar Social OS/Grok.");
     }
-  };
-  useEffect(() => { void refresh(); }, [company.id]);
+  }, [company.id]);
+  useEffect(() => { void refresh(); }, [refresh]);
 
   const mutate = async (action: () => Promise<AgentCompany>, message: string) => {
     setBusy(true);

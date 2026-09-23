@@ -12,14 +12,10 @@ import { useCloudStatus } from "@/hooks/useCloudStatus";
 import { useQueryClient } from "@tanstack/react-query";
 import { getModelUpstreamInfo } from "@/api";
 import { ArrowDownTrayIcon } from "@heroicons/react/24/outline";
+import type { CloseableButtonHandle } from "@/types/imperative";
+import { modelGroup } from "./modelPickerUtils";
 
 const stalenessCheckCache = new Map<string, number>();
-
-export function modelGroup(model: Model): string {
-  if (model.kind === "router") return "Roteamento inteligente";
-  if (model.kind === "remote") return model.provider || "APIs externas";
-  return "Modelos locais";
-}
 
 function selectableModelIndexes(models: Model[]): number[] {
   return models.flatMap((model, index) =>
@@ -28,7 +24,7 @@ function selectableModelIndexes(models: Model[]): number[] {
 }
 
 export const ModelPicker = forwardRef<
-  HTMLButtonElement,
+  CloseableButtonHandle,
   {
     chatId?: string;
     onModelSelect?: () => void;
@@ -103,7 +99,7 @@ export const ModelPicker = forwardRef<
 
   useEffect(() => {
     if (ref && typeof ref === "object" && ref.current) {
-      (ref.current as any).closeDropdown = () => setIsOpen(false);
+      ref.current.closeDropdown = () => setIsOpen(false);
     }
   }, [ref, setIsOpen]);
 

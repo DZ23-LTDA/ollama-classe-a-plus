@@ -33,7 +33,10 @@ export function useSelectedModel(currentChatId?: string, searchQuery?: string) {
     enabled: !settings.selectedModel, // Only fetch if no model is selected
   });
 
-  const inferenceComputes = inferenceComputeResponse?.inferenceComputes || [];
+  const inferenceComputes = useMemo(
+    () => inferenceComputeResponse?.inferenceComputes || [],
+    [inferenceComputeResponse?.inferenceComputes],
+  );
 
   const totalVRAM = useMemo(
     () => getTotalVRAM(inferenceComputes),
@@ -99,6 +102,7 @@ export function useSelectedModel(currentChatId?: string, searchQuery?: string) {
   }, [
     models,
     settings.selectedModel,
+    settings.turboEnabled,
     cloudDisabled,
     recommendedModel,
   ]);
@@ -125,6 +129,8 @@ export function useSelectedModel(currentChatId?: string, searchQuery?: string) {
     selectedModel,
     cloudDisabled,
     settings.selectedModel,
+    settings.turboEnabled,
+    setSettings,
   ]);
 
   // Set model from chat history when chat data loads
@@ -193,6 +199,9 @@ export function useSelectedModel(currentChatId?: string, searchQuery?: string) {
     models.length,
     settings.selectedModel,
     cloudDisabled,
+    models,
+    recommendedModel,
+    setSettings,
   ]);
 
   // Add the selected model to the models list if it's not already there

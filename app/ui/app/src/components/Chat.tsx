@@ -122,7 +122,7 @@ export default function Chat({ chatId }: { chatId: string }) {
       containerRef.current.scrollTop = containerRef.current.scrollHeight;
     }
     prevChatIdRef.current = chatId;
-  }, [chatId, messages.length]);
+  }, [chatId, messages.length, containerRef]);
 
   // Simplified submit handler - ChatForm handles all the attachment logic
   const handleChatFormSubmit = (

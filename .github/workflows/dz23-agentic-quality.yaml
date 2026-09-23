@@ -124,6 +124,9 @@ jobs:
       - name: Web typecheck
         working-directory: app/ui/app
         run: ./node_modules/.bin/tsc --noEmit
+      - name: Web lint
+        working-directory: app/ui/app
+        run: npm run lint
       - name: Web tests
         working-directory: app/ui/app
         run: npm test -- --run

@@ -31,6 +31,7 @@ import { ErrorMessage } from "./ErrorMessage";
 import { processFiles } from "@/utils/fileValidation";
 import type { ImageData } from "@/types/webview";
 import { PlusIcon } from "@heroicons/react/24/outline";
+import type { CloseableButtonHandle } from "@/types/imperative";
 
 export type ThinkingLevel = "low" | "medium" | "high";
 
@@ -102,9 +103,9 @@ function ChatForm({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const thinkButtonRef = useRef<HTMLButtonElement>(null);
-  const thinkingLevelButtonRef = useRef<HTMLButtonElement>(null);
+  const thinkingLevelButtonRef = useRef<CloseableButtonHandle>(null);
   const webSearchButtonRef = useRef<HTMLButtonElement>(null);
-  const modelPickerRef = useRef<HTMLButtonElement>(null);
+  const modelPickerRef = useRef<CloseableButtonHandle>(null);
   const submitButtonRef = useRef<HTMLButtonElement>(null);
 
   const { mutate: sendMessageMutation } = useSendMessage(chatId);
@@ -126,9 +127,9 @@ function ChatForm({
     if (
       isOpen &&
       modelPickerRef.current &&
-      (modelPickerRef.current as any).closeDropdown
+      modelPickerRef.current.closeDropdown
     ) {
-      (modelPickerRef.current as any).closeDropdown();
+      modelPickerRef.current.closeDropdown();
     }
   };
 
@@ -136,9 +137,9 @@ function ChatForm({
     if (
       isOpen &&
       thinkingLevelButtonRef.current &&
-      (thinkingLevelButtonRef.current as any).closeDropdown
+      thinkingLevelButtonRef.current.closeDropdown
     ) {
-      (thinkingLevelButtonRef.current as any).closeDropdown();
+      thinkingLevelButtonRef.current.closeDropdown();
     }
   };
 
@@ -341,6 +342,22 @@ function ChatForm({
     }
   };
 
+  const handleCancel = useCallback(() => {
+    cancelMessage(chatId);
+  }, [cancelMessage, chatId]);
+
+  const handleCancelEdit = useCallback(() => {
+    setMessage({
+      content: "",
+      attachments: [],
+      fileErrors: [],
+    });
+    onCancelEdit?.();
+    setTimeout(() => {
+      textareaRef.current?.focus();
+    }, 0);
+  }, [onCancelEdit]);
+
   // Navigation helper function
   const navigateToNextElement = useCallback(
     (current: HTMLElement, direction: "next" | "prev") => {
@@ -361,7 +378,7 @@ function ChatForm({
           : (index - 1 + elements.length) % elements.length;
       elements[nextIndex].focus();
     },
-    [],
+    [modelSupportsThinkingLevels],
   );
 
   // Focus textarea when navigating to a chat (when chatId changes)
@@ -466,7 +483,15 @@ function ChatForm({
       window.removeEventListener("keydown", handleKeyDown);
       document.removeEventListener("paste", handlePaste);
     };
-  }, [isStreaming, editingMessage, onCancelEdit, navigateToNextElement]);
+  }, [
+    isStreaming,
+    editingMessage,
+    modelSupportsThinkingLevels,
+    onCancelEdit,
+    handleCancel,
+    handleCancelEdit,
+    navigateToNextElement,
+  ]);
 
   const handleSubmit = async () => {
     if (!message.content.trim() || isStreaming || isDownloading) return;
@@ -588,26 +613,6 @@ function ChatForm({
     compositionEndTimeoutRef.current = window.setTimeout(() => {
       setIsEditing(false);
     }, 10);
-  };
-
-  const handleCancel = () => {
-    cancelMessage(chatId);
-  };
-
-  const handleCancelEdit = () => {
-    // Clear composition and call parent callback
-    setMessage({
-      content: "",
-      attachments: [],
-      fileErrors: [],
-    });
-
-    onCancelEdit?.();
-
-    // Focus the textarea after canceling edit mode
-    setTimeout(() => {
-      textareaRef.current?.focus();
-    }, 0);
   };
 
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {

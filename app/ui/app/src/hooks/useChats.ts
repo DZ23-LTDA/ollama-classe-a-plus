@@ -5,7 +5,7 @@ import { Message } from "@/gotypes";
 import { useSelectedModel } from "./useSelectedModel";
 import { createQueryBatcher } from "./useQueryBatcher";
 import { useRefetchModels } from "./useModels";
-import { useStreamingContext } from "@/contexts/StreamingContext";
+import { useStreamingContext } from "@/contexts/useStreamingContext";
 import { getModelCapabilities } from "@/api";
 import { useCloudStatus } from "./useCloudStatus";
 
@@ -568,9 +568,9 @@ export const useSendMessage = (chatId: string) => {
                       thinkingTimeEnd: event.thinkingTimeEnd,
                     }),
                     {
-                      tool_result: (event as any).toolResultData,
-                      ...((event as any).toolName
-                        ? { tool_name: (event as any).toolName }
+                      tool_result: event.toolResultData,
+                      ...(event.toolName
+                        ? { tool_name: event.toolName }
                         : {}),
                     },
                   ),
