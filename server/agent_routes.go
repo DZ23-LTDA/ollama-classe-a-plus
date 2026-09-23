@@ -1132,11 +1132,12 @@ func (a *agentAPI) prometheus(c *gin.Context) {
 }
 
 func (a *agentAPI) connectors(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"connectors": a.runtime.Connectors()})
+	c.JSON(http.StatusOK, gin.H{"connectors": a.runtime.ConnectorsForOrganization(agentOrganizationID(c))})
 }
 
 func (a *agentAPI) mcp(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"servers": a.runtime.MCPServers(), "remote_servers": a.runtime.RemoteMCPServers()})
+	organizationID := agentOrganizationID(c)
+	c.JSON(http.StatusOK, gin.H{"servers": a.runtime.MCPServersForOrganization(organizationID), "remote_servers": a.runtime.RemoteMCPServersForOrganization(organizationID)})
 }
 
 func (a *agentAPI) jobs(c *gin.Context) {
@@ -1162,7 +1163,7 @@ func (a *agentAPI) tools(c *gin.Context) {
 }
 
 func (a *agentAPI) skills(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"skills": a.context.Skills()})
+	c.JSON(http.StatusOK, gin.H{"skills": a.context.SkillsForOrganization(agentOrganizationID(c))})
 }
 
 func (a *agentAPI) schedules(c *gin.Context) {
