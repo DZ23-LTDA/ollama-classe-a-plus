@@ -669,3 +669,12 @@ O head `44628055` torna mutations persistentes fail-safe em três camadas locais
 Evidência local: regressões de fault injection para JSONStore, ContextStore e CompanyStore passaram; a suíte completa `CGO_ENABLED=0 go test ./internal/agent -count=1 -timeout=300s`, race `CGO_ENABLED=1 go test -race ./internal/agent -count=1 -timeout=300s`, `CGO_ENABLED=1 go vet ./internal/agent ./server` e `git diff --check` passaram. A garantia cobre uma instância e o writer atômico local; locking distribuído, NFS/FS remoto e falhas de energia ainda exigem ambiente de homologação e permanecem `BLOCKED_BY_EXTERNAL_DEPENDENCY`.
 
 A CI pública do head atual continua pendente até concluir. O produto segue **FIXING / preview-local RC em hardening — não finalizado e não production-ready**.
+
+
+## Addendum de enqueue idempotente e AutoRun fail-closed — 2026-09-23
+
+O head `d0a7ae6e` evita duplicação de jobs por missão: o queue local retorna o job `pending/running` existente e o Redis usa índice Lua atômico por mission ID. `CreateMission` com `auto_run=true` não descarta erro de enqueue: persiste `FAILED`, `last_error` sanitizado e `mission.queue_failed`, e devolve o erro ao caller. `resumePending` passa a ser seguro contra reenqueue na mesma instância; a jornada não inventa uma fila durável se a persistência estiver indisponível.
+
+Evidência local: suíte completa agent, race, vet e diff check passaram; Redis 7 local foi iniciado sem credenciais externas e os testes `TestDistributedRedisRetriesDeadLetterReplay` e `TestDistributedRedisClaimIsIdempotentAndReclaimsExpiredLease` passaram, cobrindo retry/DLQ, enqueue idempotente e recuperação de lease expirado entre workers. Não houve uso de contas ou serviços externos. Fencing token, Redis TLS `rediss://`, múltiplas instâncias com locking distribuído e perda de conexão continuam `BLOCKED_BY_EXTERNAL_DEPENDENCY` para homologação real.
+
+A CI pública do novo head ainda precisa concluir. O produto segue **FIXING / preview-local RC em hardening — não finalizado e não production-ready**.
