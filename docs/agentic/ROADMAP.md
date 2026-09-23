@@ -413,3 +413,12 @@ Inputs de áudio/imagem agora ficam confinados ao workspace, com rejeição de s
 ## Incremento 2026-09-23 — Growth OS sandbox-only
 
 O Company Growth OS agora identifica explicitamente campaigns, afiliados e orders como sandbox local. O relatório informa essa condição e qualquer modo externo é fail-closed. O próximo estágio exige adapters específicos por rede, marketplace, gateway, fiscal/NF-e ou fornecedor, com OAuth/API, webhooks assinados, idempotência, reconciliação, approval, limites de orçamento, rollback e homologação.
+
+
+## Incremento 2026-09-23 — R01–R04 e captura observável
+
+A reauditoria direcionada foi reproduzida no pacote real e corrigida em dois commits publicados. O próximo baseline inclui outputs de mídia/OCR ancorados em `os.Root`, leitura de visão limitada e cancelável, pacote de deploy público filtrado antes da leitura e egress que valida DNS antes de TCP. Os testes focados e suas variantes race cobrem os controles positivos e negativos; compilação Darwin/Windows foi verificada sem alegar teste físico.
+
+O capturador de paridade agora produz screenshots somente após estado observável e interação segura, com manifesto de SHA/build/viewport e política explícita para falhas esperadas do bridge local. A captura local não é prova de provider externo, conta, deploy, device ou release.
+
+Próxima frente independente: abrir e verificar o PR documental da Home a partir da main. O trabalho de produto continua aberto para CI do novo head, jornada Tel-Agent, integração externa homologada e demais requisitos V5. Dependências de conta, consentimento, hardware, certificado, loja, app review ou custo devem permanecer `BLOCKED_BY_EXTERNAL_DEPENDENCY` até existir autorização e evidência específica.

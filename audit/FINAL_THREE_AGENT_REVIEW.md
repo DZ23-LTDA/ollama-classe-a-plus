@@ -341,3 +341,12 @@ Os endpoints POST exigem owner/admin e derivam a organização da sessão. A col
 Foram aprovados testes normais e race de persistence e HTTP, além do runner local completo em Go, vet, build, UI, mobile, integrity, YAML e diff. Os checks remotos do novo SHA ainda precisavam concluir quando esta nota foi criada. O resultado não cobre contas externas, OAuth consentido, upstream smoke, execução remota, sandbox físico ou trust attestation.
 
 O veredito permanece **preview/local RC em hardening**, não final nem production-ready. A existência de uma rota e de um manifest válido não é evidência de conexão real, autorização de terceiro ou capacidade de operar um computador/conta fora do ambiente provisionado.
+
+
+## Addendum de reauditoria mídia/deploy/captura — 2026-09-23
+
+A reauditoria reproduziu quatro achados no pacote real: output de mídia via `.agent-media` symlink, inclusão de `.env` e `.git/config` no pacote, conexão TCP a endereço privado antes da recusa e leitura integral de imagem acima do limite. O commit `06990ef573129da2e4a272b49435857b9e7f46c4` corrigiu essas causas com `os.Root`, paths relativos, rejeição de symlink, leitura limitada/cancelável, validação antecipada de output, filtro de conteúdo público antes da leitura e resolução/validação de todos os IPs antes do dial. Testes normais/race e vet focados passaram; Darwin/Windows foram compilados com `go test -c`, sem alegar execução física.
+
+O commit `ec7f52c048c238510ca6dc08212cd2c10535bfe1` tornou a captura relativa ao checkout, observável e fail-closed. Contra o bundle bridged ao backend Ollama local, dez rotas foram capturadas com interação segura; o manifesto vincula SHA, build e viewport e registra falhas esperadas de ausência de conta/endpoints base sem mascarar assets, JavaScript, request failures ou Agentic API failures. A captura local não é homologação externa.
+
+Os três agentes mantêm o mesmo veredito: **FIXING / preview-local em hardening**, não final e não production-ready. Permanecem dependências externas para contas/OAuth, providers, social commerce/fiscal, deploy, dispositivos, hardware, assinatura, lojas, app review e homologação de operador.

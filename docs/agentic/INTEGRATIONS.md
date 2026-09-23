@@ -162,3 +162,10 @@ Isso significa **adapter testado**, não modelo externo conectado. Claude, Grok,
 Campaigns, affiliate programs/links e orders do Company OS carregam `mode: sandbox`, e o relatório expõe `sandbox_only`. O runtime simula planejamento, approval, budget, inventário, atribuição, métricas e fulfillment com tracking local. Isso não publica em Instagram/TikTok/WhatsApp, não cria checkout, não cobra via Woovi/OpenPix, não compra em marketplace, não solicita logística e não emite NF-e.
 
 Qualquer modo não-sandbox é recusado até existir adapter específico, credencial tenant-aware, approval de ação, idempotency key, webhook/reconciliação, limites financeiros, rollback e smoke autorizado. Woovi/OpenPix, fiscal/NF-e, redes sociais, TikTok Shop, Shopify, Mercado Livre, Amazon Seller e redes de afiliados permanecem `available/configurable`, nunca `connected`.
+
+
+## Reauditoria de mídia e deploy
+
+Os adapters locais agora têm contratos de segurança mais fortes, mas continuam distintos de uma integração upstream validada. O `MediaManager` usa provider fixture local nos testes; nenhum provider externo ou conta foi conectado. O `DeploymentManager` monta e valida um pacote público, rejeita conteúdo privado antes da transmissão e protege o egress; nenhum deploy em Vercel, Netlify, AWS, Cloudflare ou outro destino foi executado.
+
+A captura de dez rotas usa o backend Ollama local e um bridge local para o bundle distribuído. Ela comprova apenas o estado observado nessa execução. Não transforma catálogo, configuração, fixture, `configured` ou build em `connected`, `validated`, `published` ou `production-ready`.

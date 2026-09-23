@@ -399,3 +399,12 @@ Campaigns, affiliate programs/links e orders retornam `mode: "sandbox"`; o relat
 ## Configuração segura
 
 `GET /api/agent/v1/config` considera tanto arquivos/env de bootstrap quanto manifests registrados nos managers duráveis. `connectors_configured`, `mcp_configured`, `media_configured` e `deployments_configured` indicam configuração aceita pelo Runtime. Esses booleanos não afirmam credencial presente, conta OAuth conectada, resposta upstream, publicação ou homologação.
+
+
+## Contratos de mídia e deploy após a reauditoria
+
+Outputs de mídia e OCR são escritos somente por paths relativos ao workspace autorizado. A implementação usa `os.Root` e rejeita raiz, diretório ou componente symlink; uma troca concorrente para um alvo fora do root falha fechada. A validação do diretório de output ocorre antes de chamar provider ou processo externo. A leitura de áudio e imagem abre o descritor dentro do root e aplica orçamento cancelável. `Transcribe` rejeita entradas acima de 100 MiB. `AnalyzeImage` rejeita entradas acima de 25 MiB antes da leitura integral e também falha se o arquivo crescer durante a leitura.
+
+O coletor de deployment aceita somente arquivos regulares de conteúdo público. `.git`, `.hg`, `.svn`, `.agent`, `.ollama`, `.secrets`, `node_modules`, `.env`, chaves, certificados, backups, dumps, logs e nomes que indicam secret/credential/password/token são excluídos antes da leitura. Isso é uma política conservadora de pacote; um build que necessite de conteúdo adicional deve produzir um diretório público aprovado, não depender de filtro posterior.
+
+O cliente de deployment resolve A/AAAA antes do TCP. Todos os endereços retornados precisam ser não privados antes que o socket seja criado. O dial usa o IP validado, enquanto a URL mantém hostname para Host/SNI. HTTP é aceito somente para loopback em contexto local explícito; endpoints externos exigem HTTPS e redirects continuam desabilitados.

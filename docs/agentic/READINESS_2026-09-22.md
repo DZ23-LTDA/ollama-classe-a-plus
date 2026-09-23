@@ -526,3 +526,23 @@ Isso não representa publicação em rede social, checkout, gateway de pagamento
 O commit `fda91625` faz o endpoint de configuração segura reconhecer connectors, MCP, mídia e deployments registrados nos managers persistentes, mesmo quando não existe variável de bootstrap. O teste confirma o estado configurado sem expor endpoint.
 
 `configured` continua significando apenas manifest/manager aceito. Não significa credencial presente, OAuth consentido, conta conectada, provider respondendo ou deploy publicado.
+
+
+## Addendum de reauditoria README, mídia, deploy e captura — 2026-09-23
+
+O HEAD `06990ef5` corrigiu quatro achados de segurança reproduzidos no pacote real. A mídia não grava mais por `.agent-media` symlink intermediário: outputs usam `os.Root`, paths relativos e rejeição de componentes symlink. A escrita é limitada e o destino é validado antes de provider ou processo externo. Transcrição e visão abrem o descritor dentro do root e leem com orçamento cancelável; visão rejeita arquivos acima de 25 MiB antes de alocar o conteúdo inteiro. OCR e geração de tone também usam a mesma primitiva de output.
+
+O coletor de deploy agora exclui antes da leitura arquivos privados sintéticos, `.git`, `.env`, chaves, backups, logs, metadados internos e objetos não regulares. O teste do provider fixture confirma que somente o conteúdo público aprovado é enviado. O dialer de deploy resolve e valida endereços antes de estabelecer TCP; todos os IPs retornados precisam ser permitidos. O hostname original permanece na URL para Host/SNI, enquanto o socket usa o IP validado. Nenhum deploy externo foi executado.
+
+O HEAD `ec7f52c0` tornou o capturador de paridade portátil e observável. A execução bridged contra o bundle produzido e o backend Ollama local capturou dez rotas em viewport `1440x900`, com interação segura em cada rota e manifesto vinculado ao SHA `ec7f52c0`. Falhas de assets, JavaScript, requests ou endpoints agentic permanecem fatais; somente ausência de conta (`/api/me`) e endpoints base conhecidos sem implementação são classificados como esperados no manifesto. Essa captura representa o estado local observado e não prova providers externos, contas, dispositivos, deploy ou release.
+
+| Dimensão | Estado |
+|---|---|
+| Implementado | R01–R04 e capturador observável no código publicado |
+| Testado | Testes normais/race focados, vet, integrity, UI Vitest/build e compilação Darwin/Windows |
+| Publicado | Commits `06990ef5` e `ec7f52c0` na branch do PR #1 |
+| Homologado externamente | Não homologado; nenhum provider, conta, deploy, dispositivo ou loja foi usado |
+| Pendente | CI do novo head, PR documental da Home, revisão visual e aprovação do merge documental |
+| BLOCKED_BY_EXTERNAL_DEPENDENCY | OAuth/contas reais, smoke externo, hardware físico, assinatura, app review, lojas e homologação de operador |
+
+`README_MAIN_STATUS=PENDING_DOCS_MERGE`: a Home escolhida será publicada por PR independente baseado na main, sem integrar o PR #1 do produto.

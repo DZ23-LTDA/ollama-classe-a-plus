@@ -2339,3 +2339,18 @@ O fluxo local preserva approval, orçamento, idempotência, inventário e métri
 O commit `fda916253cf408336ce25024ccdb24983d2fe626` corrigiu o endpoint de configuração segura. Antes, `connectors_configured`, `mcp_configured`, `media_configured` e `deployments_configured` dependiam somente das variáveis de bootstrap e podiam reportar `false` depois de um registro persistente pelo lifecycle.
 
 Agora os campos combinam bootstrap estático com managers duráveis do Runtime. O teste registra um connector fixture, verifica `configured=true` e confirma que o endpoint não revela URL. A semântica continua restrita a configuração local; não é prova de credential presence, OAuth account ou upstream smoke. Testes normal/race e gates Go completos passaram.
+
+
+## Reauditoria README/mídia/deploy — correções R01–R04 e captura observável — 2026-09-23
+
+O snapshot `aee66ee988c99d2ed6da2e8e9fc1009e3c90592f` foi reconciliado com o HEAD antes da alteração. A reprodução temporária no pacote real confirmou R01, R02 e R03: `.agent-media` symlink permitia escrita externa antes de `BuildArtifactManifest`, `.env`/`.git/config` entravam no pacote de deploy e o dialer estabelecia TCP privado antes da recusa. R04 foi confirmado por arquivo esparso de `25 MiB + 1`: `AnalyzeImage` recusava depois de `os.ReadFile`.
+
+O commit `06990ef573129da2e4a272b49435857b9e7f46c4` corrigiu a causa raiz. Outputs de mídia e OCR usam `os.Root`, paths relativos, rejeição de componentes symlink e criação limitada. Inputs de transcrição e visão usam descritor aberto pelo root, orçamento de leitura com cancelamento e detecção de crescimento. O diretório de output é validado antes de provider/ processo externo. O coletor de deploy exclui `.git`, metadados internos, `.env`, chaves, backups, logs e arquivos não regulares antes da leitura; o provider fixture confirmou que conteúdo privado sintético não chegou ao payload. O dialer resolve A/AAAA, rejeita qualquer endereço privado antes do TCP e disca o IP aprovado, preservando hostname da URL para Host/SNI; loopback só é permitido pelo contexto explícito.
+
+As regressões permanentes passaram em normal e `-race`, com testes positivos de output legítimo, filtro de pacote, cancelamento, limite e ausência de TCP proibido. O pacote `internal/agent` também compilou para Darwin e Windows com `go test -c`; a tentativa inicial de `go test` cross-compile foi descartada como erro operacional de execução de binário estrangeiro, não como falha de compilação.
+
+O commit `ec7f52c048c238510ca6dc08212cd2c10535bfe1` tornou `capture-parity-screens.mjs` relativo ao checkout, respeitou `SCREEN_OUTPUT` explícito, rejeitou base URL inválida, aguardou estado observável, executou interação segura por rota, coletou page/console/request/HTTP diagnostics e gravou manifesto com SHA/build/viewport/limitações. O preview distribuível foi servido por bridge local conectado ao backend Ollama real; dez rotas foram capturadas com interação, zero page errors, zero console errors inesperados, zero request failures inesperados e zero HTTP failures inesperados. As respostas 401/404 conhecidas de ausência de conta ou endpoints base sem implementação foram classificadas no manifesto, não escondidas.
+
+A Home fornecida pelo mantenedor ainda segue o caminho documental separado a partir da main. O PR do produto não é base para trocar a imagem da página padrão; `README_MAIN_STATUS=PENDING_DOCS_MERGE` até aprovação e merge do PR documental independente.
+
+Estado: `FIXING`; implementação e publicação dos commits R01–R04 e do capturador concluídas; homologação externa, contas, deploy real, dispositivos, lojas e CI do novo head continuam pendentes ou `BLOCKED_BY_EXTERNAL_DEPENDENCY` conforme a matriz do readiness.

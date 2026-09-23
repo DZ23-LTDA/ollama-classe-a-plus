@@ -594,3 +594,14 @@ A mudança evita confundir simulação de venda/fulfillment com transação, mar
 A auditoria encontrou um false negative: depois do registro persistente, o endpoint de configuração só consultava env bootstrap. O commit `fda91625` passou a derivar o estado dos managers reais e mantém redaction. O teste usa fixture e verifica que a URL não aparece na resposta.
 
 A correção melhora observabilidade sem promover estados. `configured` não é `credential_configured`, `connected` ou `upstream validated`.
+
+
+## Addendum — reauditoria README, mídia e deploy — 2026-09-23
+
+A reprodução no HEAD `aee66ee9` confirmou quatro problemas do relatório direcionado. R01 permitia que `.agent-media` symlink recebesse output antes da validação posterior do manifesto. R02 coletava `.env` e `.git/config`. R03 conectava ao listener privado antes de recusar o peer. R04 lia `25 MiB + 1` com `os.ReadFile` antes de verificar o limite. Os testes foram executados com fixtures sintéticas no pacote real; não houve credencial, dataset privado, provider externo ou upload.
+
+O commit `06990ef5` corrige R01–R04. A solução usa `os.Root` do Go 1.26 para ancorar abertura/criação dentro do workspace, rejeita componentes symlink e aplica limite/cancelamento à leitura. A validação do diretório ocorre antes de provider ou processo externo, e a defesa no momento da escrita continua protegendo contra mudança entre verificação e uso. O coletor de deploy aplica política de conteúdo público antes de `ReadFile`. O egress resolve endereços e valida todos antes do dial, discando somente o IP aprovado.
+
+O commit `ec7f52c0` corrige o processo de screenshots. A captura é relativa ao checkout, aceita diretório externo somente por `SCREEN_OUTPUT` explícito, registra SHA/build/viewport, aguarda fontes/empty state/ausência de overlay, executa uma interação segura por rota e falha em page errors, console errors, request failures ou HTTP agentic inesperados. A captura bridged local no SHA publicado percorreu dez rotas sem diagnóstico inesperado. Os 401/404 de ausência de conta ou endpoints base conhecidos foram registrados como esperados e não mascaram erros de assets ou do Agentic API.
+
+Os resultados não promovem o produto a final ou production-ready. Deploy Vercel/Netlify/AWS/Cloudflare, providers externos, OAuth, commerce, fiscal, hardware físico, assinatura, lojas, app review e homologação de operador permanecem sem evidência externa.

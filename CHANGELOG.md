@@ -462,3 +462,12 @@ Campaigns, affiliate programs/links e orders agora expõem `mode: sandbox`; o re
 ## Unreleased — durable configuration reporting — 2026-09-23
 
 `safeConfig` agora reconhece connectors, MCP, mídia e deployments registrados no Runtime durável, sem vazar valores. O estado continua significando apenas configuração, não conexão upstream.
+
+
+## Unreleased — media/deploy audit and observable captures — 2026-09-23
+
+- Corrigida a escrita de outputs de mídia e OCR contra symlink intermediário e TOCTOU externo com `os.Root`, paths relativos, quotas e validação do destino antes de provider/processo externo.
+- Corrigida a leitura de transcrição e visão para usar descritor seguro, limite antes da alocação integral, leitura cancelável e detecção de crescimento.
+- Corrigido o pacote de deploy para excluir arquivos privados, credenciais, metadados internos, backups, logs e arquivos não regulares antes da leitura ou transmissão.
+- Corrigido o egress de deploy para resolver e validar endereços antes do TCP, com loopback somente por contexto explícito e Host/SNI preservados.
+- O capturador de paridade agora é portátil ao checkout, exige estado estável e interação segura, falha em diagnósticos inesperados e grava manifesto de SHA/build/viewport/limitações. A Home do README continua sendo tratada no PR documental separado baseado na main.
