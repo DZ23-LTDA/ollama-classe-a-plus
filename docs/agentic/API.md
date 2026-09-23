@@ -336,3 +336,18 @@ curl -sS -X POST http://localhost:11434/api/agent/v1/connectors \
 O endpoint valida HTTPS sem userinfo, nomes de ambiente, operações, métodos e prefixos de caminho. Requests e responses do connector permanecem limitados pelo manager e o egress mantém bloqueio de proxy/redirect e verificação do endereço conectado. A configuração `OLLAMA_AGENT_CONNECTORS=/caminho/manifest.json` continua disponível como modo estático explícito; nesse modo o manifest é carregado na inicialização e o lifecycle cadastrado pela UI não é apresentado como persistente nesse arquivo. O operador deve escolher conscientemente entre o manifest estático e o store durável.
 
 A resposta do catálogo nunca devolve o nome da variável de token. Registrar um endpoint não prova que a conta do provider existe, que OAuth foi consentido, que o upstream está saudável ou que uma ação externa foi executada. Esses estados exigem credencial provisionada fora do repositório, escopos mínimos, approval e smoke reversível autorizado.
+
+
+## Registro de MCP, Remote MCP e skills
+
+Os endpoints de registro seguem o mesmo contrato de `POST /connectors`: autenticação owner/admin, binding server-side da organização, `DisallowUnknownFields` e resposta de catálogo redigida. O MCP stdio aceita `id`, `command` absoluto, `args`, `working_directory`, `allowed_methods`, `environment_vars` e `timeout_seconds`. O servidor exige arquivo executável regular, rejeita symlink como executable, limita args e valida nomes de env. Exemplo:
+
+```json
+{"id":"desktop-commander","command":"/opt/agent/bin/mcp-server","args":["--stdio"],"allowed_methods":["tools/list","tools/call"],"environment_vars":["DESKTOP_COMMANDER_TOKEN"]}
+```
+
+Remote MCP aceita `id`, `url`, `token_env`, `headers_env`, `allowed_methods` e `timeout_seconds`. A URL deve ser HTTPS fora de loopback, não pode conter userinfo/fragment/private address, e redirects precisam conservar origin permitido. Os valores de token/header nunca entram no JSON; somente nomes de env são armazenados. O DNS é resolvido e os endereços aprovados são pinados para a conexão.
+
+Skills aceitam `id`, `version`, `description`, `scopes` e `tools`. `trusted` e `enabled` são estados derivados do servidor; o request com qualquer um desses estados como `true` é rejeitado. O runtime persiste o manifest em `OLLAMA_AGENT_STORE/context/skills/<id>.json`, sempre com `trusted=false`, para permitir revisão/approval explícita.
+
+Sem `OLLAMA_AGENT_MCP` ou `OLLAMA_AGENT_REMOTE_MCP`, os managers padrão usam `OLLAMA_AGENT_STORE/mcp.json` e `remote-mcp.json`. Quando o operador define um arquivo estático por variável de ambiente, ele é carregado como bootstrap e mutations posteriores ficam apenas no manager da execução; a API não afirma ter editado o arquivo externo. Registrar é uma operação de configuração local: não equivale a OAuth consentido, conta conectada, smoke de upstream ou ação externa executada.

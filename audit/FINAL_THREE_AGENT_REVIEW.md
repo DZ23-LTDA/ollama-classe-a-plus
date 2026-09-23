@@ -330,3 +330,14 @@ O commit `411335ba` fechou uma parte antes aberta do registro tenant-owned de co
 A slice foi coberta por testes de persistência, redaction, rollback, admin/member, cross-tenant, raw-secret rejection e build UI. O novo SHA ainda exige a conclusão dos checks remotos próprios; a evidência do head anterior não é reutilizada como se cobrisse o novo código. Persistência/lifecycle de MCP, Remote MCP e skills, attestation de skills, isolamento de processo e auditoria distribuída continuam fora desta slice.
 
 O veredito não muda: **preview/local RC em hardening**, não final e não production-ready. Cadastro de connector não equivale a OAuth consentido, conta conectada, upstream saudável ou ação externa validada.
+
+
+## Addendum de lifecycle MCP/Remote MCP/skills — 2026-09-22
+
+O commit `96fd7edd3440876ed67ae7051cc475ca953d2847` estendeu o lifecycle durável além de connectors. Managers padrão persistem MCP stdio em `mcp.json`, Remote MCP em `remote-mcp.json` e skills em `context/skills/*.json` abaixo do DataRoot. Os writers são atômicos, os arquivos são privados e reload tests demonstram round-trip após restart. Configuração por manifest externo continua sendo bootstrap estático explícito.
+
+Os endpoints POST exigem owner/admin e derivam a organização da sessão. A colisão de IDs entre tenants é rejeitada. MCP mantém executável absoluto regular, allowlist de métodos e env names; Remote MCP mantém HTTPS, SSRF/private-address rejection, DNS pinning, same-origin redirects e env-only token/header references; skills rejeitam confiança derivada do cliente e gravam `trusted=false`. A UI recebeu contratos e formulários para os três casos sem campos de segredo.
+
+Foram aprovados testes normais e race de persistence e HTTP, além do runner local completo em Go, vet, build, UI, mobile, integrity, YAML e diff. Os checks remotos do novo SHA ainda precisavam concluir quando esta nota foi criada. O resultado não cobre contas externas, OAuth consentido, upstream smoke, execução remota, sandbox físico ou trust attestation.
+
+O veredito permanece **preview/local RC em hardening**, não final nem production-ready. A existência de uma rota e de um manifest válido não é evidência de conexão real, autorização de terceiro ou capacidade de operar um computador/conta fora do ambiente provisionado.

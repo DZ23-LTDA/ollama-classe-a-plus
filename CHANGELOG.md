@@ -371,3 +371,14 @@ A matriz GPU/nativa continua manual e opt-in. Catálogo ou `credential_configure
 - A tela Plugins passou a registrar connectors com endpoint, operações, nome de env ou ID OAuth, sem campo para token. O valor da credencial continua responsabilidade do ambiente seguro do operador ou do fluxo OAuth oficial.
 
 Os checks remotos do novo SHA estavam pendentes no momento desta publicação documental. A entrega permanece **preview/local RC em hardening**. Nenhum connector externo, conta OAuth, Composio, Woovi/OpenPix, fiscal/NF-e, marketplace, rede social ou provider é declarado conectado ou validado por estes adapters.
+
+
+## Unreleased — MCP/Remote MCP/skills lifecycle — 2026-09-22
+
+O commit `96fd7edd` adiciona registro durável tenant-aware para MCP stdio, Remote MCP e skills. O runtime padrão usa `mcp.json`, `remote-mcp.json` e `context/skills/*.json` abaixo de `OLLAMA_AGENT_STORE`; manifestos são escritos atomicamente com permissões restritas. O bootstrap via `OLLAMA_AGENT_MCP`, `OLLAMA_AGENT_REMOTE_MCP` ou `OLLAMA_AGENT_CONNECTORS` segue como modo estático explícito e não promete que mutations da UI editem esses arquivos.
+
+Foram publicadas as rotas `POST /api/agent/v1/mcp`, `POST /api/agent/v1/remote-mcp` e `POST /api/agent/v1/skills`, com owner/admin, organização derivada da sessão, rejeição de colisão cross-tenant e JSON estrito. MCP aceita somente executável absoluto regular, métodos allowlisted e nomes de ambiente válidos. Remote MCP mantém HTTPS/SSRF/DNS pinning, redirects same-origin e referências de headers por env. Skills são sempre persistidas `trusted=false`; `trusted` e `enabled` não são autoridade do cliente.
+
+A UI Plugins recebeu chamadas e formulários operacionais correspondentes, sem campo para tokens ou passwords. Os testes cobrem restart, `0600`, rollback, tenant isolation, trust fail-closed, auth, unknown fields, normal e race. O runner local completo passou em integrity, YAML, Go test, vet, build, UI, mobile, audit e diff.
+
+O resultado continua preview/local RC em hardening. Nenhum MCP remoto, conta OAuth, provider externo, social commerce, marketplace, Woovi/OpenPix, fiscal/NF-e ou ação em conta de terceiros é declarado conectado ou validado.

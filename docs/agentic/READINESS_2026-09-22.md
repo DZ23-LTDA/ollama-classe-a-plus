@@ -403,3 +403,14 @@ O commit seguinte `411335ba6247b16a431c7f10b5daf8a9fcc0e8f4` adiciona lifecycle 
 Os testes locais da slice passaram para persistência, rollback, redaction, admin/member, cross-tenant e build UI. No momento do checkpoint, os checks da PR do novo SHA ainda estavam pendentes; portanto não são tratados como verdes. A configuração de `OLLAMA_AGENT_CONNECTORS` continua sendo um modo de manifesto estático explícito e não deve ser interpretada como lifecycle durável da UI.
 
 A classificação continua **preview/local RC em hardening**, não final e não production-ready. Ainda faltam persistência/lifecycle equivalente para MCP e skills, isolamento físico forte do sandbox, testes distribuídos reais, OAuth e contas externas, runners/dispositivos físicos, GPU, assinatura, lojas, app review e deploy autorizado.
+
+
+## Addendum de lifecycle MCP/Remote MCP/skills — 2026-09-22
+
+O commit `96fd7edd3440876ed67ae7051cc475ca953d2847` adicionou o segundo lifecycle durável da plataforma. O runtime padrão agora carrega e atualiza `OLLAMA_AGENT_STORE/mcp.json` para MCP stdio, `OLLAMA_AGENT_STORE/remote-mcp.json` para Remote MCP e `OLLAMA_AGENT_STORE/context/skills/*.json` para manifestos de skills. As escritas usam o writer atômico existente, diretórios privados e arquivos `0600`. O bootstrap por `OLLAMA_AGENT_MCP`, `OLLAMA_AGENT_REMOTE_MCP` ou `OLLAMA_AGENT_CONNECTORS` continua deliberadamente estático; esses managers não apresentam mutations da UI como edição persistente do arquivo de ambiente.
+
+As rotas `POST /api/agent/v1/mcp`, `POST /api/agent/v1/remote-mcp` e `POST /api/agent/v1/skills` exigem owner/admin no modo autenticado, vinculam a organização no servidor e rejeitam conflito de tenant. MCP exige executável absoluto, arquivo regular executável, allowlist de métodos e nomes de env válidos. Remote MCP mantém HTTPS fora de loopback, bloqueio de private/link-local, pinning DNS por request, redirects no mesmo origin e headers referenciados por env. Skill registration não aceita `trusted` nem `enabled` como autoridade: o servidor grava `trusted=false` e inicia habilitado para revisão/approval. O frontend possui formulários correspondentes e não coleta tokens.
+
+Os testes incluem round-trip após restart, modo `0600`, colisão cross-tenant, remoção/rollback, trust fail-closed, authorization owner/admin, raw-secret/unknown-field rejection, normal e race. O runner local completo passou: integrity, YAML, Go test, vet, build, Vitest, typecheck, Vite build, mobile typecheck, npm audit e diff. Os checks remotos do novo commit estavam recém-enfileirados no instante desta nota e não são tratados como finais.
+
+A classificação permanece **preview/local RC em hardening**, não final e não production-ready. Registrar um MCP, Remote MCP ou skill não executa ação externa, não consente OAuth, não prova uma conta ou upstream e não fornece isolamento físico além das políticas efetivamente provisionadas no host.

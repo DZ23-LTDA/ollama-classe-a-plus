@@ -2187,3 +2187,43 @@ classification: preview/local RC em hardening; NOT final; NOT production-ready
 next_action: verify SHA 411335ba CI when available, then audit MCP/Remote MCP registration lifecycle
 rollback: revert the connector lifecycle commit on the feature branch; do not force-push or merge main
 ```
+
+
+## Slice P1 de lifecycle durável MCP/Remote MCP/skills — 2026-09-22
+
+```yaml
+state: TESTING
+iteration: 6
+base_commit: 137fe6ab
+commit: 96fd7edd3440876ed67ae7051cc475ca953d2847
+branch: feat/manus-parity-omniroute
+completed:
+  - persistent_mcp_manifest_at_ollama_agent_store_mcp_json
+  - persistent_remote_mcp_manifest_at_ollama_agent_store_remote_mcp_json
+  - persistent_skill_manifests_under_context_skills
+  - owner_admin_registration_endpoints_for_mcp_remote_mcp_and_skills
+  - server_side_organization_binding_and_cross_tenant_collision_rejection
+  - strict_json_unknown_field_rejection
+  - local_mcp_absolute_regular_executable_validation
+  - remote_mcp_https_ssrf_dns_pinning_and_env_only_headers
+  - skill_trust_fail_closed_and_server_derived_enabled_state
+  - ui_forms_and_types_for_three_registration_flows
+proofs_local:
+  - go test ./internal/agent ./server: PASS
+  - focused normal and race persistence tests: PASS
+  - focused normal and race HTTP registration tests: PASS
+  - complete local runner: PASS
+  - integrity, YAML, go test, vet, build, UI Vitest/typecheck/build, mobile typecheck/audit, diff: PASS
+public_ci:
+  - 96fd7edd PR checks were newly queued at publication; no remote final conclusion claimed here
+semantics:
+  - OLLAMA_AGENT_MCP, OLLAMA_AGENT_REMOTE_MCP and OLLAMA_AGENT_CONNECTORS remain explicit static bootstrap modes
+  - UI mutations are durable only when the corresponding default DataRoot manager is used
+  - static bootstrap managers are intentionally runtime-only for UI mutations
+external_blockers_unchanged:
+  - real OAuth/account consent, external provider smoke and social/commerce/fiscal homologation
+  - physical host/device isolation, Windows/macOS/Linux/Android/iOS and GPU/native validation
+  - signing, attestation, installers, stores, app review, deploy and operator credentials
+classification: preview/local RC em hardening; NOT final; NOT production-ready
+next_action: verify current PR checks once, then review distributed/session/sandbox P1 gaps
+```
