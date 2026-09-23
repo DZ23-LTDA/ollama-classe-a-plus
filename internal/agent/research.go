@@ -151,7 +151,17 @@ func (e *ResearchEngine) fetch(ctx context.Context, rawURL string, maxBytes int6
 		return result
 	}
 	request.Header.Set("User-Agent", "ollama-dz23-research/1")
-	response, err := e.client().Do(request)
+	fetchClient := e.client()
+	if !(e.AllowHTTPForTests && parsed.Scheme == "http") {
+		pinned, perr := pinnedClient(ctx, fetchClient, rawURL)
+		if perr != nil {
+			result.Error = perr.Error()
+			return result
+		}
+		fetchClient = pinned
+		defer fetchClient.CloseIdleConnections()
+	}
+	response, err := fetchClient.Do(request)
 	if err != nil {
 		result.Error = err.Error()
 		return result
@@ -190,9 +200,23 @@ func (e *ResearchEngine) allowedByRobots(ctx context.Context, target *url.URL) b
 		robotsURL := key + "/robots.txt"
 		request, err := http.NewRequestWithContext(ctx, http.MethodGet, robotsURL, nil)
 		if err != nil {
-			return false
+			// robots.txt is advisory: fail open (allow) when it cannot be built,
+			// consistently with the client.Do error path below.
+			return true
 		}
-		response, err := e.client().Do(request)
+		// Pin the robots pre-flight to the validated public IPs as well, so it
+		// cannot re-resolve DNS to an internal target (SSRF/rebind) or follow a
+		// redirect to one.
+		robotsClient := e.client()
+		if !(e.AllowHTTPForTests && target.Scheme == "http") {
+			pinned, perr := pinnedClient(ctx, robotsClient, robotsURL)
+			if perr != nil {
+				return true
+			}
+			robotsClient = pinned
+			defer robotsClient.CloseIdleConnections()
+		}
+		response, err := robotsClient.Do(request)
 		if err != nil {
 			return true
 		}
