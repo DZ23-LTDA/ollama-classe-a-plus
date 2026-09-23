@@ -512,3 +512,10 @@ O adapter possui smoke determinístico com servidor fixture e limites de arquivo
 O commit `f45aae49` adicionou containment e proteção de symlink para inputs de áudio/imagem e para outputs no workspace. Arquivos de transcrição acima de 100 MiB são rejeitados antes da leitura, sem truncamento silencioso. Testes normal/race e gates Go completos passaram.
 
 Isso valida o comportamento do adapter e de um provider fixture local. Não valida modelos hospedados, GPU, quota, billing, conta externa, moderação ou qualidade de geração; esses requisitos continuam externos e não production-ready.
+
+
+## Addendum de Company Growth sandbox-only — 2026-09-23
+
+O commit `a286c15a` tornou explícito o campo `mode: sandbox` em campaigns, afiliados e pedidos. O relatório expõe `sandbox_only=true`, e modos externos são recusados sem adapter validado. Approval, budget, inventory, idempotência e métricas continuam testáveis localmente.
+
+Isso não representa publicação em rede social, checkout, gateway de pagamento, pedido em marketplace, fulfillment, afiliado com comissão real ou emissão fiscal. Esses fluxos continuam bloqueados por credenciais, contas, escopos, homologação e smoke externo.

@@ -2325,3 +2325,10 @@ Regressões cobrem deploy genérico fixture, root symlink, localhost HTTP e dial
 O commit `f45aae49866c16f5b5be60ccb083715663af2896` endureceu `MediaManager`. `Transcribe` e `AnalyzeImage` agora aceitam somente arquivos regulares dentro do workspace, recusam workspace/input symlink e rejeitam traversal. A transcrição verifica o tamanho antes de abrir e falha acima de 100 MiB, em vez de truncar silenciosamente com `io.CopyN`. Outputs de imagem, vídeo e speech também validam o root antes de gravar.
 
 Regressões cobrem provider TLS fixture, containment, symlink, arquivo grande, redirects, MIME/magic e limites. Testes normal/race e gates Go completos passaram em integrity, todos os pacotes, vet, build e diff. O fixture local não comprova conta, quota ou provider externo conectado.
+
+
+## Company Growth OS explicitamente sandbox-only — 2026-09-23
+
+O commit `a286c15a8c26eda227a695e42889f2ccde34ecea` adicionou `mode: sandbox` a campaigns, affiliate programs/links e orders. `CompanyGrowthReport` agora expõe `sandbox_only=true`; registros legados são normalizados ao carregar; qualquer modo diferente de sandbox falha com `ErrCompanyGrowthExternalUnavailable` até existir adapter upstream validado.
+
+O fluxo local preserva approval, orçamento, idempotência, inventário e métricas, mas não afirma campanha lançada, venda cobrada, fulfillment contratado ou conversão externa. Testes normal/race e gates Go completos passaram em integrity, todos os pacotes, vet, build e diff.

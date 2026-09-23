@@ -155,3 +155,10 @@ O runtime possui adapter local para generic, Vercel e Netlify com coleta limitad
 O `MediaManager` cobre imagem, vídeo, speech, transcrição, visão e tone local com limites, artifacts, MIME/magic e provider OpenAI-compatible/loopback. Inputs de áudio/imagem ficam confinados ao workspace e outputs não gravam em root symlink. Os testes usam fixtures TLS ou geração determinística local.
 
 Isso significa **adapter testado**, não modelo externo conectado. Claude, Grok, providers de vídeo/imagem/TTS/STT, GPU, quota, moderação, billing e qualidade de produção exigem configuração do operador e smoke autorizado por provider; nenhum é promovido a `upstream validated` por esses testes.
+
+
+## Company Growth OS: sandbox versus commerce real
+
+Campaigns, affiliate programs/links e orders do Company OS carregam `mode: sandbox`, e o relatório expõe `sandbox_only`. O runtime simula planejamento, approval, budget, inventário, atribuição, métricas e fulfillment com tracking local. Isso não publica em Instagram/TikTok/WhatsApp, não cria checkout, não cobra via Woovi/OpenPix, não compra em marketplace, não solicita logística e não emite NF-e.
+
+Qualquer modo não-sandbox é recusado até existir adapter específico, credencial tenant-aware, approval de ação, idempotency key, webhook/reconciliação, limites financeiros, rollback e smoke autorizado. Woovi/OpenPix, fiscal/NF-e, redes sociais, TikTok Shop, Shopify, Mercado Livre, Amazon Seller e redes de afiliados permanecem `available/configurable`, nunca `connected`.

@@ -389,3 +389,8 @@ O adapter de deployment aceita HTTPS para serviços externos e HTTP somente em l
 ## Mídia
 
 `Transcribe` e `AnalyzeImage` exigem arquivos regulares dentro do workspace informado. O workspace final e os componentes do caminho não podem ser symlinks; traversal e input externo são rejeitados. Transcrição acima de 100 MiB falha antes da leitura. Geração e speech gravam somente em um workspace validado. Provider fixture local valida contrato, não conta, quota, GPU ou upstream externo.
+
+
+## Company Growth OS
+
+Campaigns, affiliate programs/links e orders retornam `mode: "sandbox"`; o relatório de crescimento retorna `sandbox_only: true`. O runtime pode planejar, aprovar, registrar métricas, manter inventário e simular fulfillment local. Um modo diferente de sandbox retorna `external growth action is not configured` até existir adapter, connector, credencial e smoke autorizado. Esses endpoints não cobram, publicam, movimentam dinheiro, fazem pedido externo ou emitem NF-e.

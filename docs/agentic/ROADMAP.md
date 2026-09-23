@@ -408,3 +408,8 @@ O próximo gate externo continua exigindo credenciais do operador, contas de pro
 ## Incremento 2026-09-23 — mídia confinada e limites explícitos
 
 Inputs de áudio/imagem agora ficam confinados ao workspace, com rejeição de symlink/traversal, arquivo não regular e áudio acima de 100 MiB. Os outputs também validam o root antes de gravar. O próximo gate para mídia real continua sendo homologação por provider/modelo, credenciais, quota, GPU ou serviço externo, qualidade, moderação e recuperação.
+
+
+## Incremento 2026-09-23 — Growth OS sandbox-only
+
+O Company Growth OS agora identifica explicitamente campaigns, afiliados e orders como sandbox local. O relatório informa essa condição e qualquer modo externo é fail-closed. O próximo estágio exige adapters específicos por rede, marketplace, gateway, fiscal/NF-e ou fornecedor, com OAuth/API, webhooks assinados, idempotência, reconciliação, approval, limites de orçamento, rollback e homologação.

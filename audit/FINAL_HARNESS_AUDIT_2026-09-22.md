@@ -580,3 +580,10 @@ Fixture genérico, symlink root, localhost e dial privado têm regressões norma
 A revisão encontrou que `Transcribe` aceitava caminho arbitrário e usava `io.CopyN` para cortar silenciosamente arquivos acima do limite. O commit `f45aae49` centralizou validação de root/input, recusou symlink e traversal, exigiu arquivo regular e verificou tamanho antes de abrir. `AnalyzeImage` e outputs do provider passaram a usar o mesmo root seguro.
 
 A cobertura normal/race inclui arquivo externo, symlink, arquivo sparse acima de 100 MiB e provider TLS fixture. Os gates Go completos passaram. Isso não é validação de provider externo, modelo, GPU, quota ou moderação.
+
+
+## Addendum P1 — Company Growth sandbox-only — 2026-09-23
+
+A revisão do Company OS mostrou que campaigns e orders tinham estados genéricos (`active`, `fulfilled`) apesar de não executarem APIs externas. O commit `a286c15a` adicionou `mode`, normalização de legado e `sandbox_only`; qualquer modo não-sandbox é bloqueado com erro explícito. O fluxo continua útil para planejamento, approval, budget, inventário, idempotência e métricas locais.
+
+A mudança evita confundir simulação de venda/fulfillment com transação, marketplace, gateway, afiliado ou emissão fiscal real. Testes normal/race e gates Go completos passaram.

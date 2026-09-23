@@ -452,3 +452,8 @@ O adapter de deploy agora rejeita root symlink, bloqueia redirects e valida o IP
 ## Unreleased — media workspace input hardening — 2026-09-23
 
 O MediaManager agora rejeita traversal e symlink em inputs de áudio/imagem, valida arquivos regulares dentro do workspace e recusa áudio acima de 100 MiB antes da leitura. Testes normal/race e gates Go completos passaram.
+
+
+## Unreleased — Company Growth sandbox mode — 2026-09-23
+
+Campaigns, affiliate programs/links e orders agora expõem `mode: sandbox`; o relatório informa `sandbox_only`, e modos externos falham sem adapter upstream validado. Testes normal/race e gates Go completos passaram.
