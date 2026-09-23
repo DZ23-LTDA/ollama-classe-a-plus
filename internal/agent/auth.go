@@ -525,6 +525,22 @@ func (s *AuthStore) OAuthAccessTokenForOrganization(organizationID, provider str
 	return token, selected, nil
 }
 
+func (s *AuthStore) HasOAuthCredentialForOrganization(organizationID, provider string) bool {
+	organizationID = strings.TrimSpace(organizationID)
+	provider = strings.TrimSpace(provider)
+	if s == nil || organizationID == "" || provider == "" {
+		return false
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, credential := range s.credentials {
+		if credential.OrganizationID == organizationID && credential.Provider == provider && credential.RevokedAt == nil {
+			return true
+		}
+	}
+	return false
+}
+
 func (s *AuthStore) RefreshOAuthCredential(ctx context.Context, provider OAuthProvider, credentialID string, client *http.Client) (OAuthCredential, error) {
 	return s.refreshOAuthCredential(ctx, "", provider, credentialID, client)
 }

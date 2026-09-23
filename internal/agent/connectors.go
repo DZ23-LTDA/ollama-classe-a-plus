@@ -18,16 +18,17 @@ import (
 )
 
 type ConnectorConfig struct {
-	ID             string               `json:"id"`
-	OrganizationID string               `json:"organization_id,omitempty"`
-	Provider       string               `json:"provider"`
-	BaseURL        string               `json:"base_url"`
-	TokenEnv       string               `json:"token_env,omitempty"`
-	OAuthProvider  string               `json:"oauth_provider,omitempty"`
-	AllowedOrigins []string             `json:"allowed_origins,omitempty"`
-	Operations     []ConnectorOperation `json:"operations"`
-	TimeoutSeconds int                  `json:"timeout_seconds,omitempty"`
-	Disabled       bool                 `json:"disabled,omitempty"`
+	ID                   string               `json:"id"`
+	OrganizationID       string               `json:"organization_id,omitempty"`
+	Provider             string               `json:"provider"`
+	BaseURL              string               `json:"base_url"`
+	TokenEnv             string               `json:"token_env,omitempty"`
+	OAuthProvider        string               `json:"oauth_provider,omitempty"`
+	AllowedOrigins       []string             `json:"allowed_origins,omitempty"`
+	Operations           []ConnectorOperation `json:"operations"`
+	TimeoutSeconds       int                  `json:"timeout_seconds,omitempty"`
+	Disabled             bool                 `json:"disabled,omitempty"`
+	CredentialConfigured bool                 `json:"credential_configured,omitempty"`
 }
 
 type ConnectorOperation struct {
@@ -107,6 +108,7 @@ func (m *ConnectorManager) List() []ConnectorConfig {
 	for _, connector := range m.connectors {
 		copy := connector
 		copy.TokenEnv = ""
+		copy.CredentialConfigured = m.credentialConfigured(connector, "")
 		result = append(result, copy)
 	}
 	return result
@@ -123,9 +125,17 @@ func (m *ConnectorManager) ListForOrganization(organizationID string) []Connecto
 		}
 		copy := connector
 		copy.TokenEnv = ""
+		copy.CredentialConfigured = m.credentialConfigured(connector, organizationID)
 		result = append(result, copy)
 	}
 	return result
+}
+
+func (m *ConnectorManager) credentialConfigured(config ConnectorConfig, organizationID string) bool {
+	if config.TokenEnv != "" && strings.TrimSpace(os.Getenv(config.TokenEnv)) != "" {
+		return true
+	}
+	return config.OAuthProvider != "" && m.auth != nil && m.auth.HasOAuthCredentialForOrganization(organizationID, config.OAuthProvider)
 }
 
 func (m *ConnectorManager) SetEnabled(id string, enabled bool) error {

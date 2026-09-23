@@ -30,7 +30,7 @@ export type AgentMission = {
   artifacts?: AgentArtifact[]; last_error?: string; created_at: string; updated_at: string;
 };
 export type AgentEvent = { id: string; type: string; step_id?: string; created_at: string; payload?: unknown };
-export type AgentConnector = { id: string; provider: string; base_url: string; token_env?: string; oauth_provider?: string; allowed_origins?: string[]; operations?: Array<{ name: string; methods: string[]; path_prefixes: string[] }>; disabled?: boolean };
+export type AgentConnector = { id: string; provider: string; base_url: string; token_env?: string; oauth_provider?: string; allowed_origins?: string[]; operations?: Array<{ name: string; methods: string[]; path_prefixes: string[] }>; disabled?: boolean; credential_configured?: boolean };
 export type AgentConnectorCatalogEntry = { id: string; name: string; category: string; kind: string; description: string; auth: string; source: string; status: string; scopes?: string[] };
 export type AgentMCPServer = { id: string; command?: string; url?: string; token_env?: string; transport?: string; args?: string[]; allowed_methods?: string[]; environment_vars?: string[]; timeout_seconds?: number; disabled?: boolean };
 export type AgentSkill = { id: string; version: string; description: string; scopes?: string[]; tools?: string[]; trusted: boolean; enabled: boolean };

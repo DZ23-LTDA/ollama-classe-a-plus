@@ -58,6 +58,18 @@ func TestConnectorRequiresOrganizationScope(t *testing.T) {
 	}
 }
 
+func TestConnectorListReportsCredentialStateWithoutTokenEnvironment(t *testing.T) {
+	t.Setenv("CONNECTOR_STATUS_TOKEN", "configured-token")
+	manager := NewConnectorManager()
+	if err := manager.Register(ConnectorConfig{ID: "status", Provider: "status", BaseURL: "https://example.test", TokenEnv: "CONNECTOR_STATUS_TOKEN", Operations: []ConnectorOperation{{Name: "read", Methods: []string{"GET"}, PathPrefixes: []string{"/"}}}}); err != nil {
+		t.Fatal(err)
+	}
+	listed := manager.List()
+	if len(listed) != 1 || !listed[0].CredentialConfigured || listed[0].TokenEnv != "" {
+		t.Fatalf("connector status = %+v", listed)
+	}
+}
+
 func TestConnectorPathPrefixMatchesSegments(t *testing.T) {
 	if !connectorPathMatches("/users/123", "/users") {
 		t.Fatal("expected child path to match")
