@@ -122,7 +122,7 @@ grep -q 'MCP command must be an absolute executable path' internal/agent/mcp.go
 	grep -q 'configureMCPProcess' internal/agent/mcp_process_unix.go
 	grep -q 'browserPythonExecutable' internal/agent/browser.go
 	grep -q "playwright==1.63.0" .github/workflows/test.yaml
-	grep -q 'group: \${{ github.workflow }}-\${{ github.pull_request.number || github.run_id }}' .github/workflows/test.yaml
+		grep -q 'group: \${{ github.workflow }}-\${{ github.event.pull_request.number || github.run_id }}' .github/workflows/test.yaml
 	grep -q 'workflow_dispatch:' .github/workflows/test.yaml
 	grep -q 'run_native_matrix:' .github/workflows/test.yaml
 	grep -q 'github.event_name == '\''workflow_dispatch'\'' && inputs.run_native_matrix == true' .github/workflows/test.yaml
