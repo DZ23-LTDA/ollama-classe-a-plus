@@ -73,6 +73,7 @@ type RuntimeConfig struct {
 var (
 	ErrApprovalVersionConflict = errors.New("approval mission version conflict")
 	ErrApprovalNonceMismatch   = errors.New("approval nonce mismatch")
+	ErrApprovalReasonTooLong   = errors.New("approval reason exceeds 2048 bytes")
 	ErrQueueJobForbidden       = errors.New("job is outside the active organization")
 )
 
@@ -880,8 +881,12 @@ func (r *Runtime) decideApprovalForActor(missionID, approvalID string, approved 
 		if strings.TrimSpace(actorID) == "" {
 			return Mission{}, errors.New("approval actor is required")
 		}
-		if strings.TrimSpace(reason) == "" {
+		reason = strings.TrimSpace(reason)
+		if reason == "" {
 			return Mission{}, errors.New("approval reason is required")
+		}
+		if len([]byte(reason)) > 2048 {
+			return Mission{}, ErrApprovalReasonTooLong
 		}
 		if requireNonce && (strings.TrimSpace(nonce) == "" || nonce != mission.Approvals[index].Nonce) {
 			return Mission{}, ErrApprovalNonceMismatch
@@ -893,7 +898,7 @@ func (r *Runtime) decideApprovalForActor(missionID, approvalID string, approved 
 		} else {
 			mission.Approvals[index].Status = ApprovalRejected
 		}
-		mission.Approvals[index].Reason = strings.TrimSpace(reason)
+		mission.Approvals[index].Reason = reason
 		mission.Approvals[index].UpdatedAt = time.Now().UTC()
 		if approved && r.approvalsReady(mission) {
 			mission.State = MissionReady

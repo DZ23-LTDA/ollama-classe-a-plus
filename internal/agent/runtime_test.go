@@ -451,6 +451,9 @@ func TestApprovalCASAndNonceAreSingleUse(t *testing.T) {
 	if _, err := runtime.DecideApprovalForActorCAS(mission.ID, approval.ID, true, "approved", "admin_a", "org_a", mission.Version, "wrong"); !errors.Is(err, ErrApprovalNonceMismatch) {
 		t.Fatalf("wrong nonce err=%v", err)
 	}
+	if _, err := runtime.DecideApprovalForActorCAS(mission.ID, approval.ID, true, strings.Repeat("x", 2049), "admin_a", "org_a", mission.Version, approval.Nonce); !errors.Is(err, ErrApprovalReasonTooLong) {
+		t.Fatalf("oversized reason err=%v", err)
+	}
 	decided, err := runtime.DecideApprovalForActorCAS(mission.ID, approval.ID, true, "approved", "admin_a", "org_a", mission.Version, approval.Nonce)
 	if err != nil {
 		t.Fatal(err)
