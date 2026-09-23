@@ -21,7 +21,50 @@ type RedisQueue struct {
 	database          int
 	prefix            string
 	timeout           time.Duration
+	errors            chan error
 }
+
+const redisLeaseDuration = 15 * time.Minute
+
+const redisClaimScript = `
+local id = redis.call('RPOP', KEYS[1])
+if not id then return nil end
+local raw = redis.call('GET', KEYS[4] .. id)
+if not raw then return nil end
+local job = cjson.decode(raw)
+if job.status ~= 'pending' then return nil end
+job.status = 'running'
+job.attempts = (job.attempts or 0) + 1
+job.worker_id = ARGV[1]
+job.locked_at = ARGV[2]
+job.updated_at = ARGV[2]
+redis.call('SET', KEYS[4] .. id, cjson.encode(job), 'EX', '604800')
+redis.call('ZADD', KEYS[3], ARGV[3] + ARGV[4], id)
+return cjson.encode(job)
+`
+
+const redisReclaimScript = `
+local ids = redis.call('ZRANGEBYSCORE', KEYS[1], '-inf', ARGV[1])
+local reclaimed = 0
+for _, id in ipairs(ids) do
+  redis.call('ZREM', KEYS[1], id)
+  local raw = redis.call('GET', KEYS[2] .. id)
+  if raw then
+    local job = cjson.decode(raw)
+    if job.status == 'running' then
+      job.status = 'pending'
+      job.worker_id = ''
+      job.locked_at = cjson.null
+      job.available_at = ARGV[2]
+      job.updated_at = ARGV[2]
+      redis.call('SET', KEYS[2] .. id, cjson.encode(job), 'EX', '604800')
+      redis.call('LPUSH', ARGV[3], id)
+      reclaimed = reclaimed + 1
+    end
+  end
+end
+return reclaimed
+`
 
 func OpenRedisQueue(ctx context.Context, rawURL, prefix string) (*RedisQueue, error) {
 	u, err := url.Parse(strings.TrimSpace(rawURL))
@@ -31,6 +74,9 @@ func OpenRedisQueue(ctx context.Context, rawURL, prefix string) (*RedisQueue, er
 	if u.Scheme != "redis" && u.Scheme != "rediss" {
 		return nil, errors.New("Redis URL must use redis:// or rediss://")
 	}
+	if u.Scheme == "rediss" {
+		return nil, errors.New("rediss:// requires a TLS-configured Redis adapter; plaintext fallback is disabled")
+	}
 	database := 0
 	if value := strings.TrimPrefix(u.Path, "/"); value != "" {
 		database, err = strconv.Atoi(value)
@@ -39,7 +85,7 @@ func OpenRedisQueue(ctx context.Context, rawURL, prefix string) (*RedisQueue, er
 		}
 	}
 	password, _ := u.User.Password()
-	queue := &RedisQueue{address: u.Host, password: password, database: database, prefix: strings.TrimSuffix(prefix, ":"), timeout: 5 * time.Second}
+	queue := &RedisQueue{address: u.Host, password: password, database: database, prefix: strings.TrimSuffix(prefix, ":"), timeout: 5 * time.Second, errors: make(chan error, 32)}
 	if queue.prefix == "" {
 		queue.prefix = "ollama:agent"
 	}
@@ -54,6 +100,7 @@ func (q *RedisQueue) jobKey(id string) string { return q.key("job:" + id) }
 func (q *RedisQueue) pendingKey() string      { return q.key("pending") }
 func (q *RedisQueue) delayedKey() string      { return q.key("delayed") }
 func (q *RedisQueue) deadKey() string         { return q.key("dead") }
+func (q *RedisQueue) leaseKey() string        { return q.key("leases") }
 
 func (q *RedisQueue) Enqueue(missionID string, maxAttempts int) (QueueJob, error) {
 	if strings.TrimSpace(missionID) == "" {
@@ -79,42 +126,28 @@ func (q *RedisQueue) Claim(workerID string, now time.Time) (QueueJob, bool, erro
 	if strings.TrimSpace(workerID) == "" {
 		return QueueJob{}, false, errors.New("worker id is required")
 	}
+	if now.IsZero() {
+		now = time.Now().UTC()
+	}
 	if err := q.moveDue(context.Background(), now); err != nil {
 		return QueueJob{}, false, err
 	}
-	value, err := q.do(context.Background(), "RPOP", q.pendingKey())
+	if err := q.reclaimExpired(context.Background(), now); err != nil {
+		return QueueJob{}, false, err
+	}
+	value, err := q.do(context.Background(), "EVAL", redisClaimScript, "4", q.pendingKey(), q.delayedKey(), q.leaseKey(), q.key("job:"), workerID, now.Format(time.RFC3339Nano), strconv.FormatInt(now.UnixMilli(), 10), strconv.FormatInt(redisLeaseDuration.Milliseconds(), 10))
 	if err != nil {
 		return QueueJob{}, false, err
 	}
-	id, ok := value.(string)
-	if !ok || id == "" {
+	if value == nil {
 		return QueueJob{}, false, nil
 	}
-	job, err := q.get(id)
-	if err != nil {
-		if _, ok := err.(osErrNotExist); !ok {
-			_, _ = q.do(context.Background(), "LPUSH", q.pendingKey(), id)
-		}
-		return QueueJob{}, false, err
+	text, ok := value.(string)
+	if !ok || strings.TrimSpace(text) == "" {
+		return QueueJob{}, false, errors.New("Redis claim returned an invalid job")
 	}
-	if job.Status != QueuePending {
-		return QueueJob{}, false, nil
-	}
-	if job.AvailableAt.After(now) {
-		if _, err := q.do(context.Background(), "ZADD", q.delayedKey(), strconv.FormatInt(job.AvailableAt.UnixMilli(), 10), id); err != nil {
-			_, _ = q.do(context.Background(), "LPUSH", q.pendingKey(), id)
-			return QueueJob{}, false, err
-		}
-		return QueueJob{}, false, nil
-	}
-	job.Status = QueueRunning
-	job.Attempts++
-	job.WorkerID = workerID
-	locked := now
-	job.LockedAt = &locked
-	job.UpdatedAt = now
-	if err := q.put(job); err != nil {
-		_, _ = q.do(context.Background(), "LPUSH", q.pendingKey(), id)
+	var job QueueJob
+	if err := json.Unmarshal([]byte(text), &job); err != nil {
 		return QueueJob{}, false, err
 	}
 	return job, true, nil
@@ -155,7 +188,12 @@ func (q *RedisQueue) Nack(jobID string, runErr error) (QueueJob, error) {
 		if err := q.put(job); err != nil {
 			return QueueJob{}, err
 		}
-		_, _ = q.do(context.Background(), "LPUSH", q.deadKey(), job.ID)
+		if _, err := q.do(context.Background(), "LPUSH", q.deadKey(), job.ID); err != nil {
+			if restoreErr := q.put(previous); restoreErr != nil {
+				return QueueJob{}, fmt.Errorf("dead-letter indexing failed: %v; state restore failed: %w", err, restoreErr)
+			}
+			return QueueJob{}, fmt.Errorf("dead-letter indexing failed: %w", err)
+		}
 		return job, nil
 	}
 	job.Status = QueuePending
@@ -234,11 +272,18 @@ func (q *RedisQueue) Start(ctx context.Context, workerID string, handler func(co
 				return
 			}
 			job, ok, err := q.Claim(workerID, time.Now().UTC())
+			if err != nil {
+				q.reportError(fmt.Errorf("redis queue claim: %w", err))
+			}
 			if err == nil && ok {
 				if runErr := handler(ctx, job); runErr != nil {
-					_, _ = q.Nack(job.ID, runErr)
+					if _, nackErr := q.Nack(job.ID, runErr); nackErr != nil {
+						q.reportError(fmt.Errorf("redis queue nack %s: %w", job.ID, nackErr))
+					}
 				} else {
-					_ = q.Ack(job.ID)
+					if ackErr := q.Ack(job.ID); ackErr != nil {
+						q.reportError(fmt.Errorf("redis queue ack %s: %w", job.ID, ackErr))
+					}
 				}
 				continue
 			}
@@ -249,6 +294,23 @@ func (q *RedisQueue) Start(ctx context.Context, workerID string, handler func(co
 			}
 		}
 	}()
+}
+
+func (q *RedisQueue) Errors() <-chan error {
+	if q == nil {
+		return nil
+	}
+	return q.errors
+}
+
+func (q *RedisQueue) reportError(err error) {
+	if q == nil || q.errors == nil || err == nil {
+		return
+	}
+	select {
+	case q.errors <- err:
+	default:
+	}
 }
 
 func (q *RedisQueue) ping(ctx context.Context) error { _, err := q.do(ctx, "PING"); return err }
@@ -297,6 +359,11 @@ func (q *RedisQueue) moveDue(ctx context.Context, now time.Time) error {
 		}
 	}
 	return nil
+}
+
+func (q *RedisQueue) reclaimExpired(ctx context.Context, now time.Time) error {
+	_, err := q.do(ctx, "EVAL", redisReclaimScript, "2", q.leaseKey(), q.key("job:"), strconv.FormatInt(now.UnixMilli(), 10), now.Format(time.RFC3339Nano), q.pendingKey())
+	return err
 }
 
 func (q *RedisQueue) do(ctx context.Context, args ...string) (any, error) {
