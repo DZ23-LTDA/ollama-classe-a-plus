@@ -123,3 +123,41 @@ func TestMediaDownloadLimitsAndRejectsPrivateActualAddress(t *testing.T) {
 		t.Fatalf("expected private media dial rejection, got %v", err)
 	}
 }
+
+func TestMediaTranscriptionRestrictsWorkspaceAndSize(t *testing.T) {
+	manager, err := NewMediaManager(MediaProvider{Name: "local", BaseURL: "http://127.0.0.1:43123"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	workspace := t.TempDir()
+	outside := t.TempDir()
+	outsideInput := filepath.Join(outside, "outside.wav")
+	if err := os.WriteFile(outsideInput, []byte("wav"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := manager.Transcribe(context.Background(), workspace, outsideInput, ""); err == nil || !strings.Contains(err.Error(), "escapes workspace") {
+		t.Fatalf("expected workspace containment rejection, got %v", err)
+	}
+	linkedInput := filepath.Join(workspace, "linked.wav")
+	if err := os.Symlink(outsideInput, linkedInput); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+	if _, err := manager.Transcribe(context.Background(), workspace, linkedInput, ""); err == nil || !strings.Contains(err.Error(), "symlink") {
+		t.Fatalf("expected symlink rejection, got %v", err)
+	}
+	largeInput := filepath.Join(workspace, "large.wav")
+	file, err := os.OpenFile(largeInput, os.O_CREATE|os.O_WRONLY, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Truncate(100<<20 + 1); err != nil {
+		_ = file.Close()
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := manager.Transcribe(context.Background(), workspace, largeInput, ""); err == nil || !strings.Contains(err.Error(), "exceeds 100 MiB") {
+		t.Fatalf("expected audio size rejection, got %v", err)
+	}
+}

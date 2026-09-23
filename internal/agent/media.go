@@ -60,6 +60,53 @@ func isLoopbackHost(host string) bool {
 	return host == "localhost" || host == "127.0.0.1" || host == "::1"
 }
 
+func safeMediaWorkspaceRoot(workspace string) (string, error) {
+	if strings.TrimSpace(workspace) == "" {
+		return "", errors.New("media workspace is required")
+	}
+	root, err := filepath.Abs(workspace)
+	if err != nil {
+		return "", err
+	}
+	info, err := os.Stat(root)
+	if err != nil || !info.IsDir() {
+		return "", errors.New("media workspace must be a directory")
+	}
+	linkInfo, err := os.Lstat(root)
+	if err != nil {
+		return "", err
+	}
+	if linkInfo.Mode()&os.ModeSymlink != 0 {
+		return "", errors.New("media workspace must not be a symlink")
+	}
+	return root, nil
+}
+
+func safeMediaInputPath(workspace, inputPath string) (string, os.FileInfo, error) {
+	root, err := safeMediaWorkspaceRoot(workspace)
+	if err != nil {
+		return "", nil, err
+	}
+	input, err := filepath.Abs(inputPath)
+	if err != nil {
+		return "", nil, err
+	}
+	if !isWithin(root, input) {
+		return "", nil, errors.New("media input escapes workspace")
+	}
+	if err := rejectSymlinkComponents(root, input); err != nil {
+		return "", nil, fmt.Errorf("media input is not safe: %w", err)
+	}
+	info, err := os.Stat(input)
+	if err != nil {
+		return "", nil, err
+	}
+	if !info.Mode().IsRegular() {
+		return "", nil, errors.New("media input must be a regular file")
+	}
+	return input, info, nil
+}
+
 func NewMediaManager(provider MediaProvider) (*MediaManager, error) {
 	if err := provider.Validate(); err != nil {
 		return nil, err
@@ -181,6 +228,10 @@ func (m *MediaManager) GenerateSpeech(ctx context.Context, workspace, text, voic
 	if err != nil {
 		return MediaResult{}, err
 	}
+	workspace, err = safeMediaWorkspaceRoot(workspace)
+	if err != nil {
+		return MediaResult{}, err
+	}
 	path := filepath.Join(workspace, ".agent-media", "speech-"+strconv.FormatInt(time.Now().UnixNano(), 10)+".wav")
 	if err := writeLimitedFile(path, body, 100<<20); err != nil {
 		return MediaResult{}, err
@@ -195,6 +246,13 @@ func (m *MediaManager) GenerateSpeech(ctx context.Context, workspace, text, voic
 func (m *MediaManager) Transcribe(ctx context.Context, workspace, inputPath, model string) (MediaResult, error) {
 	if strings.TrimSpace(inputPath) == "" {
 		return MediaResult{}, errors.New("audio input is required")
+	}
+	inputPath, info, err := safeMediaInputPath(workspace, inputPath)
+	if err != nil {
+		return MediaResult{}, err
+	}
+	if info.Size() > 100<<20 {
+		return MediaResult{}, errors.New("audio input exceeds 100 MiB")
 	}
 	file, err := os.Open(inputPath)
 	if err != nil {
@@ -253,17 +311,9 @@ func (m *MediaManager) AnalyzeImage(ctx context.Context, workspace, inputPath, p
 	if strings.TrimSpace(inputPath) == "" || strings.TrimSpace(prompt) == "" {
 		return MediaResult{}, errors.New("image input and vision prompt are required")
 	}
-	root, err := filepath.Abs(workspace)
+	input, _, err := safeMediaInputPath(workspace, inputPath)
 	if err != nil {
 		return MediaResult{}, err
-	}
-	input, err := filepath.Abs(inputPath)
-	if err != nil {
-		return MediaResult{}, err
-	}
-	relative, err := filepath.Rel(root, input)
-	if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) || filepath.IsAbs(relative) {
-		return MediaResult{}, errors.New("image input escapes workspace")
 	}
 	data, err := os.ReadFile(input)
 	if err != nil {
@@ -398,6 +448,10 @@ func (m *MediaManager) postBytes(ctx context.Context, path string, value any) ([
 }
 
 func (m *MediaManager) materializeEntry(ctx context.Context, workspace, prefix, extension string, entry map[string]any) (string, string, error) {
+	workspace, err := safeMediaWorkspaceRoot(workspace)
+	if err != nil {
+		return "", "", err
+	}
 	var data []byte
 	mediaType := "application/octet-stream"
 	if encoded, ok := entry["b64_json"].(string); ok && encoded != "" {
