@@ -45,12 +45,14 @@ export type CompanyAgent = { id: string; department_id: string; name: string; ob
 export type CompanySocialAccount = { id: string; provider: string; name: string; status: string; oauth_required: boolean };
 export type CompanySocialDraft = { id: string; provider: string; account_id?: string; title: string; body: string; status: string; approval_required: boolean; approved: boolean; mode: string; published_at?: string };
 export type CompanyApproval = { id: string; company_id: string; organization_id: string; resource_type: string; resource_id: string; policy: string; category?: string; amount_cents?: number; nonce: string; actor_id?: string; status: string; reason?: string; expires_at?: string };
+export type TelAgentExchange = { id: string; channel: string; actor_id: string; organization_id: string; message: string; operation: string; status: string; reply: string; created_resource_id?: string; approval_required: boolean; created_at: string };
+export type TelAgentResult = { company: AgentCompany; exchange: TelAgentExchange; report?: AgentCompanyReport | null };
 export type CompanySocialReport = { company: AgentCompany; connected_accounts: number; pending_oauth: number; drafts: number; approved_drafts: number; published_sandbox: number; impressions: number; clicks: number; conversions: number };
 export type AgentCompany = {
   id: string; version: number; organization_id: string; name: string; mission?: string; positioning?: string; business_model?: string;
   target_audience?: string; offer?: string; website?: string; currency: string; status: string;
   departments: CompanyDepartment[]; agents?: CompanyAgent[]; roadmap?: CompanyRoadmapItem[]; goals?: CompanyGoal[]; backlog?: CompanyBacklogItem[]; cycles?: CompanyCycle[]; campaigns?: CompanyCampaign[]; affiliate_programs?: CompanyAffiliateProgram[]; affiliate_links?: CompanyAffiliateLink[]; products?: CompanyProduct[]; orders?: CompanyOrder[]; social_accounts?: CompanySocialAccount[]; social_drafts?: CompanySocialDraft[]; social_metrics?: Array<{ id: string; draft_id: string; provider: string; impressions: number; clicks: number; conversions: number }>;
-  budget: { currency: string; monthly_limit_cents: number; spent_cents: number; approval_threshold_cents: number; require_approval_for_ads: boolean; require_approval_for_sales: boolean };
+  tel_agent_history?: TelAgentExchange[]; budget: { currency: string; monthly_limit_cents: number; spent_cents: number; approval_threshold_cents: number; require_approval_for_ads: boolean; require_approval_for_sales: boolean };
   risk: { paused: boolean; pause_reason?: string; anomaly_count: number; last_anomaly?: string }; approvals?: CompanyApproval[];
   created_at: string; updated_at: string;
 };
@@ -141,6 +143,8 @@ export const listCompanies = () => agentFetch<{ companies: AgentCompany[] }>("/a
 export const createCompany = (payload: Record<string, unknown>) => agentFetch<AgentCompany>("/api/agent/v1/companies", { method: "POST", body: JSON.stringify(payload) });
 export const updateCompany = (id: string, payload: Record<string, unknown>) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(payload) });
 export const getCompanyReport = (id: string) => agentFetch<AgentCompanyReport>(`/api/agent/v1/companies/${encodeURIComponent(id)}/report`);
+export const executeCompanyTelAgent = (id: string, payload: { message: string; operation: "report.read" | "backlog.create" | "campaign.draft"; title?: string; description?: string; priority?: number; daily_budget_cents?: number }) => agentFetch<TelAgentResult>(`/api/agent/v1/companies/${encodeURIComponent(id)}/tel-agent`, { method: "POST", body: JSON.stringify(payload) });
+export const getCompanyTelAgentHistory = (id: string) => agentFetch<{ history: TelAgentExchange[]; channel: string; telephony: string }>(`/api/agent/v1/companies/${encodeURIComponent(id)}/tel-agent/history`);
 export const addCompanyRoadmap = (id: string, payload: Record<string, unknown>) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/roadmap`, { method: "POST", body: JSON.stringify(payload) });
 export const addCompanyGoal = (id: string, payload: Record<string, unknown>) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/goals`, { method: "POST", body: JSON.stringify(payload) });
 export const addCompanyBacklog = (id: string, payload: Record<string, unknown>) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/backlog`, { method: "POST", body: JSON.stringify(payload) });

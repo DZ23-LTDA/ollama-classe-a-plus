@@ -85,6 +85,74 @@ func (a *agentAPI) companyReport(c *gin.Context) {
 	c.JSON(http.StatusOK, report)
 }
 
+func (a *agentAPI) companyTelAgent(c *gin.Context) {
+	_, err := a.companyForRequest(c)
+	if err != nil {
+		writeAgentError(c, statusForAgentError(err), err)
+		return
+	}
+	var request agent.TelAgentRequest
+	if err := decodeJSON(c, &request); err != nil {
+		writeAgentError(c, http.StatusBadRequest, err)
+		return
+	}
+	operation := strings.ToLower(strings.TrimSpace(request.Operation))
+	if operation != "report.read" && !a.companyTelAgentWriteAllowed(c) {
+		writeAgentError(c, http.StatusForbidden, errAgentForbidden)
+		return
+	}
+	organizationID := companyOrganizationID(c)
+	updated, result, err := a.runtime.CompanyStore().ExecuteTelAgent(c.Param("id"), organizationID, agentActorID(c), request)
+	if err != nil {
+		status := statusForAgentError(err)
+		if errors.Is(err, agent.ErrTelAgentOrganizationMismatch) {
+			status = http.StatusForbidden
+		} else if errors.Is(err, agent.ErrTelAgentActorRequired) || errors.Is(err, agent.ErrTelAgentMessageRequired) || errors.Is(err, agent.ErrTelAgentMessageTooLong) || errors.Is(err, agent.ErrTelAgentUnsupportedOperation) {
+			status = http.StatusBadRequest
+		}
+		writeAgentError(c, status, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"company": updated, "exchange": result.Exchange, "report": result.Report})
+}
+
+func (a *agentAPI) companyTelAgentHistory(c *gin.Context) {
+	if _, err := a.companyForRequest(c); err != nil {
+		writeAgentError(c, statusForAgentError(err), err)
+		return
+	}
+	history, err := a.runtime.CompanyStore().TelAgentHistoryForOrganization(c.Param("id"), companyOrganizationID(c), 100)
+	if err != nil {
+		status := statusForAgentError(err)
+		if errors.Is(err, agent.ErrTelAgentOrganizationMismatch) {
+			status = http.StatusForbidden
+		}
+		writeAgentError(c, status, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"history": history, "channel": "tel-agent.text", "telephony": "not_configured"})
+}
+
+func (a *agentAPI) companyTelAgentWriteAllowed(c *gin.Context) bool {
+	if !a.authRequired {
+		return true
+	}
+	value, ok := c.Get("agent.membership")
+	if !ok {
+		return false
+	}
+	membership, ok := value.(agent.Membership)
+	if !ok {
+		return false
+	}
+	switch membership.Role {
+	case agent.RoleOwner, agent.RoleAdmin, agent.RoleOperator:
+		return true
+	default:
+		return false
+	}
+}
+
 func (a *agentAPI) addCompanyRoadmap(c *gin.Context) {
 	if _, err := a.companyForRequest(c); err != nil {
 		writeAgentError(c, statusForAgentError(err), err)

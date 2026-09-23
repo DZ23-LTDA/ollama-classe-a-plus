@@ -2,10 +2,12 @@ import { useCallback, useEffect, useState } from "react";
 import {
   addCompanyBacklog,
   addCompanyGoal,
-  addCompanyCycle,
+	addCompanyCycle,
 	addCompanyRoadmap,
 	createCompany,
-  getCompanyReport,
+	executeCompanyTelAgent,
+	getCompanyReport,
+	getCompanyTelAgentHistory,
   listCompanies,
   pauseCompany,
   recordCompanyAnomaly,
@@ -13,7 +15,7 @@ import {
   resumeCompany,
   updateCompany,
 } from "@/lib/agenticClient";
-import type { AgentCompany, AgentCompanyReport } from "@/lib/agenticClient";
+import type { AgentCompany, AgentCompanyReport, TelAgentExchange } from "@/lib/agenticClient";
 import { AppSidebar } from "@/components/AppSidebar";
 import { SidebarLayout } from "@/components/layout/layout";
 import { CompanyGrowthPanel } from "@/components/CompanyGrowthPanel";
@@ -57,6 +59,13 @@ export function CompanyWorkspacePage() {
   const [cycleFrequency, setCycleFrequency] = useState("daily");
   const [spendAmount, setSpendAmount] = useState("");
   const [spendCategory, setSpendCategory] = useState("ads");
+  const [telAgentMessage, setTelAgentMessage] = useState("");
+  const [telAgentOperation, setTelAgentOperation] = useState<"report.read" | "backlog.create" | "campaign.draft">("report.read");
+  const [telAgentTitle, setTelAgentTitle] = useState("");
+  const [telAgentDescription, setTelAgentDescription] = useState("");
+  const [telAgentPriority, setTelAgentPriority] = useState("50");
+  const [telAgentHistory, setTelAgentHistory] = useState<TelAgentExchange[]>([]);
+  const [telAgentReply, setTelAgentReply] = useState<string | null>(null);
 
   const refresh = useCallback(async (selectedID?: string) => {
     setLoading(true);
@@ -65,7 +74,14 @@ export function CompanyWorkspacePage() {
       setCompanies(result.companies);
       const next = result.companies.find((item) => item.id === (selectedID ?? company?.id)) ?? result.companies[0] ?? null;
       setCompany(next);
-      if (next) setReport(await getCompanyReport(next.id)); else setReport(null);
+      if (next) {
+        const [nextReport, history] = await Promise.all([getCompanyReport(next.id), getCompanyTelAgentHistory(next.id)]);
+        setReport(nextReport);
+        setTelAgentHistory(history.history);
+      } else {
+        setReport(null);
+        setTelAgentHistory([]);
+      }
     } catch (cause) {
       setNotice(cause instanceof Error ? cause.message : "Não foi possível carregar o Company OS.");
     } finally {
@@ -88,6 +104,20 @@ export function CompanyWorkspacePage() {
   };
   const selectedID = company?.id;
   const add = async (action: () => Promise<AgentCompany>, message: string, clear: () => void) => { if (!selectedID) return; await run(action, message); clear(); };
+  const sendTelAgent = async () => {
+    if (!selectedID || !telAgentMessage.trim() || (telAgentOperation !== "report.read" && !telAgentTitle.trim())) return;
+    setBusy(true);
+    try {
+      const result = await executeCompanyTelAgent(selectedID, { message: telAgentMessage, operation: telAgentOperation, ...(telAgentTitle.trim() ? { title: telAgentTitle } : {}), ...(telAgentDescription.trim() ? { description: telAgentDescription } : {}), ...(telAgentOperation === "backlog.create" ? { priority: Number(telAgentPriority || 50) } : {}) });
+      setCompany(result.company);
+      setTelAgentHistory((current) => [...current, result.exchange].slice(-100));
+      setTelAgentReply(result.exchange.reply);
+      setTelAgentMessage("");
+      setNotice(result.exchange.status === "approval_pending" ? "Tel-Agent criou um rascunho local; approval continua obrigatório." : "Tel-Agent concluiu a operação local.");
+      if (result.report) setReport(result.report);
+    } catch (cause) { setNotice(cause instanceof Error ? cause.message : "Tel-Agent não conseguiu concluir a operação."); }
+    finally { setBusy(false); }
+  };
   const departments = company?.departments ?? [];
   const backlog = company?.backlog ?? [];
   const goals = company?.goals ?? [];
@@ -103,6 +133,7 @@ export function CompanyWorkspacePage() {
     {!loading && !companies.length && <Card title="Comece com uma empresa"><div className="mt-4 grid gap-3 md:grid-cols-2"><input className={inputClass} value={name} onChange={(event) => setName(event.target.value)} placeholder="Nome da empresa" aria-label="Nome da empresa" /><input className={inputClass} value={businessModel} onChange={(event) => setBusinessModel(event.target.value)} placeholder="Modelo de negócio" aria-label="Modelo de negócio" /><textarea className={areaClass} value={mission} onChange={(event) => setMission(event.target.value)} placeholder="Missão e resultado que a empresa entrega" aria-label="Missão" /><textarea className={areaClass} value={positioning} onChange={(event) => setPositioning(event.target.value)} placeholder="Posicionamento e diferencial" aria-label="Posicionamento" /><input className={inputClass} value={audience} onChange={(event) => setAudience(event.target.value)} placeholder="Público-alvo" aria-label="Público-alvo" /><input className={inputClass} value={offer} onChange={(event) => setOffer(event.target.value)} placeholder="Oferta principal" aria-label="Oferta" /><input className={inputClass} type="number" min="0" value={budget} onChange={(event) => setBudget(event.target.value)} placeholder="Limite mensal em BRL" aria-label="Limite mensal" /></div><button type="button" disabled={busy || !name.trim()} onClick={() => void create()} className="mt-4 inline-flex items-center gap-2 rounded-xl bg-neutral-950 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-40 dark:bg-white dark:text-neutral-950"><PlusIcon className="h-4 w-4" />Criar empresa e tenant</button></Card>}
     {loading && <div className="mt-8 rounded-2xl border border-dashed border-neutral-300 px-6 py-12 text-center text-sm text-neutral-500 dark:border-neutral-700">Carregando Company OS…</div>}
     {!loading && company && <>
+	      <Card title="Tel-Agent — canal textual operacional" className="mt-7 border-violet-200 shadow-sm dark:border-violet-900/60"><div className="mt-3 flex flex-wrap items-center justify-between gap-2"><p className="max-w-3xl text-xs leading-5 text-neutral-500 dark:text-neutral-400">Comande esta empresa por texto e receba o retorno persistido no tenant. As operações são allowlisted e locais; telefonia, WhatsApp e mensagens externas permanecem não configurados até uma conexão homologada.</p><span className="rounded-full bg-violet-50 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-violet-700 dark:bg-violet-950/30 dark:text-violet-300">tel-agent.text · local</span></div><div className="mt-4 grid gap-3 lg:grid-cols-[0.8fr_1.2fr] lg:items-start"><div className="space-y-2"><select className={inputClass} value={telAgentOperation} onChange={(event) => setTelAgentOperation(event.target.value as typeof telAgentOperation)} aria-label="Operação Tel-Agent"><option value="report.read">Ler relatório operacional</option><option value="backlog.create">Criar item no backlog</option><option value="campaign.draft">Criar rascunho de campanha</option></select>{telAgentOperation !== "report.read" && <input className={inputClass} value={telAgentTitle} onChange={(event) => setTelAgentTitle(event.target.value)} placeholder="Título da operação" aria-label="Título da operação" />}{telAgentOperation === "backlog.create" && <input className={inputClass} type="number" min="1" max="1000" value={telAgentPriority} onChange={(event) => setTelAgentPriority(event.target.value)} placeholder="Prioridade" aria-label="Prioridade Tel-Agent" />}{telAgentOperation === "campaign.draft" && <textarea className={areaClass} value={telAgentDescription} onChange={(event) => setTelAgentDescription(event.target.value)} placeholder="Objetivo do rascunho (não publica)" aria-label="Objetivo da campanha" />}</div><div className="space-y-2"><textarea className={areaClass} value={telAgentMessage} onChange={(event) => setTelAgentMessage(event.target.value)} maxLength={2048} placeholder="Ex.: crie uma tarefa para revisar o onboarding" aria-label="Mensagem Tel-Agent" /><div className="flex items-center justify-between gap-3"><span className="text-[11px] text-neutral-400">Histórico limitado às últimas 100 trocas; entradas são redigidas antes da persistência.</span><button type="button" disabled={busy || !telAgentMessage.trim() || (telAgentOperation !== "report.read" && !telAgentTitle.trim())} onClick={() => void sendTelAgent()} className="rounded-xl bg-neutral-950 px-4 py-2 text-xs font-medium text-white disabled:opacity-40 dark:bg-white dark:text-neutral-950">Executar operação</button></div></div></div>{telAgentReply && <div role="status" aria-live="polite" className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/20 dark:text-emerald-200">{telAgentReply}</div>}<div className="mt-4 space-y-2">{telAgentHistory.slice(-4).reverse().map((entry) => <div key={entry.id} className="rounded-xl border border-neutral-200 p-3 dark:border-neutral-800"><div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-neutral-400"><span>{entry.operation} · {entry.status}</span><time dateTime={entry.created_at}>{new Date(entry.created_at).toLocaleString("pt-BR")}</time></div><p className="mt-1 text-xs text-neutral-700 dark:text-neutral-300">{entry.reply}</p></div>)}</div></Card>
 	      <CompanyGrowthPanel company={company} onCompanyChange={setCompany} />
 	      <CompanyOperationsPanel company={company} onCompanyChange={setCompany} />
 	      <CompanyApprovalQueue company={company} onCompanyChange={setCompany} />

@@ -174,6 +174,7 @@ type Company struct {
 	SocialAccounts    []CompanySocialAccount     `json:"social_accounts,omitempty"`
 	SocialDrafts      []CompanySocialDraft       `json:"social_drafts,omitempty"`
 	SocialMetrics     []CompanySocialMetric      `json:"social_metrics,omitempty"`
+	TelAgentHistory   []TelAgentExchange         `json:"tel_agent_history,omitempty"`
 	Budget            CompanyBudget              `json:"budget"`
 	Risk              CompanyRisk                `json:"risk"`
 	Approvals         []CompanyApproval          `json:"approvals,omitempty"`
@@ -312,6 +313,7 @@ func (s *CompanyStore) Create(company Company) (Company, error) {
 	company.SocialAccounts = nil
 	company.SocialDrafts = nil
 	company.SocialMetrics = nil
+	company.TelAgentHistory = nil
 	company.Approvals = nil
 	company.Idempotency = nil
 	company.Version = 1
@@ -853,30 +855,7 @@ func (s *CompanyStore) Report(id string) (CompanyReport, error) {
 	if err != nil {
 		return CompanyReport{}, err
 	}
-	report := CompanyReport{Company: company}
-	for _, item := range company.Backlog {
-		if item.Status == "done" || item.Status == "completed" {
-			report.CompletedBacklog++
-		} else {
-			report.OpenBacklog++
-		}
-	}
-	for _, goal := range company.Goals {
-		if goal.Status == "at_risk" || goal.Status == "blocked" {
-			report.GoalsAtRisk++
-		} else {
-			report.GoalsOnTrack++
-		}
-	}
-	for _, cycle := range company.Cycles {
-		if cycle.Enabled {
-			report.EnabledCycles++
-		}
-	}
-	if company.Budget.MonthlyLimitCents > 0 {
-		report.BudgetUtilizationPct = float64(company.Budget.SpentCents) / float64(company.Budget.MonthlyLimitCents) * 100
-	}
-	return report, nil
+	return companyReportSnapshot(company), nil
 }
 
 func (s *CompanyStore) mutate(id string, fn func(*Company) error) (Company, error) {

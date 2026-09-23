@@ -413,6 +413,8 @@ func (a *agentAPI) register(r *gin.Engine) {
 	group.GET("/companies/:id", a.getCompany)
 	group.PATCH("/companies/:id", a.updateCompany)
 	group.GET("/companies/:id/report", a.companyReport)
+	group.POST("/companies/:id/tel-agent", a.companyTelAgent)
+	group.GET("/companies/:id/tel-agent/history", a.companyTelAgentHistory)
 	group.GET("/companies/:id/agents", a.companyAgents)
 	group.GET("/companies/:id/growth/report", a.companyGrowthReport)
 	group.GET("/companies/:id/social/report", a.companySocialReport)
