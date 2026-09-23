@@ -700,3 +700,12 @@ O head `b1f557d6` endurece o mobile em três pontos. Respostas HTTP do servidor 
 Evidência local do head `b1f557d6`: `npm run typecheck` mobile passou; `npm run test:policy` passou com cenários de rede, 409, 422 e 503; YAML, guardrail de integridade, diff check e scan de segredos passaram. A CI pública foi disparada e estava `queued`/`in_progress` na primeira consulta; isso não é evidência de CI verde. Testes físicos Android/iOS, push remoto e resolução de conflitos em dispositivos reais continuam `BLOCKED_BY_EXTERNAL_DEPENDENCY`.
 
 O produto segue **FIXING / preview-local RC em hardening — não finalizado e não production-ready**. PR #1 permanece aberto e sem merge automático.
+
+
+## Addendum de deploy parcial e estado desconhecido — 2026-09-23
+
+O head `190af0f3` deixa falhas de deploy observáveis. `DeploymentManager` agora preserva provider, deployment/site ID, URL, status e quantidade conhecida de arquivos quando Netlify cria efeitos remotos e falha na criação/upload; o erro tipado `DeploymentError` impede que o caller trate o caso como uma falha limpa. Falhas sem estado determinável retornam `unknown`. O endpoint de Builder responde `502 Bad Gateway` com `project`, `approval`, `deployment` e erro sanitizado para reconciliação manual, sem retry ou rollback universal.
+
+Evidência local: testes de deploy generic/Netlify, exclusão de arquivos privados, symlink, SSRF e estado parcial passaram; o novo cenário parcial passou também com `-race`; testes server de `Deployment|Builder`, `go vet ./internal/agent ./server`, diff check e scan de segredos passaram. O rollback e health-check específicos de Vercel/Netlify/generic continuam `BLOCKED_BY_EXTERNAL_DEPENDENCY` até existirem contas, contratos, credenciais autorizadas e homologação externa.
+
+A CI pública deste head foi disparada e precisa concluir. O produto segue **FIXING / preview-local RC em hardening — não finalizado e não production-ready**.
