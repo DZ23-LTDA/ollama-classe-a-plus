@@ -60,8 +60,8 @@ function EmptyState({ message, action, onAction }: { message: string; action?: s
   return <div className="rounded-xl border border-dashed border-neutral-300 px-6 py-10 text-center dark:border-neutral-700"><FolderOpenIcon className="mx-auto h-8 w-8 text-neutral-300 dark:text-neutral-600" /><p className="mx-auto mt-3 max-w-md text-sm text-neutral-500 dark:text-neutral-400">{message}</p>{action && onAction && <button onClick={onAction} className="mt-5 inline-flex items-center gap-2 rounded-lg border border-neutral-200 px-3 py-2 text-xs font-medium text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800">{action}<ArrowRightIcon className="h-3.5 w-3.5" /></button>}</div>;
 }
 
-function ResourceRow({ children, onDelete }: { children: React.ReactNode; onDelete?: () => void }) {
-  return <div className="flex items-center justify-between gap-3 rounded-xl border border-neutral-200/80 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900"><div className="min-w-0 flex-1">{children}</div>{onDelete && <button type="button" onClick={onDelete} className="rounded-lg p-2 text-neutral-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30" aria-label="Excluir"><TrashIcon className="h-4 w-4" /></button>}</div>;
+function ResourceRow({ children, onDelete, deleteLabel = "Excluir recurso", deleteDisabled = false }: { children: React.ReactNode; onDelete?: () => void; deleteLabel?: string; deleteDisabled?: boolean }) {
+	  return <div className="flex items-center justify-between gap-3 rounded-xl border border-neutral-200/80 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900"><div className="min-w-0 flex-1">{children}</div>{onDelete && <button type="button" onClick={onDelete} disabled={deleteDisabled} className="rounded-lg p-2 text-neutral-400 hover:bg-red-50 hover:text-red-600 disabled:cursor-wait disabled:opacity-40 dark:hover:bg-red-950/30" aria-label={deleteLabel} title={deleteLabel}><TrashIcon className="h-4 w-4" /></button>}</div>;
 }
 
 export function ProductWorkspacePage({ kind }: { kind: ProductPageKind }) {
@@ -69,6 +69,8 @@ export function ProductWorkspacePage({ kind }: { kind: ProductPageKind }) {
   const current = kind as AppSection;
   const [notice, setNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [pendingActions, setPendingActions] = useState<Record<string, boolean>>({});
   const [projects, setProjects] = useState<AgentProject[]>([]);
   const [missions, setMissions] = useState<AgentMission[]>([]);
   const [schedules, setSchedules] = useState<AgentSchedule[]>([]);
@@ -108,6 +110,7 @@ export function ProductWorkspacePage({ kind }: { kind: ProductPageKind }) {
 
   const refresh = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       if (kind === "projects" || kind === "scheduled") setProjects((await listProjects()).projects);
       if (kind === "tasks" || kind === "library") setMissions((await listMissions()).missions);
@@ -121,13 +124,34 @@ export function ProductWorkspacePage({ kind }: { kind: ProductPageKind }) {
         setCliCount(cliResult.tools.filter((item) => item.installed).length);
       }
     } catch (cause) {
-      setNotice(cause instanceof Error ? cause.message : "Não foi possível carregar os dados persistidos.");
+      const message = cause instanceof Error ? cause.message : "Não foi possível carregar os dados persistidos.";
+      setLoadError(message);
+      setNotice(message);
     } finally {
       setLoading(false);
     }
   }, [kind]);
 
   useEffect(() => { void refresh(); }, [refresh]);
+
+  const setPending = (key: string, pending: boolean) => {
+    setPendingActions((current) => {
+      const next = { ...current };
+      if (pending) next[key] = true;
+      else delete next[key];
+      return next;
+    });
+  };
+
+  const runPending = async (key: string, action: () => Promise<void>) => {
+    if (pendingActions[key]) return;
+    setPending(key, true);
+    try {
+      await action();
+    } finally {
+      setPending(key, false);
+    }
+  };
 
 	const artifacts = useMemo(() => missions.flatMap((mission) => (mission.artifacts ?? []).map((artifact) => ({ ...artifact, mission }))), [missions]);
 	const runningMissions = missions.filter((mission) => ["RUNNING", "OBSERVING", "RECOVERING"].includes(mission.state)).length;
@@ -150,55 +174,69 @@ export function ProductWorkspacePage({ kind }: { kind: ProductPageKind }) {
 
   const createNewProject = async () => {
     if (!projectName.trim()) return;
-    try {
-      await createProject(projectName, projectRoot);
-      setProjectName(""); setProjectRoot(""); setNotice("Projeto criado e persistido no ContextStore."); await refresh();
-    } catch (cause) { setNotice(cause instanceof Error ? cause.message : "Falha ao criar projeto."); }
+    await runPending("create-project", async () => {
+      try {
+        await createProject(projectName, projectRoot);
+        setProjectName(""); setProjectRoot(""); setNotice("Projeto criado e persistido no ContextStore."); await refresh();
+      } catch (cause) { setNotice(cause instanceof Error ? cause.message : "Falha ao criar projeto."); }
+    });
   };
 
   const saveProject = async (project: AgentProject) => {
     if (!editingProjectName.trim()) return;
-    try { await updateProject(project.id, editingProjectName, project.root ?? ""); setEditingProject(null); setNotice("Projeto atualizado."); await refresh(); }
-    catch (cause) { setNotice(cause instanceof Error ? cause.message : "Falha ao atualizar projeto."); }
+    await runPending(`project-save:${project.id}`, async () => {
+      try { await updateProject(project.id, editingProjectName, project.root ?? ""); setEditingProject(null); setNotice("Projeto atualizado."); await refresh(); }
+      catch (cause) { setNotice(cause instanceof Error ? cause.message : "Falha ao atualizar projeto."); }
+    });
   };
 
   const removeProject = async (project: AgentProject) => {
     if (!window.confirm(`Excluir o projeto ${project.name}? Memórias locais associadas também serão removidas.`)) return;
-    try { await deleteProject(project.id); setNotice("Projeto excluído."); await refresh(); }
-    catch (cause) { setNotice(cause instanceof Error ? cause.message : "Falha ao excluir projeto."); }
+    await runPending(`project-delete:${project.id}`, async () => {
+      try { await deleteProject(project.id); setNotice("Projeto excluído."); await refresh(); }
+      catch (cause) { setNotice(cause instanceof Error ? cause.message : "Falha ao excluir projeto."); }
+    });
   };
 
   const createNewSchedule = async () => {
     if (!scheduleObjective.trim()) return;
-    try { await createSchedule({ objective: scheduleObjective, interval_seconds: Number(scheduleInterval), project_id: scheduleProject || undefined, enabled: true }); setScheduleObjective(""); setNotice("Schedule criado; o worker usará o intervalo configurado."); await refresh(); }
-    catch (cause) { setNotice(cause instanceof Error ? cause.message : "Falha ao criar schedule."); }
+    await runPending("create-schedule", async () => {
+      try { await createSchedule({ objective: scheduleObjective, interval_seconds: Number(scheduleInterval), project_id: scheduleProject || undefined, enabled: true }); setScheduleObjective(""); setNotice("Schedule criado; o worker usará o intervalo configurado."); await refresh(); }
+      catch (cause) { setNotice(cause instanceof Error ? cause.message : "Falha ao criar schedule."); }
+    });
   };
 
-	const removeSchedule = async (schedule: AgentSchedule) => {
-		if (!window.confirm("Excluir este schedule?")) return;
-		try { await deleteSchedule(schedule.id); setNotice("Schedule excluído."); await refresh(); }
-		catch (cause) { setNotice(cause instanceof Error ? cause.message : "Falha ao excluir schedule."); }
-	};
+		const removeSchedule = async (schedule: AgentSchedule) => {
+			if (!window.confirm("Excluir este schedule?")) return;
+			await runPending(`schedule-delete:${schedule.id}`, async () => {
+				try { await deleteSchedule(schedule.id); setNotice("Schedule excluído."); await refresh(); }
+				catch (cause) { setNotice(cause instanceof Error ? cause.message : "Falha ao excluir schedule."); }
+			});
+		};
 
-	const togglePlugin = async (type: "connector" | "mcp" | "remote-mcp" | "skill", id: string, enabled: boolean) => {
-		try {
-			if (type === "connector") await setConnectorEnabled(id, enabled);
-			else if (type === "skill") await setSkillEnabled(id, enabled);
-			else await setMCPEnabled(id, enabled, type === "remote-mcp");
-			setNotice(`${id} ${enabled ? "habilitado" : "desabilitado"}.`);
-			await refresh();
+		const togglePlugin = async (type: "connector" | "mcp" | "remote-mcp" | "skill", id: string, enabled: boolean) => {
+			await runPending(`plugin-toggle:${type}:${id}`, async () => {
+				try {
+					if (type === "connector") await setConnectorEnabled(id, enabled);
+					else if (type === "skill") await setSkillEnabled(id, enabled);
+					else await setMCPEnabled(id, enabled, type === "remote-mcp");
+					setNotice(`${id} ${enabled ? "habilitado" : "desabilitado"}.`);
+					await refresh();
 				} catch (cause) { setNotice(cause instanceof Error ? cause.message : "Falha ao alterar lifecycle do plugin."); }
-			};
+			});
+		};
 
 			const removePlugin = async (type: "connector" | "mcp" | "remote-mcp" | "skill", id: string) => {
 				if (!window.confirm(`Remover ${id} do manifest durável? Essa ação não revoga credenciais upstream.`)) return;
-				try {
-					if (type === "connector") await removeConnector(id);
-					else if (type === "skill") await removeSkill(id);
-					else await removeMCP(id, type === "remote-mcp");
-					setNotice(`${id} removido do manifest local.`);
-					await refresh();
-				} catch (cause) { setNotice(cause instanceof Error ? cause.message : "Falha ao remover o plugin."); }
+				await runPending(`plugin-delete:${type}:${id}`, async () => {
+					try {
+						if (type === "connector") await removeConnector(id);
+						else if (type === "skill") await removeSkill(id);
+						else await removeMCP(id, type === "remote-mcp");
+						setNotice(`${id} removido do manifest local.`);
+						await refresh();
+					} catch (cause) { setNotice(cause instanceof Error ? cause.message : "Falha ao remover o plugin."); }
+				});
 			};
 
 			const createNewConnector = async () => {
@@ -253,7 +291,8 @@ export function ProductWorkspacePage({ kind }: { kind: ProductPageKind }) {
 			};
 
 			const renderContent = () => {
-    if (loading) return <div className="rounded-xl border border-dashed border-neutral-300 px-6 py-12 text-center text-sm text-neutral-500 dark:border-neutral-700">Consultando contratos agentic…</div>;
+	    if (loading) return <div role="status" aria-live="polite" aria-busy="true" className="rounded-xl border border-dashed border-neutral-300 px-6 py-12 text-center text-sm text-neutral-500 dark:border-neutral-700">Consultando contratos agentic…</div>;
+	    if (loadError) return <div role="alert" aria-live="assertive" className="rounded-xl border border-red-200 bg-red-50 px-6 py-8 text-center text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300"><p>{loadError}</p><button type="button" onClick={() => void refresh()} className="mt-4 rounded-lg border border-red-300 px-3 py-2 text-xs font-medium dark:border-red-800">Tentar novamente</button></div>;
     if (kind === "projects") return <div className="space-y-3">{projects.length ? projects.map((project) => <ResourceRow key={project.id} onDelete={() => void removeProject(project)}><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="font-medium text-neutral-900 dark:text-white">{editingProject === project.id ? <input autoFocus value={editingProjectName} onChange={(event) => setEditingProjectName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void saveProject(project); if (event.key === "Escape") setEditingProject(null); }} className="h-8 rounded-lg border border-neutral-300 bg-transparent px-2 text-sm dark:border-neutral-700" /> : project.name}</p><p className="mt-1 text-xs text-neutral-500">{project.root || "workspace local gerenciado"} · atualizado {new Date(project.updated_at).toLocaleString()}</p></div>{editingProject === project.id ? <button onClick={() => void saveProject(project)} className="rounded-lg bg-neutral-900 px-3 py-2 text-xs text-white dark:bg-white dark:text-neutral-900">Salvar</button> : <button onClick={() => { setEditingProject(project.id); setEditingProjectName(project.name); }} className="rounded-lg border border-neutral-200 px-3 py-2 text-xs dark:border-neutral-700">Editar</button>}</div></ResourceRow>) : <EmptyState message="Crie um projeto para manter instruções, arquivos e contexto entre missões." action="Criar projeto" onAction={() => document.getElementById("new-project-name")?.focus()} />}</div>;
     if (kind === "tasks") return missions.length ? <div className="space-y-3">{missions.map((mission) => <ResourceRow key={mission.id}><Link to="/agentic" className="block"><div className="flex flex-wrap items-center justify-between gap-2"><p className="font-medium text-neutral-900 dark:text-white">{mission.objective}</p><span className="rounded-full bg-neutral-100 px-2 py-1 text-[10px] font-medium dark:bg-neutral-800">{mission.state}</span></div><p className="mt-1 text-xs text-neutral-500">{mission.id} · {mission.plan?.length ?? 0} passos · {mission.artifacts?.length ?? 0} artifacts · {mission.model || "modelo padrão"}</p></Link></ResourceRow>)}</div> : <EmptyState message="As missões criadas no Agentic Console aparecerão aqui com timeline e artifacts." action="Nova tarefa" onAction={() => window.location.assign("/agentic")} />;
     if (kind === "library") return artifacts.length ? <div className="grid gap-3 md:grid-cols-2">{artifacts.map(({ mission, ...artifact }) => <ResourceRow key={`${mission.id}-${artifact.id}`}><a href={`${API_BASE}/api/agent/v1/missions/${encodeURIComponent(mission.id)}/artifacts/${encodeURIComponent(artifact.id)}`} className="block"><p className="font-medium text-neutral-900 dark:text-white">{artifact.name}</p><p className="mt-1 text-xs text-neutral-500">{Math.round(artifact.size / 1024)} KiB · SHA-256 {artifact.sha256.slice(0, 16)}…</p><p className="mt-1 text-[10px] text-violet-600">Missão {mission.id}</p></a></ResourceRow>)}</div> : <EmptyState message="Os artifacts gerados aparecerão aqui com preview, hash, versão e download." action="Abrir Agentic Console" onAction={() => window.location.assign("/agentic")} />;
@@ -274,8 +313,8 @@ export function ProductWorkspacePage({ kind }: { kind: ProductPageKind }) {
 
   return <SidebarLayout title={copy.title} sidebar={<AppSidebar current={current} />}><div className="min-h-0 flex-1 overflow-y-auto bg-neutral-50 dark:bg-neutral-900"><div className="mx-auto w-full max-w-6xl px-6 pb-14 pt-10 lg:px-12"><div className="flex flex-col gap-5 border-b border-neutral-200 pb-8 dark:border-neutral-800 md:flex-row md:items-end md:justify-between"><div className="max-w-2xl"><div className="mb-3 flex items-center gap-2 text-xs font-medium text-violet-600 dark:text-violet-300"><SparklesIcon className="h-4 w-4" />{copy.eyebrow}</div><h2 className="font-rounded text-3xl font-semibold tracking-tight text-neutral-950 dark:text-white">{copy.title}</h2><p className="mt-3 text-sm leading-6 text-neutral-500 dark:text-neutral-400">{copy.description}</p></div><button onClick={handleAction} className="inline-flex items-center justify-center gap-2 rounded-xl bg-neutral-950 px-4 py-2.5 text-sm font-medium text-white shadow-sm dark:bg-white dark:text-neutral-950"><PlusIcon className="h-4 w-4" />{copy.action}</button></div>{notice && <div role="status" aria-live="polite" className="mt-5 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-xs leading-5 text-violet-800 dark:border-violet-900/60 dark:bg-violet-950/20 dark:text-violet-200">{notice}</div>}
 
-{kind === "projects" && <section className="mt-6 grid gap-3 rounded-2xl border border-neutral-200/80 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900 md:grid-cols-[1fr_1fr_auto]"><input id="new-project-name" value={projectName} onChange={(event) => setProjectName(event.target.value)} placeholder="Nome do projeto" className="h-10 rounded-xl border border-neutral-300 bg-transparent px-3 text-sm dark:border-neutral-700" /><input value={projectRoot} onChange={(event) => setProjectRoot(event.target.value)} placeholder="Workspace (opcional)" className="h-10 rounded-xl border border-neutral-300 bg-transparent px-3 text-sm dark:border-neutral-700" /><button onClick={() => void createNewProject()} disabled={!projectName.trim()} className="h-10 rounded-xl bg-neutral-900 px-4 text-sm text-white disabled:opacity-40 dark:bg-white dark:text-neutral-900">Criar</button></section>}
-{kind === "scheduled" && <section className="mt-6 grid gap-3 rounded-2xl border border-neutral-200/80 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900 md:grid-cols-[1.4fr_0.5fr_0.8fr_auto]"><input id="new-schedule-objective" value={scheduleObjective} onChange={(event) => setScheduleObjective(event.target.value)} placeholder="Objetivo recorrente" className="h-10 rounded-xl border border-neutral-300 bg-transparent px-3 text-sm dark:border-neutral-700" /><input type="number" min="1" value={scheduleInterval} onChange={(event) => setScheduleInterval(event.target.value)} aria-label="Intervalo em segundos" className="h-10 rounded-xl border border-neutral-300 bg-transparent px-3 text-sm dark:border-neutral-700" /><select value={scheduleProject} onChange={(event) => setScheduleProject(event.target.value)} aria-label="Projeto do schedule" className="h-10 rounded-xl border border-neutral-300 bg-transparent px-3 text-sm dark:border-neutral-700"><option value="">Sem projeto</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select><button onClick={() => void createNewSchedule()} disabled={!scheduleObjective.trim()} className="h-10 rounded-xl bg-neutral-900 px-4 text-sm text-white disabled:opacity-40 dark:bg-white dark:text-neutral-900">Agendar</button></section>}
+{kind === "projects" && <section className="mt-6 grid gap-3 rounded-2xl border border-neutral-200/80 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900 md:grid-cols-[1fr_1fr_auto]"><input id="new-project-name" aria-label="Nome do novo projeto" value={projectName} onChange={(event) => setProjectName(event.target.value)} placeholder="Nome do projeto" className="h-10 rounded-xl border border-neutral-300 bg-transparent px-3 text-sm dark:border-neutral-700" /><input aria-label="Workspace do novo projeto" value={projectRoot} onChange={(event) => setProjectRoot(event.target.value)} placeholder="Workspace (opcional)" className="h-10 rounded-xl border border-neutral-300 bg-transparent px-3 text-sm dark:border-neutral-700" /><button type="button" onClick={() => void createNewProject()} disabled={!projectName.trim() || Boolean(pendingActions["create-project"])} aria-busy={Boolean(pendingActions["create-project"])} className="h-10 rounded-xl bg-neutral-900 px-4 text-sm text-white disabled:opacity-40 dark:bg-white dark:text-neutral-900">{pendingActions["create-project"] ? "Criando…" : "Criar"}</button></section>}
+{kind === "scheduled" && <section className="mt-6 grid gap-3 rounded-2xl border border-neutral-200/80 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900 md:grid-cols-[1.4fr_0.5fr_0.8fr_auto]"><input id="new-schedule-objective" aria-label="Objetivo do novo schedule" value={scheduleObjective} onChange={(event) => setScheduleObjective(event.target.value)} placeholder="Objetivo recorrente" className="h-10 rounded-xl border border-neutral-300 bg-transparent px-3 text-sm dark:border-neutral-700" /><input type="number" min="1" value={scheduleInterval} onChange={(event) => setScheduleInterval(event.target.value)} aria-label="Intervalo em segundos" className="h-10 rounded-xl border border-neutral-300 bg-transparent px-3 text-sm dark:border-neutral-700" /><select value={scheduleProject} onChange={(event) => setScheduleProject(event.target.value)} aria-label="Projeto do schedule" className="h-10 rounded-xl border border-neutral-300 bg-transparent px-3 text-sm dark:border-neutral-700"><option value="">Sem projeto</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select><button type="button" onClick={() => void createNewSchedule()} disabled={!scheduleObjective.trim() || Boolean(pendingActions["create-schedule"])} aria-busy={Boolean(pendingActions["create-schedule"])} className="h-10 rounded-xl bg-neutral-900 px-4 text-sm text-white disabled:opacity-40 dark:bg-white dark:text-neutral-900">{pendingActions["create-schedule"] ? "Agendando…" : "Agendar"}</button></section>}
 
 <div className="mt-7 grid gap-3 sm:grid-cols-3"><StatCard label="Status" value={kind === "tasks" ? `${runningMissions} em execução` : kind === "projects" ? `${projects.length} projetos` : kind === "scheduled" ? `${schedules.length} schedules` : kind === "library" ? `${artifacts.length} artifacts` : "Catálogo real"} tone="green" /><StatCard label="Segurança" value="Approvals ativos" tone="violet" /><StatCard label="Persistência" value="Local-first" /></div><div className="mt-7 grid gap-5 lg:grid-cols-[1.45fr_0.8fr]"><section className="rounded-2xl border border-neutral-200/80 bg-neutral-50/50 p-6 dark:border-neutral-800 dark:bg-neutral-950/30"><div className="flex items-center justify-between"><div><h3 className="text-sm font-semibold text-neutral-900 dark:text-white">Dados persistidos</h3><p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">Esta superfície consulta o contrato agentic, não fixtures visuais.</p></div><CheckCircleIcon className="h-5 w-5 text-emerald-500" /></div><div className="mt-5">{renderContent()}</div></section><aside className="space-y-5"><section className="rounded-2xl border border-neutral-200/80 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-900"><div className="flex items-center gap-2 text-sm font-semibold text-neutral-900 dark:text-white"><LockClosedIcon className="h-4 w-4 text-emerald-500" />Política ativa</div><ul className="mt-4 space-y-3 text-xs leading-5 text-neutral-500 dark:text-neutral-400"><li className="flex gap-2"><CheckCircleIcon className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />Secrets não aparecem na interface.</li><li className="flex gap-2"><CheckCircleIcon className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />Ações externas exigem approval.</li><li className="flex gap-2"><CheckCircleIcon className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />Cross-tenant é rejeitado no servidor.</li></ul></section><section className="rounded-2xl border border-neutral-200/80 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-900"><div className="flex items-center gap-2 text-sm font-semibold text-neutral-900 dark:text-white"><ClockIcon className="h-4 w-4 text-violet-500" />Próximos passos</div><p className="mt-3 text-xs leading-5 text-neutral-500 dark:text-neutral-400">Para criar uma missão complexa, use o console com seleção de provider, projeto, timeline e approvals.</p><Link to="/agentic" className="mt-4 inline-flex items-center gap-2 text-xs font-medium text-violet-600 dark:text-violet-300">Abrir Agentic Console <ArrowRightIcon className="h-3.5 w-3.5" /></Link></section></aside></div></div></div></SidebarLayout>;
 }

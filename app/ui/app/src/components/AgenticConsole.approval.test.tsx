@@ -112,4 +112,21 @@ describe("AgenticConsole approval decisions", () => {
       reason: "Reviewed the scope and verified the release impact.",
     });
   });
+
+  it("announces runtime load failures as an accessible alert", async () => {
+    mocks.agentFetch.mockImplementationOnce(async () => {
+      throw new Error("runtime unavailable");
+    });
+
+    let renderer!: ReturnType<typeof create>;
+    await act(async () => {
+      renderer = create(<AgenticConsole />);
+      await Promise.resolve();
+    });
+
+    const alert = renderer.root.findByProps({ role: "alert" });
+    expect(alert.props["aria-live"]).toBe("assertive");
+    expect(alert.props["aria-atomic"]).toBe("true");
+    expect(textContent(alert)).toContain("runtime unavailable");
+  });
 });
