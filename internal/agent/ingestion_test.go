@@ -14,7 +14,7 @@ func TestDocumentIngestorChunksTextAndPersistsProvenance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	project, err := contextStore.CreateProject("Docs", root)
+	project, err := contextStore.CreateProject("Docs", root, "")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -90,7 +90,7 @@ func NewContextStore(root string) (*ContextStore, error) {
 	return store, nil
 }
 
-func (s *ContextStore) CreateProject(name, root string) (Project, error) {
+func (s *ContextStore) CreateProject(name, root, organizationID string) (Project, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return Project{}, errors.New("project name is required")
@@ -99,7 +99,7 @@ func (s *ContextStore) CreateProject(name, root string) (Project, error) {
 		return Project{}, errors.New("project name is too long")
 	}
 	now := time.Now().UTC()
-	project := Project{ID: "prj_" + uuid.NewString(), Name: name, Root: root, CreatedAt: now, UpdatedAt: now}
+	project := Project{ID: "prj_" + uuid.NewString(), Name: name, Root: root, OrganizationID: strings.TrimSpace(organizationID), CreatedAt: now, UpdatedAt: now}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.projects[project.ID] = project

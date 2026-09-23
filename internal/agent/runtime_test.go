@@ -127,7 +127,7 @@ func TestContextStorePersistsProjectAndMemory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	project, err := store.CreateProject("DZ23", filepath.Join(root, "workspace"))
+	project, err := store.CreateProject("DZ23", filepath.Join(root, "workspace"), "")
 	if err != nil {
 		t.Fatal(err)
 	}

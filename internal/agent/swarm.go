@@ -87,18 +87,19 @@ type AgentResult struct {
 }
 
 type OrchestrationJob struct {
-	ID          string             `json:"id"`
-	Objective   string             `json:"objective"`
-	Workspace   string             `json:"workspace,omitempty"`
-	ProjectID   string             `json:"project_id,omitempty"`
-	State       OrchestrationState `json:"state"`
-	Budget      AgentBudget        `json:"budget"`
-	Tasks       []AgentTask        `json:"tasks"`
-	Summary     string             `json:"summary,omitempty"`
-	Conflicts   []string           `json:"conflicts,omitempty"`
-	CreatedAt   time.Time          `json:"created_at"`
-	UpdatedAt   time.Time          `json:"updated_at"`
-	CompletedAt *time.Time         `json:"completed_at,omitempty"`
+	ID             string             `json:"id"`
+	Objective      string             `json:"objective"`
+	Workspace      string             `json:"workspace,omitempty"`
+	ProjectID      string             `json:"project_id,omitempty"`
+	OrganizationID string             `json:"organization_id,omitempty"`
+	State          OrchestrationState `json:"state"`
+	Budget         AgentBudget        `json:"budget"`
+	Tasks          []AgentTask        `json:"tasks"`
+	Summary        string             `json:"summary,omitempty"`
+	Conflicts      []string           `json:"conflicts,omitempty"`
+	CreatedAt      time.Time          `json:"created_at"`
+	UpdatedAt      time.Time          `json:"updated_at"`
+	CompletedAt    *time.Time         `json:"completed_at,omitempty"`
 }
 
 type SubagentRunner func(context.Context, AgentTask) (AgentResult, error)
@@ -156,14 +157,14 @@ func PlanAgentTasks(objective, workspace, projectID string, roles []AgentRole) (
 	return tasks, nil
 }
 
-func (o *AgentOrchestrator) Plan(objective, workspace, projectID string, roles []AgentRole, budget AgentBudget) (OrchestrationJob, error) {
+func (o *AgentOrchestrator) Plan(objective, workspace, projectID, organizationID string, roles []AgentRole, budget AgentBudget) (OrchestrationJob, error) {
 	tasks, err := PlanAgentTasks(objective, workspace, projectID, roles)
 	if err != nil {
 		return OrchestrationJob{}, err
 	}
 	budget = normalizeAgentBudget(budget, len(tasks))
 	now := time.Now().UTC()
-	job := OrchestrationJob{ID: "orch_" + uuid.NewString(), Objective: strings.TrimSpace(objective), Workspace: workspace, ProjectID: projectID, State: OrchestrationPlanned, Budget: budget, Tasks: tasks, CreatedAt: now, UpdatedAt: now}
+	job := OrchestrationJob{ID: "orch_" + uuid.NewString(), Objective: strings.TrimSpace(objective), Workspace: workspace, ProjectID: projectID, OrganizationID: strings.TrimSpace(organizationID), State: OrchestrationPlanned, Budget: budget, Tasks: tasks, CreatedAt: now, UpdatedAt: now}
 	o.mu.Lock()
 	o.jobs[job.ID] = job
 	err = o.persistLocked()

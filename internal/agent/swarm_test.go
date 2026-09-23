@@ -36,7 +36,7 @@ func TestAgentOrchestratorRunsSpecialistsAndSynthesizes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	job, err := orchestrator.Plan("pesquisar e revisar arquitetura", t.TempDir(), "project-1", []AgentRole{RoleResearch, RoleSecurity, RoleReview}, AgentBudget{MaxAgents: 2, MaxRetries: 1, MaxSeconds: 10})
+	job, err := orchestrator.Plan("pesquisar e revisar arquitetura", t.TempDir(), "project-1", "", []AgentRole{RoleResearch, RoleSecurity, RoleReview}, AgentBudget{MaxAgents: 2, MaxRetries: 1, MaxSeconds: 10})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,7 +61,7 @@ func TestAgentOrchestratorPersistsAndCancelsPlannedJob(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	job, err := orchestrator.Plan("test", root, "", []AgentRole{RoleTesting}, AgentBudget{})
+	job, err := orchestrator.Plan("test", root, "", "", []AgentRole{RoleTesting}, AgentBudget{})
 	if err != nil {
 		t.Fatal(err)
 	}

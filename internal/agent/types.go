@@ -147,11 +147,12 @@ type Tool interface {
 }
 
 type Project struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	Root      string    `json:"root"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID             string    `json:"id"`
+	Name           string    `json:"name"`
+	Root           string    `json:"root"`
+	OrganizationID string    `json:"organization_id,omitempty"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
 }
 
 type Memory struct {
