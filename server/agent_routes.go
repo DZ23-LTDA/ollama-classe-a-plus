@@ -2335,6 +2335,8 @@ func decodeJSON(c *gin.Context, value any) error {
 	if c.Request.Body == nil {
 		return errors.New("request body is required")
 	}
+	const maxAgentJSONBody = 4 << 20
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxAgentJSONBody)
 	decoder := json.NewDecoder(c.Request.Body)
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(value); err != nil {
