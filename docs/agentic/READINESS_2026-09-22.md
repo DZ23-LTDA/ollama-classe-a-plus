@@ -787,3 +787,10 @@ Evidência local: testes focados e race do TraceStore, CollaborationStore, Agent
 O head `708b4696` corrige a última mutação local observada no PushService: `Register` restaura a subscription anterior ou remove a nova entrada quando `subscriptions.json` não pode ser persistido. O caller recebe erro e não há divergência entre a lista em memória e o ledger local.
 
 Evidência local: teste de rollback do PushService, testes do push outbox, race, vet, guardrail de integridade e diff check passaram. A CI pública foi consultada uma vez e estava `queued`. Isso cobre o adapter local e uma fixture de endpoint, não APNs/FCM nem push em dispositivos reais; esses itens continuam `BLOCKED_BY_EXTERNAL_DEPENDENCY`. O produto segue **FIXING / preview-local RC em hardening — não finalizado e não production-ready**.
+
+
+## Addendum de gates backend completos — 2026-09-23
+
+No head `3c0a5ec0`, a validação local final do backend passou com `GOTOOLCHAIN=go1.26.6 CGO_ENABLED=1 go test ./... -count=1 -timeout=900s`, cobrindo os pacotes `internal/agent` e `server` junto ao restante do módulo. Também passaram `go build -trimpath`, `go vet ./...` e `git diff --check`.
+
+Essa evidência é local e não substitui os runners públicos. Na última consulta, a CI do head estava `queued` nos gates Go, web/mobile, SBOM, superfícies Classe A+ e integrações PostgreSQL/Redis/OTLP. O produto permanece **FIXING / preview-local RC em hardening — não finalizado e não production-ready**.
