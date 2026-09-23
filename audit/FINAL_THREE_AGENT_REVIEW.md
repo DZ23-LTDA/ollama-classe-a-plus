@@ -377,3 +377,8 @@ A revisão confirmou no commit `717a7e4f` que uma falha de `jobs.json` não deix
 ## Addendum independente — Ack/Nack condicionados a running — 2026-09-23
 
 A revisão confirmou no commit `9d28cbc2` que jobs fora de `running` não podem mais ser confirmados ou reenviados por Ack/Nack em local e Redis. Os gates Go completos e race passaram. O risco de lease distribuído, fencing e recuperação de worker permanece aberto e requer infraestrutura Redis/Postgres real.
+
+
+## Addendum independente — compensações do RedisQueue — 2026-09-23
+
+A revisão confirmou no commit `883a17e2` compensações para falhas entre comandos Redis em Enqueue, Claim, retry e Replay. Gates Go completos passaram. O teste distribuído foi compilado/executado sem endpoint, portanto não houve evidência de conexão, lease ou recuperação multi-worker reais. O risco residual exige Redis de homologação e, para atomicidade forte, scripts/transações apropriados.

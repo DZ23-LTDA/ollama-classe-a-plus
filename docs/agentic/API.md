@@ -440,3 +440,8 @@ As mutações de job (`Claim`, `Ack`, `Nack` e `Replay`) só permanecem no estad
 ### Estado permitido para Ack/Nack
 
 Um worker só pode concluir (`Ack`) ou devolver para retry/DLQ (`Nack`) um job que esteja `running`. Jobs em `pending`, `succeeded` ou `dead_letter` são rejeitados. A guarda existe no queue local e no adapter Redis; ela não substitui lease, fencing token ou recuperação de worker distribuídos.
+
+
+### Compensação do adapter Redis
+
+O adapter Redis tenta desfazer operações multi-comando quando a etapa seguinte falha. Isso evita que Enqueue, Claim, retry ou Replay deixem somente uma parte do estado persistida. A compensação não substitui uma transação Lua/Redis atômica nem é evidência de lease distribuído; esses gates exigem um Redis de homologação configurado pelo operador.

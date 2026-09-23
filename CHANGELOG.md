@@ -521,3 +521,8 @@ O commit `717a7e4f` impede que falhas de persistência deixem jobs parcialmente 
 ## Unreleased — queue running-state guards — 2026-09-23
 
 O commit `9d28cbc2` impede `Ack` e `Nack` fora de jobs `running` em queues local e Redis. A validação Go completa passou; integração Redis real e lease distribuído continuam pendentes.
+
+
+## Unreleased — Redis queue failure compensation — 2026-09-23
+
+O commit `883a17e2` adicionou compensações para Enqueue, Claim, retry e Replay do RedisQueue quando comandos subsequentes falham. Gates Go passaram; o smoke Redis real continua não executado por falta de endpoint configurado.

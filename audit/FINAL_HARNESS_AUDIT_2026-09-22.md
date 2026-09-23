@@ -665,3 +665,8 @@ A auditoria encontrou que o `JobQueue` atualizava o mapa antes de persistir `job
 ## Addendum P1 — Ack/Nack condicionados a running — 2026-09-23
 
 A revisão do queue encontrou que as transições de finalização não verificavam o estado atual do job. O commit `9d28cbc2` adiciona a guarda em local e Redis e uma regressão para chamadas sobre job `pending`. Os gates Go e race passaram. Ainda não há claim lease/fencing distribuído comprovado; a guarda reduz uma classe de replay lógico, mas não constitui coordenação multi-worker.
+
+
+## Addendum P1 — compensações do RedisQueue — 2026-09-23
+
+A revisão do adapter Redis encontrou sequências em que um `SET` ou `ZADD` posterior poderia falhar depois da operação anterior, deixando job órfão no store ou fora de qualquer lista. O commit `883a17e2` adiciona compensações explícitas para os caminhos de Enqueue, Claim, Nack e Replay. O código passou os gates Go e o teste de integração compilável; não houve Redis real disponível, e a compensação não é declarada como atomicidade Lua.

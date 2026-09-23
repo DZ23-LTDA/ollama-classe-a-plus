@@ -614,3 +614,8 @@ O commit `717a7e4f` tornou as transições persistentes da fila local transacion
 ## Addendum de transições Ack/Nack — 2026-09-23
 
 O commit `9d28cbc2` faz `Ack` e `Nack` aceitarem somente jobs `running` nas implementações local e Redis. A cobertura local e os gates Go completos passaram; o smoke Redis real e o lease distribuído continuam bloqueados por infraestrutura de homologação. O produto permanece **preview/local RC em hardening**.
+
+
+## Addendum de compensações Redis — 2026-09-23
+
+O commit `883a17e2` adicionou compensações para evitar chaves e IDs órfãos quando comandos Redis subsequentes falham. Os gates Go completos passaram e o teste de integração compilou, mas não houve conexão Redis real porque `OLLAMA_AGENT_TEST_REDIS_URL` não está configurado. O produto continua **preview/local RC em hardening**.

@@ -2428,3 +2428,10 @@ A regressão normal/race cobre falha de persistência durante claim e confirma q
 O commit `9d28cbc2b947160ad18e7b26c87a81dc740806f1` restringe `Ack` e `Nack` da fila local e do adapter Redis a jobs no estado `running`. Um job `pending`, `succeeded` ou `dead_letter` não pode ser finalizado ou reenviado por uma chamada fora da execução que o possui. A regressão local cobre as transições inválidas; o adapter Redis foi compilado e permanece dependente de integração Redis para o smoke distribuído.
 
 Integrity, YAML, `CGO_ENABLED=1 go test ./...`, vet, build e race do queue passaram localmente. A CI remota do head ainda está em execução. O worker distribuído continua sem claim lease/fencing homologado em múltiplos processos.
+
+
+## P1 de compensação multi-comando do RedisQueue — 2026-09-23
+
+O commit `883a17e29b8aa3bd1b1d08de3d75518974711c6e` reduz estados órfãos no adapter Redis. Enqueue remove a chave do job se o `LPUSH` falhar; claim devolve o ID ao pending quando não consegue ler ou persistir a transição; reencaminhamento restaura o snapshot `running` quando o `ZADD` falha; replay restaura o estado anterior quando o `LPUSH` falha. As compensações não são apresentadas como transação Redis atômica.
+
+Integrity, YAML, `CGO_ENABLED=1 go test ./...`, vet, build, race do queue e o teste com build tag de integração passaram. O teste distribuído foi executado sem `OLLAMA_AGENT_TEST_REDIS_URL` e, por isso, não abriu conexão real. A CI pública do SHA iniciou em jobs queued. Permanecem bloqueados por dependência externa o smoke Redis real, lease/fencing e recuperação multi-worker.
