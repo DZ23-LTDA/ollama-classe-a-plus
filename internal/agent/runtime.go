@@ -213,6 +213,16 @@ func (r *Runtime) Push() *PushService { return r.push }
 
 func (r *Runtime) Deployments() *DeploymentManager { return r.deployments }
 
+// Close releases background resources held by the runtime, notably the
+// OpenTelemetry batch span processor goroutine. It is safe to call on a nil
+// runtime and more than once.
+func (r *Runtime) Close(ctx context.Context) error {
+	if r == nil || r.telemetry == nil {
+		return nil
+	}
+	return r.telemetry.Shutdown(ctx)
+}
+
 func (r *Runtime) CreateMission(ctx context.Context, request CreateMissionRequest) (Mission, error) {
 	objective := strings.TrimSpace(request.Objective)
 	if objective == "" {

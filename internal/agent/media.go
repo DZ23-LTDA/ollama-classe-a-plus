@@ -358,6 +358,7 @@ func (m *MediaManager) materializeEntry(ctx context.Context, workspace, prefix, 
 		if err != nil {
 			return "", "", err
 		}
+		defer downloadClient.CloseIdleConnections()
 		response, err := downloadClient.Do(request)
 		if err != nil {
 			return "", "", err

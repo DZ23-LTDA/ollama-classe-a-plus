@@ -138,6 +138,19 @@ func (m *ConnectorManager) call(ctx context.Context, connectorID, operationName,
 	}
 	_ = operation
 	base, _ := url.Parse(config.BaseURL)
+	if len(config.AllowedOrigins) > 0 {
+		origin := base.Scheme + "://" + base.Host
+		permitted := false
+		for _, allowed := range config.AllowedOrigins {
+			if strings.EqualFold(strings.TrimRight(strings.TrimSpace(allowed), "/"), origin) {
+				permitted = true
+				break
+			}
+		}
+		if !permitted {
+			return 0, "", fmt.Errorf("connector origin %q is not in allowed_origins", origin)
+		}
+	}
 	relative, err := url.Parse(requestPath)
 	if err != nil || relative.IsAbs() || !validConnectorPath(relative.Path) {
 		return 0, "", errors.New("invalid connector request path")

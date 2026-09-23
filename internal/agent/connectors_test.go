@@ -4,8 +4,38 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
+
+func TestConnectorEnforcesAllowedOrigins(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	}))
+	defer server.Close()
+	op := ConnectorOperation{Name: "profile", Methods: []string{"GET"}, PathPrefixes: []string{"/user"}}
+
+	// A non-matching allowed origin blocks the call before any request is made.
+	blocked := NewConnectorManager()
+	blocked.client = server.Client()
+	if err := blocked.Register(ConnectorConfig{ID: "c", Provider: "p", BaseURL: server.URL, AllowedOrigins: []string{"https://not-allowed.example.com"}, Operations: []ConnectorOperation{op}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := blocked.Call(context.Background(), "c", "profile", "GET", "/user", nil); err == nil || !strings.Contains(err.Error(), "allowed_origins") {
+		t.Fatalf("expected allowed_origins rejection, got %v", err)
+	}
+
+	// A matching allowed origin lets the call proceed.
+	allowed := NewConnectorManager()
+	allowed.client = server.Client()
+	if err := allowed.Register(ConnectorConfig{ID: "c", Provider: "p", BaseURL: server.URL, AllowedOrigins: []string{server.URL}, Operations: []ConnectorOperation{op}}); err != nil {
+		t.Fatal(err)
+	}
+	if status, _, err := allowed.Call(context.Background(), "c", "profile", "GET", "/user", nil); err != nil || status != http.StatusOK {
+		t.Fatalf("status=%d err=%v", status, err)
+	}
+}
 
 func TestConnectorUsesTenantOAuthCredential(t *testing.T) {
 	t.Setenv("OLLAMA_AGENT_CREDENTIAL_KEY", "connector-test-key")
