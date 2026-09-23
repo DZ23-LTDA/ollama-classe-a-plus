@@ -357,3 +357,8 @@ Os três agentes mantêm o mesmo veredito: **FIXING / preview-local em hardening
 A revisão desta rodada confirmou o primeiro vertical Tel-Agent sem criar um segundo motor: `45393d8c` adiciona `tel-agent.text` ao Company OS, histórico persistente tenant-aware e três operações allowlisted. A leitura de relatório é separada das mutações; owner/admin/operator são exigidos para escrita autenticada; DLP, limite de mensagem e retenção limitada protegem o histórico. A UI expõe o canal antes dos painéis de construção e informa que telefonia não está configurada.
 
 Os testes Go normais/race, Vitest/build e integrity passaram localmente. O primeiro check remoto do SHA ainda estava parcialmente `queued`/`in_progress`, portanto não foi usado como evidência de CI final. Telefonia/SIP/SMS/WhatsApp, contas externas, OAuth e homologação continuam bloqueados por dependências do operador. A decisão permanece **FIXING / preview-local em hardening**, sem merge automático em `main`.
+
+
+## Addendum independente — Company cycles transacionais — 2026-09-23
+
+A revisão confirmou no commit `46d6b34c` que a criação de ciclo Company não deixa mais um ciclo `enabled` sem schedule quando a persistência falha. `Idempotency-Key` cobre replay após restart e conflito de payload; o handler compensa ciclo e schedule e o `ContextStore` desfaz a entrada em memória em erro de escrita. Testes normais/race, HTTP e o runner local completo passaram. O próximo risco é distribuído: lease/claim de worker, Postgres/Redis reais e execução multi-processo ainda não foram homologados.

@@ -590,3 +590,10 @@ Na última consulta pública, SBOM, RLS/Redis/OTLP, Web/Mobile, integrity, mudan
 O commit `d67e7a79` tornou retries do Tel-Agent seguros contra duplicação local. `Idempotency-Key` é recebido por header, o payload é fingerprintado por digest, replay retorna a mesma exchange e uma reutilização com dados diferentes retorna conflito `409`. A UI mantém a mesma chave durante uma tentativa que falhou, sem exibir ou persistir seu valor.
 
 O novo head passou o runner local absoluto completo (`FULL_LOCAL_GATES=PASS`), incluindo Go, UI, mobile, audits, integrity, YAML e diff. A CI remota havia iniciado e ainda estava pendente na última consulta; o veredito continua **preview/local RC em hardening**, não final ou production-ready.
+
+
+## Addendum de consistência dos ciclos Company — 2026-09-23
+
+O commit `46d6b34c` tornou a criação de ciclos Company idempotente e compensatória. O ciclo só permanece após schedule criado e vinculado; falhas de persistência não deixam ciclo enabled órfão. Replays com a mesma chave retornam `200` sem duplicar agenda, enquanto payload divergente retorna `409`.
+
+A cobertura normal/race e o runner local completo passaram. A CI remota do novo head ainda estava queued/in progress na última consulta. O produto continua **preview/local RC em hardening**, não finalizado nem production-ready.

@@ -501,3 +501,8 @@ O head `55dfa325` passou o runner local absoluto completo: integrity, YAML, Go t
 ## Unreleased — idempotência do Tel-Agent — 2026-09-23
 
 O commit `d67e7a79` adicionou `Idempotency-Key` ao Tel-Agent: replay retorna o mesmo resultado, payload divergente retorna `409`, o vínculo sobrevive a restart e a UI conserva a chave durante retry. O head passou os gates locais completos; a CI pública ainda estava em execução no registro.
+
+
+## Unreleased — Company cycles transacionais — 2026-09-23
+
+O commit `46d6b34c` impede ciclos Company órfãos quando a persistência do schedule falha, adiciona replay por `Idempotency-Key` e evita schedules duplicados em retries. Testes normais/race e o runner local completo passaram; a CI remota ainda estava em execução.

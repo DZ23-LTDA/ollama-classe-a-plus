@@ -422,3 +422,8 @@ A resposta contém `company`, `exchange` e, para leitura, `report`. Cada exchang
 ### Idempotência do Tel-Agent
 
 `POST /api/agent/v1/companies/:id/tel-agent` aceita opcionalmente `Idempotency-Key` no header, com no máximo 128 bytes. O corpo não pode declarar a chave. Para `report.read`, `backlog.create` e `campaign.draft`, o servidor grava apenas um digest do input e associa a chave ao resultado. Repetir a mesma chave com o mesmo payload retorna a exchange já criada sem duplicar backlog, campanha ou approval; reutilizar a chave com payload diferente responde `409 Conflict`. O ledger sobrevive ao restart do store. A UI gera e conserva a chave durante retries, mas não a exibe.
+
+
+## Ciclos autônomos do Company OS
+
+`POST /api/agent/v1/companies/:id/cycles` aceita opcionalmente `Idempotency-Key` no header, com limite de 128 bytes. A criação grava o ciclo e o schedule como uma jornada compensatória: se o schedule não puder ser persistido ou vinculado, o ciclo é removido; o `ContextStore` também desfaz a entrada em memória quando sua escrita falha. Repetir a mesma chave e payload retorna `200` com o Company já agendado, sem criar outro schedule; reutilizar a chave com payload diferente retorna `409 Conflict`. O organization ID continua derivado da sessão e o schedule recebe o mesmo tenant.

@@ -645,3 +645,8 @@ O head `55dfa325` passou localmente o conjunto completo de integrity, YAML, Go c
 ## Addendum P1 — idempotência e retry do Tel-Agent — 2026-09-23
 
 A jornada Tel-Agent inicialmente mutava Company sem uma chave de retry HTTP, o que permitiria duplicar backlog ou rascunho após timeout ambíguo. O commit `d67e7a79` usa o ledger idempotente já existente, limita a chave, armazena apenas digest de input e vincula o replay ao ID da exchange persistida. Testes cobrem replay normal/race, conflito `409`, HTTP e restart. O runner local completo passou; CI remota e homologação externa permanecem pendentes.
+
+
+## Addendum P1 — Company cycles e schedules transacionais — 2026-09-23
+
+A revisão do Company OS identificou que a rota criava e persistia o ciclo antes de criar o schedule. Uma falha de storage podia deixar estado `enabled` sem executor; uma repetição após timeout podia duplicar ambos. O commit `46d6b34c` adiciona idempotência, vínculo persistente, rollback de ciclo/schedule e rollback da entrada em memória no `ContextStore`. As regressões normal/race e os gates locais completos passaram. Isso melhora consistência local, mas não prova worker distribuído, Postgres/RLS real ou execução externa homologada.

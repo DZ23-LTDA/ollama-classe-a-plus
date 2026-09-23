@@ -429,3 +429,8 @@ Próxima frente independente: abrir e verificar o PR documental da Home a partir
 A prioridade Tel-Agent agora possui uma primeira jornada executável no Company OS: canal textual persistente, histórico por tenant, retorno observável e três operações allowlisted (`report.read`, `backlog.create`, `campaign.draft`). O caminho não cria um motor concorrente ao Ollama, não publica ações externas e mantém approvals e modo sandbox.
 
 Próximos gates separados: adapter de telefonia/SIP/SMS ou WhatsApp, identidade da conta operadora, consentimento de escopos, gravação/retensão aprovada, testes reversíveis de destino e homologação externa. A ausência desses recursos não bloqueia o canal textual local, mas impede classificar Tel-Agent como telefonia completa ou produto final.
+
+
+## Incremento 2026-09-23 — Company cycles transacionais
+
+O Company OS agora trata a criação de ciclo e schedule com idempotência e compensação local, incluindo replay após restart e prevenção de agendas duplicadas. O próximo gate ainda aberto é a execução distribuída real com worker persistente, lease/claim em PostgreSQL/Redis e observabilidade de falhas; a implementação local não é apresentada como homologação desse ambiente.
