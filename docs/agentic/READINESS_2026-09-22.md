@@ -428,3 +428,10 @@ Esse complemento melhora a operação local, mas não muda os blockers de OAuth,
 O commit `89b4203e` corrigiu um hardening P1 nos carregadores duráveis de MCP e Remote MCP. Após decodificar o array principal, o loader agora exige fim real do documento JSON. Um manifest como `[] {}` é rejeitado em vez de ser aceito parcialmente. Isso reduz risco de configuração ambígua ou de dados anexados após um documento válido.
 
 Os testes normal e race de persistência passaram. O gate completo Go também passou: integrity, todos os pacotes em `go test`, `go vet`, `go build` e `git diff --check`. A mudança não altera o modo de bootstrap estático nem converte falhas externas em sucesso. O produto continua preview/local RC em hardening, não final e não production-ready.
+
+
+## Addendum de harmonização dos loaders — 2026-09-22
+
+A mesma proteção de EOF foi aplicada ao manifest persistente de connectors no commit `5816c020`. A plataforma agora rejeita documento JSON trailing nos três loaders duráveis: connectors, MCP e Remote MCP. O caso `[] {}` é coberto por regressões e não é tratado como configuração parcial válida.
+
+Após a mudança, passaram os testes normal/race do connector manager e os gates Go completos: integrity, todos os testes, vet, build e diff. O estado continua preview/local RC em hardening; não há mudança nos blockers de OAuth, upstream, sandbox físico, devices ou produção.

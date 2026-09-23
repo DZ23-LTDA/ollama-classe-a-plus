@@ -496,3 +496,10 @@ Riscos não reduzidos nesta slice: OAuth real e refresh/revoke com contas, Deskt
 A revisão do novo storage encontrou uma ambiguidade de decoder: os loaders de MCP e Remote MCP paravam após o primeiro array JSON. O commit `89b4203e` adicionou uma segunda leitura e exige `io.EOF`; conteúdo trailing, incluindo um segundo objeto, falha fechado. O caso `[] {}` tem regressão dedicada nos testes de persistência.
 
 O teste normal/race dos managers e o gate completo Go passaram em integrity, `go test ./...`, vet, build e diff. O comportamento de bootstrap estático não foi relaxado e nenhuma credencial é envolvida. O achado foi classificado como hardening P1 corrigido; blockers externos e o estado preview/local RC permanecem.
+
+
+## Addendum P1 — consistência de parsing dos manifests — 2026-09-22
+
+A auditoria de todos os loaders persistentes encontrou o mesmo risco residual no connector manifest. `NewPersistentConnectorManager` agora valida a segunda leitura do decoder e exige EOF, igual aos loaders MCP e Remote MCP. A entrada `[] {}` falha fechado antes de qualquer configuração ser instalada.
+
+O commit `5816c020` foi publicado com teste dedicado. Os testes normal/race do connector manager e o gate completo Go passaram em integrity, `go test ./...`, vet, build e diff. Não há claim de integração externa ou de CI remota final nesta nota.

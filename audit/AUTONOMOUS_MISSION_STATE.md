@@ -2241,3 +2241,10 @@ A classificação não muda: preview/local RC em hardening. CI remoto do head ma
 A auditoria P1 encontrou que os novos loaders persistentes de MCP e Remote MCP aceitavam um primeiro JSON válido mesmo quando havia um segundo valor após ele. O commit `89b4203e9b6815ce9be535edf077fe2231b737e6` agora exige `io.EOF` após o primeiro documento; conteúdo trailing produz erro de bootstrap e não é parcialmente aplicado. Foram adicionadas regressões para `[] {}` nos dois loaders.
 
 Evidências: testes normais e race dos managers persistentes passaram; integrity passou; o gate completo Go passou com `CGO_ENABLED=1 go test ./... -count=1 -timeout=900s`, `go vet ./...`, `go build ./...` e `git diff --check`. Nenhum fallback foi relaxado. O SHA foi publicado na branch de revisão; CI pública do head permanece separada da evidência local até conclusão.
+
+
+## Harmonização de parsing strict dos manifests persistentes — 2026-09-22
+
+A auditoria cruzada encontrou o mesmo padrão no `NewPersistentConnectorManager`: o decoder aceitava o primeiro array e ignorava conteúdo JSON posterior. O commit `5816c020b83993007d91adee420c5bac4e1d7d3c` adicionou a exigência de EOF ao loader de connectors e uma regressão para `[] {}`. Agora connectors, MCP e Remote MCP usam parsing estrito e falham fechado quando há documento trailing.
+
+Os testes normal e race do connector manager passaram. O gate completo pós-harmonização passou em integrity, `CGO_ENABLED=1 go test ./...`, vet, build e diff. O tree segue publicado na branch pública; a CI remota do head mais recente permanece sujeita ao workflow do GitHub.

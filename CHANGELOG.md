@@ -392,3 +392,8 @@ O commit `eb97e6b8` completou a UI de lifecycle: connectors, MCP/Remote MCP e sk
 ## Unreleased — strict MCP manifest parsing — 2026-09-22
 
 O commit `89b4203e` faz os loaders persistentes de MCP e Remote MCP exigirem EOF após o primeiro documento JSON. Payloads como `[] {}` agora falham no bootstrap em vez de deixar conteúdo trailing sem validação. Regressões normal/race e os gates Go completos passaram: integrity, test, vet, build e diff.
+
+
+## Unreleased — persistent manifest parser consistency — 2026-09-22
+
+O commit `5816c020` aplica a exigência de EOF ao manifest persistente de connectors, alinhando-o ao hardening já feito para MCP e Remote MCP. Os três loaders agora rejeitam JSON trailing, com regressão dedicada e gates Go completos aprovados.
