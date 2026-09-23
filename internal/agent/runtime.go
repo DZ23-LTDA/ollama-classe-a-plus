@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sort"
@@ -483,7 +484,7 @@ func (r *Runtime) CreateMission(ctx context.Context, request CreateMissionReques
 		return Mission{}, err
 	}
 	r.metrics.missionsCreated.Add(1)
-	_ = r.event(mission, "mission.created", "", map[string]any{"objective": objective})
+	r.observeEvent(mission, "mission.created", "", map[string]any{"objective": objective})
 	planner := r.planner
 	if provider == "ollama-local" && mission.Model != "" && r.plannerResolver != nil {
 		planner, err = r.plannerResolver.ResolvePlanner(provider, mission.Model)
@@ -547,7 +548,7 @@ func (r *Runtime) CreateMission(ctx context.Context, request CreateMissionReques
 	if err := r.store.PutMission(mission); err != nil {
 		return Mission{}, err
 	}
-	_ = r.event(mission, "mission.planned", "", map[string]any{"steps": len(plan), "approvals": len(mission.Approvals)})
+	r.observeEvent(mission, "mission.planned", "", map[string]any{"steps": len(plan), "approvals": len(mission.Approvals)})
 	if request.AutoRun && mission.State == MissionReady {
 		if _, enqueueErr := r.EnqueueMission(mission.ID); enqueueErr != nil {
 			queueErr := fmt.Errorf("auto-run enqueue failed: %w", enqueueErr)
@@ -619,7 +620,9 @@ func (r *Runtime) Start(ctx context.Context) {
 		}()
 	}
 	go func() {
-		r.resumePending(ctx)
+		if err := r.resumePending(ctx); err != nil {
+			slog.Error("agent pending work recovery failed", "error", err)
+		}
 		ticker := time.NewTicker(2 * time.Second)
 		defer ticker.Stop()
 		for {
@@ -627,7 +630,9 @@ func (r *Runtime) Start(ctx context.Context) {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				r.resumePending(ctx)
+				if err := r.resumePending(ctx); err != nil {
+					slog.Error("agent pending work recovery failed", "error", err)
+				}
 			}
 		}
 	}()
@@ -660,7 +665,8 @@ func (r *Runtime) flushPushOutbox(ctx context.Context) {
 	}
 }
 
-func (r *Runtime) resumePending(ctx context.Context) {
+func (r *Runtime) resumePending(ctx context.Context) error {
+	var recoveryErrors []error
 	for _, schedule := range r.context.ClaimDueSchedules(time.Now().UTC()) {
 		if companyID := companyIDFromWorkspace(schedule.Workspace); companyID != "" && r.company != nil {
 			company, err := r.company.Get(companyID)
@@ -669,22 +675,29 @@ func (r *Runtime) resumePending(ctx context.Context) {
 			}
 		}
 		if _, err := r.CreateMission(ctx, CreateMissionRequest{Objective: schedule.Objective, Model: schedule.Model, Workspace: schedule.Workspace, ProjectID: schedule.ProjectID, OrganizationID: schedule.OrganizationID, AutoRun: true}); err != nil {
-			_, _ = r.recordScheduleFailure(schedule)
+			if _, recordErr := r.recordScheduleFailure(schedule); recordErr != nil {
+				recoveryErrors = append(recoveryErrors, fmt.Errorf("record schedule %s failure: %w", schedule.ID, recordErr))
+			}
 			continue
 		}
-		_, _ = r.recordScheduleSuccess(schedule)
+		if _, err := r.recordScheduleSuccess(schedule); err != nil {
+			recoveryErrors = append(recoveryErrors, fmt.Errorf("record schedule %s success: %w", schedule.ID, err))
+		}
 	}
 	missions, err := r.store.ListMissions()
 	if err != nil {
-		return
+		return err
 	}
 	for _, mission := range missions {
 		resume := mission.State == MissionRunning || mission.State == MissionRecovering || (mission.State == MissionReady && mission.AutoRun)
 		if !resume || !r.approvalsReady(mission) {
 			continue
 		}
-		_, _ = r.EnqueueMission(mission.ID)
+		if _, err := r.EnqueueMission(mission.ID); err != nil {
+			recoveryErrors = append(recoveryErrors, fmt.Errorf("enqueue mission %s during recovery: %w", mission.ID, err))
+		}
 	}
+	return errors.Join(recoveryErrors...)
 }
 
 const maxScheduleFailures = 3
@@ -829,7 +842,9 @@ func (r *Runtime) Run(ctx context.Context, id string) (runErr error) {
 	if !r.approvalsReady(mission) {
 		mission.State = MissionAwaitingApproval
 		mission.UpdatedAt = time.Now().UTC()
-		_ = r.store.PutMission(mission)
+		if err := r.store.PutMission(mission); err != nil {
+			return err
+		}
 		return nil
 	}
 	mission.State = MissionRunning
@@ -838,7 +853,7 @@ func (r *Runtime) Run(ctx context.Context, id string) (runErr error) {
 	if err := r.store.PutMission(mission); err != nil {
 		return err
 	}
-	_ = r.event(mission, "mission.running", "", nil)
+	r.observeEvent(mission, "mission.running", "", nil)
 
 	for index := 0; index < len(mission.Plan); index++ {
 		if r.missionCancelled(id) {
@@ -863,8 +878,10 @@ func (r *Runtime) Run(ctx context.Context, id string) (runErr error) {
 			mission.State = MissionAwaitingApproval
 			mission.Version++
 			mission.UpdatedAt = time.Now().UTC()
-			_ = r.store.PutMission(mission)
-			_ = r.event(mission, "step.awaiting_approval", step.ID, nil)
+			if err := r.store.PutMission(mission); err != nil {
+				return err
+			}
+			r.observeEvent(mission, "step.awaiting_approval", step.ID, nil)
 			return nil
 		}
 		step.State = StepRunning
@@ -877,7 +894,7 @@ func (r *Runtime) Run(ctx context.Context, id string) (runErr error) {
 		if err := r.store.PutMission(mission); err != nil {
 			return err
 		}
-		_ = r.event(mission, "step.started", step.ID, map[string]any{"tool": step.Kind, "attempt": step.Attempts})
+		r.observeEvent(mission, "step.started", step.ID, map[string]any{"tool": step.Kind, "attempt": step.Attempts})
 		toolSpan := r.traces.StartForOrganization(mission.OrganizationID, "tr_"+mission.ID, missionSpan.ID(), "tool."+step.Kind, map[string]any{"mission_id": mission.ID, "step_id": step.ID, "tool": step.Kind})
 		result, executeErr := tool.Execute(runCtx, ToolContext{MissionID: mission.ID, StepID: step.ID, Workspace: mission.Workspace, OrganizationID: mission.OrganizationID}, step.Input)
 		toolSpan.End("ok", executeErr)
@@ -891,8 +908,10 @@ func (r *Runtime) Run(ctx context.Context, id string) (runErr error) {
 				mission.State = MissionRecovering
 				mission.Version++
 				mission.UpdatedAt = time.Now().UTC()
-				_ = r.store.PutMission(mission)
-				_ = r.event(mission, "step.retry_scheduled", step.ID, map[string]any{"error": RedactDLP(executeErr.Error())})
+				if err := r.store.PutMission(mission); err != nil {
+					return err
+				}
+				r.observeEvent(mission, "step.retry_scheduled", step.ID, map[string]any{"error": RedactDLP(executeErr.Error())})
 				index--
 				continue
 			}
@@ -909,7 +928,7 @@ func (r *Runtime) Run(ctx context.Context, id string) (runErr error) {
 		if err := r.store.PutMission(mission); err != nil {
 			return err
 		}
-		_ = r.event(mission, "step.succeeded", step.ID, map[string]any{"artifacts": len(result.Artifacts)})
+		r.observeEvent(mission, "step.succeeded", step.ID, map[string]any{"artifacts": len(result.Artifacts)})
 	}
 	if r.missionCancelled(id) {
 		return nil
@@ -923,7 +942,7 @@ func (r *Runtime) Run(ctx context.Context, id string) (runErr error) {
 	if err := r.store.PutMission(mission); err != nil {
 		return err
 	}
-	_ = r.event(mission, "mission.completed", "", map[string]any{"artifacts": len(mission.Artifacts)})
+	r.observeEvent(mission, "mission.completed", "", map[string]any{"artifacts": len(mission.Artifacts)})
 	return nil
 }
 
@@ -960,7 +979,7 @@ func (r *Runtime) Cancel(id string) (Mission, error) {
 	if cancel != nil {
 		cancel()
 	}
-	_ = r.event(mission, "mission.cancelled", "", nil)
+	r.observeEvent(mission, "mission.cancelled", "", nil)
 	return mission, nil
 }
 
@@ -1044,7 +1063,7 @@ func (r *Runtime) decideApprovalForActor(missionID, approvalID string, approved 
 			return Mission{}, saveErr
 		}
 		r.metrics.approvals.Add(1)
-		_ = r.event(mission, "approval.decided", mission.Approvals[index].StepID, map[string]any{"approved": approved, "reason": reason})
+		r.observeEvent(mission, "approval.decided", mission.Approvals[index].StepID, map[string]any{"approved": approved, "reason": reason})
 		return mission, nil
 	}
 	return Mission{}, errors.New("approval not found or already decided")
@@ -1104,7 +1123,7 @@ func (r *Runtime) failMission(mission Mission, err error) (Mission, error) {
 	if saveErr := r.store.PutMission(mission); saveErr != nil {
 		return Mission{}, saveErr
 	}
-	_ = r.event(mission, "mission.failed", "", map[string]any{"error": err.Error()})
+	r.observeEvent(mission, "mission.failed", "", map[string]any{"error": err.Error()})
 	return mission, err
 }
 
@@ -1119,8 +1138,14 @@ func (r *Runtime) failStep(mission Mission, step *Step, err error) error {
 	if saveErr := r.store.PutMission(mission); saveErr != nil {
 		return saveErr
 	}
-	_ = r.event(mission, "step.failed", step.ID, map[string]any{"error": RedactDLP(err.Error()), "attempts": step.Attempts})
+	r.observeEvent(mission, "step.failed", step.ID, map[string]any{"error": RedactDLP(err.Error()), "attempts": step.Attempts})
 	return err
+}
+
+func (r *Runtime) observeEvent(mission Mission, eventType, stepID string, payload any) {
+	if err := r.event(mission, eventType, stepID, payload); err != nil {
+		slog.Error("agent event persistence failed", "mission_id", mission.ID, "event_type", eventType, "step_id", stepID, "error", err)
+	}
 }
 
 func (r *Runtime) event(mission Mission, eventType, stepID string, payload any) error {
