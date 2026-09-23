@@ -2,7 +2,7 @@
 
 ## Captura atual — 2026-09-22
 
-Os arquivos `class-a-plus-home.png`, `class-a-plus-projects.png`, `class-a-plus-library.png`, `class-a-plus-scheduled.png`, `class-a-plus-skills.png`, `class-a-plus-plugins.png`, `class-a-plus-tasks.png`, `class-a-plus-agentic.png`, `class-a-plus-settings.png` e `class-a-plus-company.png` foram recapturados nesta rodada com Chromium em viewport de 1440×900.
+Os arquivos `class-a-plus-home.png`, `class-a-plus-projects.png`, `class-a-plus-library.png`, `class-a-plus-scheduled.png`, `class-a-plus-skills.png`, `class-a-plus-plugins.png`, `class-a-plus-tasks.png`, `class-a-plus-agentic.png`, `class-a-plus-settings.png` e `class-a-plus-company.png` foram recapturados nesta rodada com Chromium em viewport de 1440×900. O arquivo compatível `settings.png` aponta para a mesma captura funcional de Settings.
 
 A captura foi feita com `app/ui/app/scripts/capture-parity-screens.mjs`, usando o Vite dev em `127.0.0.1:4173` e o servidor Ollama local em `127.0.0.1:3001`. O uso do Vite dev é intencional: o cliente agentic usa a URL de desenvolvimento para consultar a API local; o preview estático sem proxy pode mostrar uma tela de erro e não deve ser usado como fonte dessas imagens.
 
@@ -10,7 +10,7 @@ As telas mostram navegação, Agentic Console, projetos, biblioteca, schedules, 
 
 ## Arquivos históricos
 
-`agentic-console.png` e `settings.png` são capturas históricas de rodadas anteriores. O README e o guia usam a série `class-a-plus-*.png` atualizada acima; os arquivos históricos não devem ser interpretados como o estado atual do produto.
+`agentic-console.png` permanece uma captura histórica; `settings.png` é mantido como alias compatível da captura atual `class-a-plus-settings.png`. O README e o guia usam a série `class-a-plus-*.png` atualizada acima. Capturas históricas não devem ser interpretadas como prova de provider externo, conta conectada ou release homologado.
 
 ## Regra de proveniência
 

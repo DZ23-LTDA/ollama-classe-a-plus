@@ -1,6 +1,6 @@
 import { chromium } from "playwright";
 import { execFileSync } from "node:child_process";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, stat, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -109,7 +109,11 @@ async function interactSafely(page, route) {
 
 async function waitForStablePage(page, diagnostics, route) {
   await page.locator("body").waitFor({ state: "visible", timeout: 15000 });
-  await page.waitForFunction(() => document.body?.innerText?.trim().length > 0, undefined, { timeout: 15000 });
+  await page.waitForFunction(() => {
+    const bodyText = document.body?.innerText?.trim() ?? "";
+    const mainText = document.querySelector("main")?.textContent?.trim() ?? "";
+    return bodyText.length >= 80 && mainText.length >= 40;
+  }, undefined, { timeout: 15000 });
   await page.evaluate(async () => {
     if (document.fonts?.ready) await document.fonts.ready;
   });
@@ -183,6 +187,10 @@ try {
     await waitForStablePage(page, diagnostics, route);
     const screenshotPath = resolve(outputDir, `class-a-plus-${route.slice(1) || "home"}.png`);
     await page.screenshot({ path: screenshotPath, fullPage: true });
+    const screenshotInfo = await stat(screenshotPath);
+    if (screenshotInfo.size < 16 * 1024) {
+      throw new Error(`screenshot is unexpectedly small for ${route}: ${screenshotInfo.size} bytes`);
+    }
     captures.push({
       route,
       screenshot: screenshotPath,
