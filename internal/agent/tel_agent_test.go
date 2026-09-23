@@ -90,7 +90,7 @@ func TestCompanyTelAgentHistoryIsBounded(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for i := 0; i < maxTelAgentHistory+10; i++ {
+	for range maxTelAgentHistory + 10 {
 		if _, _, err := store.ExecuteTelAgent(company.ID, "org-a", "user-a", TelAgentRequest{Message: "state", Operation: "report.read"}); err != nil {
 			t.Fatal(err)
 		}

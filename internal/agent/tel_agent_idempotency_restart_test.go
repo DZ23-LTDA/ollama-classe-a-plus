@@ -12,7 +12,7 @@ func TestCompanyTelAgentIdempotencySurvivesRestart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	request := TelAgentRequest{Message: "criar tarefa", Operation: "backlog.create", Title: "Persistente", IdempotencyKey: "restart-key"}
+	request := TelAgentRequest{Message: "criar tarefa", Operation: "backlog.create", Title: "Persistent", IdempotencyKey: "restart-key"}
 	first, firstResult, err := store.ExecuteTelAgent(company.ID, "org-a", "user-a", request)
 	if err != nil {
 		t.Fatal(err)

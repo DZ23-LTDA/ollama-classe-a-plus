@@ -215,15 +215,6 @@ func rejectMediaOutputSymlinks(root *os.Root, relativePath string) error {
 	return nil
 }
 
-func validateMediaOutputPath(workspace, relativePath string) error {
-	root, _, err := openMediaWorkspaceRoot(workspace)
-	if err != nil {
-		return err
-	}
-	defer root.Close()
-	return rejectMediaOutputSymlinks(root, relativePath)
-}
-
 func validateMediaOutputDirectory(workspace, relativePath string) error {
 	root, _, err := openMediaWorkspaceRoot(workspace)
 	if err != nil {
