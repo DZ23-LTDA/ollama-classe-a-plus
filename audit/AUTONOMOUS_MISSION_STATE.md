@@ -2354,3 +2354,12 @@ O commit `ec7f52c048c238510ca6dc08212cd2c10535bfe1` tornou `capture-parity-scree
 A Home fornecida pelo mantenedor ainda segue o caminho documental separado a partir da main. O PR do produto não é base para trocar a imagem da página padrão; `README_MAIN_STATUS=PENDING_DOCS_MERGE` até aprovação e merge do PR documental independente.
 
 Estado: `FIXING`; implementação e publicação dos commits R01–R04 e do capturador concluídas; homologação externa, contas, deploy real, dispositivos, lojas e CI do novo head continuam pendentes ou `BLOCKED_BY_EXTERNAL_DEPENDENCY` conforme a matriz do readiness.
+
+
+## Hardening da cadeia de dependências runtime da UI — 2026-09-23
+
+O gate local completo iniciado no head `2f5674cf` passou por integrity, YAML, Go test, vet, build e testes/build da UI, mas parou em `app/ui/app/npm audit --omit=dev` com 12 vulnerabilidades runtime. O mobile não chegou a executar nesse runner abortado; a auditoria independente do mobile depois retornou zero vulnerabilidades.
+
+A análise do grafo mostrou que `streamdown@1.4.0` trazia Mermaid 11.12, DOMPurify, lodash-es e uuid em runtime; `@tanstack/react-router-devtools` estava em `dependencies` apesar de não ser importado pela aplicação e trazia `solid-js/seroval`. O commit `eff054c14c38d824654fc44c095b910038bc9726` atualizou Streamdown para `2.6.0`, removeu o devtools não utilizado, declarou Shiki usado diretamente e fixou `mdast-util-to-hast` em `13.2.1` via override. O grafo runtime resultante não contém Mermaid, DOMPurify, lodash-es, seroval ou o devtools removido.
+
+Evidência local pós-correção: Vitest 21 arquivos/204 testes, `npm run build`, `npm ci`/dry-run do lockfile, `npm audit --omit=dev` com zero vulnerabilidades, `apps/mobile-agentic/npm run typecheck` e `npm audit --omit=dev` com zero vulnerabilidades. O CI público do novo SHA ainda precisa concluir; a falha race macOS do head anterior não é reutilizada nem declarada resolvida.

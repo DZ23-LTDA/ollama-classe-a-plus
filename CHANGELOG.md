@@ -471,3 +471,8 @@ Campaigns, affiliate programs/links e orders agora expõem `mode: sandbox`; o re
 - Corrigido o pacote de deploy para excluir arquivos privados, credenciais, metadados internos, backups, logs e arquivos não regulares antes da leitura ou transmissão.
 - Corrigido o egress de deploy para resolver e validar endereços antes do TCP, com loopback somente por contexto explícito e Host/SNI preservados.
 - O capturador de paridade agora é portátil ao checkout, exige estado estável e interação segura, falha em diagnósticos inesperados e grava manifesto de SHA/build/viewport/limitações. A Home do README continua sendo tratada no PR documental separado baseado na main.
+
+
+## Unreleased — UI runtime dependency hardening — 2026-09-23
+
+O commit `eff054c1` atualizou `streamdown` para `2.6.0`, removeu o `@tanstack/react-router-devtools` não utilizado de `dependencies`, declarou `shiki` diretamente e fixou `mdast-util-to-hast` em `13.2.1`. A mudança removeu do grafo runtime os caminhos vulneráveis de Mermaid, DOMPurify, lodash-es, seroval e uuid. A UI passou 204 testes, build e `npm audit --omit=dev` sem vulnerabilidades; o mobile também passou typecheck e audit de produção.

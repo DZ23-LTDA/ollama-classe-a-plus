@@ -546,3 +546,12 @@ O HEAD `ec7f52c0` tornou o capturador de paridade portátil e observável. A exe
 | BLOCKED_BY_EXTERNAL_DEPENDENCY | OAuth/contas reais, smoke externo, hardware físico, assinatura, app review, lojas e homologação de operador |
 
 `README_MAIN_STATUS=PENDING_DOCS_MERGE`: a Home escolhida será publicada por PR independente baseado na main, sem integrar o PR #1 do produto.
+
+
+## Addendum de hardening de dependências runtime — 2026-09-23
+
+O gate local do head documental `2f5674cf` revelou uma falha objetiva no audit de produção da UI: 12 vulnerabilidades transitivas, incluindo `seroval` crítico, Mermaid/DOMPurify/lodash-es/uuid e `mdast-util-to-hast`. A causa foi tratada no commit `eff054c1`: Streamdown passou de `1.4.0` para `2.6.0`, o devtools TanStack não utilizado saiu de `dependencies`, Shiki foi declarado diretamente e `mdast-util-to-hast` foi fixado em `13.2.1`.
+
+Depois da correção, UI Vitest passou com 204 testes, o build TypeScript/Vite passou, `npm ci` foi reproduzível e `npm audit --omit=dev` retornou zero vulnerabilidades. O mobile também passou typecheck e audit de produção com zero vulnerabilidades. O CI remoto do novo head ainda está pendente; a execução anterior teve race macOS falho e normal macOS ainda em andamento, portanto não há claim de CI totalmente verde.
+
+Estado: dependência interna **implementada/testada/publicada**; homologação externa e o novo CI permanecem pendentes. O veredito continua `FIXING / preview-local RC em hardening`, não final ou production-ready.

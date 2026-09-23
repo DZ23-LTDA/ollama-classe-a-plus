@@ -605,3 +605,12 @@ O commit `06990ef5` corrige R01–R04. A solução usa `os.Root` do Go 1.26 para
 O commit `ec7f52c0` corrige o processo de screenshots. A captura é relativa ao checkout, aceita diretório externo somente por `SCREEN_OUTPUT` explícito, registra SHA/build/viewport, aguarda fontes/empty state/ausência de overlay, executa uma interação segura por rota e falha em page errors, console errors, request failures ou HTTP agentic inesperados. A captura bridged local no SHA publicado percorreu dez rotas sem diagnóstico inesperado. Os 401/404 de ausência de conta ou endpoints base conhecidos foram registrados como esperados e não mascaram erros de assets ou do Agentic API.
 
 Os resultados não promovem o produto a final ou production-ready. Deploy Vercel/Netlify/AWS/Cloudflare, providers externos, OAuth, commerce, fiscal, hardware físico, assinatura, lojas, app review e homologação de operador permanecem sem evidência externa.
+
+
+## Addendum P1 — cadeia de dependências runtime da UI — 2026-09-23
+
+O gate local pós-reauditoria parou no audit de produção da UI com 12 vulnerabilidades transitivas. A investigação identificou `streamdown@1.4.0` como origem de Mermaid/DOMPurify/lodash-es/uuid e um devtools TanStack não utilizado em `dependencies`, responsável pelo caminho `solid-js/seroval` crítico. Não foi usado `npm audit fix` cego.
+
+O commit `eff054c1` atualizou Streamdown para `2.6.0`, removeu o devtools, declarou Shiki que já era importado pelo código e fixou `mdast-util-to-hast@13.2.1`. A UI passou 204 testes, build, lockfile `npm ci` e `npm audit --omit=dev` com zero vulnerabilidades. Mobile typecheck/audit também passaram.
+
+A correção reduz risco de supply chain do bundle, mas não equivale a auditoria integral de todas as dependências de desenvolvimento, assinatura de artefatos ou homologação de release. O CI remoto do novo head precisa concluir, e a falha race macOS observada no head anterior deve ser tratada separadamente.
