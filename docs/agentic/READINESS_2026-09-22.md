@@ -766,3 +766,10 @@ Evidência local: testes focados de Runtime, schedules, queue e CreateMission pa
 O head `35be21c6` fecha descartes adicionais de erros nas superfícies agentic. O worker local registra falhas de ACK/NACK. A promoção de jobs delayed no Redis preserva e reporta falha de rollback quando o LPUSH não consegue concluir. O CollaborationStore rejeita ledgers JSON corrompidos em vez de inicializar silenciosamente estado vazio. O AgentOrchestrator restaura o snapshot em memória quando Plan, Run ou Cancel não conseguem persistir. As rotas HTTP de autorun e execução assíncrona registram falhas de RunForOrganization com identificador do job e organização.
 
 Evidência local: regressões de colaboração, Plan/Run/Cancel, queue e runtime passaram; `CGO_ENABLED=1 go test -race ./internal/agent -count=1 -timeout=600s`, `CGO_ENABLED=1 go vet ./internal/agent ./server`, testes server de orchestration/agent, guardrail de integridade e diff check passaram. A CI pública do head foi consultada uma vez e estava `queued`. O produto segue **FIXING / preview-local RC em hardening — não finalizado e não production-ready**.
+
+
+## Addendum de rollback de colaboração — 2026-09-23
+
+O head `c43e02e6` completa a transação local do CollaborationStore. `AddComment` e `SetPresence` restauram o snapshot anterior quando qualquer write atômico falha, e o carregamento continua rejeitando ledgers corrompidos. O AgentOrchestrator agora retorna o snapshot efetivamente persistido quando a persistência final falha, em vez de devolver ao caller um estado que não está no ledger.
+
+Evidência local: testes focados de colaboração e orchestrator, race, vet, guardrail de integridade e diff check passaram. A CI pública do head foi consultada uma vez e estava `queued`. O produto continua **FIXING / preview-local RC em hardening — não finalizado e não production-ready**.
