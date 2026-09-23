@@ -362,13 +362,16 @@ func deploymentPathExclusionReason(relative string) string {
 		return "private-directory"
 	}
 	base := strings.ToLower(filepath.Base(relative))
-	if base == ".env" || strings.HasPrefix(base, ".env.") || strings.HasSuffix(base, ".pem") || strings.HasSuffix(base, ".key") || strings.HasSuffix(base, ".crt") || strings.HasSuffix(base, ".p12") || strings.HasSuffix(base, ".pfx") {
+	if base == ".env" || strings.HasPrefix(base, ".env.") || strings.HasSuffix(base, ".pem") || strings.HasSuffix(base, ".key") || strings.HasSuffix(base, ".crt") || strings.HasSuffix(base, ".p12") || strings.HasSuffix(base, ".pfx") || strings.HasSuffix(base, ".log") || strings.HasSuffix(base, ".backup") || strings.HasSuffix(base, ".bak") || strings.HasSuffix(base, ".sqlite") || strings.HasSuffix(base, ".sqlite3") || strings.HasSuffix(base, ".db") || strings.HasSuffix(base, ".dump") || strings.HasSuffix(base, ".sql") {
 		return "private-extension"
 	}
-	for _, marker := range []string{"secret", "credential", "password", "token", "apikey", "api_key", "backup", "dump", "log"} {
+	for _, marker := range []string{"secret", "credential", "password", "apikey", "api_key"} {
 		if strings.Contains(base, marker) {
 			return "private-name-marker"
 		}
+	}
+	if base == "token" || strings.HasPrefix(base, "token.") || strings.Contains(base, "-token.") || strings.Contains(base, "_token.") || strings.Contains(base, ".token.") {
+		return "private-name-marker"
 	}
 	return ""
 }

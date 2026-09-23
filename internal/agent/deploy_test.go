@@ -201,8 +201,13 @@ func TestDeploymentPackageExcludesPrivateFiles(t *testing.T) {
 func TestBuildDeploymentManifestReportsIncludedExcludedAndHash(t *testing.T) {
 	root := t.TempDir()
 	for name, content := range map[string]string{
-		"index.html": "<h1>public</h1>",
-		".env":       "SYNTHETIC_PRIVATE=1",
+		"index.html":     "<h1>public</h1>",
+		"logo.svg":       "<svg></svg>",
+		"tokenizer.json": "{\"version\":1}",
+		".env":           "SYNTHETIC_PRIVATE=1",
+		"runtime.log":    "SYNTHETIC_PRIVATE=2",
+		"state.sqlite":   "SYNTHETIC_PRIVATE=3",
+		"api-token.json": "SYNTHETIC_PRIVATE=4",
 	} {
 		if err := os.WriteFile(filepath.Join(root, name), []byte(content), 0o600); err != nil {
 			t.Fatal(err)
@@ -215,10 +220,13 @@ func TestBuildDeploymentManifestReportsIncludedExcludedAndHash(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if manifest.SHA256 == "" || len(manifest.Included) != 1 || manifest.Included[0].Path != "index.html" {
+	if manifest.SHA256 == "" || len(manifest.Included) != 3 {
 		t.Fatalf("manifest included=%+v hash=%q", manifest.Included, manifest.SHA256)
 	}
-	if len(manifest.Excluded) != 2 {
+	if manifest.Included[0].Path != "index.html" || manifest.Included[1].Path != "logo.svg" || manifest.Included[2].Path != "tokenizer.json" {
+		t.Fatalf("manifest included order=%+v", manifest.Included)
+	}
+	if len(manifest.Excluded) != 5 {
 		t.Fatalf("manifest excluded=%+v", manifest.Excluded)
 	}
 	for _, entry := range manifest.Excluded {
@@ -227,7 +235,7 @@ func TestBuildDeploymentManifestReportsIncludedExcludedAndHash(t *testing.T) {
 		}
 	}
 	files, err := collectDeployFiles(root)
-	if err != nil || len(files) != 1 {
+	if err != nil || len(files) != 3 {
 		t.Fatalf("collect files=%+v err=%v", files, err)
 	}
 }
