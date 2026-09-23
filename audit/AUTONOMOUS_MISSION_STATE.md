@@ -2052,3 +2052,46 @@ classification: preview/local RC em hardening; NÃO final; NÃO production-ready
 blockers: host sandbox/AppArmor/SELinux e isolamento forte homologado, auth/IdP/OAuth externos, providers/deploy/media/marketplaces, devices físicos, push remoto, signing/provenance efetiva, rollback, stores/app review e homologação externa
 next_action: continuar P0/P1 independentes e manter PR #1 aberto; não fazer merge automático em main
 ```
+
+
+## V5 — provider/catalog/egress e CI multiplataforma verde — 2026-09-22
+
+```yaml
+state: FIXING
+iteration: 41
+branch: feat/manus-parity-omniroute
+remote: class-a-plus/feat/manus-parity-omniroute
+head_sha: 0f95b6a1969462fb309e00e29813e8136d15f757
+commits:
+  - 2237a802: planner efetivo por provider/modelo configurado, sem substituição silenciosa
+  - 2439ea51: data root durável separado do workspace de execução
+  - 1bc64191: pinagem do IP aprovado no Remote MCP após resolução DNS
+  - bff02ef3: estados truthful de connector e credential_configured booleano sem secrets
+  - b3c364a3: seletor de provider/modelo derivado do catálogo real
+  - 6d8b8710: integrity guard alinhado ao seletor dinâmico
+  - 93a0115f: remoção do helper OllamaPlanner.fallback não utilizado
+  - 0f95b6a1: cache npm isolado por runner e fail-fast=false nas matrizes test/race
+local_evidence:
+  - Go completo em sequência desta rodada: CGO_ENABLED=1 go test ./... -count=1, go vet ./... e go build ./...: PASS
+  - golangci-lint v2.13.2, testes agent/server e integrity após o cleanup do planner: PASS
+  - UI Vitest, tsc -b e Vite build: PASS
+  - mobile typecheck e npm audit --omit=dev: PASS; 0 vulnerabilidades
+  - YAML de workflows, npm ci com cache isolado e git diff --check: PASS
+remote_evidence:
+  - class-a-plus-integrity PR run 35804229189: PASS
+  - dz23-agentic-quality PR run 35804229301: PASS (Go/server, PostgreSQL RLS + Redis DLQ + OTLP, Web/Mobile e SBOM)
+  - dz23-multi-provider PR run 35804229204: PASS
+  - upstream test PR run 35804229207: PASS (Linux, macOS e Windows; race Linux/macOS; go_mod_tidy e patches)
+  - PR #1: 21 checks successful, 3 skipped, 0 failing, 0 pending
+ci_diagnosis:
+  - head 6d8b8710 falhou no upstream somente por helper planner não utilizado; removido em 93a0115f
+  - head 93a0115f teve falha transitória EEXIST/ENOENT do cache global npm no Windows e cancelamento fail-fast dos irmãos; 0f95b6a1 isolou cache por runner e desabilitou cancelamento em cascata
+classification: preview/local RC em hardening; NÃO final; NÃO production-ready
+limits:
+  - catálogo de connectors, MCPs, skills e providers não equivale a contas OAuth ativas ou plugins externos homologados
+  - Woovi/OpenPix, fiscal/NF-e, Composio, marketplaces, social commerce, deploy, mídia e providers externos exigem credenciais, aprovação, smoke reversível e evidência do operador
+  - sandbox strict depende de cgroup v2 delegado e host compatível; AppArmor/SELinux e homologação física continuam externos
+  - matriz GPU/nativa permanece workflow_dispatch + run_native_matrix=true; não foi executada
+  - auth/IdP distribuído, dispositivos físicos, push remoto, signing/provenance efetiva, rollback, stores e app review permanecem abertos
+next_action: continuar P0/P1 internos independentes; manter PR #1 aberto para revisão e não fazer merge automático em main
+```

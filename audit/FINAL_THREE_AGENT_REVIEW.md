@@ -310,3 +310,12 @@ A triagem inicialmente reportada foi concluída. Como o fix automático exigia E
 A revisão confirmou o head `e6e0632ba5ff0495ed4b061221c90696478b3d67` nos quatro workflows do PR: upstream `test` `35794443450`, integrity `35794443307`, multi-provider `35794443300` e agentic quality `35794443501`, todos PASS. O conjunto ficou em 21 checks successful, 3 skipped, 0 failing e 0 pending. O upstream executou as plataformas públicas disponíveis e o workflow agentic cobriu Go/server, Browser Operator, serviços distribuídos, Web/Mobile e SBOM.
 
 A troca para `npm ci` torna os gates web/mobile reproduzíveis; o audit de produção mobile permanece zero. Os skips de licença e matriz nativa não contam como aprovação. O resultado mitiga o caminho normal de CI, mas não fecha sandbox de host, IdP/OAuth, providers externos, deploys, devices, signing, stores ou homologação. A decisão continua **FIXING / preview-local em hardening**, sem merge automático em `main`.
+
+
+## Validação independente — V5 provider/connectors e CI — 2026-09-22
+
+A revisão confirmou cinco melhorias internas verificáveis. O planner deixou de aceitar fallback silencioso e exige provider/modelo executável. O runtime separa dados duráveis do workspace. O Remote MCP fixa o destino aprovado depois de DNS. O catálogo e a UI de connectors expõem somente readiness seguro e o seletor de missão não apresenta providers ausentes como conectados. O integrity guard passou a proteger esse contrato dinâmico.
+
+O upstream falhou primeiro por um helper `OllamaPlanner.fallback` não utilizado; a correção foi removê-lo. A execução seguinte expôs uma colisão `EEXIST/ENOENT` no cache npm compartilhado do runner Windows, com cancelamento dos irmãos por `fail-fast`. O workflow foi corrigido para cache por runner e `fail-fast: false`. O head `0f95b6a1969462fb309e00e29813e8136d15f757` passou os quatro workflows: `test` `35804229207`, integrity `35804229189`, multi-provider `35804229204` e agentic quality `35804229301`.
+
+O resultado é mitigação observável do caminho normal, não homologação externa. Não há base para declarar Composio, OAuth, Woovi/OpenPix, fiscal, marketplaces, deploy, mídia, dispositivos ou signing conectados/concluídos. A decisão permanece **FIXING / preview-local em hardening**, com PR aberto e sem merge automático em `main`.

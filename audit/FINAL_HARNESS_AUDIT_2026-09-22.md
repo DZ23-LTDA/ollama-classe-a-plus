@@ -458,3 +458,12 @@ O audit de produção inicialmente reportou 18 vulnerabilidades transitivas. A a
 O head `e6e0632ba5ff0495ed4b061221c90696478b3d67` passou upstream `test` (`35794443450`), `class-a-plus-integrity` (`35794443307`), `dz23-multi-provider` (`35794443300`) e `dz23-agentic-quality` (`35794443501`). O upstream passou Linux, macOS, Windows, race Linux/macOS, patches e go_mod_tidy; o workflow agentic passou Go/server, Browser Operator, PostgreSQL RLS + Redis DLQ + OTLP, Web/Mobile e SBOM. O PR consolidou 21 successful, 3 skipped, 0 failing e 0 pending.
 
 O gate de integrity agora protege explicitamente sandbox strict, isolamento mobile e release SBOM/checksum; os gates Node usam `npm ci`. Isso é evidência do caminho normal de CI, não um release assinado nem homologação dos skips. A matriz GPU/nativa continua manual/opt-in e permanecem abertos sandbox de host, IdP/OAuth/providers/deploy/media reais, dispositivos, push remoto, signing/provenance efetiva, rollback, stores/app review e produção.
+
+
+## Addendum — V5 provider, connectors e CI normal — 2026-09-22
+
+As mudanças V5 mitigaram lacunas internas específicas sem revogar os achados originais. O planner agora exige um provider/modelo resolvido e falha fechado em caso de ausência ou erro. O estado durável foi separado do workspace, o Remote MCP usa IPs aprovados após DNS e o catálogo de connectors informa apenas readiness seguro por tenant. A UI deixou de sugerir aliases Claude/Codex/OmniRoute como conectados quando o runtime não publica um modelo correspondente.
+
+A sequência de CI também foi corrigida com diagnóstico observável. O head `6d8b8710` encontrou um helper planner morto; `93a0115f` o removeu. O head seguinte revelou uma colisão transitória do cache npm global no Windows; `0f95b6a1` isolou o cache por runner e desabilitou cancelamento em cascata nas matrizes test/race. No head final passaram upstream `test` (`35804229207`), `class-a-plus-integrity` (`35804229189`), `dz23-multi-provider` (`35804229204`) e `dz23-agentic-quality` (`35804229301`).
+
+O resultado fecha o caminho normal de CI desta slice, não o produto inteiro. Permanecem abertos sandbox de host homologado, auth/IdP distribuído, OAuth e providers externos, Composio e connectors de contas reais, Woovi/OpenPix e fiscal/NF-e, social commerce/marketplaces, deploy/media, dispositivos físicos, push remoto, signing/provenance, rollback, stores e app review. A classificação vigente continua **preview/local RC em hardening; não production-ready**.

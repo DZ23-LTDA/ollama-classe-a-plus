@@ -362,3 +362,12 @@ Os 18 achados transitivos do primeiro audit mobile foram tratados com overrides 
 O head `e6e0632b` fechou o caminho normal do PR com upstream test, integrity, multi-provider e agentic quality verdes. A matriz comprovou Linux/macOS/Windows, race aplicável, Browser Operator, Go/server, RLS + Redis DLQ + OTLP, Web/Mobile e SBOM; os gates Node usam `npm ci` com lockfiles. Permanecem fora do resultado os jobs nativos/GPU manuais e os skips condicionais.
 
 O roadmap agora prioriza validações que não podem ser simuladas honestamente nesta sandbox: host strict com cgroup/AppArmor/SELinux, IdP/OAuth/provider real, deploy/media/marketplace, push e dispositivos físicos, signing/provenance/rollback e stores/app review. A classificação permanece **preview/local RC em hardening**.
+
+
+## V5 — provider efetivo, catálogo de connectors e CI verde — 2026-09-22
+
+O caminho interno avançou em quatro frentes. O planner agora usa provider/modelo real e não substitui falhas por um plano determinístico silencioso. O runtime separa estado durável do workspace e o Remote MCP usa pinagem de IP após DNS. O catálogo de connectors e a UI de Plugins mostram estado seguro e tenant-aware, enquanto o Mission Console libera somente providers/modelos publicados pelo runtime.
+
+O upstream teve duas falhas diagnosticadas e corrigidas sem relaxar gates: helper Go não utilizado e colisão do cache npm global no Windows. O workflow agora isola o cache por runner e deixa test/race concluírem todas as plataformas. O head `0f95b6a1` passou upstream, integrity, multi-provider e agentic quality, com Linux/macOS/Windows, race Linux/macOS, PostgreSQL RLS, Redis DLQ, OTLP, Web/Mobile e SBOM.
+
+A próxima prioridade continua sendo a validação que não pode ser simulada honestamente nesta sandbox: host strict com cgroup/AppArmor/SELinux, IdP/OAuth e providers reais, deploy/media/marketplaces, Woovi/OpenPix e fiscal, push e dispositivos físicos, signing/provenance/rollback e stores/app review. O estado permanece **preview/local RC em hardening**.

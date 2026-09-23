@@ -4,7 +4,7 @@ A primeira API agentic roda no mesmo listener do Ollama e é local-first. Ela cr
 
 ## Configuração
 
-Defina `OLLAMA_AGENT_ROOT` para o diretório que pode ser usado pelas missões. Por padrão, o runtime usa um diretório temporário do sistema. Defina `OLLAMA_AGENT_STORE` para o diretório persistente de missões, eventos e empresas. Se `OLLAMA_AGENT_MODEL` estiver definido, o runtime tenta usar esse modelo para gerar o plano JSON; em caso de erro, usa o planner determinístico seguro. `OLLAMA_AGENT_EMBED_MODEL` ativa memória semântica sobre a API `/api/embed`; `OLLAMA_AGENT_CONNECTORS`, `OLLAMA_AGENT_MCP` e `OLLAMA_AGENT_REMOTE_MCP` apontam para os manifestos de integração descritos em [INTEGRATIONS.md](INTEGRATIONS.md). `OLLAMA_AGENT_AUTH_STORE` habilita o store de identidade; `OLLAMA_AGENT_AUTH_REQUIRED=true` exige Bearer token; `OLLAMA_AGENT_CREDENTIAL_KEY` é obrigatório para persistir credenciais OAuth cifradas; cada provider OAuth pode declarar `OLLAMA_AGENT_OAUTH_<PROVIDER>_REVOCATION_URL`; `OLLAMA_AGENT_MEDIA_BASE_URL` e `OLLAMA_AGENT_MEDIA_API_KEY` ativam o adapter multimídia HTTPS.
+Defina `OLLAMA_AGENT_ROOT` para o diretório que pode ser usado pelas missões. Por padrão, o runtime usa um diretório temporário do sistema. Defina `OLLAMA_AGENT_STORE` para o diretório persistente de missões, eventos e empresas. Se `OLLAMA_AGENT_MODEL` estiver definido, o runtime usa esse modelo para gerar o plano JSON; se o provider/modelo solicitado não tiver planner configurado ou a chamada falhar, a missão falha fechado em vez de usar um plano determinístico silencioso. `OLLAMA_AGENT_EMBED_MODEL` ativa memória semântica sobre a API `/api/embed`; `OLLAMA_AGENT_CONNECTORS`, `OLLAMA_AGENT_MCP` e `OLLAMA_AGENT_REMOTE_MCP` apontam para os manifestos de integração descritos em [INTEGRATIONS.md](INTEGRATIONS.md). `OLLAMA_AGENT_AUTH_STORE` habilita o store de identidade; `OLLAMA_AGENT_AUTH_REQUIRED=true` exige Bearer token; `OLLAMA_AGENT_CREDENTIAL_KEY` é obrigatório para persistir credenciais OAuth cifradas; cada provider OAuth pode declarar `OLLAMA_AGENT_OAUTH_<PROVIDER>_REVOCATION_URL`; `OLLAMA_AGENT_MEDIA_BASE_URL` e `OLLAMA_AGENT_MEDIA_API_KEY` ativam o adapter multimídia HTTPS.
 
 ```bash
 export OLLAMA_AGENT_ROOT=/home/usuario/dz23-workspaces
@@ -108,6 +108,8 @@ curl -sS http://localhost:11434/api/agent/v1/metrics/prometheus
 ```
 
 O endpoint Prometheus expõe counters de missões, passos, retries, approvals e chamadas de tool.
+
+`GET /api/agent/v1/connectors` retorna o catálogo tenant-aware e o estado seguro de cada connector. O campo `credential_configured` é apenas booleano; tokens, nomes de variáveis e ciphertext nunca fazem parte da resposta. Catálogo, adapter e credencial configurada não significam conta OAuth ativa: a conexão real ainda exige autorização do operador, teste reversível e evidência do upstream.
 
 ## Agendamentos e webhooks
 

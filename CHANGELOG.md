@@ -350,3 +350,12 @@ O audit inicial do pacote Expo encontrou 18 vulnerabilidades transitivas, cuja c
 O head `e6e0632ba5ff0495ed4b061221c90696478b3d67` passou upstream `test` (`35794443450`), integrity (`35794443307`), multi-provider (`35794443300`) e agentic quality (`35794443501`). O PR ficou com 21 checks successful, 3 skipped, 0 failing e 0 pending. O upstream executou Linux/macOS/Windows e race Linux/macOS; o workflow agentic passou Go/server, RLS + Redis DLQ + OTLP, Web/Mobile e SBOM.
 
 Os gates Node agora usam `npm ci` com lockfile versionado. A matriz nativa/GPU continua manual e opt-in; os skips não são tratados como homologação física. O produto segue preview/local RC em hardening.
+
+
+## 2026-09-22 — V5: provider efetivo, connectors truthful e CI multiplataforma
+
+O runtime passou a selecionar planner pelo provider/modelo efetivo e a falhar fechado quando o executor não está configurado. O data root durável foi separado do workspace, o Remote MCP passou a fixar os IPs aprovados após DNS e o catálogo de connectors ganhou estados tenant-aware sem expor tokens. A UI passou a derivar o seletor de providers/modelos do catálogo real, eliminando aliases fictícios.
+
+O upstream encontrou primeiro um helper planner não utilizado e depois uma falha `EEXIST/ENOENT` do cache npm global no Windows. O helper foi removido e o workflow passou a usar cache npm isolado por runner e `fail-fast: false` nas matrizes normal/race. No head `0f95b6a1`, passaram upstream `test` (`35804229207`), `class-a-plus-integrity` (`35804229189`), `dz23-multi-provider` (`35804229204`) e `dz23-agentic-quality` (`35804229301`). O caminho normal confirmou Linux, macOS e Windows, race aplicável, Go/server, serviços distribuídos, Web/Mobile e SBOM.
+
+A matriz GPU/nativa continua manual e opt-in. Catálogo ou `credential_configured` não significa conta externa conectada; credenciais, OAuth, Woovi/OpenPix, fiscal, marketplaces, deploys, mídia, dispositivos, signing e stores continuam dependências do operador.
