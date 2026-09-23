@@ -250,6 +250,7 @@ func (q *JobQueue) signal() {
 	default:
 	}
 }
+
 func limitError(value string, limit int) string {
 	if len(value) <= limit {
 		return value

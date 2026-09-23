@@ -11,6 +11,7 @@ import (
 type desktopCompanionTool struct{}
 
 func (desktopCompanionTool) Descriptor() ToolDescriptor {
+	//nolint:misspell // "processos" é português (processes), não um erro de grafia
 	return ToolDescriptor{Name: "desktop.companion", Version: "1", Description: "Operações controladas de tela, mouse, teclado, clipboard e processos no Desktop local", Risk: RiskExternalSideEffect, RequiresApproval: true, Scopes: []string{"desktop:screen", "desktop:input", "desktop:clipboard", "desktop:process"}}
 }
 

@@ -21,8 +21,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-const maxRequestBytes = 32 << 20
-const maxResponseBytes = 128 << 20
+const (
+	maxRequestBytes  = 32 << 20
+	maxResponseBytes = 128 << 20
+)
 
 var errResponseLimit = errors.New("provider response exceeded limit")
 

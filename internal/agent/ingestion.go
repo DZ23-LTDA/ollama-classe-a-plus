@@ -144,6 +144,7 @@ func readDocument(ctx context.Context, path string, limit int64) (string, error)
 	}
 	return string(data), nil
 }
+
 func readPDF(ctx context.Context, path string, limit int64) (string, error) {
 	command := exec.CommandContext(ctx, "pdftotext", "-layout", path, "-")
 	var output bytes.Buffer
@@ -170,6 +171,7 @@ func readLimitedFile(path string, limit int64) ([]byte, error) {
 	}
 	return data, nil
 }
+
 func readDOCX(path string, limit int64) (string, error) {
 	archive, err := zip.OpenReader(path)
 	if err != nil {
@@ -193,6 +195,7 @@ func readDOCX(path string, limit int64) (string, error) {
 	}
 	return "", errors.New("docx document.xml not found")
 }
+
 func readXLSX(path string, limit int64) (string, error) {
 	archive, err := zip.OpenReader(path)
 	if err != nil {
@@ -224,6 +227,7 @@ func readXLSX(path string, limit int64) (string, error) {
 	}
 	return builder.String(), nil
 }
+
 func xmlText(data []byte) string {
 	decoder := xml.NewDecoder(strings.NewReader(string(data)))
 	var builder strings.Builder
@@ -242,6 +246,7 @@ func xmlText(data []byte) string {
 	}
 	return strings.TrimSpace(html.UnescapeString(builder.String()))
 }
+
 func chunkText(text string, size, overlap int) []string {
 	text = strings.TrimSpace(text)
 	if text == "" {

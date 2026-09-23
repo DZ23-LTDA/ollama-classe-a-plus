@@ -754,6 +754,7 @@ func decryptCredential(value string) (string, error) {
 	}
 	return string(plaintext), nil
 }
+
 func randomSecret(size int) (string, error) {
 	data := make([]byte, size)
 	if _, err := rand.Read(data); err != nil {
@@ -761,6 +762,7 @@ func randomSecret(size int) (string, error) {
 	}
 	return hex.EncodeToString(data), nil
 }
+
 func filepathJoin(root, name string) string {
 	return strings.TrimRight(root, string(os.PathSeparator)) + string(os.PathSeparator) + name
 }

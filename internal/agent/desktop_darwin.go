@@ -16,21 +16,27 @@ import (
 func desktopScreenshot(ctx context.Context, path string) error {
 	return runDesktop(ctx, "screencapture", "-x", path)
 }
+
 func desktopMouseClick(ctx context.Context, x, y int) error {
 	return runDesktop(ctx, "cliclick", "c:"+strconv.Itoa(x)+","+strconv.Itoa(y))
 }
+
 func desktopKeyboardType(ctx context.Context, text string) error {
 	return runDesktopWithInput(ctx, text, "cliclick", "t:"+text)
 }
+
 func desktopClipboardGet(ctx context.Context) (string, error) {
 	return runDesktopOutput(ctx, "pbpaste")
 }
+
 func desktopClipboardSet(ctx context.Context, text string) error {
 	return runDesktopWithInput(ctx, text, "pbcopy")
 }
+
 func desktopProcessList(ctx context.Context) (string, error) {
 	return runDesktopOutput(ctx, "ps", "-axo", "pid=,comm=,args=")
 }
+
 func desktopProcessTerminate(ctx context.Context, pid int) error {
 	return runDesktop(ctx, "kill", "-TERM", strconv.Itoa(pid))
 }
@@ -39,6 +45,7 @@ func runDesktop(ctx context.Context, name string, args ...string) error {
 	_, err := runDesktopOutput(ctx, name, args...)
 	return err
 }
+
 func runDesktopOutput(ctx context.Context, name string, args ...string) (string, error) {
 	deadline, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
@@ -52,6 +59,7 @@ func runDesktopOutput(ctx context.Context, name string, args ...string) (string,
 	}
 	return stdout.String(), nil
 }
+
 func runDesktopWithInput(ctx context.Context, input, name string, args ...string) error {
 	deadline, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()

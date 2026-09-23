@@ -126,9 +126,7 @@ func anthropicMessagesToOpenAI(rawMessages, rawSystem json.RawMessage) ([]map[st
 			return nil, err
 		}
 		if len(toolResults) > 0 {
-			for _, result := range toolResults {
-				messages = append(messages, result)
-			}
+			messages = append(messages, toolResults...)
 			if content == nil && len(toolCalls) == 0 {
 				continue
 			}

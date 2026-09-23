@@ -2,7 +2,6 @@ package server
 
 import (
 	"crypto/subtle"
-	"encoding/json"
 	"net/http"
 	"os"
 	"strings"
@@ -90,8 +89,4 @@ func companionSecureRequest(request *http.Request) bool {
 		return strings.EqualFold(request.Header.Get("X-Forwarded-Proto"), "https")
 	}
 	return false
-}
-func encodeCompanionFrame(frame agent.CompanionFrame) []byte {
-	data, _ := json.Marshal(frame)
-	return data
 }

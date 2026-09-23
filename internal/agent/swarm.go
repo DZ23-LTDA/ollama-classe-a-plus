@@ -102,8 +102,10 @@ type OrchestrationJob struct {
 	CompletedAt    *time.Time         `json:"completed_at,omitempty"`
 }
 
-type SubagentRunner func(context.Context, AgentTask) (AgentResult, error)
-type ResultReducer func(context.Context, OrchestrationJob) (string, []string, error)
+type (
+	SubagentRunner func(context.Context, AgentTask) (AgentResult, error)
+	ResultReducer  func(context.Context, OrchestrationJob) (string, []string, error)
+)
 
 type AgentOrchestrator struct {
 	mu      sync.Mutex
@@ -319,6 +321,7 @@ func (o *AgentOrchestrator) Cancel(id string) (OrchestrationJob, error) {
 func (o *AgentOrchestrator) persistLocked() error {
 	return writeJSONAtomic(filepath.Join(o.root, "jobs.json"), o.jobs)
 }
+
 func normalizeAgentBudget(b AgentBudget, taskCount int) AgentBudget {
 	if b.MaxAgents <= 0 || b.MaxAgents > taskCount {
 		b.MaxAgents = taskCount
@@ -334,12 +337,14 @@ func normalizeAgentBudget(b AgentBudget, taskCount int) AgentBudget {
 	}
 	return b
 }
+
 func truncateAgentOutput(value string, limit int) string {
 	if limit <= 0 || len(value) <= limit {
 		return value
 	}
 	return value[:limit] + "\n[output truncated]"
 }
+
 func validAgentRole(role AgentRole) bool {
 	switch role {
 	case RoleResearch, RoleProgram, RoleTesting, RoleDesign, RoleSecurity, RoleData, RoleReview:
@@ -348,6 +353,7 @@ func validAgentRole(role AgentRole) bool {
 		return false
 	}
 }
+
 func inferAgentRoles(objective string) []AgentRole {
 	lower := strings.ToLower(objective)
 	roles := []AgentRole{}
@@ -360,7 +366,9 @@ func inferAgentRoles(objective string) []AgentRole {
 	roles = append(roles, RoleProgram, RoleTesting, RoleSecurity, RoleReview)
 	return roles
 }
+
 func roleObjective(role AgentRole, objective string) string {
+	//nolint:misspell // "independente" é português (independently), não um erro de grafia
 	return fmt.Sprintf("Você é o subagente %s. Trabalhe de forma independente sobre o objetivo abaixo, registre evidências verificáveis, não invente resultados e entregue uma saída curta para síntese.\n\nObjetivo: %s", role, objective)
 }
 

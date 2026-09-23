@@ -270,7 +270,7 @@ func GenerateTone(workspace string, frequency float64, duration time.Duration) (
 		return MediaResult{}, err
 	}
 	data := make([]byte, samples*2)
-	for i := 0; i < samples; i++ {
+	for i := range samples {
 		sample := int16(12000 * sin(2*3.141592653589793*frequency*float64(i)/sampleRate))
 		data[i*2] = byte(sample)
 		data[i*2+1] = byte(sample >> 8)
@@ -388,18 +388,21 @@ func (m *MediaManager) materializeEntry(ctx context.Context, workspace, prefix, 
 func (m *MediaManager) endpoint(path string) string {
 	return strings.TrimRight(m.Provider.BaseURL, "/") + "/" + strings.TrimLeft(path, "/")
 }
+
 func (m *MediaManager) client() *http.Client {
 	if m.Client != nil {
 		return m.Client
 	}
 	return http.DefaultClient
 }
+
 func (m *MediaManager) headers(request *http.Request) {
 	if strings.TrimSpace(m.Provider.APIKey) != "" {
 		request.Header.Set("Authorization", "Bearer "+m.Provider.APIKey)
 	}
 	request.Header.Set("User-Agent", "ollama-dz23-agentic-media/1")
 }
+
 func firstData(payload map[string]any) (map[string]any, error) {
 	data, ok := payload["data"].([]any)
 	if !ok || len(data) == 0 {
@@ -411,6 +414,7 @@ func firstData(payload map[string]any) (map[string]any, error) {
 	}
 	return entry, nil
 }
+
 func decodeResponse(response *http.Response) (map[string]any, error) {
 	body, err := io.ReadAll(io.LimitReader(response.Body, 8<<20))
 	if err != nil {
@@ -425,6 +429,7 @@ func decodeResponse(response *http.Response) (map[string]any, error) {
 	}
 	return payload, nil
 }
+
 func writeLimitedFile(path string, data []byte, limit int64) error {
 	if int64(len(data)) > limit {
 		return errors.New("media payload exceeds limit")
@@ -434,6 +439,7 @@ func writeLimitedFile(path string, data []byte, limit int64) error {
 	}
 	return os.WriteFile(path, data, 0o600)
 }
+
 func sin(value float64) float64 {
 	x := value
 	for x > 3.141592653589793 {
@@ -449,6 +455,7 @@ func sin(value float64) float64 {
 	}
 	return sum
 }
+
 func writeWAVHeader(w io.Writer, dataSize, sampleRate int) error {
 	header := make([]byte, 44)
 	copy(header[0:4], "RIFF")

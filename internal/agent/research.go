@@ -233,6 +233,7 @@ func (e *ResearchEngine) allowedByRobots(ctx context.Context, target *url.URL) b
 	}
 	return true
 }
+
 func parseRobots(body string) []string {
 	var rules []string
 	active := false
@@ -255,6 +256,7 @@ func parseRobots(body string) []string {
 	}
 	return rules
 }
+
 func publicHost(host string) error {
 	if net.ParseIP(host) != nil {
 		ip := net.ParseIP(host)
@@ -274,12 +276,14 @@ func publicHost(host string) error {
 	}
 	return nil
 }
+
 func (e *ResearchEngine) client() *http.Client {
 	if e.Client != nil {
 		return e.Client
 	}
 	return http.DefaultClient
 }
+
 func truncateResearch(value string, limit int) string {
 	value = strings.TrimSpace(value)
 	if len(value) <= limit {
@@ -288,9 +292,11 @@ func truncateResearch(value string, limit int) string {
 	return value[:limit] + "…"
 }
 
-var tagRE = regexp.MustCompile(`(?s)<[^>]*>`)
-var invisibleTagRE = regexp.MustCompile(`(?is)<(?:script|style|noscript)[^>]*>.*?</(?:script|style|noscript)>`)
-var spaceRE = regexp.MustCompile(`\s+`)
+var (
+	tagRE          = regexp.MustCompile(`(?s)<[^>]*>`)
+	invisibleTagRE = regexp.MustCompile(`(?is)<(?:script|style|noscript)[^>]*>.*?</(?:script|style|noscript)>`)
+	spaceRE        = regexp.MustCompile(`\s+`)
+)
 
 func extractResearchText(body, contentType string) (string, string) {
 	title := ""
@@ -308,6 +314,7 @@ func extractResearchText(body, contentType string) (string, string) {
 	text = spaceRE.ReplaceAllString(text, " ")
 	return title, strings.TrimSpace(text)
 }
+
 func minResearchInt(a, b int) int {
 	if a < b {
 		return a

@@ -2109,7 +2109,9 @@ func Serve(ln net.Listener) error {
 	http.Handle("/", h)
 
 	ctx, done := context.WithCancel(context.Background())
+	defer done()
 	schedCtx, schedDone := context.WithCancel(ctx)
+	defer schedDone()
 	sched := InitScheduler(schedCtx)
 	s.sched = sched
 	s.agentRuntime.Start(ctx)
