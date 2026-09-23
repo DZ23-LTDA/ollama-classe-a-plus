@@ -49,6 +49,7 @@ func NewCollaborationStore(root string) (*CollaborationStore, error) {
 	_ = readJSON(filepath.Join(root, "presence.json"), &store.presence)
 	return store, nil
 }
+
 func (s *CollaborationStore) AddComment(projectID, userID, body string) (Comment, error) {
 	projectID = strings.TrimSpace(projectID)
 	userID = strings.TrimSpace(userID)
@@ -65,6 +66,7 @@ func (s *CollaborationStore) AddComment(projectID, userID, body string) (Comment
 	s.comments[projectID] = append(s.comments[projectID], comment)
 	return comment, s.persistLocked()
 }
+
 func (s *CollaborationStore) Comments(projectID string) []Comment {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -72,6 +74,7 @@ func (s *CollaborationStore) Comments(projectID string) []Comment {
 	sort.Slice(result, func(i, j int) bool { return result[i].CreatedAt.Before(result[j].CreatedAt) })
 	return result
 }
+
 func (s *CollaborationStore) SetPresence(projectID, userID, status string) (Presence, error) {
 	projectID = strings.TrimSpace(projectID)
 	userID = strings.TrimSpace(userID)
@@ -91,6 +94,7 @@ func (s *CollaborationStore) SetPresence(projectID, userID, status string) (Pres
 	s.presence[projectID][userID] = presence
 	return presence, s.persistLocked()
 }
+
 func (s *CollaborationStore) Presence(projectID string) []Presence {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -101,9 +105,11 @@ func (s *CollaborationStore) Presence(projectID string) []Presence {
 	sort.Slice(result, func(i, j int) bool { return result[i].UserID < result[j].UserID })
 	return result
 }
+
 func (s *CollaborationStore) Snapshot(projectID string) CollaborationSnapshot {
 	return CollaborationSnapshot{Comments: s.Comments(projectID), Presence: s.Presence(projectID), UpdatedAt: time.Now().UTC()}
 }
+
 func (s *CollaborationStore) persistLocked() error {
 	if s.root == "" {
 		return nil

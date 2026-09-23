@@ -87,22 +87,25 @@ type AgentResult struct {
 }
 
 type OrchestrationJob struct {
-	ID          string             `json:"id"`
-	Objective   string             `json:"objective"`
-	Workspace   string             `json:"workspace,omitempty"`
-	ProjectID   string             `json:"project_id,omitempty"`
-	State       OrchestrationState `json:"state"`
-	Budget      AgentBudget        `json:"budget"`
-	Tasks       []AgentTask        `json:"tasks"`
-	Summary     string             `json:"summary,omitempty"`
-	Conflicts   []string           `json:"conflicts,omitempty"`
-	CreatedAt   time.Time          `json:"created_at"`
-	UpdatedAt   time.Time          `json:"updated_at"`
-	CompletedAt *time.Time         `json:"completed_at,omitempty"`
+	ID             string             `json:"id"`
+	Objective      string             `json:"objective"`
+	Workspace      string             `json:"workspace,omitempty"`
+	ProjectID      string             `json:"project_id,omitempty"`
+	OrganizationID string             `json:"organization_id,omitempty"`
+	State          OrchestrationState `json:"state"`
+	Budget         AgentBudget        `json:"budget"`
+	Tasks          []AgentTask        `json:"tasks"`
+	Summary        string             `json:"summary,omitempty"`
+	Conflicts      []string           `json:"conflicts,omitempty"`
+	CreatedAt      time.Time          `json:"created_at"`
+	UpdatedAt      time.Time          `json:"updated_at"`
+	CompletedAt    *time.Time         `json:"completed_at,omitempty"`
 }
 
-type SubagentRunner func(context.Context, AgentTask) (AgentResult, error)
-type ResultReducer func(context.Context, OrchestrationJob) (string, []string, error)
+type (
+	SubagentRunner func(context.Context, AgentTask) (AgentResult, error)
+	ResultReducer  func(context.Context, OrchestrationJob) (string, []string, error)
+)
 
 type AgentOrchestrator struct {
 	mu      sync.Mutex
@@ -156,14 +159,14 @@ func PlanAgentTasks(objective, workspace, projectID string, roles []AgentRole) (
 	return tasks, nil
 }
 
-func (o *AgentOrchestrator) Plan(objective, workspace, projectID string, roles []AgentRole, budget AgentBudget) (OrchestrationJob, error) {
+func (o *AgentOrchestrator) Plan(objective, workspace, projectID, organizationID string, roles []AgentRole, budget AgentBudget) (OrchestrationJob, error) {
 	tasks, err := PlanAgentTasks(objective, workspace, projectID, roles)
 	if err != nil {
 		return OrchestrationJob{}, err
 	}
 	budget = normalizeAgentBudget(budget, len(tasks))
 	now := time.Now().UTC()
-	job := OrchestrationJob{ID: "orch_" + uuid.NewString(), Objective: strings.TrimSpace(objective), Workspace: workspace, ProjectID: projectID, State: OrchestrationPlanned, Budget: budget, Tasks: tasks, CreatedAt: now, UpdatedAt: now}
+	job := OrchestrationJob{ID: "orch_" + uuid.NewString(), Objective: strings.TrimSpace(objective), Workspace: workspace, ProjectID: projectID, OrganizationID: strings.TrimSpace(organizationID), State: OrchestrationPlanned, Budget: budget, Tasks: tasks, CreatedAt: now, UpdatedAt: now}
 	o.mu.Lock()
 	o.jobs[job.ID] = job
 	err = o.persistLocked()
@@ -318,6 +321,7 @@ func (o *AgentOrchestrator) Cancel(id string) (OrchestrationJob, error) {
 func (o *AgentOrchestrator) persistLocked() error {
 	return writeJSONAtomic(filepath.Join(o.root, "jobs.json"), o.jobs)
 }
+
 func normalizeAgentBudget(b AgentBudget, taskCount int) AgentBudget {
 	if b.MaxAgents <= 0 || b.MaxAgents > taskCount {
 		b.MaxAgents = taskCount
@@ -333,12 +337,14 @@ func normalizeAgentBudget(b AgentBudget, taskCount int) AgentBudget {
 	}
 	return b
 }
+
 func truncateAgentOutput(value string, limit int) string {
 	if limit <= 0 || len(value) <= limit {
 		return value
 	}
 	return value[:limit] + "\n[output truncated]"
 }
+
 func validAgentRole(role AgentRole) bool {
 	switch role {
 	case RoleResearch, RoleProgram, RoleTesting, RoleDesign, RoleSecurity, RoleData, RoleReview:
@@ -347,6 +353,7 @@ func validAgentRole(role AgentRole) bool {
 		return false
 	}
 }
+
 func inferAgentRoles(objective string) []AgentRole {
 	lower := strings.ToLower(objective)
 	roles := []AgentRole{}
@@ -359,7 +366,9 @@ func inferAgentRoles(objective string) []AgentRole {
 	roles = append(roles, RoleProgram, RoleTesting, RoleSecurity, RoleReview)
 	return roles
 }
+
 func roleObjective(role AgentRole, objective string) string {
+	//nolint:misspell // "independente" é português (independently), não um erro de grafia
 	return fmt.Sprintf("Você é o subagente %s. Trabalhe de forma independente sobre o objetivo abaixo, registre evidências verificáveis, não invente resultados e entregue uma saída curta para síntese.\n\nObjetivo: %s", role, objective)
 }
 

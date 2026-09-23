@@ -111,10 +111,11 @@ type AuthStore struct {
 	tokens        map[string]AccessToken
 	oauthStates   map[string]OAuthState
 	credentials   map[string]OAuthCredential
+	mfaUsed       map[string]int64
 }
 
 func NewAuthStore(root string) (*AuthStore, error) {
-	store := &AuthStore{root: strings.TrimSpace(root), users: map[string]User{}, organizations: map[string]Organization{}, memberships: map[string]Membership{}, tokens: map[string]AccessToken{}, oauthStates: map[string]OAuthState{}, credentials: map[string]OAuthCredential{}}
+	store := &AuthStore{root: strings.TrimSpace(root), users: map[string]User{}, organizations: map[string]Organization{}, memberships: map[string]Membership{}, tokens: map[string]AccessToken{}, oauthStates: map[string]OAuthState{}, credentials: map[string]OAuthCredential{}, mfaUsed: map[string]int64{}}
 	if store.root == "" {
 		return store, nil
 	}
@@ -289,7 +290,17 @@ func (s *AuthStore) VerifyMFA(userID, code string, now time.Time) error {
 	}
 	counter := now.UTC().Unix() / 30
 	for offset := int64(-1); offset <= 1; offset++ {
-		if hmac.Equal([]byte(code), []byte(totpCode(secret, counter+offset))) {
+		matched := counter + offset
+		if hmac.Equal([]byte(code), []byte(totpCode(secret, matched))) {
+			// Reject replay: a TOTP counter can only be accepted once per user,
+			// so a code captured within its ±1 window cannot be reused.
+			s.mu.Lock()
+			if last, ok := s.mfaUsed[userID]; ok && matched <= last {
+				s.mu.Unlock()
+				return errors.New("mfa code was already used")
+			}
+			s.mfaUsed[userID] = matched
+			s.mu.Unlock()
 			return nil
 		}
 	}
@@ -743,6 +754,7 @@ func decryptCredential(value string) (string, error) {
 	}
 	return string(plaintext), nil
 }
+
 func randomSecret(size int) (string, error) {
 	data := make([]byte, size)
 	if _, err := rand.Read(data); err != nil {
@@ -750,6 +762,7 @@ func randomSecret(size int) (string, error) {
 	}
 	return hex.EncodeToString(data), nil
 }
+
 func filepathJoin(root, name string) string {
 	return strings.TrimRight(root, string(os.PathSeparator)) + string(os.PathSeparator) + name
 }

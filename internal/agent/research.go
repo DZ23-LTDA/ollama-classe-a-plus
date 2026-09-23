@@ -151,7 +151,16 @@ func (e *ResearchEngine) fetch(ctx context.Context, rawURL string, maxBytes int6
 		return result
 	}
 	request.Header.Set("User-Agent", "ollama-dz23-research/1")
-	response, err := e.client().Do(request)
+	fetchClient := e.client()
+	if !(e.AllowHTTPForTests && parsed.Scheme == "http") {
+		pinned, err := pinnedClient(ctx, fetchClient, rawURL)
+		if err != nil {
+			result.Error = err.Error()
+			return result
+		}
+		fetchClient = pinned
+	}
+	response, err := fetchClient.Do(request)
 	if err != nil {
 		result.Error = err.Error()
 		return result
@@ -190,9 +199,22 @@ func (e *ResearchEngine) allowedByRobots(ctx context.Context, target *url.URL) b
 		robotsURL := key + "/robots.txt"
 		request, err := http.NewRequestWithContext(ctx, http.MethodGet, robotsURL, nil)
 		if err != nil {
-			return false
+			// robots.txt is advisory: when it cannot be fetched or built we fail
+			// open (allow), consistently with the client.Do error path below.
+			return true
 		}
-		response, err := e.client().Do(request)
+		// Pin the robots pre-flight to validated public IPs too (unless the test
+		// http override is active); otherwise it re-resolves DNS and follows
+		// redirects, reopening the SSRF/rebind window the main fetch closes.
+		robotsClient := e.client()
+		if !(e.AllowHTTPForTests && target.Scheme == "http") {
+			pinned, perr := pinnedClient(ctx, robotsClient, robotsURL)
+			if perr != nil {
+				return true
+			}
+			robotsClient = pinned
+		}
+		response, err := robotsClient.Do(request)
 		if err != nil {
 			return true
 		}
@@ -211,6 +233,7 @@ func (e *ResearchEngine) allowedByRobots(ctx context.Context, target *url.URL) b
 	}
 	return true
 }
+
 func parseRobots(body string) []string {
 	var rules []string
 	active := false
@@ -233,6 +256,7 @@ func parseRobots(body string) []string {
 	}
 	return rules
 }
+
 func publicHost(host string) error {
 	if net.ParseIP(host) != nil {
 		ip := net.ParseIP(host)
@@ -252,12 +276,14 @@ func publicHost(host string) error {
 	}
 	return nil
 }
+
 func (e *ResearchEngine) client() *http.Client {
 	if e.Client != nil {
 		return e.Client
 	}
 	return http.DefaultClient
 }
+
 func truncateResearch(value string, limit int) string {
 	value = strings.TrimSpace(value)
 	if len(value) <= limit {
@@ -266,9 +292,11 @@ func truncateResearch(value string, limit int) string {
 	return value[:limit] + "…"
 }
 
-var tagRE = regexp.MustCompile(`(?s)<[^>]*>`)
-var invisibleTagRE = regexp.MustCompile(`(?is)<(?:script|style|noscript)[^>]*>.*?</(?:script|style|noscript)>`)
-var spaceRE = regexp.MustCompile(`\s+`)
+var (
+	tagRE          = regexp.MustCompile(`(?s)<[^>]*>`)
+	invisibleTagRE = regexp.MustCompile(`(?is)<(?:script|style|noscript)[^>]*>.*?</(?:script|style|noscript)>`)
+	spaceRE        = regexp.MustCompile(`\s+`)
+)
 
 func extractResearchText(body, contentType string) (string, string) {
 	title := ""
@@ -286,6 +314,7 @@ func extractResearchText(body, contentType string) (string, string) {
 	text = spaceRE.ReplaceAllString(text, " ")
 	return title, strings.TrimSpace(text)
 }
+
 func minResearchInt(a, b int) int {
 	if a < b {
 		return a

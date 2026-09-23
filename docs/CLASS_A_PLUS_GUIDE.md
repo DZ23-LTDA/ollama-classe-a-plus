@@ -73,6 +73,15 @@ export OLLAMA_AGENT_OTLP_ENDPOINT='http://127.0.0.1:4318'
 ./ollama-classe-a-plus serve
 ```
 
+> **Importante — RLS exige um papel sem superusuário.** O isolamento por
+> organização é aplicado por Row Level Security (`FORCE ROW LEVEL SECURITY`). O
+> PostgreSQL **ignora RLS para superusuários** (e para papéis com `BYPASSRLS`),
+> então a aplicação **nunca** deve conectar como o superusuário do banco. O
+> `deploy/postgres-init.sql` provisiona um papel de aplicação dedicado
+> `ollama_app` (`NOSUPERUSER NOBYPASSRLS`) que é o dono das tabelas criadas pelas
+> migrações; aponte `OLLAMA_AGENT_DATABASE_URL` para esse papel. Conectar como
+> superusuário anula silenciosamente o isolamento entre tenants.
+
 Em produção, use PostgreSQL gerenciado ou uma instância com backups e RLS revisado, Redis com autenticação e rede privada, e um collector OTLP com autenticação e retenção definida.
 
 ## Configuração essencial

@@ -255,6 +255,7 @@ func (t mcpCallTool) Execute(ctx context.Context, _ ToolContext, input map[strin
 	}
 	var value any
 	if err := json.Unmarshal(result, &value); err != nil {
+		//nolint:nilerr // by design: a non-JSON MCP result is returned as a raw string
 		return ToolResult{Value: string(result)}, nil
 	}
 	return ToolResult{Value: value}, nil

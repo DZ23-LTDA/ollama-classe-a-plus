@@ -35,7 +35,7 @@ type Runtime struct {
 	ingestion     DocumentIngestor
 	push          *PushService
 	deployments   *DeploymentManager
-	mu            sync.Mutex
+	mu            *sync.Mutex
 	running       map[string]bool
 }
 
@@ -131,7 +131,7 @@ func NewRuntime(config RuntimeConfig) (*Runtime, error) {
 			return nil, err
 		}
 	}
-	runtime := &Runtime{store: store, planner: planner, tools: tools, workspaceRoot: root, context: contextStore, metrics: &RuntimeMetrics{}, connectors: config.Connectors, mcp: config.MCP, queue: queue, redisQueue: config.RedisQueue, traces: traces, telemetry: telemetry, media: config.Media, builder: builder, collaboration: collaboration, push: config.Push, deployments: config.Deployments, running: make(map[string]bool)}
+	runtime := &Runtime{store: store, planner: planner, tools: tools, workspaceRoot: root, context: contextStore, metrics: &RuntimeMetrics{}, connectors: config.Connectors, mcp: config.MCP, queue: queue, redisQueue: config.RedisQueue, traces: traces, telemetry: telemetry, media: config.Media, builder: builder, collaboration: collaboration, push: config.Push, deployments: config.Deployments, running: make(map[string]bool), mu: &sync.Mutex{}}
 	orchestrator, err := NewAgentOrchestrator(filepath.Join(root, ".agent-orchestrator"), runtime.SubagentRunner)
 	if err != nil {
 		return nil, err
@@ -389,7 +389,7 @@ func (r *Runtime) Run(ctx context.Context, id string) (runErr error) {
 	}
 	_ = r.event(mission, "mission.running", "", nil)
 
-	for index := range mission.Plan {
+	for index := 0; index < len(mission.Plan); index++ {
 		step := &mission.Plan[index]
 		if step.State == StepSucceeded {
 			continue
@@ -447,6 +447,11 @@ func (r *Runtime) Run(ctx context.Context, id string) (runErr error) {
 			return err
 		}
 		_ = r.event(mission, "step.succeeded", step.ID, map[string]any{"artifacts": len(result.Artifacts)})
+	}
+	for index := range mission.Plan {
+		if mission.Plan[index].State != StepSucceeded {
+			return r.failStep(mission, &mission.Plan[index], fmt.Errorf("step %q did not reach a succeeded state", mission.Plan[index].ID))
+		}
 	}
 	completed := time.Now().UTC()
 	mission.State = MissionCompleted
@@ -593,7 +598,9 @@ func (r *Runtime) event(mission Mission, eventType, stepID string, payload any) 
 			body = "A missão " + mission.ID + " foi concluída"
 		}
 		go func() {
-			_ = r.push.NotifyOrganization(context.Background(), mission.OrganizationID, title, body, map[string]any{"mission_id": mission.ID, "event": eventType})
+			pushCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			defer cancel()
+			_ = r.push.NotifyOrganization(pushCtx, mission.OrganizationID, title, body, map[string]any{"mission_id": mission.ID, "event": eventType})
 		}()
 	}
 	return err

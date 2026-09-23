@@ -39,7 +39,15 @@ func newAgentAPI(runtime *agent.Runtime) (*agentAPI, error) {
 		return nil, err
 	}
 	runtime.SetAuthStore(auth)
-	required, _ := strconv.ParseBool(strings.TrimSpace(os.Getenv("OLLAMA_AGENT_AUTH_REQUIRED")))
+	// Fail closed: the agentic surface exposes OS-level tools (desktop, sandbox,
+	// deploy, connectors), so authentication is required unless the operator
+	// explicitly opts out with OLLAMA_AGENT_AUTH_REQUIRED=false for local dev.
+	required := true
+	if raw := strings.TrimSpace(os.Getenv("OLLAMA_AGENT_AUTH_REQUIRED")); raw != "" {
+		if parsed, err := strconv.ParseBool(raw); err == nil {
+			required = parsed
+		}
+	}
 	return &agentAPI{runtime: runtime, context: runtime.Context(), auth: auth, authRequired: required, push: runtime.Push(), samlServices: map[string]*agent.SAMLService{}}, nil
 }
 
@@ -247,6 +255,7 @@ func (a *agentAPI) register(r *gin.Engine) {
 	group.GET("/deployments", a.deployments)
 	group.POST("/builders/:id/deploy/:provider", a.deployBuilder)
 	group.GET("/builders/:id/preview/*path", a.builderPreviewFile)
+	group.GET("/metrics", a.metrics)
 	group.GET("/metrics/prometheus", a.prometheus)
 	group.GET("/tools", a.tools)
 	group.GET("/connectors", a.connectors)
@@ -281,15 +290,25 @@ func (a *agentAPI) authMiddleware(c *gin.Context) {
 		c.Next()
 		return
 	}
-	if strings.HasSuffix(c.Request.URL.Path, "/auth/dev/token") && strings.EqualFold(strings.TrimSpace(os.Getenv("OLLAMA_AGENT_AUTH_DEV")), "true") {
+	// Exemptions match the matched ROUTE PATTERN (c.FullPath()), never a raw path
+	// suffix: the builder preview route is a `/*path` catch-all, so a suffix match
+	// like ".../preview/x/connect" could otherwise smuggle an unauthenticated
+	// request into a real handler.
+	route := c.FullPath()
+	// SSO start/callback/metadata/acs may be reached without a prior session when
+	// the operator explicitly enables public SSO.
+	if (strings.HasPrefix(route, "/api/agent/v1/auth/oauth/") || strings.HasPrefix(route, "/api/agent/v1/auth/saml/")) && strings.EqualFold(strings.TrimSpace(os.Getenv("OLLAMA_AGENT_AUTH_SSO_PUBLIC")), "true") {
 		c.Next()
 		return
 	}
-	if (strings.Contains(c.Request.URL.Path, "/auth/oauth/") || strings.Contains(c.Request.URL.Path, "/auth/saml/")) && strings.EqualFold(strings.TrimSpace(os.Getenv("OLLAMA_AGENT_AUTH_SSO_PUBLIC")), "true") {
+	// The device companion upgrade authenticates itself with a device token.
+	if route == "/api/agent/v1/devices/:id/connect" {
 		c.Next()
 		return
 	}
-	if strings.HasSuffix(c.Request.URL.Path, "/connect") {
+	// Liveness endpoint must stay reachable for health checks even when auth is
+	// required; it exposes no tenant data.
+	if route == "/api/agent/v1/health" {
 		c.Next()
 		return
 	}
@@ -479,7 +498,10 @@ func (a *agentAPI) registerPush(c *gin.Context) {
 }
 
 func (a *agentAPI) devToken(c *gin.Context) {
-	if !strings.EqualFold(strings.TrimSpace(os.Getenv("OLLAMA_AGENT_AUTH_DEV")), "true") {
+	// The dev token mints a real 24h credential with a self-chosen organization,
+	// so it is only ever available in local dev where auth is disabled. It must
+	// never be reachable once authentication is required.
+	if a.authRequired || !strings.EqualFold(strings.TrimSpace(os.Getenv("OLLAMA_AGENT_AUTH_DEV")), "true") {
 		c.AbortWithStatus(http.StatusNotFound)
 		return
 	}
@@ -507,7 +529,7 @@ func (a *agentAPI) devToken(c *gin.Context) {
 		writeAgentError(c, http.StatusBadRequest, err)
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{"access_token": raw, "token": token, "user": user.Public(), "organization": organization})
+	c.JSON(http.StatusCreated, gin.H{"access_token": raw, "expires_at": token.ExpiresAt, "user": user.Public(), "organization": organization})
 }
 
 func oauthProviderFromEnv(name string) agent.OAuthProvider {
@@ -671,12 +693,12 @@ func (a *agentAPI) oauthCallback(c *gin.Context) {
 		writeAgentError(c, http.StatusInternalServerError, err)
 		return
 	}
-	localToken, session, err := a.auth.IssueToken(userID, organization.ID, 24*time.Hour)
+	localToken, _, err := a.auth.IssueToken(userID, organization.ID, 24*time.Hour)
 	if err != nil {
 		writeAgentError(c, http.StatusInternalServerError, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"access_token": localToken, "token": session, "credential_id": credential.ID, "provider": provider.Name, "organization": organization, "expires_at": credential.ExpiresAt})
+	c.JSON(http.StatusOK, gin.H{"access_token": localToken, "credential_id": credential.ID, "provider": provider.Name, "organization": organization, "expires_at": credential.ExpiresAt})
 }
 
 func (a *agentAPI) samlStart(c *gin.Context) {
@@ -723,7 +745,7 @@ func (a *agentAPI) samlACS(c *gin.Context) {
 		writeAgentError(c, http.StatusInternalServerError, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"access_token": localToken, "token": session, "provider": service.Provider.Name, "organization": organization, "user": user.Public()})
+	c.JSON(http.StatusOK, gin.H{"access_token": localToken, "expires_at": session.ExpiresAt, "provider": service.Provider.Name, "organization": organization, "user": user.Public()})
 }
 
 func (a *agentAPI) metrics(c *gin.Context) {
@@ -825,7 +847,8 @@ func (a *agentAPI) createProject(c *gin.Context) {
 		writeAgentError(c, http.StatusBadRequest, err)
 		return
 	}
-	project, err := a.context.CreateProject(request.Name, request.Root)
+	_, organizationID := a.actorIdentity(c)
+	project, err := a.context.CreateProject(request.Name, request.Root, organizationID)
 	if err != nil {
 		writeAgentError(c, http.StatusBadRequest, err)
 		return
@@ -833,10 +856,28 @@ func (a *agentAPI) createProject(c *gin.Context) {
 	c.JSON(http.StatusCreated, project)
 }
 
-func (a *agentAPI) getProject(c *gin.Context) {
-	project, err := a.context.GetProject(c.Param("id"))
+// projectForCaller loads a project and enforces tenant isolation: when auth is
+// required the project must belong to the caller's organization, otherwise it is
+// reported as not found. Returns false once it has written the response.
+func (a *agentAPI) projectForCaller(c *gin.Context, projectID string) (agent.Project, bool) {
+	project, err := a.context.GetProject(projectID)
 	if err != nil {
 		writeAgentError(c, statusForAgentError(err), err)
+		return agent.Project{}, false
+	}
+	if a.authRequired {
+		_, organizationID := a.actorIdentity(c)
+		if organizationID == "" || project.OrganizationID != organizationID {
+			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": "project not found"})
+			return agent.Project{}, false
+		}
+	}
+	return project, true
+}
+
+func (a *agentAPI) getProject(c *gin.Context) {
+	project, ok := a.projectForCaller(c, c.Param("id"))
+	if !ok {
 		return
 	}
 	c.JSON(http.StatusOK, project)
@@ -855,10 +896,16 @@ func (a *agentAPI) collabActor(c *gin.Context) string {
 }
 
 func (a *agentAPI) collabSnapshot(c *gin.Context) {
+	if _, ok := a.projectForCaller(c, c.Param("project_id")); !ok {
+		return
+	}
 	c.JSON(http.StatusOK, a.runtime.Collaboration().Snapshot(c.Param("project_id")))
 }
 
 func (a *agentAPI) collabComment(c *gin.Context) {
+	if _, ok := a.projectForCaller(c, c.Param("project_id")); !ok {
+		return
+	}
 	var request struct {
 		Body string `json:"body"`
 	}
@@ -875,6 +922,9 @@ func (a *agentAPI) collabComment(c *gin.Context) {
 }
 
 func (a *agentAPI) collabPresence(c *gin.Context) {
+	if _, ok := a.projectForCaller(c, c.Param("project_id")); !ok {
+		return
+	}
 	var request struct {
 		Status string `json:"status"`
 	}
@@ -891,6 +941,9 @@ func (a *agentAPI) collabPresence(c *gin.Context) {
 }
 
 func (a *agentAPI) collabStream(c *gin.Context) {
+	if _, ok := a.projectForCaller(c, c.Param("project_id")); !ok {
+		return
+	}
 	c.Header("Content-Type", "text/event-stream")
 	c.Header("Cache-Control", "no-cache")
 	c.Header("Connection", "keep-alive")
@@ -919,6 +972,9 @@ func (a *agentAPI) addMemory(c *gin.Context) {
 		writeAgentError(c, http.StatusBadRequest, err)
 		return
 	}
+	if _, ok := a.projectForCaller(c, c.Param("id")); !ok {
+		return
+	}
 	memory.ProjectID = c.Param("id")
 	created, err := a.context.AddMemoryContext(c.Request.Context(), memory)
 	if err != nil {
@@ -929,6 +985,9 @@ func (a *agentAPI) addMemory(c *gin.Context) {
 }
 
 func (a *agentAPI) searchMemories(c *gin.Context) {
+	if _, ok := a.projectForCaller(c, c.Param("id")); !ok {
+		return
+	}
 	memories, err := a.context.SearchMemoriesContext(c.Request.Context(), c.Param("id"), c.Query("q"), 20)
 	if err != nil {
 		writeAgentError(c, http.StatusBadRequest, err)
@@ -1022,7 +1081,22 @@ func (a *agentAPI) traces(c *gin.Context) {
 }
 
 func (a *agentAPI) allTraces(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"spans": a.runtime.Traces(c.Query("trace_id"))})
+	traceID := strings.TrimSpace(c.Query("trace_id"))
+	if traceID == "" {
+		writeAgentError(c, http.StatusBadRequest, errors.New("trace_id is required"))
+		return
+	}
+	// Trace IDs are "tr_<missionID>"; require that the mission belongs to the
+	// caller's organization so a tenant cannot read another tenant's spans (nor
+	// dump every span with an empty trace_id).
+	if a.authRequired {
+		missionID := strings.TrimPrefix(traceID, "tr_")
+		if _, err := a.missionByID(c, missionID); err != nil {
+			writeAgentError(c, statusForAgentError(err), err)
+			return
+		}
+	}
+	c.JSON(http.StatusOK, gin.H{"spans": a.runtime.Traces(traceID)})
 }
 
 func (a *agentAPI) createOrchestration(c *gin.Context) {
@@ -1038,7 +1112,8 @@ func (a *agentAPI) createOrchestration(c *gin.Context) {
 		writeAgentError(c, http.StatusBadRequest, err)
 		return
 	}
-	job, err := a.runtime.Orchestrator().Plan(request.Objective, request.Workspace, request.ProjectID, request.Roles, request.Budget)
+	_, organizationID := a.actorIdentity(c)
+	job, err := a.runtime.Orchestrator().Plan(request.Objective, request.Workspace, request.ProjectID, organizationID, request.Roles, request.Budget)
 	if err != nil {
 		writeAgentError(c, http.StatusBadRequest, err)
 		return
@@ -1051,19 +1126,39 @@ func (a *agentAPI) createOrchestration(c *gin.Context) {
 	c.JSON(http.StatusCreated, job)
 }
 
-func (a *agentAPI) getOrchestration(c *gin.Context) {
-	job, err := a.runtime.Orchestrator().Get(c.Param("id"))
+// orchestrationForCaller enforces tenant isolation on an orchestration job by
+// ID. Returns false once it has written the response.
+func (a *agentAPI) orchestrationForCaller(c *gin.Context, jobID string) (agent.OrchestrationJob, bool) {
+	job, err := a.runtime.Orchestrator().Get(jobID)
 	if err != nil {
 		writeAgentError(c, statusForAgentError(err), err)
+		return agent.OrchestrationJob{}, false
+	}
+	if a.authRequired {
+		_, organizationID := a.actorIdentity(c)
+		if organizationID == "" || job.OrganizationID != organizationID {
+			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": "orchestration job not found"})
+			return agent.OrchestrationJob{}, false
+		}
+	}
+	return job, true
+}
+
+func (a *agentAPI) getOrchestration(c *gin.Context) {
+	job, ok := a.orchestrationForCaller(c, c.Param("id"))
+	if !ok {
 		return
 	}
 	c.JSON(http.StatusOK, job)
 }
 
 func (a *agentAPI) runOrchestration(c *gin.Context) {
-	job, err := a.runtime.Orchestrator().Get(c.Param("id"))
-	if err != nil {
-		writeAgentError(c, statusForAgentError(err), err)
+	job, ok := a.orchestrationForCaller(c, c.Param("id"))
+	if !ok {
+		return
+	}
+	if job.State == agent.OrchestrationRunning {
+		c.AbortWithStatusJSON(http.StatusConflict, gin.H{"error": "orchestration job is already running"})
 		return
 	}
 	go func(id string) { _, _ = a.runtime.Orchestrator().Run(context.Background(), id) }(job.ID)
@@ -1071,6 +1166,9 @@ func (a *agentAPI) runOrchestration(c *gin.Context) {
 }
 
 func (a *agentAPI) cancelOrchestration(c *gin.Context) {
+	if _, ok := a.orchestrationForCaller(c, c.Param("id")); !ok {
+		return
+	}
 	job, err := a.runtime.Orchestrator().Cancel(c.Param("id"))
 	if err != nil {
 		writeAgentError(c, statusForAgentError(err), err)
@@ -1096,14 +1194,37 @@ func (a *agentAPI) research(c *gin.Context) {
 func (a *agentAPI) actorIdentity(c *gin.Context) (string, string) {
 	if value, ok := c.Get("agent.user"); ok {
 		if user, ok := value.(agent.User); ok {
-			return user.ID, ""
+			organizationID := ""
+			if orgValue, ok := c.Get("agent.organization"); ok {
+				if organization, ok := orgValue.(agent.Organization); ok {
+					organizationID = organization.ID
+				}
+			}
+			return user.ID, organizationID
 		}
+	}
+	// Never derive identity from client-supplied headers once authentication is
+	// required: that would let a caller bind pairings/collab to any organization.
+	if a.authRequired {
+		return "", ""
 	}
 	return strings.TrimSpace(c.GetHeader("X-Ollama-User")), strings.TrimSpace(c.GetHeader("X-Ollama-Organization"))
 }
 
 func (a *agentAPI) devices(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"devices": a.runtime.Devices().List()})
+	_, organizationID := a.actorIdentity(c)
+	all := a.runtime.Devices().List()
+	if !a.authRequired {
+		c.JSON(http.StatusOK, gin.H{"devices": all})
+		return
+	}
+	scoped := make([]agent.Device, 0, len(all))
+	for _, device := range all {
+		if device.OrganizationID == organizationID {
+			scoped = append(scoped, device)
+		}
+	}
+	c.JSON(http.StatusOK, gin.H{"devices": scoped})
 }
 
 func (a *agentAPI) startDevicePairing(c *gin.Context) {
@@ -1157,6 +1278,18 @@ func (a *agentAPI) deviceHeartbeat(c *gin.Context) {
 }
 
 func (a *agentAPI) revokeDevice(c *gin.Context) {
+	if a.authRequired {
+		_, organizationID := a.actorIdentity(c)
+		existing, err := a.runtime.Devices().Get(c.Param("id"))
+		if err != nil {
+			writeAgentError(c, statusForAgentError(err), err)
+			return
+		}
+		if existing.OrganizationID != organizationID {
+			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": "device not found"})
+			return
+		}
+	}
 	device, err := a.runtime.Devices().Revoke(c.Param("id"))
 	if err != nil {
 		writeAgentError(c, statusForAgentError(err), err)
@@ -1172,9 +1305,8 @@ func (a *agentAPI) ingestProject(c *gin.Context) {
 		return
 	}
 	request.ProjectID = c.Param("id")
-	project, err := a.runtime.Context().GetProject(request.ProjectID)
-	if err != nil {
-		writeAgentError(c, statusForAgentError(err), err)
+	project, ok := a.projectForCaller(c, request.ProjectID)
+	if !ok {
 		return
 	}
 	request.Workspace = project.Root
@@ -1402,8 +1534,39 @@ func (a *agentAPI) mediaTone(c *gin.Context) {
 	c.JSON(http.StatusCreated, result)
 }
 
+// builderForCaller enforces tenant isolation on a builder project by ID: when
+// auth is required it must belong to the caller's organization, otherwise it is
+// reported as not found. Returns false once it has written the response.
+func (a *agentAPI) builderForCaller(c *gin.Context, builderID string) (agent.BuilderProject, bool) {
+	project, err := a.runtime.Builder().Get(builderID)
+	if err != nil {
+		writeAgentError(c, statusForAgentError(err), err)
+		return agent.BuilderProject{}, false
+	}
+	if a.authRequired {
+		_, organizationID := a.actorIdentity(c)
+		if organizationID == "" || project.OrganizationID != organizationID {
+			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": "builder not found"})
+			return agent.BuilderProject{}, false
+		}
+	}
+	return project, true
+}
+
 func (a *agentAPI) builders(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"projects": a.runtime.Builder().List()})
+	_, organizationID := a.actorIdentity(c)
+	all := a.runtime.Builder().List()
+	if !a.authRequired {
+		c.JSON(http.StatusOK, gin.H{"projects": all})
+		return
+	}
+	scoped := make([]agent.BuilderProject, 0, len(all))
+	for _, project := range all {
+		if project.OrganizationID == organizationID {
+			scoped = append(scoped, project)
+		}
+	}
+	c.JSON(http.StatusOK, gin.H{"projects": scoped})
 }
 
 func (a *agentAPI) createBuilder(c *gin.Context) {
@@ -1412,6 +1575,7 @@ func (a *agentAPI) createBuilder(c *gin.Context) {
 		writeAgentError(c, http.StatusBadRequest, err)
 		return
 	}
+	_, spec.OrganizationID = a.actorIdentity(c)
 	project, err := a.runtime.Builder().Create(c.Request.Context(), spec)
 	if err != nil {
 		writeAgentError(c, http.StatusBadRequest, err)
@@ -1421,6 +1585,9 @@ func (a *agentAPI) createBuilder(c *gin.Context) {
 }
 
 func (a *agentAPI) previewBuilder(c *gin.Context) {
+	if _, ok := a.builderForCaller(c, c.Param("id")); !ok {
+		return
+	}
 	project, artifact, err := a.runtime.Builder().Preview(c.Request.Context(), c.Param("id"))
 	if err != nil {
 		writeAgentError(c, statusForAgentError(err), err)
@@ -1430,6 +1597,9 @@ func (a *agentAPI) previewBuilder(c *gin.Context) {
 }
 
 func (a *agentAPI) updateBuilderVisual(c *gin.Context) {
+	if _, ok := a.builderForCaller(c, c.Param("id")); !ok {
+		return
+	}
 	var request struct {
 		Components []agent.VisualComponent `json:"components"`
 	}
@@ -1446,6 +1616,9 @@ func (a *agentAPI) updateBuilderVisual(c *gin.Context) {
 }
 
 func (a *agentAPI) undoBuilder(c *gin.Context) {
+	if _, ok := a.builderForCaller(c, c.Param("id")); !ok {
+		return
+	}
 	project, err := a.runtime.Builder().Undo(c.Request.Context(), c.Param("id"))
 	if err != nil {
 		writeAgentError(c, statusForAgentError(err), err)
@@ -1455,6 +1628,9 @@ func (a *agentAPI) undoBuilder(c *gin.Context) {
 }
 
 func (a *agentAPI) redoBuilder(c *gin.Context) {
+	if _, ok := a.builderForCaller(c, c.Param("id")); !ok {
+		return
+	}
 	project, err := a.runtime.Builder().Redo(c.Request.Context(), c.Param("id"))
 	if err != nil {
 		writeAgentError(c, statusForAgentError(err), err)
@@ -1464,6 +1640,9 @@ func (a *agentAPI) redoBuilder(c *gin.Context) {
 }
 
 func (a *agentAPI) exportBuilder(c *gin.Context) {
+	if _, ok := a.builderForCaller(c, c.Param("id")); !ok {
+		return
+	}
 	project, archivePath, err := a.runtime.Builder().Export(c.Request.Context(), c.Param("id"))
 	if err != nil {
 		writeAgentError(c, statusForAgentError(err), err)
@@ -1473,6 +1652,9 @@ func (a *agentAPI) exportBuilder(c *gin.Context) {
 }
 
 func (a *agentAPI) exportProfessionalBuilder(c *gin.Context) {
+	if _, ok := a.builderForCaller(c, c.Param("id")); !ok {
+		return
+	}
 	project, outputPath, err := a.runtime.Builder().ExportProfessional(c.Request.Context(), c.Param("id"), c.Param("format"))
 	if err != nil {
 		writeAgentError(c, statusForAgentError(err), err)
@@ -1482,6 +1664,9 @@ func (a *agentAPI) exportProfessionalBuilder(c *gin.Context) {
 }
 
 func (a *agentAPI) publishBuilder(c *gin.Context) {
+	if _, ok := a.builderForCaller(c, c.Param("id")); !ok {
+		return
+	}
 	project, publishedPath, err := a.runtime.Builder().PublishLocal(c.Request.Context(), c.Param("id"))
 	if err != nil {
 		writeAgentError(c, statusForAgentError(err), err)
@@ -1517,9 +1702,8 @@ func (a *agentAPI) deployBuilder(c *gin.Context) {
 		writeAgentError(c, http.StatusPreconditionRequired, errors.New("external deployment requires explicit approval"))
 		return
 	}
-	project, err := a.runtime.Builder().Get(c.Param("id"))
-	if err != nil {
-		writeAgentError(c, statusForAgentError(err), err)
+	project, ok := a.builderForCaller(c, c.Param("id"))
+	if !ok {
 		return
 	}
 	result, err := manager.Deploy(c.Request.Context(), c.Param("provider"), agent.DeploymentRequest{Name: project.Name, Root: project.Root, Target: request.Target})
@@ -1531,9 +1715,8 @@ func (a *agentAPI) deployBuilder(c *gin.Context) {
 }
 
 func (a *agentAPI) builderPreviewFile(c *gin.Context) {
-	project, err := a.runtime.Builder().Get(c.Param("id"))
-	if err != nil {
-		writeAgentError(c, statusForAgentError(err), err)
+	project, ok := a.builderForCaller(c, c.Param("id"))
+	if !ok {
 		return
 	}
 	relative := strings.TrimPrefix(c.Param("path"), "/")
@@ -1650,10 +1833,15 @@ func (a *agentAPI) decideApproval(c *gin.Context) {
 	c.JSON(http.StatusOK, mission)
 }
 
+// maxAgentRequestBody bounds every decoded JSON body to guard against
+// memory-exhaustion from an oversized request.
+const maxAgentRequestBody = 8 << 20 // 8 MiB
+
 func decodeJSON(c *gin.Context, value any) error {
 	if c.Request.Body == nil {
 		return errors.New("request body is required")
 	}
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxAgentRequestBody)
 	decoder := json.NewDecoder(c.Request.Body)
 	decoder.DisallowUnknownFields()
 	return decoder.Decode(value)

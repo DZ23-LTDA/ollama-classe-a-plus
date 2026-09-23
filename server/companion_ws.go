@@ -2,7 +2,6 @@ package server
 
 import (
 	"crypto/subtle"
-	"encoding/json"
 	"net/http"
 	"os"
 	"strings"
@@ -79,9 +78,15 @@ func (a *agentAPI) deviceConnect(c *gin.Context) {
 }
 
 func companionSecureRequest(request *http.Request) bool {
-	return request.TLS != nil || strings.EqualFold(request.Header.Get("X-Forwarded-Proto"), "https")
-}
-func encodeCompanionFrame(frame agent.CompanionFrame) []byte {
-	data, _ := json.Marshal(frame)
-	return data
+	if request.TLS != nil {
+		return true
+	}
+	// X-Forwarded-Proto is client-controllable unless a trusted proxy sits in
+	// front, so only honour it when the operator has declared they run behind
+	// one. Otherwise a direct client could set the header to defeat the TLS
+	// requirement and send the device token in cleartext.
+	if os.Getenv("OLLAMA_AGENT_TRUST_FORWARDED_PROTO") == "1" {
+		return strings.EqualFold(request.Header.Get("X-Forwarded-Proto"), "https")
+	}
+	return false
 }

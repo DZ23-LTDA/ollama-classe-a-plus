@@ -28,20 +28,21 @@ const (
 )
 
 type BuilderProject struct {
-	ID            string              `json:"id"`
-	Name          string              `json:"name"`
-	Kind          BuilderKind         `json:"kind"`
-	Entry         string              `json:"entry"`
-	Version       int                 `json:"version"`
-	Status        string              `json:"status"`
-	Root          string              `json:"root"`
-	PreviewPath   string              `json:"preview_path,omitempty"`
-	PublishedPath string              `json:"published_path,omitempty"`
-	CreatedAt     time.Time           `json:"created_at"`
-	UpdatedAt     time.Time           `json:"updated_at"`
-	Components    []VisualComponent   `json:"components,omitempty"`
-	UndoStack     [][]VisualComponent `json:"undo_stack,omitempty"`
-	RedoStack     [][]VisualComponent `json:"redo_stack,omitempty"`
+	ID             string              `json:"id"`
+	Name           string              `json:"name"`
+	OrganizationID string              `json:"organization_id,omitempty"`
+	Kind           BuilderKind         `json:"kind"`
+	Entry          string              `json:"entry"`
+	Version        int                 `json:"version"`
+	Status         string              `json:"status"`
+	Root           string              `json:"root"`
+	PreviewPath    string              `json:"preview_path,omitempty"`
+	PublishedPath  string              `json:"published_path,omitempty"`
+	CreatedAt      time.Time           `json:"created_at"`
+	UpdatedAt      time.Time           `json:"updated_at"`
+	Components     []VisualComponent   `json:"components,omitempty"`
+	UndoStack      [][]VisualComponent `json:"undo_stack,omitempty"`
+	RedoStack      [][]VisualComponent `json:"redo_stack,omitempty"`
 }
 
 type VisualComponent struct {
@@ -59,11 +60,12 @@ type VisualComponent struct {
 }
 
 type BuilderSpec struct {
-	Name       string            `json:"name"`
-	Kind       BuilderKind       `json:"kind"`
-	Entry      string            `json:"entry"`
-	Files      map[string]string `json:"files"`
-	Components []VisualComponent `json:"components,omitempty"`
+	Name           string            `json:"name"`
+	OrganizationID string            `json:"organization_id,omitempty"`
+	Kind           BuilderKind       `json:"kind"`
+	Entry          string            `json:"entry"`
+	Files          map[string]string `json:"files"`
+	Components     []VisualComponent `json:"components,omitempty"`
 }
 
 type BuilderService struct {
@@ -138,7 +140,7 @@ func (b *BuilderService) Create(ctx context.Context, spec BuilderSpec) (BuilderP
 			return BuilderProject{}, err
 		}
 	}
-	project := BuilderProject{ID: id, Name: name, Kind: spec.Kind, Entry: filepath.ToSlash(entry), Version: 1, Status: "draft", Root: projectRoot, Components: spec.Components, CreatedAt: now, UpdatedAt: now}
+	project := BuilderProject{ID: id, Name: name, OrganizationID: strings.TrimSpace(spec.OrganizationID), Kind: spec.Kind, Entry: filepath.ToSlash(entry), Version: 1, Status: "draft", Root: projectRoot, Components: spec.Components, CreatedAt: now, UpdatedAt: now}
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.projects[id] = project
@@ -376,6 +378,7 @@ func (b *BuilderService) List() []BuilderProject {
 func (b *BuilderService) persistLocked() error {
 	return writeJSONAtomic(filepath.Join(b.root, "projects.json"), b.projects)
 }
+
 func validBuilderKind(kind BuilderKind) bool {
 	switch kind {
 	case BuilderWebsite, BuilderApp, BuilderGame, BuilderSlides, BuilderDashboard:
@@ -384,6 +387,7 @@ func validBuilderKind(kind BuilderKind) bool {
 		return false
 	}
 }
+
 func validateBuilderFile(path, contents string) error {
 	clean := filepath.ToSlash(filepath.Clean(path))
 	if clean == "." || strings.HasPrefix(clean, "../") || strings.HasPrefix(clean, "/") || strings.Contains(clean, "../") {
@@ -394,6 +398,7 @@ func validateBuilderFile(path, contents string) error {
 	}
 	return nil
 }
+
 func templateFiles(kind BuilderKind, name string) map[string]string {
 	title := name
 	switch kind {
@@ -407,6 +412,7 @@ func templateFiles(kind BuilderKind, name string) map[string]string {
 		return map[string]string{"index.html": "<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>" + title + "</title></head><body><main><h1>" + title + "</h1><p>Builder preview ready.</p></main></body></html>"}
 	}
 }
+
 func mustJSON(value any) string {
 	data, _ := json.MarshalIndent(value, "", "  ")
 	return string(data)

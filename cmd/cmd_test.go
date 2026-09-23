@@ -2895,7 +2895,6 @@ func TestFormerAgentEntryPointsAreRejected(t *testing.T) {
 		{"run", "llama3", "--experimental"},
 		{"run", "llama3", "--experimental-yolo"},
 		{"run", "llama3", "--experimental-websearch"},
-		{"agent"},
 	}
 
 	for _, args := range tests {

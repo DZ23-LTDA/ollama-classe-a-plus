@@ -36,6 +36,21 @@ func OpenPostgresStore(ctx context.Context, dsn string) (*PostgresStore, error) 
 		_ = db.Close()
 		return nil, err
 	}
+	// PostgreSQL bypasses Row Level Security for superusers and BYPASSRLS roles,
+	// even with FORCE ROW LEVEL SECURITY — which would silently void the
+	// per-tenant isolation this store depends on. Refuse to run as such a role
+	// unless the operator explicitly opts out (e.g. a single-tenant deployment).
+	if os.Getenv("OLLAMA_AGENT_ALLOW_SUPERUSER_DB") != "1" {
+		var privileged bool
+		if err := db.QueryRowContext(pingCtx, `SELECT rolsuper OR rolbypassrls FROM pg_roles WHERE rolname = current_user`).Scan(&privileged); err != nil {
+			_ = db.Close()
+			return nil, fmt.Errorf("verify database role privileges: %w", err)
+		}
+		if privileged {
+			_ = db.Close()
+			return nil, errors.New("agent database role must not be a superuser or have BYPASSRLS (it silently disables tenant RLS); use a NOSUPERUSER NOBYPASSRLS role such as ollama_app, or set OLLAMA_AGENT_ALLOW_SUPERUSER_DB=1 to override")
+		}
+	}
 	if err := store.Migrate(ctx); err != nil {
 		_ = db.Close()
 		return nil, err
@@ -159,21 +174,30 @@ func (s *PostgresStore) ListMissions() ([]Mission, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	var missions []Mission
+	// Drain every id before issuing per-mission queries: database/sql runs a
+	// transaction on a single connection, so calling getMissionTx while these
+	// rows are still open fails with "conn busy: another query is running".
+	var ids []string
 	for rows.Next() {
 		var id string
 		if err := rows.Scan(&id); err != nil {
+			rows.Close()
 			return nil, err
 		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return nil, err
+	}
+	rows.Close()
+	var missions []Mission
+	for _, id := range ids {
 		mission, err := s.getMissionTx(tx, id)
 		if err != nil {
 			return nil, err
 		}
 		missions = append(missions, mission)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, err

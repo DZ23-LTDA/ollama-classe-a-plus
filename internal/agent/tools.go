@@ -205,6 +205,28 @@ func safeWorkspacePath(workspace, relative string) (string, error) {
 	if !isWithin(root, candidate) {
 		return "", errors.New("tool path escapes workspace")
 	}
+	// Defend against a symlink placed inside the workspace (e.g. by sandbox.exec
+	// or an ingested repo) that points outside root: resolve the deepest existing
+	// ancestor of the candidate and re-check containment against the resolved
+	// root. The lexical check above is not enough once symlinks exist on disk.
+	resolvedRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return "", err
+	}
+	existing := candidate
+	for {
+		if resolved, err := filepath.EvalSymlinks(existing); err == nil {
+			if !isWithin(resolvedRoot, resolved) {
+				return "", errors.New("tool path escapes workspace via symlink")
+			}
+			break
+		}
+		parent := filepath.Dir(existing)
+		if parent == existing {
+			break
+		}
+		existing = parent
+	}
 	return candidate, nil
 }
 
