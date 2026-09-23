@@ -2117,6 +2117,7 @@ func Serve(ln net.Listener) error {
 	sched := InitScheduler(schedCtx)
 	s.sched = sched
 	s.agentRuntime.Start(ctx)
+	defer func() { _ = s.agentRuntime.Close(context.Background()) }()
 	s.modelCaches.Start(ctx)
 
 	slog.Info(fmt.Sprintf("Listening on %s (version %s)", ln.Addr(), version.Version))

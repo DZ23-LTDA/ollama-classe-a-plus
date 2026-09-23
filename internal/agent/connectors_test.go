@@ -101,6 +101,33 @@ func TestConnectorPathPrefixMatchesSegments(t *testing.T) {
 	}
 }
 
+func TestConnectorEnforcesAllowedOrigins(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	}))
+	defer server.Close()
+	op := ConnectorOperation{Name: "read", Methods: []string{"GET"}, PathPrefixes: []string{"/"}}
+
+	blocked := NewConnectorManager()
+	blocked.client = server.Client()
+	if err := blocked.Register(ConnectorConfig{ID: "c", Provider: "test", BaseURL: server.URL, AllowedOrigins: []string{"https://not-allowed.example.com"}, Operations: []ConnectorOperation{op}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := blocked.CallForOrganization(context.Background(), "org_test", "c", "read", "GET", "/resource", nil); err == nil || !strings.Contains(err.Error(), "allowed_origins") {
+		t.Fatalf("expected allowed_origins rejection, got %v", err)
+	}
+
+	allowed := NewConnectorManager()
+	allowed.client = server.Client()
+	if err := allowed.Register(ConnectorConfig{ID: "c", Provider: "test", BaseURL: server.URL, AllowedOrigins: []string{server.URL}, Operations: []ConnectorOperation{op}}); err != nil {
+		t.Fatal(err)
+	}
+	if status, _, err := allowed.CallForOrganization(context.Background(), "org_test", "c", "read", "GET", "/resource", nil); err != nil || status != http.StatusOK {
+		t.Fatalf("status=%d err=%v", status, err)
+	}
+}
+
 func TestConnectorEgressBlocksRedirectsAndBoundsPayloads(t *testing.T) {
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
