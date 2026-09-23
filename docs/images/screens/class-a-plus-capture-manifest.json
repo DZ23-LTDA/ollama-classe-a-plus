@@ -15,7 +15,7 @@
     "deviceScaleFactor": 1
   },
   "files": [
-    { "path": "class-a-plus-home.png", "bytes": 88617, "sha256": "ed12cd7f5abcdb244b785b4fd44a4cf1781a2217d324649e1469aa4fb5f3f783" },
+    { "path": "class-a-plus-home.png", "bytes": 107111, "sha256": "0291a918e1af8ea282721ea4b4f126c7d9ceb95c983299da964d1e9461b235bf" },
     { "path": "class-a-plus-projects.png", "bytes": 123306, "sha256": "93ad91537292455d3f9afcc28d83b31394a0a13f18a0b676083b79ece453e068" },
     { "path": "class-a-plus-library.png", "bytes": 114374, "sha256": "c9264148bd9da4c1bc585eedbb6e91d0548b821ab6165fa020aadbb7f1723e67" },
     { "path": "class-a-plus-scheduled.png", "bytes": 155005, "sha256": "81c9dc84bb1aa0cff5aba06e536e761e50102d5c019f4a7e462a5b075e330207" },
