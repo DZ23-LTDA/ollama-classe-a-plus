@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"encoding/base32"
+	"errors"
 	"io"
 	"net"
 	"net/http"
@@ -200,6 +201,52 @@ func TestAuthStoreMFAUsesTOTPAndPersistsEncryptedSecret(t *testing.T) {
 	}
 	if err := store.VerifyMFA(user.ID, "000000", now); err == nil {
 		t.Fatal("invalid MFA code accepted")
+	}
+}
+
+func TestAuthStoreMFAThrottlePersistsAndUnlocks(t *testing.T) {
+	t.Setenv("OLLAMA_AGENT_CREDENTIAL_KEY", "mfa-throttle-test-key-long-enough")
+	root := t.TempDir()
+	store, err := NewAuthStore(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	user, err := store.CreateUser("mfa-throttle@example.com", "MFA Throttle")
+	if err != nil {
+		t.Fatal(err)
+	}
+	secret := base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString([]byte("0123456789012345"))
+	if _, err := store.EnableMFA(user.ID, secret); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Unix(1_700_000_000, 0).UTC()
+	for attempt := 1; attempt < mfaFailureLimit; attempt++ {
+		if err := store.VerifyMFAWithThrottle(user.ID, "000000", "127.0.0.1:1234", now); err == nil {
+			t.Fatalf("invalid MFA accepted on attempt %d", attempt)
+		} else {
+			var throttle *MFAThrottleError
+			if errors.As(err, &throttle) {
+				t.Fatalf("MFA throttled too early on attempt %d", attempt)
+			}
+		}
+	}
+	err = store.VerifyMFAWithThrottle(user.ID, "000000", "127.0.0.1:1234", now)
+	var throttle *MFAThrottleError
+	if !errors.As(err, &throttle) || throttle.RetryAfter <= 0 {
+		t.Fatalf("fifth invalid MFA error=%v, throttle=%+v", err, throttle)
+	}
+	reloaded, err := NewAuthStore(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = reloaded.VerifyMFAWithThrottle(user.ID, "000000", "127.0.0.1:1234", now.Add(time.Minute))
+	if !errors.As(err, &throttle) {
+		t.Fatalf("persisted lockout error=%v", err)
+	}
+	unlockTime := now.Add(mfaLockoutPeriod + time.Minute)
+	valid := totpCode(secret, unlockTime.Unix()/30)
+	if err := reloaded.VerifyMFAWithThrottle(user.ID, valid, "127.0.0.1:1234", unlockTime); err != nil {
+		t.Fatalf("valid MFA did not unlock after lockout: %v", err)
 	}
 }
 

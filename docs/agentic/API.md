@@ -23,6 +23,12 @@ ollama serve
 
 O modelo não recebe permissão implícita. Ele somente sugere passos; o runtime valida cada passo contra o registry e a policy.
 
+## MFA e proteção contra tentativa repetida
+
+Quando `auth_required=true` e o usuário tem MFA habilitado, o middleware aceita `X-Ollama-MFA-Code` ou um `X-Ollama-MFA-Recovery-Code` de uso único. Falhas são contabilizadas por usuário e peer remoto, com limite de cinco falhas em cinco minutos; a quinta falha abre lockout de 15 minutos. Durante o lockout, a API responde `429 Too Many Requests` com `Retry-After` em segundos e não executa a ação protegida. O estado fica em `OLLAMA_AGENT_AUTH_STORE/mfa-attempts.json` e sobrevive a restart do `AuthStore`; um código TOTP válido após o lockout limpa a janela.
+
+O ledger local é atômico em relação ao arquivo do `AuthStore`, mas não substitui um rate limiter coordenado para múltiplas instâncias que compartilhem armazenamento sem locking distribuído. Essa homologação, além de política de proxy para identificação de IP real, permanece `BLOCKED_BY_EXTERNAL_DEPENDENCY` até existir infraestrutura e teste distribuídos autorizados.
+
 ### Sandbox de execução
 
 `sandbox.exec` usa `best-effort` por padrão para preservar compatibilidade local. Em Linux, tenta user/mount/PID/network namespaces quando o host permite, além de `ulimit`, timeout, grupo de processo e saída limitada. Em macOS e Windows, executa pelo interpretador disponível como processo best-effort com timeout e saída limitada; o resultado informa `network_isolation=not-enforced`. Nenhum desses modos é uma fronteira forte de segurança.

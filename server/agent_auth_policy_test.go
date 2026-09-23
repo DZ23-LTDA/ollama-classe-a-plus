@@ -1,8 +1,11 @@
 package server
 
 import (
+	"encoding/base32"
+	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/ollama/ollama/internal/agent"
@@ -150,6 +153,67 @@ func TestApprovalApproverRequiresOwnerOrAdminWhenAuthenticated(t *testing.T) {
 				t.Fatalf("role %s approval access=%v want=%v", test.role, got, test.want)
 			}
 		})
+	}
+}
+
+func TestAgentAuthMiddlewareThrottlesMFAFailuresAndPersistsLockout(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	t.Setenv("OLLAMA_AGENT_CREDENTIAL_KEY", "server-mfa-throttle-test-key-long-enough")
+	root := t.TempDir()
+	auth, err := agent.NewAuthStore(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	user, err := auth.CreateUser("mfa-middleware@example.com", "MFA Middleware")
+	if err != nil {
+		t.Fatal(err)
+	}
+	organization, _, err := auth.CreateOrganization("MFA Org", user)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secret := base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString([]byte("0123456789012345"))
+	if _, err := auth.EnableMFA(user.ID, secret); err != nil {
+		t.Fatal(err)
+	}
+	rawToken, _, err := auth.IssueToken(user.ID, organization.ID, time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	api := &agentAPI{auth: auth, authRequired: true}
+	for attempt := 1; attempt <= 5; attempt++ {
+		recorder := httptest.NewRecorder()
+		ctx, _ := gin.CreateTestContext(recorder)
+		ctx.Request = httptest.NewRequest(http.MethodPost, "/api/agent/v1/missions", nil)
+		ctx.Request.Header.Set("Authorization", "Bearer "+rawToken)
+		ctx.Request.Header.Set("X-Ollama-MFA-Code", "000000")
+		ctx.Request.RemoteAddr = "127.0.0.1:4567"
+		api.authMiddleware(ctx)
+		want := http.StatusUnauthorized
+		if attempt == 5 {
+			want = http.StatusTooManyRequests
+			if recorder.Header().Get("Retry-After") == "" {
+				t.Fatal("throttled MFA response omitted Retry-After")
+			}
+		}
+		if recorder.Code != want || !ctx.IsAborted() {
+			t.Fatalf("attempt %d status=%d want=%d aborted=%v body=%s", attempt, recorder.Code, want, ctx.IsAborted(), recorder.Body.String())
+		}
+	}
+	reloaded, err := agent.NewAuthStore(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	api.auth = reloaded
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/api/agent/v1/missions", nil)
+	ctx.Request.Header.Set("Authorization", "Bearer "+rawToken)
+	ctx.Request.Header.Set("X-Ollama-MFA-Code", "000000")
+	ctx.Request.RemoteAddr = "127.0.0.1:4567"
+	api.authMiddleware(ctx)
+	if recorder.Code != http.StatusTooManyRequests {
+		t.Fatalf("persisted lockout status=%d body=%s", recorder.Code, recorder.Body.String())
 	}
 }
 

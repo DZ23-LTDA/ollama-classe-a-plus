@@ -118,17 +118,40 @@ type AuthStore struct {
 	tokens        map[string]AccessToken
 	oauthStates   map[string]OAuthState
 	credentials   map[string]OAuthCredential
+	mfaAttempts   map[string]MFAAttemptState
+}
+
+const (
+	mfaFailureLimit   = 5
+	mfaFailureWindow  = 5 * time.Minute
+	mfaLockoutPeriod  = 15 * time.Minute
+	mfaStateRetention = 24 * time.Hour
+)
+
+type MFAAttemptState struct {
+	Failures      int       `json:"failures"`
+	WindowStarted time.Time `json:"window_started"`
+	LockedUntil   time.Time `json:"locked_until,omitempty"`
+	LastAttemptAt time.Time `json:"last_attempt_at"`
+}
+
+type MFAThrottleError struct {
+	RetryAfter time.Duration
+}
+
+func (e *MFAThrottleError) Error() string {
+	return "mfa verification temporarily locked"
 }
 
 func NewAuthStore(root string) (*AuthStore, error) {
-	store := &AuthStore{root: strings.TrimSpace(root), users: map[string]User{}, organizations: map[string]Organization{}, memberships: map[string]Membership{}, tokens: map[string]AccessToken{}, oauthStates: map[string]OAuthState{}, credentials: map[string]OAuthCredential{}}
+	store := &AuthStore{root: strings.TrimSpace(root), users: map[string]User{}, organizations: map[string]Organization{}, memberships: map[string]Membership{}, tokens: map[string]AccessToken{}, oauthStates: map[string]OAuthState{}, credentials: map[string]OAuthCredential{}, mfaAttempts: map[string]MFAAttemptState{}}
 	if store.root == "" {
 		return store, nil
 	}
 	if err := os.MkdirAll(store.root, 0o700); err != nil {
 		return nil, err
 	}
-	for name, target := range map[string]any{"users": &store.users, "organizations": &store.organizations, "memberships": &store.memberships, "tokens": &store.tokens, "oauth-states": &store.oauthStates, "credentials": &store.credentials} {
+	for name, target := range map[string]any{"users": &store.users, "organizations": &store.organizations, "memberships": &store.memberships, "tokens": &store.tokens, "oauth-states": &store.oauthStates, "credentials": &store.credentials, "mfa-attempts": &store.mfaAttempts} {
 		path := filepathJoin(store.root, name+".json")
 		if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
 			continue
@@ -136,6 +159,9 @@ func NewAuthStore(root string) (*AuthStore, error) {
 		if err := readJSON(path, target); err != nil {
 			return nil, err
 		}
+	}
+	if store.mfaAttempts == nil {
+		store.mfaAttempts = map[string]MFAAttemptState{}
 	}
 	return store, nil
 }
@@ -303,6 +329,114 @@ func (s *AuthStore) VerifyMFA(userID, code string, now time.Time) error {
 	return errors.New("invalid mfa code")
 }
 
+func (s *AuthStore) VerifyMFAWithThrottle(userID, code, clientKey string, now time.Time) error {
+	if now.IsZero() {
+		now = time.Now().UTC()
+	}
+	now = now.UTC()
+	key := mfaAttemptKey(userID, clientKey)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if throttle := s.mfaThrottleLocked(key, now); throttle != nil {
+		return throttle
+	}
+	user, ok := s.users[userID]
+	if !ok {
+		return os.ErrNotExist
+	}
+	if !user.MFAEnabled {
+		return nil
+	}
+	secret, err := decryptCredential(user.MFASecretCiphertext)
+	if err == nil {
+		err = verifyTOTP(secret, code, now)
+	}
+	if err != nil {
+		return s.recordMFAFailureLocked(key, now, err)
+	}
+	if err := s.clearMFAFailureLocked(key); err != nil {
+		return err
+	}
+	return nil
+}
+
+func verifyTOTP(secret, code string, now time.Time) error {
+	code = strings.TrimSpace(code)
+	if len(code) != 6 {
+		return errors.New("mfa code must have six digits")
+	}
+	if _, err := strconv.Atoi(code); err != nil {
+		return errors.New("mfa code must contain digits")
+	}
+	counter := now.Unix() / 30
+	for offset := int64(-1); offset <= 1; offset++ {
+		if hmac.Equal([]byte(code), []byte(totpCode(secret, counter+offset))) {
+			return nil
+		}
+	}
+	return errors.New("invalid mfa code")
+}
+
+func mfaAttemptKey(userID, clientKey string) string {
+	return strings.TrimSpace(userID) + ":" + hashSecret(strings.TrimSpace(clientKey))
+}
+
+func (s *AuthStore) mfaThrottleLocked(key string, now time.Time) *MFAThrottleError {
+	state, ok := s.mfaAttempts[key]
+	if !ok {
+		return nil
+	}
+	if state.LockedUntil.After(now) {
+		return &MFAThrottleError{RetryAfter: state.LockedUntil.Sub(now)}
+	}
+	if !state.LockedUntil.IsZero() || (!state.LastAttemptAt.IsZero() && now.Sub(state.LastAttemptAt) > mfaStateRetention) {
+		delete(s.mfaAttempts, key)
+	}
+	if !state.WindowStarted.IsZero() && now.Sub(state.WindowStarted) >= mfaFailureWindow {
+		delete(s.mfaAttempts, key)
+	}
+	return nil
+}
+
+func (s *AuthStore) recordMFAFailureLocked(key string, now time.Time, cause error) error {
+	previous, hadPrevious := s.mfaAttempts[key]
+	state := previous
+	if state.WindowStarted.IsZero() || now.Sub(state.WindowStarted) >= mfaFailureWindow {
+		state = MFAAttemptState{WindowStarted: now}
+	}
+	state.Failures++
+	state.LastAttemptAt = now
+	if state.Failures >= mfaFailureLimit {
+		state.LockedUntil = now.Add(mfaLockoutPeriod)
+	}
+	s.mfaAttempts[key] = state
+	if err := s.persistLocked(); err != nil {
+		if hadPrevious {
+			s.mfaAttempts[key] = previous
+		} else {
+			delete(s.mfaAttempts, key)
+		}
+		return err
+	}
+	if state.LockedUntil.After(now) {
+		return &MFAThrottleError{RetryAfter: state.LockedUntil.Sub(now)}
+	}
+	return cause
+}
+
+func (s *AuthStore) clearMFAFailureLocked(key string) error {
+	previous, ok := s.mfaAttempts[key]
+	if !ok {
+		return nil
+	}
+	delete(s.mfaAttempts, key)
+	if err := s.persistLocked(); err != nil {
+		s.mfaAttempts[key] = previous
+		return err
+	}
+	return nil
+}
+
 func (s *AuthStore) GenerateRecoveryCodes(userID string) (User, []string, error) {
 	codes := make([]string, 10)
 	for index := range codes {
@@ -334,12 +468,50 @@ func (s *AuthStore) GenerateRecoveryCodes(userID string) (User, []string, error)
 }
 
 func (s *AuthStore) VerifyRecoveryCode(userID, code string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := s.verifyRecoveryCodeLocked(userID, code); err != nil {
+		return err
+	}
+	return s.persistLocked()
+}
+
+func (s *AuthStore) VerifyRecoveryCodeWithThrottle(userID, code, clientKey string, now time.Time) error {
+	if now.IsZero() {
+		now = time.Now().UTC()
+	}
+	now = now.UTC()
+	key := mfaAttemptKey(userID, clientKey)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if throttle := s.mfaThrottleLocked(key, now); throttle != nil {
+		return throttle
+	}
+	previousUser, userExists := s.users[userID]
+	if err := s.verifyRecoveryCodeLocked(userID, code); err != nil {
+		return s.recordMFAFailureLocked(key, now, err)
+	}
+	previousAttempt, hadAttempt := s.mfaAttempts[key]
+	delete(s.mfaAttempts, key)
+	if err := s.persistLocked(); err != nil {
+		if userExists {
+			s.users[userID] = previousUser
+		}
+		if hadAttempt {
+			s.mfaAttempts[key] = previousAttempt
+		} else {
+			delete(s.mfaAttempts, key)
+		}
+		return err
+	}
+	return nil
+}
+
+func (s *AuthStore) verifyRecoveryCodeLocked(userID, code string) error {
 	code = normalizeRecoveryCode(code)
 	if code == "" {
 		return errors.New("recovery code is required")
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	user, ok := s.users[userID]
 	if !ok {
 		return os.ErrNotExist
@@ -373,7 +545,7 @@ func (s *AuthStore) VerifyRecoveryCode(userID, code string) error {
 		}
 	}
 	s.users[userID] = user
-	return s.persistLocked()
+	return nil
 }
 
 func normalizeRecoveryCode(value string) string {
@@ -737,6 +909,7 @@ func (s *AuthStore) persistLocked() error {
 		"tokens":        s.tokens,
 		"oauth-states":  s.oauthStates,
 		"credentials":   s.credentials,
+		"mfa-attempts":  s.mfaAttempts,
 	} {
 		if err := writeJSONAtomic(filepathJoin(s.root, name+".json"), value); err != nil {
 			return err
