@@ -54,7 +54,7 @@ jobs:
         run: docker compose -f deploy/docker-compose.agentic.yml up -d --wait
       - name: Run integration tests
         env:
-          OLLAMA_AGENT_TEST_POSTGRES_URL: postgres://ollama_agent:change-me-local-only@127.0.0.1:5432/ollama_agent?sslmode=disable
+          OLLAMA_AGENT_TEST_POSTGRES_URL: postgres://ollama_app:change-me-local-only@127.0.0.1:5432/ollama_agent?sslmode=disable
           OLLAMA_AGENT_TEST_REDIS_URL: redis://127.0.0.1:6379/0
           OLLAMA_AGENT_TEST_OTLP_ENDPOINT: http://127.0.0.1:4318/v1/traces
           OLLAMA_AGENT_OTLP_ALLOW_INSECURE: '1'

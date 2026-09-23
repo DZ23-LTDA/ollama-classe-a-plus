@@ -10,6 +10,7 @@ services:
       - "5432:5432"
     volumes:
       - agent-postgres:/var/lib/postgresql/data
+      - ./postgres-init.sql:/docker-entrypoint-initdb.d/10-nosuperuser.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ollama_agent -d ollama_agent"]
       interval: 5s

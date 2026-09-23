@@ -154,6 +154,12 @@ func TestSandboxExecRunsIsolatedPython(t *testing.T) {
 	if _, err := os.Stat("/usr/bin/python3"); err != nil {
 		t.Skip("python3 interpreter is unavailable; skipping sandbox test")
 	}
+	// sandbox.exec relies on unprivileged user namespaces (unshare --user), which
+	// are disabled on some hosts (e.g. Ubuntu 24.04's AppArmor restriction on
+	// GitHub runners). Probe the capability and skip when it is not available.
+	if err := exec.Command("unshare", "--user", "--map-root-user", "true").Run(); err != nil {
+		t.Skip("unprivileged user namespaces are unavailable; skipping sandbox test")
+	}
 	root := t.TempDir()
 	runtime, err := NewRuntime(RuntimeConfig{Store: NewMemoryStore(), WorkspaceRoot: root, Planner: fixedPlanner{steps: []Step{{ID: "step_1", Kind: "sandbox.exec", Title: "run", Risk: RiskWrite, RequiresApproval: true, State: StepPending, Input: map[string]any{"language": "python", "code": "print(2 + 2)"}}}}})
 	if err != nil {
