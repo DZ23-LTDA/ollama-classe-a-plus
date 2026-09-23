@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
+    "screens:verify": "node scripts/validate-capture-manifest.mjs",
     "prettier": "prettier --write .",
     "prettier:check": "prettier --check .",
     "storybook": "storybook dev -p 6006",

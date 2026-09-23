@@ -6,6 +6,8 @@ Os arquivos `class-a-plus-home.png`, `class-a-plus-projects.png`, `class-a-plus-
 
 A captura foi feita com `app/ui/app/scripts/capture-parity-screens.mjs`, usando o Vite dev em `127.0.0.1:4173` e o servidor Ollama local em `127.0.0.1:3001`. O uso do Vite dev é intencional: o cliente agentic usa a URL de desenvolvimento para consultar a API local; o preview estático sem proxy pode mostrar uma tela de erro e não deve ser usado como fonte dessas imagens.
 
+O manifesto versionado [`class-a-plus-capture-manifest.json`](class-a-plus-capture-manifest.json) registra o checkpoint de desenvolvimento, viewport, tamanho e SHA-256 de cada PNG. `npm run screens:verify` falha quando um arquivo é alterado sem atualizar o manifesto; esse gate verifica proveniência do arquivo, não transforma screenshot em evidência de produção.
+
 As telas mostram navegação, Agentic Console, projetos, biblioteca, schedules, skills, plugins, tarefas, Settings e Company OS com estado local/sandbox. Alguns dados demonstrativos foram criados no runtime local; aprovações permanecem visíveis como pendentes quando aplicável. Nenhuma captura representa provider externo conectado, credencial válida, login enterprise, dispositivo físico, deploy, marketplace, loja ou harness remoto.
 
 ## Arquivos históricos

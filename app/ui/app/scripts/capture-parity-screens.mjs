@@ -1,6 +1,7 @@
 import { chromium } from "playwright";
 import { execFileSync } from "node:child_process";
-import { mkdir, stat, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -191,9 +192,12 @@ try {
     if (screenshotInfo.size < 16 * 1024) {
       throw new Error(`screenshot is unexpectedly small for ${route}: ${screenshotInfo.size} bytes`);
     }
+    const screenshotSHA256 = createHash("sha256").update(await readFile(screenshotPath)).digest("hex");
     captures.push({
       route,
       screenshot: screenshotPath,
+      bytes: screenshotInfo.size,
+      sha256: screenshotSHA256,
       interaction,
       title: await page.title(),
       h1: await page.locator("h1").first().textContent().catch(() => ""),

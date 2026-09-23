@@ -42,36 +42,35 @@ A arquitetura é local-first. Um operador pode começar apenas com o binário e 
 
 O relatório [`READINESS_2026-09-22.md`](agentic/READINESS_2026-09-22.md) registra o smoke das APIs fornecidas, a chamada gratuita ponta a ponta via OpenRouter e a lista de gates que ainda dependem de contas, hardware, dispositivos ou infraestrutura externa. As chaves usadas no teste foram fornecidas fora do repositório e devem ser rotacionadas pelo operador.
 
-## Instalação rápida
+## Build e execução rápidos
 
-### Linux
-
-Use o método de instalação correspondente à versão do Ollama que você pretende operar ou compile a revisão do repositório para desenvolvimento. Para executar uma revisão local a partir do código-fonte:
+O fork público distribui o código-fonte, não um instalador assinado, binário de release, imagem Docker pública ou pacote de loja Classe A+. Não use `ollama.com/install.sh`, `OllamaSetup.exe`, `Ollama.dmg` ou `ollama/ollama` para instalar este fork: esses artefatos pertencem ao upstream. Compile a revisão do repositório para desenvolvimento e validação local:
 
 ```bash
 git clone https://github.com/DZ23-LTDA/ollama-classe-a-plus.git
 cd ollama-classe-a-plus
 
 # Conferir a revisão pública
- git log -1 --oneline
+git log -1 --oneline
 
 # Executar testes do runtime agentic
-CGO_ENABLED=0 go test ./internal/agent -count=1
+CGO_ENABLED=1 go test ./internal/agent -count=1
 
 # Testar servidor e integrações principais
 CGO_ENABLED=1 go test ./server ./cmd/launch ./internal/multillm -count=1
 
-# Compilar o binário
-CGO_ENABLED=1 go build -o ollama-classe-a-plus .
+# Compilar o binário do fork
+mkdir -p bin
+CGO_ENABLED=1 go build -trimpath -o bin/ollama-classe-a-plus .
 ```
 
 Para utilizar o binário compilado:
 
 ```bash
-./ollama-classe-a-plus serve
+OLLAMA_HOST=127.0.0.1:11434 ./bin/ollama-classe-a-plus serve
 ```
 
-Em instalações do sistema, substitua o nome do binário pelo caminho instalado. O runtime agentic usa o mesmo servidor Ollama e publica as rotas versionadas sob `/api/agent/v1`.
+Os helpers `scripts/install.sh` e `scripts/install.ps1` fazem o mesmo build local e instalam o executável em um diretório escolhido pelo operador. Eles não baixam binários, modelos ou serviços externos. O runtime agentic usa o mesmo servidor compatível e publica as rotas versionadas sob `/api/agent/v1`.
 
 ### Docker e infraestrutura distribuída
 
@@ -84,7 +83,7 @@ docker compose -f deploy/docker-compose.agentic.yml up -d --wait
 export OLLAMA_AGENT_DATABASE_URL="postgres://ollama_agent:${OLLAMA_AGENT_POSTGRES_PASSWORD}@127.0.0.1:5432/ollama_agent?sslmode=disable"
 export OLLAMA_AGENT_REDIS_URL="redis://:${OLLAMA_AGENT_REDIS_PASSWORD}@127.0.0.1:6379/0"
 export OLLAMA_AGENT_OTLP_ENDPOINT='http://127.0.0.1:4318'
-./ollama-classe-a-plus serve
+OLLAMA_HOST=127.0.0.1:11434 ./bin/ollama-classe-a-plus serve
 ```
 
 Em produção, use PostgreSQL gerenciado ou uma instância com backups e RLS revisado, Redis com autenticação e rede privada, e um collector OTLP com autenticação e retenção definida.
@@ -100,7 +99,7 @@ export OLLAMA_AGENT_MODEL='qwen3:32b'
 export OLLAMA_AGENT_EMBED_MODEL='nomic-embed-text'
 export OLLAMA_AGENT_AUTH_REQUIRED='true'
 export OLLAMA_AGENT_AUTH_STORE="$HOME/.local/share/ollama-classe-a-plus/auth"
-./ollama-classe-a-plus serve
+OLLAMA_HOST=127.0.0.1:11434 ./bin/ollama-classe-a-plus serve
 ```
 
 ### Variáveis do runtime
@@ -221,7 +220,7 @@ As capturas abaixo foram atualizadas em **2026-09-22** com Chromium, Vite dev e 
 | Builder visual | [builder-mockup.png](images/mockups/builder-mockup.png) | **CONCEITO** para o editor rico; preview/export local têm screenshots de API, não esta imagem. |
 | Companion mobile | [mobile-mockup.png](images/mockups/mobile-mockup.png) | **CONCEITO**; push, conflitos avançados, builds e lojas continuam pendentes. |
 
-As notas de proveniência estão em `docs/images/screens/SCREEN_CAPTURE_NOTES.md` e `docs/images/mockups/MOCKUP_NOTES.md`. Isso evita apresentar uma tela conceitual como funcionalidade concluída.
+As notas de proveniência estão em `docs/images/screens/SCREEN_CAPTURE_NOTES.md`, no [manifesto com hashes](images/screens/class-a-plus-capture-manifest.json) e em `docs/images/mockups/MOCKUP_NOTES.md`. A CI executa `npm run screens:verify` para detectar alterações não registradas. Isso evita apresentar uma tela conceitual como funcionalidade concluída, mas não substitui homologação de produto.
 
 ## Desktop, mobile e companions
 

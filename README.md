@@ -1,14 +1,8 @@
-<p align="center">
-  <a href="https://ollama.com">
-    <img src="https://github.com/ollama/ollama/assets/3325447/0d0b44e2-8f4a-4e99-9b52-a5c1c741c8f7" alt="ollama" width="200"/>
-  </a>
-</p>
-
 # Ollama Classe A+
 
 > **Uma distribuição agentic local-first para modelos, automações, pesquisa, builders e operação segura.**
 
-Este repositório público reúne a base Ollama DZ23 e a evolução agentic do projeto. O manual completo, os contratos, a configuração e a política de atualização estão em [`docs/CLASS_A_PLUS_GUIDE.md`](docs/CLASS_A_PLUS_GUIDE.md).
+Este é o fork público mantido por [DZ23-LTDA](https://github.com/DZ23-LTDA), baseado no Ollama e preservando a licença MIT e os avisos de atribuição upstream. O projeto adiciona superfícies agentic próprias; não é o instalador, serviço hospedado ou distribuição oficial do Ollama. O manual completo, os contratos, a configuração e a política de atualização estão em [`docs/CLASS_A_PLUS_GUIDE.md`](docs/CLASS_A_PLUS_GUIDE.md).
 
 ### Visão rápida — capturas reais atualizadas em 2026-09-22
 
@@ -45,51 +39,39 @@ As imagens acima foram recapturadas com Chromium contra o Vite dev e o servidor 
 
 Start building with open models.
 
-## Download
+## Build and run this fork
 
-### macOS
-
-```shell
-curl -fsSL https://ollama.com/install.sh | sh
-```
-
-or [download manually](https://ollama.com/download/Ollama.dmg)
-
-### Windows
+The public repository currently distributes source code, not a signed Classe A+ installer, release binary, Docker image, or app-store package. Build the revision you have checked out so the executable and agentic runtime come from this fork:
 
 ```shell
-irm https://ollama.com/install.ps1 | iex
+git clone https://github.com/DZ23-LTDA/ollama-classe-a-plus.git
+cd ollama-classe-a-plus
+go version  # Go version required by go.mod
+mkdir -p bin
+go build -trimpath -o bin/ollama-classe-a-plus .
+OLLAMA_HOST=127.0.0.1:11434 ./bin/ollama-classe-a-plus serve
 ```
 
-or [download manually](https://ollama.com/download/OllamaSetup.exe)
+The equivalent helpers are `scripts/install.sh` on Unix-like systems and `scripts/install.ps1` on Windows. They build the checked-out source locally and never download `ollama.com` installers or official upstream binaries. They require Go and do not install models or configure external providers.
 
-### Linux
+In a second terminal, run the web operator surface from source:
 
 ```shell
-curl -fsSL https://ollama.com/install.sh | sh
+cd app/ui/app
+npm ci --no-audit --no-fund
+npm run dev
 ```
 
-[Manual install instructions](https://docs.ollama.com/linux#manual-install)
+The local web development configuration uses the agentic API at `http://127.0.0.1:3001` when the development server is configured for that port. A source build is not evidence of a signed release, production deployment, external OAuth, provider account, or physical-device validation. Those remain `BLOCKED_BY_EXTERNAL_DEPENDENCY` until the maintainer supplies the required signing keys, release workflow, accounts and test environments.
 
-### Docker
+### Upstream compatibility references
 
-The official [Ollama Docker image](https://hub.docker.com/r/ollama/ollama) `ollama/ollama` is available on Docker Hub.
-
-### Libraries
-
-- [ollama-python](https://github.com/ollama/ollama-python)
-- [ollama-js](https://github.com/ollama/ollama-js)
-
-### Community
-
-- [Discord](https://discord.gg/ollama)
-- [𝕏 (Twitter)](https://x.com/ollama)
-- [Reddit](https://reddit.com/r/ollama)
+The inherited Ollama CLI/API and integration pages remain available for compatibility and attribution. Links to `ollama.com`, `docs.ollama.com`, upstream libraries, Docker Hub, or upstream communities describe the upstream project; they do **not** install or publish this fork. Use the source-build instructions above for Classe A+.
 
 ## Get started
 
 ```
-ollama
+./bin/ollama-classe-a-plus
 ```
 
 You'll be prompted to run a model or connect Ollama to your existing agents or applications such as `Claude Code`, `OpenClaw`, `OpenCode` , `Codex`, `Copilot`,  and more.
@@ -99,7 +81,7 @@ You'll be prompted to run a model or connect Ollama to your existing agents or a
 To launch a specific integration:
 
 ```
-ollama launch claude
+./bin/ollama-classe-a-plus launch claude
 ```
 
 Supported integrations include [Claude Code](https://docs.ollama.com/integrations/claude-code), [Codex](https://docs.ollama.com/integrations/codex), [Copilot CLI](https://docs.ollama.com/integrations/copilot-cli), [DeepSeek Harness](https://docs.ollama.com/integrations/deepseek-harness), [Droid](https://docs.ollama.com/integrations/droid), and [OpenCode](https://docs.ollama.com/integrations/opencode).
@@ -109,20 +91,18 @@ Supported integrations include [Claude Code](https://docs.ollama.com/integration
 Use [OpenClaw](https://docs.ollama.com/integrations/openclaw) to turn Ollama into a personal AI assistant across WhatsApp, Telegram, Slack, Discord, and more:
 
 ```
-ollama launch openclaw
+./bin/ollama-classe-a-plus launch openclaw
 ```
 
 ### Chat with a model
 
-Run and chat with [Gemma 4](https://ollama.com/library/gemma4):
+Run and chat with a model already available in your local Ollama-compatible model store:
 
 ```
-ollama run gemma4
+./bin/ollama-classe-a-plus run <modelo-local>
 ```
 
-See [ollama.com/library](https://ollama.com/library) for the full list.
-
-See the [quickstart guide](https://docs.ollama.com/quickstart) for more details.
+See the [upstream model library](https://ollama.com/library) only as a compatibility reference; model availability, licensing and downloads are operator responsibilities. The [Classe A+ guide](docs/CLASS_A_PLUS_GUIDE.md) is the canonical source-build documentation.
 
 ## REST API
 
@@ -147,15 +127,15 @@ This fork can expose explicitly configured API and CLI providers beside local mo
 
 ### DZ23 agentic runtime
 
-The fork now includes an agentic runtime with persistent missions, validated plans, approval-gated tools, workspace isolation, artifact manifests, event history, recovery-aware execution, a persistent queue with retries/dead-letter/replay, optional PostgreSQL persistence and Redis workers, SSE events, local and OTLP traces, a multiagent orchestrator with specialist roles and synthesis, deep research with citations/cache/robots policy/SSRF guard, Playwright Browser Operator, Linux/macOS/Windows Desktop companion pairing, TLS 1.3/mTLS WebSocket transport with reloadable server certificates, MCP stdio lifecycle, semantic memory, PDF/DOCX/XLSX ingestion, HTTP connectors, scheduler/webhooks, Prometheus metrics, MFA TOTP with recovery codes, OIDC discovery/userinfo provisioning, SAML SP metadata/AuthnRequest/ACS, optional encrypted OAuth credentials, organization/RBAC boundaries with forced PostgreSQL RLS, collaboration comments/presence, multimodal provider adapters, local OCR when Tesseract is installed, visual component canvas with bindings/events and persistent undo/redo, PDF/DOCX/PPTX exports, builders for websites/apps/games/slides/dashboards, and approved real deployment adapters for Vercel, Netlify or a generic hosting gateway. Configure `OLLAMA_AGENT_ROOT`, optionally set `OLLAMA_AGENT_STORE`, `OLLAMA_AGENT_DATABASE_URL`, `OLLAMA_AGENT_REDIS_URL`, `OLLAMA_AGENT_OTLP_ENDPOINT`, `OLLAMA_AGENT_MODEL`, `OLLAMA_AGENT_EMBED_MODEL`, `OLLAMA_AGENT_CONNECTORS`, `OLLAMA_AGENT_DEPLOYMENTS`, `OLLAMA_AGENT_MCP`, `OLLAMA_AGENT_AUTH_STORE`, `OLLAMA_AGENT_AUTH_REQUIRED`, `OLLAMA_AGENT_AUTH_SSO_PUBLIC`, `OLLAMA_AGENT_MEDIA_BASE_URL` and `OLLAMA_AGENT_MEDIA_API_KEY`, then use the API or the CLI:
+The fork now includes an agentic runtime with persistent missions, validated plans, approval-gated tools, workspace isolation, artifact manifests, event history, recovery-aware execution, a persistent queue with retries/dead-letter/replay, optional PostgreSQL persistence and Redis workers, SSE events, local and OTLP traces, a multiagent orchestrator with specialist roles and synthesis, deep research with citations/cache/robots policy/SSRF guard, Playwright Browser Operator, Linux/macOS/Windows Desktop companion pairing, TLS 1.3/mTLS WebSocket transport with reloadable server certificates, MCP stdio lifecycle, semantic memory, PDF/DOCX/XLSX ingestion, HTTP connectors, scheduler/webhooks, Prometheus metrics, MFA TOTP with recovery codes, OIDC discovery/userinfo provisioning, SAML SP metadata/AuthnRequest/ACS, optional encrypted OAuth credentials, organization/RBAC boundaries with forced PostgreSQL RLS, collaboration comments/presence, multimodal provider adapters, local OCR when Tesseract is installed, visual component canvas with bindings/events and persistent undo/redo, PDF/DOCX/PPTX exports, and builders for websites/apps/games/slides/dashboards. Deployment adapters for Vercel, Netlify and generic gateways are present with local fixtures and server-side approvals; real provider accounts, billing, health checks and rollback remain operator-owned and unhomologated. Configure `OLLAMA_AGENT_ROOT`, optionally set `OLLAMA_AGENT_STORE`, `OLLAMA_AGENT_DATABASE_URL`, `OLLAMA_AGENT_REDIS_URL`, `OLLAMA_AGENT_OTLP_ENDPOINT`, `OLLAMA_AGENT_MODEL`, `OLLAMA_AGENT_EMBED_MODEL`, `OLLAMA_AGENT_CONNECTORS`, `OLLAMA_AGENT_DEPLOYMENTS`, `OLLAMA_AGENT_MCP`, `OLLAMA_AGENT_AUTH_STORE`, `OLLAMA_AGENT_AUTH_REQUIRED`, `OLLAMA_AGENT_AUTH_SSO_PUBLIC`, `OLLAMA_AGENT_MEDIA_BASE_URL` and `OLLAMA_AGENT_MEDIA_API_KEY`, then use the API or the CLI:
 
 ```shell
-ollama agent create --objective "inspecionar o workspace" --auto-run
+./bin/ollama-classe-a-plus agent create --objective "inspecionar o workspace" --auto-run
 ```
 
 Read [the product tree](docs/agentic/PRODUCT_TREE.md), [the parity matrix](docs/agentic/PARITY_MATRIX.md), [the agentic architecture](docs/agentic/ARCHITECTURE.md), [the integrations guide](docs/agentic/INTEGRATIONS.md), [the executable roadmap](docs/agentic/ROADMAP.md), [the API guide](docs/agentic/API.md), the [phase 7 delivery note](docs/agentic/PHASE7_DELIVERY.md), the [phase 8 delivery note](docs/agentic/PHASE8_DELIVERY.md), and the [harness comparison synthesis](docs/agentic/HARNESS_COMPARISON_SYNTHESIS.md). The Web Agentic Console and an Expo mobile client are included as operator surfaces. Provider credentials, EAS signing, external OAuth/OIDC/SAML configuration, Tesseract installation and hosting credentials remain deployment responsibilities; the code does not execute an external publish without explicit approval.
 
-### Python
+### Python (cliente upstream compatível)
 
 ```
 pip install ollama
@@ -173,7 +153,7 @@ response = chat(model='gemma4', messages=[
 print(response.message.content)
 ```
 
-### JavaScript
+### JavaScript (cliente upstream compatível)
 
 ```
 npm i ollama

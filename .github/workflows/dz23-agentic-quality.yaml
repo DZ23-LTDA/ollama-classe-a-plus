@@ -136,13 +136,16 @@ jobs:
       - name: Web production build
         working-directory: app/ui/app
         run: npm run build
+      - name: Screenshot provenance manifest
+        working-directory: app/ui/app
+        run: npm run screens:verify
 
   sbom:
     name: Generate SBOM
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: anchore/sbom-action@v0
+      - uses: anchore/sbom-action@006b7ce8314066bdf1765b4500370d40fa6917a3 # v0.24.2
         with:
           path: .
           format: cyclonedx-json

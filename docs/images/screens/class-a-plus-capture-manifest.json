@@ -1,0 +1,34 @@
+{
+  "schema": "class-a-plus.capture.v1",
+  "capturedAtUTC": "2026-09-22",
+  "source": {
+    "repository": "DZ23-LTDA/ollama-classe-a-plus",
+    "branch": "feat/manus-parity-omniroute",
+    "gitSHA": "366a4964",
+    "baseURL": "http://127.0.0.1:4173",
+    "apiURL": "http://127.0.0.1:3001",
+    "captureScript": "app/ui/app/scripts/capture-parity-screens.mjs"
+  },
+  "viewport": {
+    "width": 1440,
+    "height": 900,
+    "deviceScaleFactor": 1
+  },
+  "files": [
+    { "path": "class-a-plus-home.png", "bytes": 88617, "sha256": "ed12cd7f5abcdb244b785b4fd44a4cf1781a2217d324649e1469aa4fb5f3f783" },
+    { "path": "class-a-plus-projects.png", "bytes": 123306, "sha256": "93ad91537292455d3f9afcc28d83b31394a0a13f18a0b676083b79ece453e068" },
+    { "path": "class-a-plus-library.png", "bytes": 114374, "sha256": "c9264148bd9da4c1bc585eedbb6e91d0548b821ab6165fa020aadbb7f1723e67" },
+    { "path": "class-a-plus-scheduled.png", "bytes": 155005, "sha256": "81c9dc84bb1aa0cff5aba06e536e761e50102d5c019f4a7e462a5b075e330207" },
+    { "path": "class-a-plus-skills.png", "bytes": 114374, "sha256": "48cddfb1b454a7164ef8482412e01375a6d740ae9b41068a4943f18f68ff0896" },
+    { "path": "class-a-plus-plugins.png", "bytes": 129228, "sha256": "edb642ee03459b7b3cbe3531a0d93209cad9774dcdb467b119069509f72d0035" },
+    { "path": "class-a-plus-tasks.png", "bytes": 161665, "sha256": "d7ea2a746d6540563a5ca5134d9b906660276a39e49cd1b9413c5bc8f939893c" },
+    { "path": "class-a-plus-agentic.png", "bytes": 110239, "sha256": "cfa1a74b8874cd1d1745408543cf9492f06481637e6a09c167a13281131e4149" },
+    { "path": "class-a-plus-settings.png", "bytes": 161659, "sha256": "89420370b9d3c7317a2c5d7c51bb9f8d4eba914a6d7b7bf829c855c909902e72" },
+    { "path": "class-a-plus-company.png", "bytes": 130236, "sha256": "dd29f61eaed8bfbd9c7a8e146dd8fc2f615a9e896ebba15e0fc89651af6d2781" }
+  ],
+  "limitations": [
+    "These files show observed local/sandbox UI state only; they do not prove external providers, accounts, devices, deployment, store review, or production readiness.",
+    "The manifest records the development branch checkpoint that produced the captures; it is not a claim that every screen is merged into main.",
+    "The settings.png and agentic-console.png aliases are historical compatibility assets and are not part of this current capture set."
+  ]
+}

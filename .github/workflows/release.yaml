@@ -1,9 +1,22 @@
 name: release
 
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_dispatch:
+    inputs:
+      enable_release:
+        description: "Acknowledge that signing, accounts, runners and release review are ready"
+        required: true
+        type: boolean
+        default: false
+      release_version:
+        description: "Semver version to publish, for example 0.1.0"
+        required: true
+        type: string
+
+# This inherited release pipeline is not a public distribution promise. It is
+# manual-only and requires both the dispatch acknowledgement and the repository
+# variable OLLAMA_ENABLE_RELEASE=true. The fork remains source-distributed until
+# signing, provenance, rollback and release review are actually completed.
 
 env:
   CGO_CFLAGS: '-O3'
@@ -11,6 +24,7 @@ env:
 
 jobs:
   setup-environment:
+    if: ${{ inputs.enable_release == true && vars.OLLAMA_ENABLE_RELEASE == 'true' }}
     runs-on: ubuntu-latest
     environment: release
     outputs:
@@ -21,12 +35,19 @@ jobs:
       - uses: actions/checkout@v4
       - name: Set environment
         id: goflags
+        env:
+          RELEASE_VERSION: ${{ inputs.release_version }}
         run: |
-          echo GOFLAGS="'-ldflags=-w -s \"-X=github.com/ollama/ollama/version.Version=${GITHUB_REF_NAME#v}\" \"-X=github.com/ollama/ollama/server.mode=release\"'" | tee -a $GITHUB_OUTPUT
-          echo VERSION="${GITHUB_REF_NAME#v}" | tee -a $GITHUB_OUTPUT
+          version="$RELEASE_VERSION"
+          case "$version" in
+            ''|*[!0-9.]*|.*|*.) echo "Invalid release_version: $version"; exit 1 ;;
+          esac
+          echo GOFLAGS="'-ldflags=-w -s \"-X=github.com/ollama/ollama/version.Version=$version\" \"-X=github.com/ollama/ollama/server.mode=release\"'" | tee -a $GITHUB_OUTPUT
+          echo VERSION="$version" | tee -a $GITHUB_OUTPUT
           echo vendorsha=$(cat LLAMA_CPP_VERSION)-$(cat MLX_VERSION)-$(cat MLX_C_VERSION) | tee -a $GITHUB_OUTPUT
 
   quality:
+    if: ${{ inputs.enable_release == true && vars.OLLAMA_ENABLE_RELEASE == 'true' }}
     name: Agentic release quality gate
     runs-on: ubuntu-latest
     steps:
@@ -46,11 +67,15 @@ jobs:
       - name: Mobile typecheck
         working-directory: apps/mobile-agentic
         run: npm ci --no-audit --no-fund && npm run typecheck
+      - name: Mobile offline policy regression
+        working-directory: apps/mobile-agentic
+        run: npm run test:policy
       - name: Web tests and production build
         working-directory: app/ui/app
-        run: npm ci --no-audit --no-fund && npm test -- --run && npm run build
+        run: npm ci --no-audit --no-fund && npm run lint && npm test -- --run && npm run build && npm run screens:verify
 
   darwin-build:
+    if: ${{ inputs.enable_release == true && vars.OLLAMA_ENABLE_RELEASE == 'true' }}
     runs-on: macos-26-xlarge
     environment: release
     needs: [setup-environment, quality]
@@ -117,6 +142,7 @@ jobs:
             dist/*.dmg
 
   windows-depends:
+    if: ${{ inputs.enable_release == true && vars.OLLAMA_ENABLE_RELEASE == 'true' }}
     needs: [setup-environment, quality]
     strategy:
       fail-fast: false
@@ -357,6 +383,7 @@ jobs:
           path: dist\*
 
   windows-build:
+    if: ${{ inputs.enable_release == true && vars.OLLAMA_ENABLE_RELEASE == 'true' }}
     runs-on: windows
     environment: release
     needs: [setup-environment, quality]
@@ -421,6 +448,7 @@ jobs:
             dist\*
 
   windows-app:
+    if: ${{ inputs.enable_release == true && vars.OLLAMA_ENABLE_RELEASE == 'true' }}
     runs-on: windows
     environment: release
     needs: [setup-environment, windows-build, windows-depends]
@@ -501,6 +529,7 @@ jobs:
             dist/OllamaSetup.exe
 
   linux-depends:
+    if: ${{ inputs.enable_release == true && vars.OLLAMA_ENABLE_RELEASE == 'true' }}
     strategy:
       fail-fast: false
       matrix:
@@ -583,6 +612,7 @@ jobs:
   # Heavy stages were pre-built by linux-depends; this job is cache-hit-only for those layers
   # and just assembles, runs the Go build, pushes the final image, and extracts release bundles.
   docker-build-push:
+    if: ${{ inputs.enable_release == true && vars.OLLAMA_ENABLE_RELEASE == 'true' }}
     strategy:
       fail-fast: false
       matrix:
@@ -735,6 +765,7 @@ jobs:
 
   # Merge Docker images for the same flavor into a single multi-arch manifest
   docker-merge-push:
+    if: ${{ inputs.enable_release == true && vars.OLLAMA_ENABLE_RELEASE == 'true' }}
     strategy:
       fail-fast: false
       matrix:
@@ -770,6 +801,7 @@ jobs:
 
   # Final release process
   release:
+    if: ${{ inputs.enable_release == true && vars.OLLAMA_ENABLE_RELEASE == 'true' }}
     runs-on: ubuntu-latest
     environment: release
     needs: [darwin-build, windows-app, docker-build-push, quality]
@@ -818,7 +850,7 @@ jobs:
             fi
           done < <(find dist -type f -print0)
       - name: Generate release SBOM
-        uses: anchore/sbom-action@v0
+        uses: anchore/sbom-action@006b7ce8314066bdf1765b4500370d40fa6917a3 # v0.24.2
         with:
           path: .
           format: cyclonedx-json
