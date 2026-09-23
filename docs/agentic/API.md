@@ -318,3 +318,21 @@ Os endpoints seguintes alteram somente recursos já registrados no servidor e s�
 - `DELETE` nos recursos correspondentes para remoção explícita.
 
 A UI não concede scopes por conta própria. O servidor valida o identificador, o estado e as allowlists antes de alterar o lifecycle. Tokens continuam fora das respostas e manifests sem atestado permanecem sem confiança executável.
+
+
+## Lifecycle de connectors
+
+`GET /api/agent/v1/connectors` lista somente connectors acessíveis à organização ativa e redige `token_env`; `credential_configured` é calculado no servidor como booleano. Quando `OLLAMA_AGENT_CONNECTORS` não está definido, o runtime usa o manifest durável `OLLAMA_AGENT_STORE/connectors.json`. O arquivo é criado com diretório privado, modo `0600` e atualização por arquivo temporário seguido de rename. Ele contém referências de configuração, nunca valores de token, ciphertext ou headers secretos.
+
+Em modo autenticado, `POST /api/agent/v1/connectors` exige membership `owner` ou `admin`. O servidor força `organization_id` a partir do contexto autenticado. Um `organization_id` conflitante, um ID já pertencente a outro tenant, campos JSON desconhecidos e valores de segredo como `token` ou `api_key` são rejeitados. O payload usa apenas nomes de variáveis de ambiente e/ou identificadores de provider OAuth:
+
+```bash
+curl -sS -X POST http://localhost:11434/api/agent/v1/connectors \
+  -H 'Authorization: Bearer TOKEN' \
+  -H 'Content-Type: application/json' \
+  -d '{"id":"github-prod","provider":"GitHub","base_url":"https://api.github.com","token_env":"DZ23_GITHUB_TOKEN","oauth_provider":"github","operations":[{"name":"profile","methods":["GET"],"path_prefixes":["/user"]}]}'
+```
+
+O endpoint valida HTTPS sem userinfo, nomes de ambiente, operações, métodos e prefixos de caminho. Requests e responses do connector permanecem limitados pelo manager e o egress mantém bloqueio de proxy/redirect e verificação do endereço conectado. A configuração `OLLAMA_AGENT_CONNECTORS=/caminho/manifest.json` continua disponível como modo estático explícito; nesse modo o manifest é carregado na inicialização e o lifecycle cadastrado pela UI não é apresentado como persistente nesse arquivo. O operador deve escolher conscientemente entre o manifest estático e o store durável.
+
+A resposta do catálogo nunca devolve o nome da variável de token. Registrar um endpoint não prova que a conta do provider existe, que OAuth foi consentido, que o upstream está saudável ou que uma ação externa foi executada. Esses estados exigem credencial provisionada fora do repositório, escopos mínimos, approval e smoke reversível autorizado.

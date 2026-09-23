@@ -359,3 +359,15 @@ O runtime passou a selecionar planner pelo provider/modelo efetivo e a falhar fe
 O upstream encontrou primeiro um helper planner não utilizado e depois uma falha `EEXIST/ENOENT` do cache npm global no Windows. O helper foi removido e o workflow passou a usar cache npm isolado por runner e `fail-fast: false` nas matrizes normal/race. No head `0f95b6a1`, passaram upstream `test` (`35804229207`), `class-a-plus-integrity` (`35804229189`), `dz23-multi-provider` (`35804229204`) e `dz23-agentic-quality` (`35804229301`). O caminho normal confirmou Linux, macOS e Windows, race aplicável, Go/server, serviços distribuídos, Web/Mobile e SBOM.
 
 A matriz GPU/nativa continua manual e opt-in. Catálogo ou `credential_configured` não significa conta externa conectada; credenciais, OAuth, Woovi/OpenPix, fiscal, marketplaces, deploys, mídia, dispositivos, signing e stores continuam dependências do operador.
+
+
+## Unreleased — pós-V5, macOS portability e connector lifecycle — 2026-09-22
+
+- Corrigida a validação de workspace em macOS para não confundir o alias `/var` → `/private/var` com um symlink no componente final; a proteção de componentes descendentes e containment foi preservada.
+- Corrigido o teste de defaults duráveis para consultar `os.UserConfigDir()` efetivo da plataforma.
+- Confirmado o upstream `test` no head `0da6be80`: run `35808941810` SUCCESS, incluindo normal macOS `107015911723`, race macOS `107015880499`, normal Ubuntu `107015911678`, normal Windows `107015911689` e race Ubuntu `107015880534`; integrity `35808941807`, agentic quality `35808941824` e multi-provider `35808941746` também passaram.
+- Publicado `411335ba6247b16a431c7f10b5daf8a9fcc0e8f4` com manifest durável de connectors em `OLLAMA_AGENT_STORE/connectors.json`, escrita `0600`, rename após arquivo temporário, rollback em falha e redaction de referências sensíveis na resposta.
+- Adicionado `POST /api/agent/v1/connectors` com owner/admin, binding server-side do tenant, validação HTTPS/allowlist e rejeição de campos desconhecidos, `credential_configured` caller-controlled e valores de segredo.
+- A tela Plugins passou a registrar connectors com endpoint, operações, nome de env ou ID OAuth, sem campo para token. O valor da credencial continua responsabilidade do ambiente seguro do operador ou do fluxo OAuth oficial.
+
+Os checks remotos do novo SHA estavam pendentes no momento desta publicação documental. A entrega permanece **preview/local RC em hardening**. Nenhum connector externo, conta OAuth, Composio, Woovi/OpenPix, fiscal/NF-e, marketplace, rede social ou provider é declarado conectado ou validado por estes adapters.

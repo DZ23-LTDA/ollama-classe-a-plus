@@ -371,3 +371,12 @@ O caminho interno avançou em quatro frentes. O planner agora usa provider/model
 O upstream teve duas falhas diagnosticadas e corrigidas sem relaxar gates: helper Go não utilizado e colisão do cache npm global no Windows. O workflow agora isola o cache por runner e deixa test/race concluírem todas as plataformas. O head `0f95b6a1` passou upstream, integrity, multi-provider e agentic quality, com Linux/macOS/Windows, race Linux/macOS, PostgreSQL RLS, Redis DLQ, OTLP, Web/Mobile e SBOM.
 
 A próxima prioridade continua sendo a validação que não pode ser simulada honestamente nesta sandbox: host strict com cgroup/AppArmor/SELinux, IdP/OAuth e providers reais, deploy/media/marketplaces, Woovi/OpenPix e fiscal, push e dispositivos físicos, signing/provenance/rollback e stores/app review. O estado permanece **preview/local RC em hardening**.
+
+
+## Incremento 2026-09-22 — macOS CI e lifecycle durável de connectors
+
+O head `0da6be80` fechou a portabilidade do workspace e foi validado pela matriz pública normal/race de Linux, macOS e Windows. A correção foi específica para o alias de filesystem `/var` → `/private/var` no macOS e não relaxou a proteção contra symlinks descendentes. O run upstream `35808941810` terminou com sucesso, e os workflows do fork `35808941807`, `35808941824` e `35808941746` também passaram nesse head.
+
+O commit `411335ba` adicionou o primeiro registro server-owned para connectors. Em auth mode, somente owner/admin pode cadastrar; o servidor ignora qualquer tentativa de escolher outro tenant e rejeita colisões de ID entre organizações. Sem um manifesto estático explícito, configurações registradas são persistidas em `OLLAMA_AGENT_STORE/connectors.json` com permissões `0600`, rename após arquivo temporário e rollback quando a persistência falha. O manifest guarda nomes de variáveis e referências OAuth, não valores de credenciais. A UI agora oferece o fluxo correspondente e mantém a distinção entre registrado, credencial presente e conta upstream validada.
+
+O próximo incremento deve aplicar o mesmo padrão, separadamente e com testes negativos, ao registro/persistência de MCP stdio, Remote MCP e skills. Esse trabalho não deve copiar segredos, permitir comandos fora da allowlist ou transformar OAuth em status conectado. Depois disso permanecem os gates de isolamento físico do sandbox, staging distribuído, OAuth/IdP e contas reais, providers externos, social commerce, fiscal/NF-e, dispositivos físicos, GPU, signing, lojas, app review e deploy autorizado.

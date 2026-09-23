@@ -319,3 +319,14 @@ A revisão confirmou cinco melhorias internas verificáveis. O planner deixou de
 O upstream falhou primeiro por um helper `OllamaPlanner.fallback` não utilizado; a correção foi removê-lo. A execução seguinte expôs uma colisão `EEXIST/ENOENT` no cache npm compartilhado do runner Windows, com cancelamento dos irmãos por `fail-fast`. O workflow foi corrigido para cache por runner e `fail-fast: false`. O head `0f95b6a1969462fb309e00e29813e8136d15f757` passou os quatro workflows: `test` `35804229207`, integrity `35804229189`, multi-provider `35804229204` e agentic quality `35804229301`.
 
 O resultado é mitigação observável do caminho normal, não homologação externa. Não há base para declarar Composio, OAuth, Woovi/OpenPix, fiscal, marketplaces, deploy, mídia, dispositivos ou signing conectados/concluídos. A decisão permanece **FIXING / preview-local em hardening**, com PR aberto e sem merge automático em `main`.
+
+
+## Addendum de evidências pós-V5 — 2026-09-22
+
+O head `0da6be80` foi revalidado pela matriz pública. O run upstream `35808941810` terminou `SUCCESS`; normal macOS `107015911723`, race macOS `107015880499`, normal Ubuntu `107015911678`, normal Windows `107015911689` e race Ubuntu `107015880534` terminaram com sucesso. Os workflows do fork correspondentes a integrity `35808941807`, agentic quality `35808941824` e multi-provider `35808941746` também passaram. A falha macOS anterior foi diagnosticada como uma diferença de alias de filesystem (`/var` e `/private/var`) e corrigida sem remover a rejeição de symlinks descendentes.
+
+O commit `411335ba` fechou uma parte antes aberta do registro tenant-owned de connectors. O runtime agora usa manifest durável em `OLLAMA_AGENT_STORE/connectors.json` quando não há manifest estático explícito. Escritas usam modo `0600`, arquivo temporário, sync, rename e rollback. `POST /api/agent/v1/connectors` exige owner/admin em auth mode, força o tenant server-side, recusa campos desconhecidos e valores de segredo e bloqueia colisões de ID cross-tenant. O cliente web possui formulário para endpoint HTTPS, operações, nome de env e ID OAuth, mas nenhum campo de token.
+
+A slice foi coberta por testes de persistência, redaction, rollback, admin/member, cross-tenant, raw-secret rejection e build UI. O novo SHA ainda exige a conclusão dos checks remotos próprios; a evidência do head anterior não é reutilizada como se cobrisse o novo código. Persistência/lifecycle de MCP, Remote MCP e skills, attestation de skills, isolamento de processo e auditoria distribuída continuam fora desta slice.
+
+O veredito não muda: **preview/local RC em hardening**, não final e não production-ready. Cadastro de connector não equivale a OAuth consentido, conta conectada, upstream saudável ou ação externa validada.

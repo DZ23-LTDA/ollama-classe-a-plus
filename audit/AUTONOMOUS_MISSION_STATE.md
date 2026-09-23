@@ -2115,3 +2115,75 @@ pr_checks: 21 successful, 3 skipped, 0 failing, 0 pending
 classification: preview/local RC em hardening; NÃO final; NÃO production-ready
 next_action: manter PR #1 aberto; continuar somente slices P0/P1 independentes e validações externas autorizadas
 ```
+
+
+## Fechamento do head portátil pós-V5 — 2026-09-22
+
+```yaml
+state: CANDIDATE_COMPLETED
+iteration: 4
+head: 0da6be80
+completed:
+  - durable_runtime_data_root_and_legacy_state_migration
+  - fail_closed_default_planner_and_provider_resolver_wiring
+  - tenant_binding_for_missions_projects_and_local_catalog
+  - ingestion_workspace_containment_cancelability_and_compressed_byte_budgets
+  - macos_workspace_alias_portability_fix
+macos_fix:
+  observed_failure: os.EvalSymlinks treated macOS /var -> /private/var ancestor alias as a final workspace symlink
+  correction: os.Lstat checks only the final workspace entry while descendant containment checks remain symlink-aware
+  test_portability: server default runtime test now asserts effective os.UserConfigDir rather than Linux-only XDG semantics
+ci:
+  integrity_pr: 35808941807 PASS
+  agentic_quality_pr: 35808941824 PASS
+  multi_provider_pr: 35808941746 PASS
+  upstream_test: 35808941810 SUCCESS
+  upstream_normal_macos_job: 107015911723 SUCCESS
+  upstream_race_macos_job: 107015880499 SUCCESS
+  upstream_normal_ubuntu_job: 107015911678 SUCCESS
+  upstream_normal_windows_job: 107015911689 SUCCESS
+  upstream_race_ubuntu_job: 107015880534 SUCCESS
+proofs_local:
+  - focused ingestion normal and race tests: PASS
+  - focused portable runtime default normal and race tests: PASS
+  - complete local gates before portable tweak: PASS
+external_blockers_unchanged:
+  - strong host-enforced sandbox and multi-platform process/device isolation
+  - real OAuth/IdP/provider/account smoke and external connector authorization
+  - physical Windows/macOS/Linux/Android/iOS and GPU/native validation
+  - signed release, installer/store/app-review and operator deployment credentials
+classification: preview/local RC em hardening; NOT final; NOT production-ready
+next_action: publish connector lifecycle slice and document current CI separately from its pending checks
+```
+
+## Slice P1 de lifecycle durável de connectors — 2026-09-22
+
+```yaml
+state: TESTING
+iteration: 5
+base_commit: 0da6be80
+commit: 411335ba6247b16a431c7f10b5daf8a9fcc0e8f4
+branch: feat/manus-parity-omniroute
+completed:
+  - persistent_connector_manifest_under_runtime_data_root
+  - atomic_0600_manifest_writes_without_credential_values
+  - register_connector_http_endpoint
+  - owner_admin_guard_and_server_side_organization_binding
+  - strict_unknown_field_and_raw_secret_rejection
+  - ID_collision_cross_tenant_regression
+  - plugins_ui_form_using_env_names_or_oauth_provider_ids_only
+proofs_local:
+  - connector persistence, redaction, rollback and tenant collision tests: PASS
+  - HTTP admin/member, cross-tenant and response redaction tests: PASS
+  - UI Vitest and Vite build: PASS
+  - integrity guard and git diff --check: PASS
+public_ci_at_checkpoint:
+  - SHA 411335ba: 18 PR checks pending at initial query; no final conclusion claimed
+remaining:
+  - MCP/Remote MCP/skill registration persistence and process isolation are separate slices
+  - raw secret values are intentionally unsupported by the API; operator must provision env/OAuth securely
+  - external accounts, OAuth consent and provider smoke remain unvalidated
+classification: preview/local RC em hardening; NOT final; NOT production-ready
+next_action: verify SHA 411335ba CI when available, then audit MCP/Remote MCP registration lifecycle
+rollback: revert the connector lifecycle commit on the feature branch; do not force-push or merge main
+```
