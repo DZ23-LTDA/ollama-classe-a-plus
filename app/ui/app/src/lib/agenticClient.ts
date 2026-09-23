@@ -131,8 +131,11 @@ export const registerMCP = (payload: { id: string; command: string; args?: strin
 export const registerRemoteMCP = (payload: { id: string; url: string; token_env?: string; headers_env?: Record<string, string>; allowed_methods: string[]; timeout_seconds?: number }) => agentFetch<{ connectors: AgentConnector[]; mcp: AgentMCPServer[]; remote_mcp: AgentMCPServer[]; skills: AgentSkill[] }>("/api/agent/v1/remote-mcp", { method: "POST", body: JSON.stringify(payload) });
 export const registerSkill = (payload: { id: string; version: string; description?: string; scopes?: string[]; tools?: string[] }) => agentFetch<{ connectors: AgentConnector[]; mcp: AgentMCPServer[]; remote_mcp: AgentMCPServer[]; skills: AgentSkill[] }>("/api/agent/v1/skills", { method: "POST", body: JSON.stringify(payload) });
 export const setConnectorEnabled = (id: string, enabled: boolean) => agentFetch(`/api/agent/v1/connectors/${encodeURIComponent(id)}/${enabled ? "enable" : "disable"}`, { method: "POST", body: "{}" });
+export const removeConnector = (id: string) => agentFetch(`/api/agent/v1/connectors/${encodeURIComponent(id)}`, { method: "DELETE" });
 export const setMCPEnabled = (id: string, enabled: boolean, remote = false) => agentFetch(`/api/agent/v1/${remote ? "remote-mcp" : "mcp"}/${encodeURIComponent(id)}/${enabled ? "enable" : "disable"}`, { method: "POST", body: "{}" });
+export const removeMCP = (id: string, remote = false) => agentFetch(`/api/agent/v1/${remote ? "remote-mcp" : "mcp"}/${encodeURIComponent(id)}`, { method: "DELETE" });
 export const setSkillEnabled = (id: string, enabled: boolean) => agentFetch(`/api/agent/v1/skills/${encodeURIComponent(id)}/${enabled ? "enable" : "disable"}`, { method: "POST", body: "{}" });
+export const removeSkill = (id: string) => agentFetch(`/api/agent/v1/skills/${encodeURIComponent(id)}`, { method: "DELETE" });
 
 export const listCompanies = () => agentFetch<{ companies: AgentCompany[] }>("/api/agent/v1/companies");
 export const createCompany = (payload: Record<string, unknown>) => agentFetch<AgentCompany>("/api/agent/v1/companies", { method: "POST", body: JSON.stringify(payload) });
