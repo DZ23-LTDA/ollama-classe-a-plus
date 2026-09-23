@@ -66,6 +66,7 @@ export function CompanyWorkspacePage() {
   const [telAgentPriority, setTelAgentPriority] = useState("50");
   const [telAgentHistory, setTelAgentHistory] = useState<TelAgentExchange[]>([]);
   const [telAgentReply, setTelAgentReply] = useState<string | null>(null);
+  const [telAgentIdempotencyKey, setTelAgentIdempotencyKey] = useState<string | null>(null);
 
   const refresh = useCallback(async (selectedID?: string) => {
     setLoading(true);
@@ -107,12 +108,15 @@ export function CompanyWorkspacePage() {
   const sendTelAgent = async () => {
     if (!selectedID || !telAgentMessage.trim() || (telAgentOperation !== "report.read" && !telAgentTitle.trim())) return;
     setBusy(true);
+    const requestKey = telAgentIdempotencyKey ?? (globalThis.crypto?.randomUUID?.() ?? `tel-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    setTelAgentIdempotencyKey(requestKey);
     try {
-      const result = await executeCompanyTelAgent(selectedID, { message: telAgentMessage, operation: telAgentOperation, ...(telAgentTitle.trim() ? { title: telAgentTitle } : {}), ...(telAgentDescription.trim() ? { description: telAgentDescription } : {}), ...(telAgentOperation === "backlog.create" ? { priority: Number(telAgentPriority || 50) } : {}) });
+      const result = await executeCompanyTelAgent(selectedID, { message: telAgentMessage, operation: telAgentOperation, ...(telAgentTitle.trim() ? { title: telAgentTitle } : {}), ...(telAgentDescription.trim() ? { description: telAgentDescription } : {}), ...(telAgentOperation === "backlog.create" ? { priority: Number(telAgentPriority || 50) } : {}) }, requestKey);
       setCompany(result.company);
       setTelAgentHistory((current) => [...current, result.exchange].slice(-100));
       setTelAgentReply(result.exchange.reply);
       setTelAgentMessage("");
+      setTelAgentIdempotencyKey(null);
       setNotice(result.exchange.status === "approval_pending" ? "Tel-Agent criou um rascunho local; approval continua obrigatório." : "Tel-Agent concluiu a operação local.");
       if (result.report) setReport(result.report);
     } catch (cause) { setNotice(cause instanceof Error ? cause.message : "Tel-Agent não conseguiu concluir a operação."); }

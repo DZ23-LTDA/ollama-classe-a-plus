@@ -96,6 +96,7 @@ func (a *agentAPI) companyTelAgent(c *gin.Context) {
 		writeAgentError(c, http.StatusBadRequest, err)
 		return
 	}
+	request.IdempotencyKey = c.GetHeader("Idempotency-Key")
 	operation := strings.ToLower(strings.TrimSpace(request.Operation))
 	if operation != "report.read" && !a.companyTelAgentWriteAllowed(c) {
 		writeAgentError(c, http.StatusForbidden, errAgentForbidden)
@@ -107,7 +108,9 @@ func (a *agentAPI) companyTelAgent(c *gin.Context) {
 		status := statusForAgentError(err)
 		if errors.Is(err, agent.ErrTelAgentOrganizationMismatch) {
 			status = http.StatusForbidden
-		} else if errors.Is(err, agent.ErrTelAgentActorRequired) || errors.Is(err, agent.ErrTelAgentMessageRequired) || errors.Is(err, agent.ErrTelAgentMessageTooLong) || errors.Is(err, agent.ErrTelAgentUnsupportedOperation) {
+		} else if errors.Is(err, agent.ErrCompanyIdempotentReplay) || errors.Is(err, agent.ErrCompanyIdempotencyConflict) {
+			status = http.StatusConflict
+		} else if errors.Is(err, agent.ErrTelAgentActorRequired) || errors.Is(err, agent.ErrTelAgentMessageRequired) || errors.Is(err, agent.ErrTelAgentMessageTooLong) || errors.Is(err, agent.ErrTelAgentUnsupportedOperation) || errors.Is(err, agent.ErrTelAgentIdempotencyKeyTooLong) {
 			status = http.StatusBadRequest
 		}
 		writeAgentError(c, status, err)

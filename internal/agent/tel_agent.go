@@ -11,10 +11,11 @@ import (
 )
 
 const (
-	maxTelAgentMessageBytes = 2048
-	maxTelAgentTitleBytes   = 256
-	maxTelAgentDetailBytes  = 2048
-	maxTelAgentHistory      = 100
+	maxTelAgentMessageBytes        = 2048
+	maxTelAgentTitleBytes          = 256
+	maxTelAgentDetailBytes         = 2048
+	maxTelAgentHistory             = 100
+	maxTelAgentIdempotencyKeyBytes = 128
 )
 
 type TelAgentRequest struct {
@@ -24,6 +25,7 @@ type TelAgentRequest struct {
 	Description      string `json:"description,omitempty"`
 	Priority         int    `json:"priority,omitempty"`
 	DailyBudgetCents int64  `json:"daily_budget_cents,omitempty"`
+	IdempotencyKey   string `json:"-"`
 }
 
 type TelAgentExchange struct {
@@ -46,11 +48,12 @@ type TelAgentResult struct {
 }
 
 var (
-	ErrTelAgentOrganizationMismatch = errors.New("tel-agent organization mismatch")
-	ErrTelAgentActorRequired        = errors.New("tel-agent actor is required")
-	ErrTelAgentMessageRequired      = errors.New("tel-agent message is required")
-	ErrTelAgentMessageTooLong       = errors.New("tel-agent message exceeds 2048 bytes")
-	ErrTelAgentUnsupportedOperation = errors.New("tel-agent operation is not allowlisted")
+	ErrTelAgentOrganizationMismatch  = errors.New("tel-agent organization mismatch")
+	ErrTelAgentActorRequired         = errors.New("tel-agent actor is required")
+	ErrTelAgentMessageRequired       = errors.New("tel-agent message is required")
+	ErrTelAgentMessageTooLong        = errors.New("tel-agent message exceeds 2048 bytes")
+	ErrTelAgentUnsupportedOperation  = errors.New("tel-agent operation is not allowlisted")
+	ErrTelAgentIdempotencyKeyTooLong = errors.New("tel-agent idempotency key exceeds 128 bytes")
 )
 
 func validateTelAgentText(value, field string, maxBytes int) (string, error) {
@@ -119,11 +122,47 @@ func (s *CompanyStore) ExecuteTelAgent(id, organizationID, actorID string, reque
 	if request.Priority < 0 || request.Priority > 1000 || request.DailyBudgetCents < 0 {
 		return Company{}, TelAgentResult{}, errors.New("tel-agent operation values are outside the allowed range")
 	}
+	idempotencyKey := strings.TrimSpace(request.IdempotencyKey)
+	if len([]byte(idempotencyKey)) > maxTelAgentIdempotencyKeyBytes {
+		return Company{}, TelAgentResult{}, ErrTelAgentIdempotencyKeyTooLong
+	}
+	fingerprintInput := fmt.Sprintf("%s\x00%s\x00%s\x00%d\x00%d", operation, message, title, request.Priority, request.DailyBudgetCents)
+	fingerprint := companyIdempotencyDigest("company.tel_agent.input", fingerprintInput)
+	idempotencyDigest := ""
+	if idempotencyKey != "" {
+		idempotencyDigest = companyIdempotencyDigest("company.tel_agent", idempotencyKey)
+	}
 
 	var result TelAgentResult
 	updated, err := s.mutate(id, func(company *Company) error {
 		if strings.TrimSpace(company.OrganizationID) != organizationID {
 			return ErrTelAgentOrganizationMismatch
+		}
+		if err := checkCompanyIdempotency(company, "company.tel_agent", idempotencyKey, fingerprint); err != nil {
+			if !errors.Is(err, ErrCompanyIdempotentReplay) || idempotencyDigest == "" {
+				return err
+			}
+			var resultID string
+			for index := len(company.Idempotency) - 1; index >= 0; index-- {
+				record := company.Idempotency[index]
+				if record.Operation == "company.tel_agent" && record.Digest == idempotencyDigest {
+					resultID = record.ResultID
+					break
+				}
+			}
+			for index := len(company.TelAgentHistory) - 1; index >= 0; index-- {
+				previous := company.TelAgentHistory[index]
+				if resultID == "" || previous.ID != resultID {
+					continue
+				}
+				result.Exchange = previous
+				if operation == "report.read" {
+					report := companyReportSnapshot(*company)
+					result.Report = &report
+				}
+				return nil
+			}
+			return err
 		}
 		now := time.Now().UTC()
 		exchange := TelAgentExchange{
@@ -163,6 +202,15 @@ func (s *CompanyStore) ExecuteTelAgent(id, organizationID, actorID string, reque
 			exchange.Reply = fmt.Sprintf("Rascunho de campanha criado em sandbox: %s. Approval obrigatório antes de qualquer ação externa.", campaign.Name)
 		}
 		company.TelAgentHistory = append(company.TelAgentHistory, exchange)
+		rememberCompanyIdempotency(company, "company.tel_agent", idempotencyKey, fingerprint)
+		if idempotencyDigest != "" {
+			for index := len(company.Idempotency) - 1; index >= 0; index-- {
+				if company.Idempotency[index].Operation == "company.tel_agent" && company.Idempotency[index].Digest == idempotencyDigest {
+					company.Idempotency[index].ResultID = exchange.ID
+					break
+				}
+			}
+		}
 		if len(company.TelAgentHistory) > maxTelAgentHistory {
 			company.TelAgentHistory = append([]TelAgentExchange(nil), company.TelAgentHistory[len(company.TelAgentHistory)-maxTelAgentHistory:]...)
 		}

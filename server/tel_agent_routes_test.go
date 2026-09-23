@@ -43,6 +43,7 @@ func TestCompanyTelAgentEnforcesRoleAndReturnsHistory(t *testing.T) {
 	operator.Set("agent.membership", agent.Membership{Role: agent.RoleOperator, OrganizationID: "org-a"})
 	operator.Set("agent.user", agent.User{ID: "operator-a"})
 	operator.Request = httptest.NewRequest(http.MethodPost, path, bytes.NewBufferString(`{"message":"create","operation":"backlog.create","title":"Prepare launch","priority":10}`))
+	operator.Request.Header.Set("Idempotency-Key", "http-tel-agent-1")
 	api.companyTelAgent(operator)
 	if operatorRecorder.Code != http.StatusOK {
 		t.Fatalf("operator status=%d body=%s", operatorRecorder.Code, operatorRecorder.Body.String())
@@ -56,6 +57,26 @@ func TestCompanyTelAgentEnforcesRoleAndReturnsHistory(t *testing.T) {
 	}
 	if response.Exchange.CreatedResourceID == "" || len(response.Company.Backlog) != 1 {
 		t.Fatalf("unexpected response=%+v", response)
+	}
+	replay, replayRecorder := orgContext(t, http.MethodPost, path, "org-a")
+	replay.Params = gin.Params{{Key: "id", Value: company.ID}}
+	replay.Set("agent.membership", agent.Membership{Role: agent.RoleOperator, OrganizationID: "org-a"})
+	replay.Set("agent.user", agent.User{ID: "operator-a"})
+	replay.Request = httptest.NewRequest(http.MethodPost, path, bytes.NewBufferString(`{"message":"create","operation":"backlog.create","title":"Prepare launch","priority":10}`))
+	replay.Request.Header.Set("Idempotency-Key", "http-tel-agent-1")
+	api.companyTelAgent(replay)
+	if replayRecorder.Code != http.StatusOK {
+		t.Fatalf("replay status=%d body=%s", replayRecorder.Code, replayRecorder.Body.String())
+	}
+	conflict, conflictRecorder := orgContext(t, http.MethodPost, path, "org-a")
+	conflict.Params = gin.Params{{Key: "id", Value: company.ID}}
+	conflict.Set("agent.membership", agent.Membership{Role: agent.RoleOperator, OrganizationID: "org-a"})
+	conflict.Set("agent.user", agent.User{ID: "operator-a"})
+	conflict.Request = httptest.NewRequest(http.MethodPost, path, bytes.NewBufferString(`{"message":"create","operation":"backlog.create","title":"Different","priority":10}`))
+	conflict.Request.Header.Set("Idempotency-Key", "http-tel-agent-1")
+	api.companyTelAgent(conflict)
+	if conflictRecorder.Code != http.StatusConflict {
+		t.Fatalf("conflict status=%d body=%s", conflictRecorder.Code, conflictRecorder.Body.String())
 	}
 
 	history, historyRecorder := orgContext(t, http.MethodGet, "/companies/"+company.ID+"/tel-agent/history", "org-a")

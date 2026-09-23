@@ -128,6 +128,7 @@ type CompanyIdempotencyRecord struct {
 	Digest      string    `json:"digest"`
 	Operation   string    `json:"operation"`
 	Fingerprint string    `json:"fingerprint"`
+	ResultID    string    `json:"result_id,omitempty"`
 	CreatedAt   time.Time `json:"created_at"`
 }
 
