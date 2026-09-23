@@ -353,10 +353,6 @@ func deploymentPathContainsPrivateDirectory(relative string) bool {
 	return false
 }
 
-func deploymentPathIsPublic(relative string) bool {
-	return deploymentPathExclusionReason(relative) == ""
-}
-
 func deploymentPathExclusionReason(relative string) string {
 	if deploymentPathContainsPrivateDirectory(relative) {
 		return "private-directory"

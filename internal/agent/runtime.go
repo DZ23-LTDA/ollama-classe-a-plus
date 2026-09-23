@@ -123,6 +123,10 @@ func NewRuntime(config RuntimeConfig) (*Runtime, error) {
 	if err := os.MkdirAll(root, 0o700); err != nil {
 		return nil, err
 	}
+	root, err = canonicalExistingDirectory(root)
+	if err != nil {
+		return nil, fmt.Errorf("canonicalize runtime workspace: %w", err)
+	}
 	dataRoot, err := resolveRuntimeDataRoot(root, config.DataRoot)
 	if err != nil {
 		return nil, err
@@ -1184,19 +1188,16 @@ func riskRank(risk RiskClass) int {
 }
 
 func (r *Runtime) resolveWorkspace(requested string) (string, error) {
-	root, err := filepath.Abs(r.workspaceRoot)
+	root, err := canonicalExistingDirectory(r.workspaceRoot)
 	if err != nil {
 		return "", err
 	}
 	if strings.TrimSpace(requested) == "" {
 		return root, nil
 	}
-	candidate, err := filepath.Abs(requested)
+	candidate, err := canonicalProjectRoot(root, requested)
 	if err != nil {
 		return "", err
-	}
-	if !isWithin(root, candidate) {
-		return "", errors.New("workspace must be inside the configured agent root")
 	}
 	if err := os.MkdirAll(candidate, 0o700); err != nil {
 		return "", err

@@ -105,7 +105,7 @@ func TestProjectRootCreateAndUpdateStayInsideRuntimeWorkspace(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if current.Root != inside {
+	if current.Root != project.Root {
 		t.Fatalf("project root changed after rejected update: %q", current.Root)
 	}
 }

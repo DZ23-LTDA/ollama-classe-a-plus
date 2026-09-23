@@ -64,5 +64,4 @@ func TestWebhookBindsScheduleOrganizationAndDeduplicates(t *testing.T) {
 	if replayRecorder.Code != http.StatusConflict {
 		t.Fatalf("replay webhook status=%d body=%s", replayRecorder.Code, replayRecorder.Body.String())
 	}
-
 }

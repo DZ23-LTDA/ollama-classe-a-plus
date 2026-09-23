@@ -106,7 +106,7 @@ func TestRuntimeBindsMissionToProjectOrganizationAndWorkspace(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if mission.OrganizationID != "org_a" || mission.Workspace != projectRoot {
+	if mission.OrganizationID != "org_a" || mission.Workspace != project.Root {
 		t.Fatalf("mission binding = %+v", mission)
 	}
 }
