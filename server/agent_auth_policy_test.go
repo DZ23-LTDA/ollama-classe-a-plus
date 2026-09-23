@@ -152,3 +152,18 @@ func TestApprovalApproverRequiresOwnerOrAdminWhenAuthenticated(t *testing.T) {
 		})
 	}
 }
+
+func TestLocalAuthMiddlewareAppliesOriginPolicyToMutations(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	api := &agentAPI{authRequired: false}
+	recorder := httptest.NewRecorder()
+	context, _ := gin.CreateTestContext(recorder)
+	context.Request = httptest.NewRequest("POST", "/api/agent/v1/missions", nil)
+	context.Request.Header.Set("Origin", "https://evil.example")
+
+	api.authMiddleware(context)
+
+	if recorder.Code != 403 || !context.IsAborted() {
+		t.Fatalf("local cross-site mutation status=%d aborted=%v body=%s", recorder.Code, context.IsAborted(), recorder.Body.String())
+	}
+}

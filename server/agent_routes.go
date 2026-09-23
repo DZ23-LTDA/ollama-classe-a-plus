@@ -474,6 +474,10 @@ func (a *agentAPI) register(r *gin.Engine) {
 
 func (a *agentAPI) authMiddleware(c *gin.Context) {
 	if !a.authRequired {
+		if !agentOriginAllowed(c) {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "request origin is not allowed"})
+			return
+		}
 		c.Next()
 		return
 	}
