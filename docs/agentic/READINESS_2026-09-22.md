@@ -752,3 +752,10 @@ O head `677c3dbc` atualiza o módulo para Go `1.26.6` e corrige as dependências
 Evidência local: `GOTOOLCHAIN=go1.26.6 /tmp/govulncheck ./...` terminou com `No vulnerabilities found` e zero vulnerabilidades alcançáveis; o relatório ainda informa sete vulnerabilidades em pacotes importados e cinco em módulos exigidos que não são alcançáveis pelos caminhos analisados, portanto isso não equivale a uma declaração de risco zero em todas as dependências. `go mod verify`, `CGO_ENABLED=1 go test ./... -count=1 -timeout=900s`, `go vet ./...` e `go build -trimpath` passaram. `npm audit --omit=dev` também retornou zero vulnerabilidades para web e mobile.
 
 O produto segue **FIXING / preview-local RC em hardening — não finalizado e não production-ready**. A CI pública do novo head ainda precisa concluir, e homologações de múltiplos sistemas, providers, IdP/OAuth, sandbox host, dispositivos, releases assinados e serviços externos continuam pendentes ou `BLOCKED_BY_EXTERNAL_DEPENDENCY`.
+
+
+## Addendum de falhas de persistência e eventos observáveis — 2026-09-23
+
+O head `fc7b77c6` remove descartes silenciosos no caminho de execução do Runtime. Writes de estado em awaiting approval e retry agora retornam imediatamente erros de persistência. O recovery de schedules e missões acumula falhas de reenqueue e de atualização de schedule, devolve um erro agregado e o worker registra a falha. Eventos de missão, passo e approval passam por `observeEvent`; falhas de persistência incrementam a métrica existente e são registradas com IDs/tipos não sensíveis.
+
+Evidência local: testes focados de Runtime, schedules, queue e CreateMission passaram; `CGO_ENABLED=1 go test -race ./internal/agent -count=1 -timeout=600s`, `CGO_ENABLED=1 go vet ./internal/agent`, diff check e scan básico de segredos passaram. A CI pública do head foi disparada e estava `queued`/`in_progress` na consulta inicial; isso não é evidência de CI verde. O produto segue **FIXING / preview-local RC em hardening — não finalizado e não production-ready**.
