@@ -408,3 +408,12 @@ Outputs de mídia e OCR são escritos somente por paths relativos ao workspace a
 O coletor de deployment aceita somente arquivos regulares de conteúdo público. `.git`, `.hg`, `.svn`, `.agent`, `.ollama`, `.secrets`, `node_modules`, `.env`, chaves, certificados, backups, dumps, logs e nomes que indicam secret/credential/password/token são excluídos antes da leitura. Isso é uma política conservadora de pacote; um build que necessite de conteúdo adicional deve produzir um diretório público aprovado, não depender de filtro posterior.
 
 O cliente de deployment resolve A/AAAA antes do TCP. Todos os endereços retornados precisam ser não privados antes que o socket seja criado. O dial usa o IP validado, enquanto a URL mantém hostname para Host/SNI. HTTP é aceito somente para loopback em contexto local explícito; endpoints externos exigem HTTPS e redirects continuam desabilitados.
+
+
+## Tel-Agent textual do Company OS
+
+`POST /api/agent/v1/companies/:id/tel-agent` executa uma operação textual dentro do tenant da empresa. O corpo aceita `message` e uma operação explicitamente allowlisted: `report.read`, `backlog.create` ou `campaign.draft`. Para mutações, `title`, `description`, `priority` e `daily_budget_cents` são validados conforme a operação. O organization ID não é aceito do cliente: é derivado do contexto de autenticação. Em auth-required, apenas owner, admin ou operator podem executar mutações; leitura de relatório permanece disponível a membros autorizados.
+
+A resposta contém `company`, `exchange` e, para leitura, `report`. Cada exchange inclui `channel: tel-agent.text`, actor, organization, operação, status, retorno, recurso criado quando aplicável e indicação de approval. `campaign.draft` sempre permanece sandbox e gera approval pendente; não publica campanha nem chama provedor externo.
+
+`GET /api/agent/v1/companies/:id/tel-agent/history` retorna as últimas 100 trocas persistidas para o tenant e informa `telephony: not_configured`. Mensagens são limitadas a 2048 bytes e passam por redaction DLP antes da persistência. O canal textual não comprova OAuth, telefonia, WhatsApp, SMS, SIP ou qualquer conta externa ativa.

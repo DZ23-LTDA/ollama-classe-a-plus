@@ -169,3 +169,10 @@ Qualquer modo não-sandbox é recusado até existir adapter específico, credenc
 Os adapters locais agora têm contratos de segurança mais fortes, mas continuam distintos de uma integração upstream validada. O `MediaManager` usa provider fixture local nos testes; nenhum provider externo ou conta foi conectado. O `DeploymentManager` monta e valida um pacote público, rejeita conteúdo privado antes da transmissão e protege o egress; nenhum deploy em Vercel, Netlify, AWS, Cloudflare ou outro destino foi executado.
 
 A captura de dez rotas usa o backend Ollama local e um bridge local para o bundle distribuído. Ela comprova apenas o estado observado nessa execução. Não transforma catálogo, configuração, fixture, `configured` ou build em `connected`, `validated`, `published` ou `production-ready`.
+
+
+## Tel-Agent: canal textual versus telefonia externa
+
+O estado publicado em `45393d8c` cobre `tel-agent.text` dentro do Company OS. O canal aceita operações locais allowlisted, persiste histórico redigido por tenant e exige role operacional para mutações autenticadas. `report.read` retorna o estado da empresa; `backlog.create` cria uma tarefa local; `campaign.draft` cria um rascunho sandbox com approval pendente.
+
+Isso não equivale a telefonia ou mensageria externa. SIP, PSTN, SMS, WhatsApp, gravação de voz e discagem permanecem `telephony: not_configured` e `BLOCKED_BY_EXTERNAL_DEPENDENCY` até contas, credenciais, consentimento, destino de teste e homologação autorizada. Nenhum catálogo ou tela de configuração deve ser interpretado como conta conectada.

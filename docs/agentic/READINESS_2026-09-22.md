@@ -567,3 +567,12 @@ Os gates locais completos foram fechados no head anterior `f9ae5dd8` com caminho
 ## Addendum de limite server-side de approval — 2026-09-23
 
 O limite de motivo não depende mais somente da UI: o domínio rejeita razões acima de 2048 bytes antes da mutação CAS. Isso complementa o campo de 512 caracteres da Agentic Console e mantém input inválido em status de cliente, sem criar uma falsa garantia de homologação externa.
+
+
+## Addendum — Tel-Agent textual operacional — 2026-09-23
+
+O commit `45393d8c` entrega um canal Tel-Agent textual funcional no Company OS, acima dos painéis de construção: o operador escolhe uma operação allowlisted, envia uma mensagem bounded, recebe retorno estruturado e pode consultar o histórico persistente do tenant. As operações disponíveis são `report.read`, `backlog.create` e `campaign.draft`; mutações exigem owner/admin/operator quando a autenticação está ativa. Mensagens são redigidas por DLP antes da persistência e o histórico é limitado a 100 trocas.
+
+O caminho é deliberadamente local-first. `campaign.draft` não publica campanha: grava um rascunho sandbox e cria approval pendente. O canal não simula telefonia, WhatsApp, SMS, voz ou integração externa; a resposta de histórico expõe `telephony: not_configured`. Assim, a jornada textual é **implementada, testada e publicada**, enquanto telefonia homologada, contas externas e mensagens reais continuam pendentes ou bloqueadas por dependência externa.
+
+No primeiro check do SHA `45393d8c`, a CI pública estava parcialmente `queued`/`in_progress`; não há base para chamar o candidato totalmente verde ainda. O estado global continua **preview/local RC em hardening — não finalizado e não production-ready**.

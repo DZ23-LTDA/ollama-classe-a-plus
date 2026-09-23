@@ -626,3 +626,12 @@ A correção melhora a evidência do ator, mas não substitui autorização, pol
 ## Addendum P1 — limite server-side de reason em approvals — 2026-09-23
 
 A melhoria de approval não ficou restrita ao cliente: `Runtime.DecideApprovalForActorCAS` normaliza e rejeita razões acima de 2048 bytes antes de gravar actor, status ou ledger. A regressão demonstra que um cliente que ignore `maxLength=512` não consegue persistir input excessivo; os testes normal e race de approval passaram.
+
+
+## Addendum P1 — Tel-Agent textual e Company OS — 2026-09-23
+
+A continuidade pós-V5 exigia que Tel-Agent permanecesse funcionalmente acima do canvas, sem adicionar outro motor ou uma coleção de cards sem jornada. O commit `45393d8c` atende a primeira parte verificável: Company OS possui canal textual persistente, histórico tenant-aware e retorno observável. O dispatcher aceita somente `report.read`, `backlog.create` e `campaign.draft`; roles de leitura e mutação são diferenciadas, DLP é aplicado antes da persistência e a retenção é limitada às últimas 100 trocas.
+
+A operação de campanha é somente rascunho sandbox com approval pendente; backlog é local; relatório é leitura. Não existe alegação de telefonia, WhatsApp, SMS, SIP, voz ou mensagem externa. Portanto, a implementação está testada e publicada, mas a homologação de telefonia e contas reais permanece `BLOCKED_BY_EXTERNAL_DEPENDENCY`.
+
+Evidência do slice: testes Go normais e race de `internal/agent` e `server`, Vitest/build UI e integrity guard passaram localmente. A CI pública do SHA `45393d8c` foi observada parcialmente `queued`/`in_progress` no primeiro check e deve ser reconsultada por SHA antes de qualquer conclusão.

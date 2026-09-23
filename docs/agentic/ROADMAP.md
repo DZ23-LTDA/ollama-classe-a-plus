@@ -422,3 +422,10 @@ A reauditoria direcionada foi reproduzida no pacote real e corrigida em dois com
 O capturador de paridade agora produz screenshots somente após estado observável e interação segura, com manifesto de SHA/build/viewport e política explícita para falhas esperadas do bridge local. A captura local não é prova de provider externo, conta, deploy, device ou release.
 
 Próxima frente independente: abrir e verificar o PR documental da Home a partir da main. O trabalho de produto continua aberto para CI do novo head, jornada Tel-Agent, integração externa homologada e demais requisitos V5. Dependências de conta, consentimento, hardware, certificado, loja, app review ou custo devem permanecer `BLOCKED_BY_EXTERNAL_DEPENDENCY` até existir autorização e evidência específica.
+
+
+## Incremento 2026-09-23 — Tel-Agent textual acima do canvas
+
+A prioridade Tel-Agent agora possui uma primeira jornada executável no Company OS: canal textual persistente, histórico por tenant, retorno observável e três operações allowlisted (`report.read`, `backlog.create`, `campaign.draft`). O caminho não cria um motor concorrente ao Ollama, não publica ações externas e mantém approvals e modo sandbox.
+
+Próximos gates separados: adapter de telefonia/SIP/SMS ou WhatsApp, identidade da conta operadora, consentimento de escopos, gravação/retensão aprovada, testes reversíveis de destino e homologação externa. A ausência desses recursos não bloqueia o canal textual local, mas impede classificar Tel-Agent como telefonia completa ou produto final.

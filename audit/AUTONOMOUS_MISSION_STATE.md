@@ -2375,3 +2375,14 @@ A regressão `AgenticConsole.approval.test.tsx` confirma que uma decisão sem mo
 ## Fechamento P1 do limite server-side de approval — 2026-09-23
 
 O commit `92c7bdd220a39e444e824f2022d9399e756306d5` fechou a fronteira de confiança da melhoria de approval: além do `maxLength=512` da UI, `Runtime.DecideApprovalForActorCAS` agora normaliza e rejeita motivos acima de 2048 bytes com erro de input, antes de alterar o approval. A regressão cobre o bypass por cliente direto e a variante race do conjunto de approvals passou.
+
+
+## Jornada P1 Tel-Agent textual acima do canvas — 2026-09-23
+
+O commit `45393d8ca08599f008ea81598ef1f8d3f75f66bc` adiciona o primeiro vertical funcional da prioridade Tel-Agent definida na continuidade pós-V5. O Company OS agora possui o canal `tel-agent.text`, persistido por tenant nas últimas 100 trocas, com redaction DLP antes da gravação, actor e organization derivados do contexto autenticado e histórico recuperável por `GET /api/agent/v1/companies/:id/tel-agent/history`.
+
+A operação `POST /api/agent/v1/companies/:id/tel-agent` aceita somente `report.read`, `backlog.create` e `campaign.draft`. Leituras são permitidas a membros autenticados do tenant; mutações exigem owner, admin ou operator. `backlog.create` cria uma tarefa local priorizada e `campaign.draft` cria somente rascunho sandbox com approval pendente. Nenhuma operação envia mensagem, publica anúncio, movimenta dinheiro, chama telefonia ou afirma conta externa conectada. A UI do Company OS coloca o canal antes dos demais painéis, com retorno estruturado, histórico e aviso explícito de `telephony: not_configured`.
+
+Evidência local: `go test ./internal/agent -run 'TestCompanyTelAgent'`, `go test ./server -run 'TestCompanyTelAgent'`, variantes `-race`, Vitest completo, build TypeScript/Vite e `Class A+ integrity guard` passaram. O SHA remoto confirmado é `45393d8ca08599f008ea81598ef1f8d3f75f66bc`; no primeiro check público, os workflows ainda estavam `queued`/`in_progress`, portanto a CI desse candidato permanece pendente.
+
+Classificação: **IMPLEMENTADO, TESTADO, PUBLICADO; não homologado externamente**. Telefonia, SIP, SMS, WhatsApp e provedores de voz continuam `BLOCKED_BY_EXTERNAL_DEPENDENCY` até existir conector, consentimento, conta de operador, destino de teste e smoke test reversível autorizado.

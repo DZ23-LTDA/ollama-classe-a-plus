@@ -486,3 +486,8 @@ A Agentic Console agora exige um motivo escrito antes de aprovar ou rejeitar uma
 ## Unreleased — server-side approval reason bound — 2026-09-23
 
 O runtime agora rejeita motivos de approval acima de 2048 bytes antes da decisão CAS, complementando o limite de 512 caracteres da UI e a regressão contra clientes que contornem o formulário.
+
+
+## Unreleased — Tel-Agent textual no Company OS — 2026-09-23
+
+O Company OS ganhou o canal `tel-agent.text`, com histórico persistente tenant-aware, retorno estruturado e operações locais allowlisted para leitura de relatório, criação de backlog e rascunho de campanha. Mutações exigem role operacional quando auth está ativa; entradas são limitadas e redigidas antes da persistência. O rascunho de campanha permanece sandbox e gera approval pendente. Telefonia, WhatsApp, SMS e mensagens externas continuam explicitamente não configurados e não homologados.
