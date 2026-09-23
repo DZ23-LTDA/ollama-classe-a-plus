@@ -840,7 +840,7 @@ func (a *agentAPI) devToken(c *gin.Context) {
 		Name         string `json:"name"`
 		Organization string `json:"organization"`
 	}
-	if err := c.ShouldBindJSON(&input); err != nil {
+	if err := decodeJSON(c, &input); err != nil {
 		writeAgentError(c, http.StatusBadRequest, err)
 		return
 	}
