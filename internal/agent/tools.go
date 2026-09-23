@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -373,7 +374,38 @@ func minInt(a, b int) int {
 type sandboxExecTool struct{}
 
 func (sandboxExecTool) Descriptor() ToolDescriptor {
-	return ToolDescriptor{Name: "sandbox.exec", Version: "2", Description: "Executar Python ou Node sem rede; modo strict exige namespaces, seccomp e cgroup v2 delegado", Risk: RiskWrite, RequiresApproval: true, Scopes: []string{"sandbox:execute"}}
+	return ToolDescriptor{Name: "sandbox.exec", Version: "3", Description: "Executar Python ou Node; strict Linux exige namespaces, seccomp e cgroup v2 delegado; outras plataformas reportam best-effort sem isolamento de rede", Risk: RiskWrite, RequiresApproval: true, Scopes: []string{"sandbox:execute"}}
+}
+
+func resolveSandboxInterpreter(language string) (string, error) {
+	var candidates []string
+	switch language {
+	case "python", "python3":
+		if runtime.GOOS == "linux" {
+			candidates = []string{"/usr/bin/python3"}
+		} else {
+			candidates = []string{"python3", "python"}
+		}
+	case "node":
+		if runtime.GOOS == "linux" {
+			candidates = []string{"/usr/bin/node"}
+		} else {
+			candidates = []string{"node"}
+		}
+	default:
+		return "", errors.New("sandbox language must be python or node")
+	}
+	for _, candidate := range candidates {
+		resolved, err := exec.LookPath(candidate)
+		if err != nil {
+			continue
+		}
+		info, err := os.Stat(resolved)
+		if err == nil && info.Mode().IsRegular() {
+			return resolved, nil
+		}
+	}
+	return "", fmt.Errorf("sandbox interpreter unavailable for %s", language)
 }
 
 func (sandboxExecTool) Execute(ctx context.Context, toolContext ToolContext, input map[string]any) (ToolResult, error) {
@@ -381,9 +413,9 @@ func (sandboxExecTool) Execute(ctx context.Context, toolContext ToolContext, inp
 		return ToolResult{}, err
 	}
 	language := strings.ToLower(strings.TrimSpace(stringInput(input, "language", "")))
-	interpreter := map[string]string{"python": "/usr/bin/python3", "python3": "/usr/bin/python3", "node": "/usr/bin/node"}[language]
-	if interpreter == "" {
-		return ToolResult{}, errors.New("sandbox language must be python or node")
+	interpreter, err := resolveSandboxInterpreter(language)
+	if err != nil {
+		return ToolResult{}, err
 	}
 	mode := strings.ToLower(strings.TrimSpace(os.Getenv("OLLAMA_AGENT_SANDBOX_MODE")))
 	if mode == "" {
@@ -398,9 +430,6 @@ func (sandboxExecTool) Execute(ctx context.Context, toolContext ToolContext, inp
 	}
 	if len(code) > 512<<10 {
 		return ToolResult{}, errors.New("sandbox code limit exceeded")
-	}
-	if _, err := os.Stat(interpreter); err != nil {
-		return ToolResult{}, fmt.Errorf("sandbox interpreter unavailable: %w", err)
 	}
 	strict := mode == "strict"
 	var control *sandboxControl
@@ -438,6 +467,19 @@ func (sandboxExecTool) Execute(ctx context.Context, toolContext ToolContext, inp
 	}
 	deadline, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
+	if runtime.GOOS != "linux" {
+		command := exec.Command(interpreter, codePath)
+		command.Dir = toolContext.Workspace
+		command.Env = []string{"PATH=" + os.Getenv("PATH"), "HOME=" + toolContext.Workspace, "PWD=" + toolContext.Workspace}
+		configureToolProcess(command)
+		var stdout, stderr bytes.Buffer
+		command.Stdout = &limitedBuffer{Buffer: &stdout, Limit: 128 << 10}
+		command.Stderr = &limitedBuffer{Buffer: &stderr, Limit: 128 << 10}
+		if err := runToolCommand(deadline, command); err != nil {
+			return ToolResult{Value: map[string]any{"stdout": RedactDLP(stdout.String()), "stderr": RedactDLP(stderr.String()), "execution_isolation": "best-effort-platform-process", "resource_limits": "context-timeout-output-bounded", "network_isolation": "not-enforced"}}, err
+		}
+		return ToolResult{Value: map[string]any{"stdout": RedactDLP(stdout.String()), "stderr": RedactDLP(stderr.String()), "exit_code": 0, "execution_isolation": "best-effort-platform-process", "resource_limits": "context-timeout-output-bounded", "network_isolation": "not-enforced"}}, nil
+	}
 	mountScript := `set -eu
 ulimit -t 55 || true
 ulimit -v 524288 || true

@@ -81,3 +81,13 @@ func TestSandboxRejectsUnknownMode(t *testing.T) {
 		t.Fatalf("unknown sandbox mode error = %v", err)
 	}
 }
+
+func TestResolveSandboxInterpreterUsesSupportedLanguageOnly(t *testing.T) {
+	resolved, err := resolveSandboxInterpreter("python")
+	if err != nil || resolved == "" {
+		t.Fatalf("python interpreter=%q err=%v", resolved, err)
+	}
+	if _, err := resolveSandboxInterpreter("ruby"); err == nil {
+		t.Fatal("expected unsupported language rejection")
+	}
+}
