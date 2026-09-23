@@ -17,6 +17,7 @@ import (
 type Runtime struct {
 	store            Store
 	planner          Planner
+	plannerResolver  PlannerResolver
 	tools            *Registry
 	capabilityPolicy CapabilityPolicy
 	workspaceRoot    string
@@ -45,25 +46,26 @@ type Runtime struct {
 }
 
 type RuntimeConfig struct {
-	Store         Store
-	Planner       Planner
-	Tools         *Registry
-	WorkspaceRoot string
-	Context       *ContextStore
-	Company       *CompanyStore
-	RemoteMCP     *RemoteMCPManager
-	Connectors    *ConnectorManager
-	MCP           *MCPManager
-	Queue         *JobQueue
-	RedisQueue    *RedisQueue
-	Traces        *TraceStore
-	Telemetry     *Telemetry
-	Media         *MediaManager
-	Builder       *BuilderService
-	Collaboration *CollaborationStore
-	Devices       *DeviceStore
-	Push          *PushService
-	Deployments   *DeploymentManager
+	Store           Store
+	Planner         Planner
+	PlannerResolver PlannerResolver
+	Tools           *Registry
+	WorkspaceRoot   string
+	Context         *ContextStore
+	Company         *CompanyStore
+	RemoteMCP       *RemoteMCPManager
+	Connectors      *ConnectorManager
+	MCP             *MCPManager
+	Queue           *JobQueue
+	RedisQueue      *RedisQueue
+	Traces          *TraceStore
+	Telemetry       *Telemetry
+	Media           *MediaManager
+	Builder         *BuilderService
+	Collaboration   *CollaborationStore
+	Devices         *DeviceStore
+	Push            *PushService
+	Deployments     *DeploymentManager
 }
 
 var (
@@ -160,7 +162,7 @@ func NewRuntime(config RuntimeConfig) (*Runtime, error) {
 			return nil, err
 		}
 	}
-	runtime := &Runtime{store: store, planner: planner, tools: tools, capabilityPolicy: capabilityPolicy, workspaceRoot: root, context: contextStore, company: companyStore, remoteMCP: config.RemoteMCP, metrics: &RuntimeMetrics{}, connectors: config.Connectors, mcp: config.MCP, queue: queue, redisQueue: config.RedisQueue, traces: traces, telemetry: telemetry, media: config.Media, builder: builder, collaboration: collaboration, push: config.Push, deployments: config.Deployments, mu: &sync.Mutex{}, running: make(map[string]bool), activeCancels: make(map[string]context.CancelFunc)}
+	runtime := &Runtime{store: store, planner: planner, plannerResolver: config.PlannerResolver, tools: tools, capabilityPolicy: capabilityPolicy, workspaceRoot: root, context: contextStore, company: companyStore, remoteMCP: config.RemoteMCP, metrics: &RuntimeMetrics{}, connectors: config.Connectors, mcp: config.MCP, queue: queue, redisQueue: config.RedisQueue, traces: traces, telemetry: telemetry, media: config.Media, builder: builder, collaboration: collaboration, push: config.Push, deployments: config.Deployments, mu: &sync.Mutex{}, running: make(map[string]bool), activeCancels: make(map[string]context.CancelFunc)}
 	orchestrator, err := NewAgentOrchestrator(filepath.Join(root, ".agent-orchestrator"), runtime.SubagentRunner)
 	if err != nil {
 		return nil, err
@@ -190,6 +192,12 @@ func (r *Runtime) WithOrganization(organizationID string) *Runtime {
 		view.store = postgres.WithOrganization(organizationID)
 	}
 	return &view
+}
+
+func (r *Runtime) SetPlannerResolver(resolver PlannerResolver) {
+	if r != nil {
+		r.plannerResolver = resolver
+	}
 }
 
 func (r *Runtime) Context() *ContextStore {
@@ -325,9 +333,6 @@ func (r *Runtime) CreateMission(ctx context.Context, request CreateMissionReques
 	if provider == "" {
 		provider = "ollama-local"
 	}
-	if provider != "ollama-local" {
-		return Mission{}, fmt.Errorf("provider %q is not configured in this runtime", provider)
-	}
 	workspace, err := r.resolveWorkspace(request.Workspace)
 	if err != nil {
 		return Mission{}, err
@@ -347,7 +352,20 @@ func (r *Runtime) CreateMission(ctx context.Context, request CreateMissionReques
 	}
 	r.metrics.missionsCreated.Add(1)
 	_ = r.event(mission, "mission.created", "", map[string]any{"objective": objective})
-	plan, err := r.planner.Plan(ctx, mission)
+	planner := r.planner
+	if provider != "ollama-local" {
+		if r.plannerResolver == nil {
+			return Mission{}, fmt.Errorf("provider %q is not configured in this runtime", provider)
+		}
+		planner, err = r.plannerResolver.ResolvePlanner(provider, mission.Model)
+		if err != nil {
+			return Mission{}, err
+		}
+		if planner == nil {
+			return Mission{}, fmt.Errorf("provider %q returned no planner", provider)
+		}
+	}
+	plan, err := planner.Plan(ctx, mission)
 	if err != nil {
 		return r.failMission(mission, err)
 	}

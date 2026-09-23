@@ -1965,6 +1965,7 @@ func (s *Server) GenerateRoutes() (http.Handler, error) {
 		s.multiRegistry = registry
 		s.multiProvider = multillm.NewGateway(registry, nil)
 		r.Use(s.multiProvider.Middleware())
+		s.agentRuntime.SetPlannerResolver(multiProviderPlannerResolver{registry: registry})
 	}
 
 	// General

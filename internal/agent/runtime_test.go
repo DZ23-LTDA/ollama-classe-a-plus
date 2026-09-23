@@ -577,3 +577,51 @@ func TestBrowserOperatorNavigateAndSnapshot(t *testing.T) {
 		t.Fatalf("browser result = %+v", result.Value)
 	}
 }
+
+type plannerResolverStub struct {
+	provider string
+	model    string
+	planner  Planner
+}
+
+func (s *plannerResolverStub) ResolvePlanner(provider, model string) (Planner, error) {
+	s.provider = provider
+	s.model = model
+	return s.planner, nil
+}
+
+func TestRuntimeUsesExplicitPlannerResolverForRemoteProvider(t *testing.T) {
+	resolver := &plannerResolverStub{planner: RulePlanner{}}
+	runtime, err := NewRuntime(RuntimeConfig{
+		Store:           NewMemoryStore(),
+		PlannerResolver: resolver,
+		WorkspaceRoot:   t.TempDir(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mission, err := runtime.CreateMission(context.Background(), CreateMissionRequest{
+		Objective: "inspect remote provider",
+		Provider:  "anthropic",
+		Model:     "claude-sonnet-4-5",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolver.provider != "anthropic" || resolver.model != "claude-sonnet-4-5" {
+		t.Fatalf("resolver request = %q/%q", resolver.provider, resolver.model)
+	}
+	if mission.Provider != "anthropic" || mission.Model != "claude-sonnet-4-5" {
+		t.Fatalf("mission provider/model = %q/%q", mission.Provider, mission.Model)
+	}
+}
+
+func TestRuntimeRejectsRemoteProviderWithoutResolver(t *testing.T) {
+	runtime, err := NewRuntime(RuntimeConfig{Store: NewMemoryStore(), WorkspaceRoot: t.TempDir()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runtime.CreateMission(context.Background(), CreateMissionRequest{Objective: "remote", Provider: "codex", Model: "codex-mini"}); err == nil || !strings.Contains(err.Error(), "not configured") {
+		t.Fatalf("err = %v, want explicit unavailable provider", err)
+	}
+}

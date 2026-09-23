@@ -14,6 +14,12 @@ type Planner interface {
 	Plan(ctx context.Context, mission Mission) ([]Step, error)
 }
 
+type PlannerResolver interface {
+	// ResolvePlanner must return an executable planner for the requested provider.
+	// It must not silently substitute a different provider or a rule-only plan.
+	ResolvePlanner(provider, model string) (Planner, error)
+}
+
 type plannerChatClient interface {
 	Chat(ctx context.Context, request *api.ChatRequest, callback api.ChatResponseFunc) error
 }
@@ -54,8 +60,11 @@ func (p OllamaPlanner) Plan(ctx context.Context, mission Mission) ([]Step, error
 	if model == "" {
 		model = strings.TrimSpace(p.Model)
 	}
-	if p.Client == nil || model == "" {
-		return p.fallback().Plan(ctx, mission)
+	if p.Client == nil {
+		return nil, errors.New("planner provider client is unavailable")
+	}
+	if model == "" {
+		return nil, errors.New("planner provider model is required")
 	}
 	stream := false
 	format := json.RawMessage(`"json"`)
@@ -64,7 +73,7 @@ func (p OllamaPlanner) Plan(ctx context.Context, mission Mission) ([]Step, error
 		Stream: &stream,
 		Format: format,
 		Messages: []api.Message{
-			{Role: "system", Content: "You are a mission planner. Return only JSON with a top-level steps array. Each step must have kind, title, risk, requires_approval, and input. Allowed kinds are workspace.list, workspace.read, workspace.write, terminal.exec, sandbox.exec, browser.operator, desktop.companion, mcp.call, connector.http. Never invent completed results. Use read risk for inspection, write risk for filesystem changes, external_side_effect for browser, desktop, MCP, and connector actions, and require approval for write, terminal, sandbox, browser, desktop, MCP, or connector steps."},
+			{Role: "system", Content: "You are a mission planner. Return only JSON with a top-level steps array. Each step must have kind, title, risk, requires_approval, and input. Allowed kinds are workspace.list, workspace.read, workspace.write, terminal.exec, sandbox.exec, browser.operator, desktop.companion, mcp.call, mcp.remote.call, connector.http. Never invent completed results. Use read risk for inspection, write risk for filesystem changes, external_side_effect for browser, desktop, MCP, and connector actions, and require approval for write, terminal, sandbox, browser, desktop, MCP, or connector steps."},
 			{Role: "user", Content: fmt.Sprintf("Objective: %s\nWorkspace: %s\nProject: %s", mission.Objective, mission.Workspace, mission.ProjectID)},
 		},
 	}
@@ -121,6 +130,7 @@ func normalizeSteps(steps []Step) ([]Step, error) {
 		"browser.operator":  RiskExternalSideEffect,
 		"desktop.companion": RiskExternalSideEffect,
 		"mcp.call":          RiskExternalSideEffect,
+		"mcp.remote.call":   RiskExternalSideEffect,
 		"connector.http":    RiskExternalSideEffect,
 	}
 	for i := range steps {
