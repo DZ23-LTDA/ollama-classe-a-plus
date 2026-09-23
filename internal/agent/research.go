@@ -159,6 +159,7 @@ func (e *ResearchEngine) fetch(ctx context.Context, rawURL string, maxBytes int6
 			return result
 		}
 		fetchClient = pinned
+		defer fetchClient.CloseIdleConnections()
 	}
 	response, err := fetchClient.Do(request)
 	if err != nil {
@@ -213,6 +214,7 @@ func (e *ResearchEngine) allowedByRobots(ctx context.Context, target *url.URL) b
 				return true
 			}
 			robotsClient = pinned
+			defer robotsClient.CloseIdleConnections()
 		}
 		response, err := robotsClient.Do(request)
 		if err != nil {
