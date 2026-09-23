@@ -4,7 +4,7 @@
 
 O **Ollama Classe A+** é a distribuição experimental do Ollama DZ23 que combina execução local de modelos, roteamento multi-provider e um runtime agentic com missões persistentes, ferramentas com aprovação, sandbox, memória, pesquisa, Browser Operator, companions, conectores, builders, observabilidade e publicação controlada. O projeto preserva a compatibilidade da base Ollama sempre que possível e evolui as superfícies agentic em camadas verificáveis.
 
-> **Estado real:** o projeto possui uma base extensa implementada e testada localmente, mas ainda não deve ser descrito como paridade total com todos os produtos do mercado. Recursos dependentes de contas externas, hardware, certificados, lojas, modelos multimodais e ambientes distribuídos precisam de validação adicional.
+> **Estado real:** o projeto está em **preview/local RC em hardening**. Possui uma base agentic implementada e testada localmente, mas não deve ser descrito como paridade total, release de produção ou substituto de contas externas, hardware, certificados, lojas, modelos multimodais e ambientes distribuídos.
 
 ## Visão geral
 
@@ -34,14 +34,14 @@ A arquitetura é local-first. Um operador pode começar apenas com o binário e 
 
 ### Linux
 
-Use o método de instalação correspondente à versão do Ollama que você pretende operar ou compile a revisão do repositório para desenvolvimento. Para executar uma revisão local a partir do código-fonte:
+O fork ainda não publica instaladores assinados, binários versionados ou imagem Docker própria. Não use o instalador do domínio `ollama.com` para instalar este repositório. Para executar o Classe A+ a partir do código-fonte:
 
 ```bash
-git clone https://github.com/LMPrado-DZ23/ollama-classe-a-plus.git
+git clone https://github.com/DZ23-LTDA/ollama-classe-a-plus.git
 cd ollama-classe-a-plus
 
-# Conferir a revisão pública
- git log -1 --oneline
+# A main é a linha pública de documentação; esta branch contém a evolução agentic em revisão.
+git switch feat/manus-parity-omniroute
 
 # Executar testes do runtime agentic
 CGO_ENABLED=0 go test ./internal/agent -count=1
@@ -50,20 +50,22 @@ CGO_ENABLED=0 go test ./internal/agent -count=1
 CGO_ENABLED=1 go test ./server ./cmd/launch ./internal/multillm -count=1
 
 # Compilar o binário
-CGO_ENABLED=1 go build -o ollama-classe-a-plus .
+go build -o ./bin/ollama-classe-a-plus .
 ```
 
 Para utilizar o binário compilado:
 
 ```bash
-./ollama-classe-a-plus serve
+OLLAMA_HOST=127.0.0.1:11434 ./bin/ollama-classe-a-plus serve
 ```
 
-Em instalações do sistema, substitua o nome do binário pelo caminho instalado. O runtime agentic usa o mesmo servidor Ollama e publica as rotas versionadas sob `/api/agent/v1`.
+Em outro terminal, a UI web pode ser executada em desenvolvimento com `npm ci` e `npm run dev -- --host 127.0.0.1` dentro de `app/ui/app`. O runtime agentic usa o mesmo servidor Ollama e publica as rotas versionadas sob `/api/agent/v1`. O frontend de desenvolvimento consulta a API local configurada em `app/ui/app/src/lib/config.ts`.
+
+> **BLOCKED_BY_EXTERNAL_DEPENDENCY:** instaladores assinados, artefatos de release, auto-update, rollback verificável, imagens Docker publicadas e validação física em cada sistema operacional exigem pipeline de release, chaves, máquinas e homologação do mantenedor.
 
 ### Docker e infraestrutura distribuída
 
-A composição de desenvolvimento está em `deploy/docker-compose.agentic.yml`. Ela fornece os serviços auxiliares usados para testar PostgreSQL, Redis e OpenTelemetry Collector. Não trate o compose de desenvolvimento como configuração de produção: troque senhas, restrinja rede, use TLS e faça backup antes de expor qualquer serviço.
+A composição local de desenvolvimento está em `deploy/docker-compose.agentic.yml`. Ela fornece serviços auxiliares para testes de PostgreSQL, Redis e OpenTelemetry Collector; não é uma imagem ou distribuição Docker publicada do fork. Não trate o compose de desenvolvimento como configuração de produção: troque senhas, restrinja rede, use TLS e faça backup antes de expor qualquer serviço.
 
 ```bash
 docker compose -f deploy/docker-compose.agentic.yml up -d
@@ -160,7 +162,7 @@ Configure o arquivo `examples/agent-deployments.json` e aponte `OLLAMA_AGENT_DEP
 
 ```bash
 export OLLAMA_AGENT_DEPLOYMENTS="$PWD/examples/agent-deployments.json"
-export DZ23_VERCEL_TOKEN='token-fora-do-repositorio'
+export DZ23_VERCEL_TOKEN="$DZ23_VERCEL_TOKEN_FROM_SECRET_MANAGER"
 ```
 
 Uma publicação externa precisa ser explícita:
@@ -176,11 +178,11 @@ O runtime valida o workspace, rejeita symlinks, limita tamanho e quantidade de a
 
 ## Telas e estado visual
 
-A captura abaixo é real da rota `/agentic`, renderizada com Chromium usando fixtures locais demonstrativas para exibir a tela sem executar ações externas:
+A captura abaixo é real da rota `/agentic`, renderizada com Chromium usando fixtures locais demonstrativas para exibir a tela sem executar ações externas. Ela foi publicada na `main` como documentação do estado observado durante o desenvolvimento, não como prova de release ou de integração externa:
 
 ![Mission Console atual](images/screens/agentic-console.png)
 
-A tela de Settings atual ainda é mínima nesta revisão. Por isso o repositório também contém mockups conceituais, todos marcados como **CONCEITO** dentro da própria imagem:
+Esta branch de documentação contém também a captura histórica de Settings e mockups conceituais, todos classificados explicitamente para não serem confundidos com funcionalidades homologadas:
 
 | Tela | Imagem | Estado |
 |---|---|---|
@@ -188,8 +190,9 @@ A tela de Settings atual ainda é mínima nesta revisão. Por isso o repositóri
 | Builder visual | [builder-mockup.png](images/mockups/builder-mockup.png) | Canvas e histórico têm base; editor rico ainda evolui. |
 | Companion mobile | [mobile-mockup.png](images/mockups/mobile-mockup.png) | Base Expo existe; push, conflitos avançados e lojas pendentes. |
 | Agentic Console real | [agentic-console.png](images/screens/agentic-console.png) | Rota implementada, dados da captura são demonstrativos. |
+| Settings publicada | [settings.png](images/screens/settings.png) | Captura documental da revisão publicada; não comprova contas ou integrações externas. |
 
-As notas de proveniência estão em `docs/images/screens/SCREEN_CAPTURE_NOTES.md` e `docs/images/mockups/MOCKUP_NOTES.md`. Isso evita apresentar uma tela conceitual como funcionalidade concluída.
+As notas de proveniência estão em [`docs/images/ASSET_PROVENANCE.md`](images/ASSET_PROVENANCE.md), `docs/images/screens/SCREEN_CAPTURE_NOTES.md` e `docs/images/mockups/MOCKUP_NOTES.md`. Assets de Cline, Codex, Goose, VS Code e outras ferramentas na raiz `docs/images/` pertencem à documentação de integração herdada; não são telas do Classe A+.
 
 ## Desktop, mobile e companions
 
@@ -251,7 +254,9 @@ server/               rotas HTTP, auth, SAML, TLS e WebSocket
 app/ui/app/            UI web e Agentic Console
 apps/mobile-agentic/  cliente Expo para operação mobile
 docs/agentic/          arquitetura, API, integrações, roadmap e entregas
-docs/images/           screenshots reais e mockups identificados
+docs/images/screens/   capturas observadas da UI Classe A+
+docs/images/mockups/   conceitos visuais, sempre rotulados
+docs/images/           assets upstream/terceiros de documentação de integração
 examples/              configurações sem segredos
 schemas/               contratos versionados
 scripts/               gates e verificações
@@ -263,9 +268,9 @@ Este repositório deriva de uma base Ollama e deve preservar os arquivos de lice
 
 ## Links públicos
 
-- [Repositório Ollama Classe A+](https://github.com/LMPrado-DZ23/ollama-classe-a-plus)
-- [Branch de evolução agentic](https://github.com/LMPrado-DZ23/ollama-classe-a-plus/tree/feat/dz23-claude-codex-desktop)
-- [PR de revisão inicial](https://github.com/LMPrado-DZ23/ollama-classe-a-plus/pulls)
+- [Repositório Ollama Classe A+](https://github.com/DZ23-LTDA/ollama-classe-a-plus)
+- [Branch de evolução agentic](https://github.com/DZ23-LTDA/ollama-classe-a-plus/tree/feat/manus-parity-omniroute)
+- [PRs de revisão](https://github.com/DZ23-LTDA/ollama-classe-a-plus/pulls)
 - [Arquitetura agentic](agentic/ARCHITECTURE.md)
 - [API agentic](agentic/API.md)
 - [Integrações](agentic/INTEGRATIONS.md)
