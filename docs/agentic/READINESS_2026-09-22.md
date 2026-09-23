@@ -826,3 +826,12 @@ O head `18059ba1` corrige um risco residual de identidade/distribuição: o work
 Evidência local: YAML, guardrail de integridade, `sh -n`, cenários negativos de `tag_latest.sh` e do push Docker sem registry explícito passaram. Nenhuma imagem foi construída, publicada ou autenticada em registry. A CI pública do head `18059ba1` foi consultada uma vez e estava `queued`/`in_progress`; não é CI verde.
 
 O produto continua **FIXING / preview-local RC em hardening — não finalizado e não production-ready**. A habilitação de registry, assinatura, SBOM/provenance operacional, smoke de pull e rollback ainda exige configuração e homologação externa pelo mantenedor (`BLOCKED_BY_EXTERNAL_DEPENDENCY`).
+
+
+## Addendum de gates locais finais — 2026-09-23
+
+No head `ae15710e`, o roteiro reprodutível de gates locais terminou com `FINAL_GATES=PASS`. Passaram `python3 /tmp/check-dz23-yaml.py`, `bash scripts/check-class-a-plus-integrity.sh`, `git diff --check`, `GOTOOLCHAIN=go1.26.6 CGO_ENABLED=1 go test ./... -count=1 -timeout=900s`, `go vet ./...`, `go build -trimpath`, lint/typecheck/test/build da UI web, `npm audit --omit=dev --audit-level=high` web, `npm run screens:verify`, typecheck e política offline mobile e auditoria de produção mobile. A UI informou apenas o warning não bloqueante de chunks maiores que 500 kB; o teste mobile em Node 22 informou warning experimental de strip-types, sem falha.
+
+O primeiro roteiro havia parado antes do mobile por ausência local de `tsc`, causada pela remoção deliberada de `apps/mobile-agentic/node_modules` ao limpar artefatos da PR documental. Após `npm ci --no-audit --no-fund` somente no ambiente, os gates mobile passaram e `node_modules`/`dist` foram removidos novamente. Nenhuma dependência gerada foi commitada.
+
+A auditoria completa de desenvolvimento ainda mantém 7 advisories moderados no toolchain Vitest/Storybook, conforme registrado acima; as auditorias de produção web e mobile estão em zero. A CI pública do head posterior será consultada separadamente e continua não substituindo homologação física, contas externas, signing, registry, providers, OAuth/IdP, Redis/PostgreSQL/OTLP operacionais ou deploy real. O produto permanece **FIXING / preview-local RC em hardening — não finalizado e não production-ready**.
