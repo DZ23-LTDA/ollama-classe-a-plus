@@ -687,3 +687,16 @@ O head `55c805a0` corrige o caminho de egress dos connectors. Quando `TokenEnv` 
 Evidência local: testes de catálogo, OAuth tenant-aware, lifecycle, redirect/payload bounds e a regressão `TestConnectorFailsClosedBeforeEgressWhenTokenEnvIsMissing` passaram; essa regressão usa `httptest` e confirmou zero requests ao server. A suíte completa agent, race focado, vet e diff check passaram. Credenciais reais, OAuth upstream, scopes e homologação de cada connector continuam pendentes ou `BLOCKED_BY_EXTERNAL_DEPENDENCY`.
 
 A CI pública do novo head precisa concluir. O produto permanece **FIXING / preview-local RC em hardening — não finalizado e não production-ready**.
+
+
+## Addendum de qualidade web e mobile — 2026-09-23
+
+O head `610de35e` limpa o lint mantido da UI sem desabilitar regras: usos manuais de `any` foram tipados com `unknown`/contratos específicos, refs imperativos receberam handle explícito, hooks passaram a declarar dependências completas e exports utilitários foram separados dos componentes para preservar Fast Refresh. A CI agora executa `npm run lint` no job Web and mobile quality.
+
+Evidência local do head `610de35e`: `npm run lint` passou com zero errors e zero warnings; `./node_modules/.bin/tsc --noEmit` passou; `npm run test -- --run` passou com 22 arquivos/205 testes; `npm run build` passou; YAML, guardrail de integridade, diff check e scan de segredos passaram. O build ainda emite somente o aviso informativo de chunks grandes do Vite.
+
+O head `b1f557d6` endurece o mobile em três pontos. Respostas HTTP do servidor deixam de ser tratadas como falha de transporte e não entram no retry offline; somente falhas sem status HTTP podem ser enfileiradas. O outbox preserva conflitos e respostas HTTP inesperadas para revisão, sem repetir uma mutação rejeitada pelo servidor. Approvals agora exigem motivo explícito digitado pelo operador, e o formulário usa `KeyboardAvoidingView`/persistência de toque para operação em teclado móvel.
+
+Evidência local do head `b1f557d6`: `npm run typecheck` mobile passou; `npm run test:policy` passou com cenários de rede, 409, 422 e 503; YAML, guardrail de integridade, diff check e scan de segredos passaram. A CI pública foi disparada e estava `queued`/`in_progress` na primeira consulta; isso não é evidência de CI verde. Testes físicos Android/iOS, push remoto e resolução de conflitos em dispositivos reais continuam `BLOCKED_BY_EXTERNAL_DEPENDENCY`.
+
+O produto segue **FIXING / preview-local RC em hardening — não finalizado e não production-ready**. PR #1 permanece aberto e sem merge automático.
