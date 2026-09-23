@@ -21,6 +21,7 @@ type Runtime struct {
 	tools            *Registry
 	capabilityPolicy CapabilityPolicy
 	workspaceRoot    string
+	dataRoot         string
 	context          *ContextStore
 	company          *CompanyStore
 	remoteMCP        *RemoteMCPManager
@@ -51,6 +52,7 @@ type RuntimeConfig struct {
 	PlannerResolver PlannerResolver
 	Tools           *Registry
 	WorkspaceRoot   string
+	DataRoot        string
 	Context         *ContextStore
 	Company         *CompanyStore
 	RemoteMCP       *RemoteMCPManager
@@ -113,44 +115,48 @@ func NewRuntime(config RuntimeConfig) (*Runtime, error) {
 	if err := os.MkdirAll(root, 0o700); err != nil {
 		return nil, err
 	}
+	dataRoot, err := resolveRuntimeDataRoot(root, config.DataRoot)
+	if err != nil {
+		return nil, err
+	}
 	contextStore := config.Context
 	if contextStore == nil {
-		contextStore, err = NewContextStore(filepath.Join(root, ".agent-context"))
+		contextStore, err = NewContextStore(filepath.Join(dataRoot, ".agent-context"))
 		if err != nil {
 			return nil, err
 		}
 	}
 	companyStore := config.Company
 	if companyStore == nil {
-		companyStore, err = NewCompanyStore(filepath.Join(root, ".agent-companies"))
+		companyStore, err = NewCompanyStore(filepath.Join(dataRoot, ".agent-companies"))
 		if err != nil {
 			return nil, err
 		}
 	}
 	queue := config.Queue
 	if queue == nil {
-		queue, err = NewJobQueue(filepath.Join(root, ".agent-queue"))
+		queue, err = NewJobQueue(filepath.Join(dataRoot, ".agent-queue"))
 		if err != nil {
 			return nil, err
 		}
 	}
 	traces := config.Traces
 	if traces == nil {
-		traces, err = NewTraceStore(filepath.Join(root, ".agent-traces"))
+		traces, err = NewTraceStore(filepath.Join(dataRoot, ".agent-traces"))
 		if err != nil {
 			return nil, err
 		}
 	}
 	builder := config.Builder
 	if builder == nil {
-		builder, err = NewBuilderService(filepath.Join(root, ".agent-builders"))
+		builder, err = NewBuilderService(filepath.Join(dataRoot, ".agent-builders"))
 		if err != nil {
 			return nil, err
 		}
 	}
 	collaboration := config.Collaboration
 	if collaboration == nil {
-		collaboration, err = NewCollaborationStore(filepath.Join(root, ".agent-collaboration"))
+		collaboration, err = NewCollaborationStore(filepath.Join(dataRoot, ".agent-collaboration"))
 		if err != nil {
 			return nil, err
 		}
@@ -162,8 +168,8 @@ func NewRuntime(config RuntimeConfig) (*Runtime, error) {
 			return nil, err
 		}
 	}
-	runtime := &Runtime{store: store, planner: planner, plannerResolver: config.PlannerResolver, tools: tools, capabilityPolicy: capabilityPolicy, workspaceRoot: root, context: contextStore, company: companyStore, remoteMCP: config.RemoteMCP, metrics: &RuntimeMetrics{}, connectors: config.Connectors, mcp: config.MCP, queue: queue, redisQueue: config.RedisQueue, traces: traces, telemetry: telemetry, media: config.Media, builder: builder, collaboration: collaboration, push: config.Push, deployments: config.Deployments, mu: &sync.Mutex{}, running: make(map[string]bool), activeCancels: make(map[string]context.CancelFunc)}
-	orchestrator, err := NewAgentOrchestrator(filepath.Join(root, ".agent-orchestrator"), runtime.SubagentRunner)
+	runtime := &Runtime{store: store, planner: planner, plannerResolver: config.PlannerResolver, tools: tools, capabilityPolicy: capabilityPolicy, workspaceRoot: root, dataRoot: dataRoot, context: contextStore, company: companyStore, remoteMCP: config.RemoteMCP, metrics: &RuntimeMetrics{}, connectors: config.Connectors, mcp: config.MCP, queue: queue, redisQueue: config.RedisQueue, traces: traces, telemetry: telemetry, media: config.Media, builder: builder, collaboration: collaboration, push: config.Push, deployments: config.Deployments, mu: &sync.Mutex{}, running: make(map[string]bool), activeCancels: make(map[string]context.CancelFunc)}
+	orchestrator, err := NewAgentOrchestrator(filepath.Join(dataRoot, ".agent-orchestrator"), runtime.SubagentRunner)
 	if err != nil {
 		return nil, err
 	}
@@ -171,7 +177,7 @@ func NewRuntime(config RuntimeConfig) (*Runtime, error) {
 	runtime.research = NewResearchEngine()
 	devices := config.Devices
 	if devices == nil {
-		devices, err = NewDeviceStore(filepath.Join(root, ".agent-devices"))
+		devices, err = NewDeviceStore(filepath.Join(dataRoot, ".agent-devices"))
 		if err != nil {
 			return nil, err
 		}
