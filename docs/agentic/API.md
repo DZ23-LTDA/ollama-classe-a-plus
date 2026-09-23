@@ -454,7 +454,9 @@ Schedules também expõem `failure_count` e `last_failure_code` de forma sanitiz
 
 ### Atomicidade do queue local
 
-As mutações de job (`Claim`, `Ack`, `Nack` e `Replay`) só permanecem no estado em memória quando a gravação atômica de `jobs.json` é confirmada. Em erro de filesystem, a fila restaura o snapshot anterior. Esse contrato vale para o queue local; o adapter Redis continua exigindo testes distribuídos de lease, fencing, perda de conexão e recuperação de worker.
+As mutações de job (`Claim`, `Ack`, `Nack` e `Replay`) só permanecem no estado em memória quando a gravação atômica de `jobs.json` é confirmada. Em erro de filesystem, a fila restaura o snapshot anterior. `Enqueue` é idempotente enquanto já existe job `pending` ou `running` para a mesma missão, evitando duplicatas de `resumePending` na instância local.
+
+Quando `auto_run=true` não consegue persistir o enqueue, a missão é marcada `FAILED`, recebe `last_error` sanitizado e um evento `mission.queue_failed`; o erro é devolvido ao caller. Ela não fica silenciosamente `READY` para ser duplicada por um restart.
 
 
 ### Estado permitido para Ack/Nack
@@ -464,7 +466,7 @@ Um worker só pode concluir (`Ack`) ou devolver para retry/DLQ (`Nack`) um job q
 
 ### Compensação do adapter Redis
 
-O adapter Redis tenta desfazer operações multi-comando quando a etapa seguinte falha. Isso evita que Enqueue, Claim, retry ou Replay deixem somente uma parte do estado persistida. A compensação não substitui uma transação Lua/Redis atômica nem é evidência de lease distribuído; esses gates exigem um Redis de homologação configurado pelo operador.
+O adapter Redis usa scripts Lua para tornar `Enqueue` idempotente por missão e para fazer o `Claim` retirar/verificar/marcar o job atomicamente. Cada claim registra lease de visibilidade de 15 minutos; antes de um novo claim, leases expirados são recuperados para `pending`. Erros de claim/Ack/Nack e indexação dead-letter são publicados no canal bounded `RedisQueue.Errors()` em vez de serem descartados.
 
 
-O movimento de jobs delayed para pending no adapter Redis também possui compensação: falha do `LPUSH` após `ZREM` recoloca o ID no sorted set. Esse comportamento é best-effort e deve ser validado em Redis de homologação antes de claims distribuídos.
+O movimento de jobs delayed para pending no adapter Redis ainda usa compensação entre comandos (`ZREM`/`LPUSH`); falha do `LPUSH` recoloca o ID no sorted set. O fixture Redis local comprovou retry/dead-letter, enqueue idempotente e recuperação de lease. Fencing token, Redis TLS `rediss://`, perda de conexão e múltiplas instâncias continuam exigindo homologação distribuída autorizada.

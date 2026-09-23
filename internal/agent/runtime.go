@@ -540,7 +540,21 @@ func (r *Runtime) CreateMission(ctx context.Context, request CreateMissionReques
 	}
 	_ = r.event(mission, "mission.planned", "", map[string]any{"steps": len(plan), "approvals": len(mission.Approvals)})
 	if request.AutoRun && mission.State == MissionReady {
-		_, _ = r.EnqueueMission(mission.ID)
+		if _, enqueueErr := r.EnqueueMission(mission.ID); enqueueErr != nil {
+			queueErr := fmt.Errorf("auto-run enqueue failed: %w", enqueueErr)
+			mission.State = MissionFailed
+			mission.LastError = RedactDLP(queueErr.Error())
+			mission.Version++
+			mission.UpdatedAt = time.Now().UTC()
+			r.metrics.missionsFailed.Add(1)
+			if saveErr := r.store.PutMission(mission); saveErr != nil {
+				return Mission{}, errors.Join(queueErr, saveErr)
+			}
+			if eventErr := r.event(mission, "mission.queue_failed", "", map[string]any{"error": mission.LastError}); eventErr != nil {
+				return mission, errors.Join(queueErr, eventErr)
+			}
+			return mission, queueErr
+		}
 	}
 	return mission, nil
 }

@@ -119,3 +119,21 @@ func TestJobQueueRejectsAckAndNackForNonRunningJobs(t *testing.T) {
 		t.Fatal("nack of pending job unexpectedly succeeded")
 	}
 }
+
+func TestJobQueueEnqueueIsIdempotentByMission(t *testing.T) {
+	queue, err := NewJobQueue("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := queue.Enqueue("mission-idempotent", 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := queue.Enqueue("mission-idempotent", 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if second.ID != first.ID || len(queue.List("")) != 1 {
+		t.Fatalf("duplicate mission jobs: first=%+v second=%+v jobs=%+v", first, second, queue.List(""))
+	}
+}

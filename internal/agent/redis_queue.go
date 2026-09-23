@@ -66,6 +66,24 @@ end
 return reclaimed
 `
 
+const redisEnqueueScript = `
+local existingID = redis.call('GET', KEYS[1])
+if existingID then
+  local existingRaw = redis.call('GET', KEYS[2] .. existingID)
+  if existingRaw then
+    local existing = cjson.decode(existingRaw)
+    if existing.mission_id == ARGV[2] and (existing.status == 'pending' or existing.status == 'running') then
+      return existingRaw
+    end
+  end
+  redis.call('DEL', KEYS[1])
+end
+redis.call('SET', KEYS[2] .. cjson.decode(ARGV[1]).id, ARGV[1], 'EX', '604800')
+redis.call('SET', KEYS[1], cjson.decode(ARGV[1]).id, 'EX', '604800')
+redis.call('LPUSH', KEYS[3], cjson.decode(ARGV[1]).id)
+return ARGV[1]
+`
+
 func OpenRedisQueue(ctx context.Context, rawURL, prefix string) (*RedisQueue, error) {
 	u, err := url.Parse(strings.TrimSpace(rawURL))
 	if err != nil || u.Host == "" {
@@ -97,10 +115,13 @@ func OpenRedisQueue(ctx context.Context, rawURL, prefix string) (*RedisQueue, er
 
 func (q *RedisQueue) key(name string) string  { return q.prefix + ":" + name }
 func (q *RedisQueue) jobKey(id string) string { return q.key("job:" + id) }
-func (q *RedisQueue) pendingKey() string      { return q.key("pending") }
-func (q *RedisQueue) delayedKey() string      { return q.key("delayed") }
-func (q *RedisQueue) deadKey() string         { return q.key("dead") }
-func (q *RedisQueue) leaseKey() string        { return q.key("leases") }
+func (q *RedisQueue) missionKey(id string) string {
+	return q.key("mission:" + id)
+}
+func (q *RedisQueue) pendingKey() string { return q.key("pending") }
+func (q *RedisQueue) delayedKey() string { return q.key("delayed") }
+func (q *RedisQueue) deadKey() string    { return q.key("dead") }
+func (q *RedisQueue) leaseKey() string   { return q.key("leases") }
 
 func (q *RedisQueue) Enqueue(missionID string, maxAttempts int) (QueueJob, error) {
 	if strings.TrimSpace(missionID) == "" {
@@ -111,12 +132,19 @@ func (q *RedisQueue) Enqueue(missionID string, maxAttempts int) (QueueJob, error
 	}
 	now := time.Now().UTC()
 	job := QueueJob{ID: "job_" + uuid.NewString(), MissionID: missionID, Status: QueuePending, MaxAttempts: maxAttempts, AvailableAt: now, CreatedAt: now, UpdatedAt: now}
-	data, _ := json.Marshal(job)
-	if _, err := q.do(context.Background(), "SET", q.jobKey(job.ID), string(data), "EX", "604800"); err != nil {
+	data, err := json.Marshal(job)
+	if err != nil {
 		return QueueJob{}, err
 	}
-	if _, err := q.do(context.Background(), "LPUSH", q.pendingKey(), job.ID); err != nil {
-		_, _ = q.do(context.Background(), "DEL", q.jobKey(job.ID))
+	value, err := q.do(context.Background(), "EVAL", redisEnqueueScript, "3", q.missionKey(missionID), q.key("job:"), q.pendingKey(), string(data), missionID)
+	if err != nil {
+		return QueueJob{}, err
+	}
+	text, ok := value.(string)
+	if !ok || strings.TrimSpace(text) == "" {
+		return QueueJob{}, errors.New("Redis enqueue returned an invalid job")
+	}
+	if err := json.Unmarshal([]byte(text), &job); err != nil {
 		return QueueJob{}, err
 	}
 	return job, nil

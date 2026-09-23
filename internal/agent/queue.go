@@ -86,6 +86,11 @@ func (q *JobQueue) Enqueue(missionID string, maxAttempts int) (QueueJob, error) 
 	job := QueueJob{ID: "job_" + uuid.NewString(), MissionID: missionID, Status: QueuePending, MaxAttempts: maxAttempts, AvailableAt: now, CreatedAt: now, UpdatedAt: now}
 	q.mu.Lock()
 	defer q.mu.Unlock()
+	for _, existing := range q.jobs {
+		if existing.MissionID == missionID && (existing.Status == QueuePending || existing.Status == QueueRunning) {
+			return existing, nil
+		}
+	}
 	if err := q.persistLocked(job); err != nil {
 		return QueueJob{}, err
 	}
