@@ -4,7 +4,7 @@ import {
   type ReactNode,
 } from "react";
 import { DownloadEvent } from "@/gotypes";
-import { StreamingContext } from "./streamingContext";
+import { StreamingContext } from "./streaming-context";
 
 export function StreamingProvider({ children }: { children: ReactNode }) {
   const [streamingChatIds, setStreamingChatIds] = useState<Set<string>>(
