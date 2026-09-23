@@ -576,3 +576,10 @@ O commit `45393d8c` entrega um canal Tel-Agent textual funcional no Company OS, 
 O caminho é deliberadamente local-first. `campaign.draft` não publica campanha: grava um rascunho sandbox e cria approval pendente. O canal não simula telefonia, WhatsApp, SMS, voz ou integração externa; a resposta de histórico expõe `telephony: not_configured`. Assim, a jornada textual é **implementada, testada e publicada**, enquanto telefonia homologada, contas externas e mensagens reais continuam pendentes ou bloqueadas por dependência externa.
 
 No primeiro check do SHA `45393d8c`, a CI pública estava parcialmente `queued`/`in_progress`; não há base para chamar o candidato totalmente verde ainda. O estado global continua **preview/local RC em hardening — não finalizado e não production-ready**.
+
+
+## Addendum de gates completos do head Tel-Agent — 2026-09-23
+
+O head documental `55dfa325` foi validado pelo runner absoluto com `FULL_LOCAL_GATES=PASS`. Passaram integrity, YAML, suíte Go completa com CGO, vet, build Go, Vitest, build TypeScript/Vite, audit de produção da UI, typecheck mobile, audit de produção mobile e diff limpo. Isso é evidência local reprodutível do candidato, não homologação de contas, hardware, lojas ou providers externos.
+
+Na última consulta pública, SBOM, RLS/Redis/OTLP, Web/Mobile, integrity, mudanças, patches e `go_mod_tidy` estavam concluídos com sucesso; jobs Go e test/race da matriz upstream ainda estavam em execução. Assim, a CI remota do head não deve ser chamada totalmente verde até todos os jobs terminarem.

@@ -635,3 +635,8 @@ A continuidade pós-V5 exigia que Tel-Agent permanecesse funcionalmente acima do
 A operação de campanha é somente rascunho sandbox com approval pendente; backlog é local; relatório é leitura. Não existe alegação de telefonia, WhatsApp, SMS, SIP, voz ou mensagem externa. Portanto, a implementação está testada e publicada, mas a homologação de telefonia e contas reais permanece `BLOCKED_BY_EXTERNAL_DEPENDENCY`.
 
 Evidência do slice: testes Go normais e race de `internal/agent` e `server`, Vitest/build UI e integrity guard passaram localmente. A CI pública do SHA `45393d8c` foi observada parcialmente `queued`/`in_progress` no primeiro check e deve ser reconsultada por SHA antes de qualquer conclusão.
+
+
+## Addendum de gates completos do candidato Tel-Agent — 2026-09-23
+
+O head `55dfa325` passou localmente o conjunto completo de integrity, YAML, Go com CGO, vet, build, UI, mobile, audits e diff (`FULL_LOCAL_GATES=PASS`). A consulta pública seguinte confirmou vários jobs remotos em sucesso, enquanto jobs Go e test/race da matriz upstream ainda estavam em execução. A conclusão correta é **localmente validado e publicado; CI remota ainda pendente**, sem converter essa evidência em homologação externa ou production-ready.

@@ -491,3 +491,8 @@ O runtime agora rejeita motivos de approval acima de 2048 bytes antes da decisã
 ## Unreleased — Tel-Agent textual no Company OS — 2026-09-23
 
 O Company OS ganhou o canal `tel-agent.text`, com histórico persistente tenant-aware, retorno estruturado e operações locais allowlisted para leitura de relatório, criação de backlog e rascunho de campanha. Mutações exigem role operacional quando auth está ativa; entradas são limitadas e redigidas antes da persistência. O rascunho de campanha permanece sandbox e gera approval pendente. Telefonia, WhatsApp, SMS e mensagens externas continuam explicitamente não configurados e não homologados.
+
+
+## 2026-09-23 — gates completos do candidato Tel-Agent
+
+O head `55dfa325` passou o runner local absoluto completo: integrity, YAML, Go test/vet/build, Vitest/build/audit de produção da UI, typecheck/audit de produção mobile e diff. A CI pública ainda precisava concluir jobs Go e a matriz upstream no momento do registro; nenhum check falho foi observado nessa consulta.

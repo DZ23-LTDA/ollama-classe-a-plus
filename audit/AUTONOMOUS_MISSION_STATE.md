@@ -2386,3 +2386,10 @@ A operação `POST /api/agent/v1/companies/:id/tel-agent` aceita somente `report
 Evidência local: `go test ./internal/agent -run 'TestCompanyTelAgent'`, `go test ./server -run 'TestCompanyTelAgent'`, variantes `-race`, Vitest completo, build TypeScript/Vite e `Class A+ integrity guard` passaram. O SHA remoto confirmado é `45393d8ca08599f008ea81598ef1f8d3f75f66bc`; no primeiro check público, os workflows ainda estavam `queued`/`in_progress`, portanto a CI desse candidato permanece pendente.
 
 Classificação: **IMPLEMENTADO, TESTADO, PUBLICADO; não homologado externamente**. Telefonia, SIP, SMS, WhatsApp e provedores de voz continuam `BLOCKED_BY_EXTERNAL_DEPENDENCY` até existir conector, consentimento, conta de operador, destino de teste e smoke test reversível autorizado.
+
+
+## Evidência final local do head Tel-Agent — 2026-09-23
+
+Após a publicação documental, o runner absoluto `FULL_LOCAL_GATES=PASS` foi concluído no head `55dfa325d1f270284169f4d99beb4f539f38bd54`: integrity, YAML, `CGO_ENABLED=1 go test ./... -count=1 -timeout=900s`, `go vet`, build Go, `npm ci`/Vitest/build/audit de produção da UI, `npm ci`/typecheck/audit de produção mobile e `git diff --check` passaram. Avisos de chunks Vite grandes e pacotes npm deprecated não produziram falha nem foram tratados como vulnerabilidades.
+
+A conferência pública do mesmo SHA encontrou SBOM, serviços distribuídos, Web/Mobile, integrity, mudanças, patches e go_mod_tidy concluídos com sucesso; jobs Go e a matriz upstream ainda estavam `in_progress`, sem falha observada naquele instante. Portanto, a prova local é completa, mas a CI remota permanece pendente até seus jobs terminarem.
