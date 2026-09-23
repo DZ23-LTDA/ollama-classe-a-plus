@@ -198,6 +198,8 @@ type Schedule struct {
 	WebhookSecretEnv string     `json:"webhook_secret_env,omitempty"`
 	NextRunAt        time.Time  `json:"next_run_at"`
 	LastRunAt        *time.Time `json:"last_run_at,omitempty"`
+	FailureCount     int        `json:"failure_count,omitempty"`
+	LastFailureCode  string     `json:"last_failure_code,omitempty"`
 	CreatedAt        time.Time  `json:"created_at"`
 	UpdatedAt        time.Time  `json:"updated_at"`
 }

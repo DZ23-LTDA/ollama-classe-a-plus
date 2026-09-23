@@ -578,7 +578,11 @@ func (r *Runtime) resumePending(ctx context.Context) {
 				continue
 			}
 		}
-		_, _ = r.CreateMission(ctx, CreateMissionRequest{Objective: schedule.Objective, Model: schedule.Model, Workspace: schedule.Workspace, ProjectID: schedule.ProjectID, OrganizationID: schedule.OrganizationID, AutoRun: true})
+		if _, err := r.CreateMission(ctx, CreateMissionRequest{Objective: schedule.Objective, Model: schedule.Model, Workspace: schedule.Workspace, ProjectID: schedule.ProjectID, OrganizationID: schedule.OrganizationID, AutoRun: true}); err != nil {
+			_, _ = r.recordScheduleFailure(schedule)
+			continue
+		}
+		_, _ = r.recordScheduleSuccess(schedule)
 	}
 	missions, err := r.store.ListMissions()
 	if err != nil {
@@ -591,6 +595,35 @@ func (r *Runtime) resumePending(ctx context.Context) {
 		}
 		_, _ = r.EnqueueMission(mission.ID)
 	}
+}
+
+const maxScheduleFailures = 3
+
+func (r *Runtime) recordScheduleFailure(schedule Schedule) (Schedule, error) {
+	if r.context == nil {
+		return Schedule{}, errors.New("context store is required for schedule failure")
+	}
+	schedule.FailureCount++
+	schedule.LastFailureCode = "mission_creation_failed"
+	if schedule.FailureCount >= maxScheduleFailures {
+		schedule.Enabled = false
+	} else {
+		retryDelay := time.Duration(schedule.FailureCount*5) * time.Second
+		if retryDelay > 5*time.Minute {
+			retryDelay = 5 * time.Minute
+		}
+		schedule.NextRunAt = time.Now().UTC().Add(retryDelay)
+	}
+	return r.context.UpdateSchedule(schedule.ID, schedule)
+}
+
+func (r *Runtime) recordScheduleSuccess(schedule Schedule) (Schedule, error) {
+	if r.context == nil || (schedule.FailureCount == 0 && schedule.LastFailureCode == "") {
+		return schedule, nil
+	}
+	schedule.FailureCount = 0
+	schedule.LastFailureCode = ""
+	return r.context.UpdateSchedule(schedule.ID, schedule)
 }
 
 func companyIDFromWorkspace(workspace string) string {

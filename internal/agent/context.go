@@ -704,15 +704,19 @@ func (s *ContextStore) ClaimDueSchedules(now time.Time) []Schedule {
 		if !schedule.Enabled || schedule.NextRunAt.After(now) {
 			continue
 		}
-		due = append(due, schedule)
+		previous := schedule
 		last := now
 		schedule.LastRunAt = &last
 		schedule.NextRunAt = now.Add(time.Duration(schedule.IntervalSeconds) * time.Second)
 		schedule.UpdatedAt = now
-		s.schedules[id] = schedule
 		if s.root != "" {
-			_ = writeJSONAtomic(filepath.Join(s.root, "schedules", id+".json"), schedule)
+			if err := writeJSONAtomic(filepath.Join(s.root, "schedules", id+".json"), schedule); err != nil {
+				s.schedules[id] = previous
+				continue
+			}
 		}
+		s.schedules[id] = schedule
+		due = append(due, schedule)
 	}
 	return due
 }
