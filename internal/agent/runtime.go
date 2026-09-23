@@ -40,6 +40,7 @@ type Runtime struct {
 	devices             *DeviceStore
 	ingestion           DocumentIngestor
 	push                *PushService
+	pushOutbox          *PushOutbox
 	deployments         *DeploymentManager
 	deploymentApprovals *DeploymentApprovalStore
 	webhookReplay       *WebhookReplayStore
@@ -69,6 +70,7 @@ type RuntimeConfig struct {
 	Collaboration       *CollaborationStore
 	Devices             *DeviceStore
 	Push                *PushService
+	PushOutbox          *PushOutbox
 	Deployments         *DeploymentManager
 	DeploymentApprovals *DeploymentApprovalStore
 	WebhookReplay       *WebhookReplayStore
@@ -123,6 +125,13 @@ func NewRuntime(config RuntimeConfig) (*Runtime, error) {
 	dataRoot, err := resolveRuntimeDataRoot(root, config.DataRoot)
 	if err != nil {
 		return nil, err
+	}
+	pushOutbox := config.PushOutbox
+	if pushOutbox == nil && config.Push != nil {
+		pushOutbox, err = NewPushOutbox(filepath.Join(dataRoot, ".agent-push-outbox"))
+		if err != nil {
+			return nil, err
+		}
 	}
 	contextStore := config.Context
 	if contextStore == nil {
@@ -190,7 +199,7 @@ func NewRuntime(config RuntimeConfig) (*Runtime, error) {
 			return nil, err
 		}
 	}
-	runtime := &Runtime{store: store, planner: planner, plannerResolver: config.PlannerResolver, tools: tools, capabilityPolicy: capabilityPolicy, workspaceRoot: root, dataRoot: dataRoot, context: contextStore, company: companyStore, remoteMCP: config.RemoteMCP, metrics: &RuntimeMetrics{}, connectors: config.Connectors, mcp: config.MCP, queue: queue, redisQueue: config.RedisQueue, traces: traces, telemetry: telemetry, media: config.Media, builder: builder, collaboration: collaboration, push: config.Push, deployments: config.Deployments, deploymentApprovals: deploymentApprovals, webhookReplay: webhookReplay, mu: &sync.Mutex{}, running: make(map[string]bool), activeCancels: make(map[string]context.CancelFunc)}
+	runtime := &Runtime{store: store, planner: planner, plannerResolver: config.PlannerResolver, tools: tools, capabilityPolicy: capabilityPolicy, workspaceRoot: root, dataRoot: dataRoot, context: contextStore, company: companyStore, remoteMCP: config.RemoteMCP, metrics: &RuntimeMetrics{}, connectors: config.Connectors, mcp: config.MCP, queue: queue, redisQueue: config.RedisQueue, traces: traces, telemetry: telemetry, media: config.Media, builder: builder, collaboration: collaboration, push: config.Push, pushOutbox: pushOutbox, deployments: config.Deployments, deploymentApprovals: deploymentApprovals, webhookReplay: webhookReplay, mu: &sync.Mutex{}, running: make(map[string]bool), activeCancels: make(map[string]context.CancelFunc)}
 	orchestrator, err := NewAgentOrchestrator(filepath.Join(dataRoot, ".agent-orchestrator"), runtime.SubagentRunner)
 	if err != nil {
 		return nil, err
@@ -594,6 +603,21 @@ func (r *Runtime) Start(ctx context.Context) {
 	} else {
 		r.queue.Start(ctx, "agent-runtime", worker)
 	}
+	if r.push != nil && r.pushOutbox != nil {
+		go func() {
+			r.flushPushOutbox(ctx)
+			ticker := time.NewTicker(2 * time.Second)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					r.flushPushOutbox(ctx)
+				}
+			}
+		}()
+	}
 	go func() {
 		r.resumePending(ctx)
 		ticker := time.NewTicker(2 * time.Second)
@@ -607,6 +631,33 @@ func (r *Runtime) Start(ctx context.Context) {
 			}
 		}
 	}()
+}
+
+func (r *Runtime) flushPushOutbox(ctx context.Context) {
+	if r == nil || r.push == nil || r.pushOutbox == nil {
+		return
+	}
+	for {
+		item, ok, err := r.pushOutbox.ClaimDue(time.Now().UTC())
+		if err != nil {
+			r.metrics.pushOutboxFailures.Add(1)
+			return
+		}
+		if !ok {
+			return
+		}
+		err = r.push.NotifyOrganization(ctx, item.OrganizationID, item.Title, item.Body, item.Data)
+		if err != nil {
+			r.metrics.pushDeliveryFailures.Add(1)
+			if failErr := r.pushOutbox.Fail(item.ID, err, time.Now().UTC()); failErr != nil {
+				r.metrics.pushOutboxFailures.Add(1)
+			}
+			continue
+		}
+		if err := r.pushOutbox.Complete(item.ID); err != nil {
+			r.metrics.pushOutboxFailures.Add(1)
+		}
+	}
 }
 
 func (r *Runtime) resumePending(ctx context.Context) {
@@ -1074,15 +1125,20 @@ func (r *Runtime) failStep(mission Mission, step *Step, err error) error {
 
 func (r *Runtime) event(mission Mission, eventType, stepID string, payload any) error {
 	err := r.store.AppendEvent(Event{ID: "evt_" + uuid.NewString(), MissionID: mission.ID, OrganizationID: mission.OrganizationID, Type: eventType, StepID: stepID, Payload: RedactValue(payload), CreatedAt: time.Now().UTC()})
+	if err != nil {
+		r.metrics.eventPersistFailures.Add(1)
+	}
 	if r.push != nil && mission.OrganizationID != "" && (eventType == "mission.completed" || eventType == "mission.failed" || eventType == "step.awaiting_approval") {
 		title := "DZ23 Agentic"
 		body := "A missão " + mission.ID + " mudou de estado"
 		if eventType == "mission.completed" {
 			body = "A missão " + mission.ID + " foi concluída"
 		}
-		go func() {
-			_ = r.push.NotifyOrganization(context.Background(), mission.OrganizationID, title, body, map[string]any{"mission_id": mission.ID, "event": eventType})
-		}()
+		if r.pushOutbox == nil {
+			r.metrics.pushOutboxFailures.Add(1)
+		} else if _, enqueueErr := r.pushOutbox.Enqueue(mission.OrganizationID, title, body, map[string]any{"mission_id": mission.ID, "event": eventType}); enqueueErr != nil {
+			r.metrics.pushOutboxFailures.Add(1)
+		}
 	}
 	return err
 }

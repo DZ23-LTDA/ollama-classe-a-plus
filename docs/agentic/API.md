@@ -117,6 +117,8 @@ curl -sS http://localhost:11434/api/agent/v1/metrics/prometheus
 
 O endpoint Prometheus expõe counters de missões, passos, retries, approvals e chamadas de tool.
 
+Notificações de eventos de missão para mobile não são enviadas em uma goroutine descartável. Quando push está configurado, o runtime grava primeiro em `OLLAMA_AGENT_STORE/.agent-push-outbox/outbox.json`; um worker local reivindica cada item com lease, tenta a entrega, remove no sucesso e aplica backoff persistente no erro. Restart recupera itens não concluídos, e `ollama_agent_event_persist_failures`, `ollama_agent_push_outbox_failures` e `ollama_agent_push_delivery_failures` ficam disponíveis no snapshot/Prometheus. Isso comprova durabilidade local e observabilidade, não entrega remota, APNs/FCM, push em dispositivo ou operação distribuída.
+
 `GET /api/agent/v1/connectors` retorna o catálogo tenant-aware e o estado seguro de cada connector. O campo `credential_configured` é apenas booleano; tokens, nomes de variáveis e ciphertext nunca fazem parte da resposta. Catálogo, adapter e credencial configurada não significam conta OAuth ativa: a conexão real ainda exige autorização do operador, teste reversível e evidência do upstream.
 
 ## Agendamentos e webhooks
