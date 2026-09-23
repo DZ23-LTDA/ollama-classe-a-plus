@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -48,8 +49,50 @@ type DeploymentManager struct {
 	client  *http.Client
 }
 
+type deploymentLoopbackContextKey struct{}
+
 func NewDeploymentManager() *DeploymentManager {
-	return &DeploymentManager{configs: map[string]DeployConfig{}, client: &http.Client{CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return errors.New("deployment redirects are disabled") }}}
+	return &DeploymentManager{configs: map[string]DeployConfig{}, client: newDeploymentHTTPClient()}
+}
+
+func newDeploymentHTTPClient() *http.Client {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.Proxy = nil
+	transport.DialContext = deploymentDialContext
+	return &http.Client{Timeout: 120 * time.Second, Transport: transport, CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return errors.New("deployment redirects are disabled") }}
+}
+
+func deploymentRequestContext(ctx context.Context, rawURL string) (context.Context, error) {
+	parsed, err := url.Parse(rawURL)
+	if err != nil || parsed.Hostname() == "" {
+		return nil, errors.New("deployment URL is invalid")
+	}
+	return context.WithValue(ctx, deploymentLoopbackContextKey{}, isLoopbackHost(parsed.Hostname())), nil
+}
+
+func deploymentDialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	dialer := &net.Dialer{Timeout: 15 * time.Second}
+	conn, err := dialer.DialContext(ctx, network, address)
+	if err != nil {
+		return nil, err
+	}
+	if loopback, _ := ctx.Value(deploymentLoopbackContextKey{}).(bool); loopback {
+		return conn, nil
+	}
+	remote, _, splitErr := net.SplitHostPort(conn.RemoteAddr().String())
+	if splitErr != nil {
+		_ = conn.Close()
+		return nil, errors.New("deployment connected address is invalid")
+	}
+	if ip := net.ParseIP(strings.Trim(remote, "[]")); ip != nil && deploymentPrivateIP(ip) {
+		_ = conn.Close()
+		return nil, errors.New("deployment destination connected to a private address")
+	}
+	return conn, nil
+}
+
+func deploymentPrivateIP(ip net.IP) bool {
+	return ip.IsLoopback() || ip.IsUnspecified() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsMulticast()
 }
 
 func (m *DeploymentManager) Register(config DeployConfig) error {
@@ -65,7 +108,7 @@ func (m *DeploymentManager) Register(config DeployConfig) error {
 	if err != nil || base == nil || base.Host == "" || base.User != nil {
 		return errors.New("deployment base_url must be HTTPS or loopback HTTP without userinfo")
 	}
-	loopbackHTTP := base.Scheme == "http" && (base.Hostname() == "127.0.0.1" || base.Hostname() == "::1")
+	loopbackHTTP := base.Scheme == "http" && isLoopbackHost(base.Hostname())
 	if base.Scheme != "https" && !loopbackHTTP {
 		return errors.New("deployment base_url must be HTTPS or loopback HTTP without userinfo")
 	}
@@ -135,6 +178,10 @@ func collectDeployFiles(root string) ([]deployFile, error) {
 	if err != nil || !info.IsDir() {
 		return nil, errors.New("deployment root is not a directory")
 	}
+	rootInfo, err := os.Lstat(root)
+	if err != nil || rootInfo.Mode()&os.ModeSymlink != 0 {
+		return nil, errors.New("deployment root must not be a symlink")
+	}
 	var files []deployFile
 	var total int64
 	err = filepath.Walk(root, func(path string, info os.FileInfo, walkErr error) error {
@@ -183,7 +230,11 @@ func (m *DeploymentManager) request(ctx context.Context, config DeployConfig, me
 	}
 	base.Path = strings.TrimSuffix(base.Path, "/") + relative.Path
 	base.RawQuery = relative.RawQuery
-	req, err := http.NewRequestWithContext(ctx, method, base.String(), bytes.NewReader(body))
+	requestContext, err := deploymentRequestContext(ctx, base.String())
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequestWithContext(requestContext, method, base.String(), bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}

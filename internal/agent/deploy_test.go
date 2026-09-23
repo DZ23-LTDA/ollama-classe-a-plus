@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -62,5 +64,48 @@ func TestDeploymentManagerRejectsExternalHTTP(t *testing.T) {
 	manager := NewDeploymentManager()
 	if err := manager.Register(DeployConfig{ID: "unsafe", Provider: "generic", BaseURL: "http://example.com"}); err == nil {
 		t.Fatal("external HTTP deployment unexpectedly accepted")
+	}
+}
+
+func TestDeploymentRejectsSymlinkRoot(t *testing.T) {
+	parent := t.TempDir()
+	realRoot := filepath.Join(parent, "real")
+	if err := os.Mkdir(realRoot, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	linkRoot := filepath.Join(parent, "link")
+	if err := os.Symlink(realRoot, linkRoot); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+	if _, err := collectDeployFiles(linkRoot); err == nil || !strings.Contains(err.Error(), "symlink") {
+		t.Fatalf("expected symlink root rejection, got %v", err)
+	}
+}
+
+func TestDeploymentDialRejectsPrivateConnectedAddress(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	accepted := make(chan struct{})
+	go func() {
+		conn, acceptErr := listener.Accept()
+		if acceptErr == nil && conn != nil {
+			_ = conn.Close()
+		}
+		close(accepted)
+	}()
+	_, err = deploymentDialContext(context.Background(), "tcp", listener.Addr().String())
+	<-accepted
+	if err == nil || !strings.Contains(err.Error(), "private") {
+		t.Fatalf("expected private deployment dial rejection, got %v", err)
+	}
+}
+
+func TestDeploymentAllowsLocalhostHTTPConfiguration(t *testing.T) {
+	manager := NewDeploymentManager()
+	if err := manager.Register(DeployConfig{ID: "local", Provider: "generic", BaseURL: "http://localhost:43123"}); err != nil {
+		t.Fatalf("localhost deployment config rejected: %v", err)
 	}
 }
