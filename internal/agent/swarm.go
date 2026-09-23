@@ -176,6 +176,9 @@ func (o *AgentOrchestrator) PlanForOrganization(organizationID, objective, works
 	o.mu.Lock()
 	o.jobs[job.ID] = job
 	err = o.persistLocked()
+	if err != nil {
+		delete(o.jobs, job.ID)
+	}
 	o.mu.Unlock()
 	return job, err
 }
@@ -203,7 +206,8 @@ func (o *AgentOrchestrator) GetForOrganization(id, organizationID string) (Orche
 
 func (o *AgentOrchestrator) Run(ctx context.Context, id string) (OrchestrationJob, error) {
 	o.mu.Lock()
-	job, ok := o.jobs[strings.TrimSpace(id)]
+	id = strings.TrimSpace(id)
+	job, ok := o.jobs[id]
 	if !ok {
 		o.mu.Unlock()
 		return OrchestrationJob{}, os.ErrNotExist
@@ -212,10 +216,15 @@ func (o *AgentOrchestrator) Run(ctx context.Context, id string) (OrchestrationJo
 		o.mu.Unlock()
 		return job, errors.New("orchestration job is already running")
 	}
+	previous := job
 	job.State = OrchestrationRunning
 	job.UpdatedAt = time.Now().UTC()
 	o.jobs[id] = job
-	_ = o.persistLocked()
+	if err := o.persistLocked(); err != nil {
+		o.jobs[id] = previous
+		o.mu.Unlock()
+		return previous, err
+	}
 	o.mu.Unlock()
 	if job.Budget.MaxSeconds > 0 {
 		var cancel context.CancelFunc
@@ -313,8 +322,12 @@ func (o *AgentOrchestrator) Run(ctx context.Context, id string) (OrchestrationJo
 	job.CompletedAt = &now
 	job.UpdatedAt = now
 	o.mu.Lock()
+	persistedJob := o.jobs[id]
 	o.jobs[id] = job
 	err := o.persistLocked()
+	if err != nil {
+		o.jobs[id] = persistedJob
+	}
 	o.mu.Unlock()
 	return job, err
 }
@@ -334,10 +347,16 @@ func (o *AgentOrchestrator) Cancel(id string) (OrchestrationJob, error) {
 		return OrchestrationJob{}, os.ErrNotExist
 	}
 	if job.State == OrchestrationPlanned {
+		previous := job
 		job.State = OrchestrationCancelled
 		job.UpdatedAt = time.Now().UTC()
 		o.jobs[id] = job
-		return job, o.persistLocked()
+		err := o.persistLocked()
+		if err != nil {
+			o.jobs[id] = previous
+			return previous, err
+		}
+		return job, nil
 	}
 	return job, errors.New("running cancellation requires the request context")
 }

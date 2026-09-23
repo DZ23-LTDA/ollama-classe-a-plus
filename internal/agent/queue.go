@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sort"
@@ -225,9 +226,13 @@ func (q *JobQueue) Start(ctx context.Context, workerID string, handler func(cont
 			job, ok, err := q.Claim(workerID, time.Now().UTC())
 			if err == nil && ok {
 				if runErr := handler(ctx, job); runErr != nil {
-					_, _ = q.Nack(job.ID, runErr)
+					if _, nackErr := q.Nack(job.ID, runErr); nackErr != nil {
+						slog.Error("agent queue NACK failed", "job_id", job.ID, "error", nackErr)
+					}
 				} else {
-					_ = q.Ack(job.ID)
+					if ackErr := q.Ack(job.ID); ackErr != nil {
+						slog.Error("agent queue ACK failed", "job_id", job.ID, "error", ackErr)
+					}
 				}
 				continue
 			}

@@ -382,7 +382,9 @@ func (q *RedisQueue) moveDue(ctx context.Context, now time.Time) error {
 			return err
 		}
 		if _, err := q.do(ctx, "LPUSH", q.pendingKey(), id); err != nil {
-			_, _ = q.do(ctx, "ZADD", q.delayedKey(), strconv.FormatInt(now.UnixMilli(), 10), id)
+			if _, rollbackErr := q.do(ctx, "ZADD", q.delayedKey(), strconv.FormatInt(now.UnixMilli(), 10), id); rollbackErr != nil {
+				return errors.Join(err, fmt.Errorf("restore delayed job %s: %w", id, rollbackErr))
+			}
 			return err
 		}
 	}

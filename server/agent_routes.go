@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
@@ -1712,10 +1713,12 @@ func (a *agentAPI) createOrchestration(c *gin.Context) {
 		writeAgentError(c, http.StatusBadRequest, err)
 		return
 	}
-	if request.AutoRun {
-		go func(id, organizationID string) {
-			_, _ = a.runtime.Orchestrator().RunForOrganization(context.Background(), id, organizationID)
-		}(job.ID, organizationID)
+		if request.AutoRun {
+			go func(id, organizationID string) {
+				if _, err := a.runtime.Orchestrator().RunForOrganization(context.Background(), id, organizationID); err != nil {
+					slog.Error("agent orchestration autorun failed", "job_id", id, "organization_id", organizationID, "error", err)
+				}
+			}(job.ID, organizationID)
 		c.JSON(http.StatusAccepted, job)
 		return
 	}
@@ -1737,10 +1740,12 @@ func (a *agentAPI) runOrchestration(c *gin.Context) {
 	if err != nil {
 		writeAgentError(c, statusForAgentError(err), err)
 		return
-	}
-	go func(id, organizationID string) {
-		_, _ = a.runtime.Orchestrator().RunForOrganization(context.Background(), id, organizationID)
-	}(job.ID, organizationID)
+		}
+		go func(id, organizationID string) {
+			if _, err := a.runtime.Orchestrator().RunForOrganization(context.Background(), id, organizationID); err != nil {
+				slog.Error("agent orchestration run failed", "job_id", id, "organization_id", organizationID, "error", err)
+			}
+		}(job.ID, organizationID)
 	c.JSON(http.StatusAccepted, gin.H{"id": job.ID, "state": agent.OrchestrationRunning})
 }
 

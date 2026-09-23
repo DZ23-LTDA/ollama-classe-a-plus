@@ -1,6 +1,10 @@
 package agent
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
 
 func TestCollaborationPersistsCommentsAndPresence(t *testing.T) {
 	root := t.TempDir()
@@ -21,5 +25,15 @@ func TestCollaborationPersistsCommentsAndPresence(t *testing.T) {
 	snapshot := reloaded.Snapshot("project-1")
 	if len(snapshot.Comments) != 1 || len(snapshot.Presence) != 1 || snapshot.Comments[0].Body != "revisar o preview" {
 		t.Fatalf("snapshot=%+v", snapshot)
+	}
+}
+
+func TestCollaborationRejectsCorruptLedgers(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "comments.json"), []byte("{"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := NewCollaborationStore(root); err == nil {
+		t.Fatal("corrupt collaboration ledger unexpectedly loaded")
 	}
 }

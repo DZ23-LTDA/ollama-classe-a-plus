@@ -2,6 +2,7 @@ package agent
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -45,8 +46,12 @@ func NewCollaborationStore(root string) (*CollaborationStore, error) {
 	if err := os.MkdirAll(root, 0o700); err != nil {
 		return nil, err
 	}
-	_ = readJSON(filepath.Join(root, "comments.json"), &store.comments)
-	_ = readJSON(filepath.Join(root, "presence.json"), &store.presence)
+	if err := readJSON(filepath.Join(root, "comments.json"), &store.comments); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return nil, fmt.Errorf("load collaboration comments: %w", err)
+	}
+	if err := readJSON(filepath.Join(root, "presence.json"), &store.presence); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return nil, fmt.Errorf("load collaboration presence: %w", err)
+	}
 	return store, nil
 }
 
