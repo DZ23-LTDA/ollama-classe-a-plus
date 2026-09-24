@@ -1,0 +1,74 @@
+name: dz23-linux-package
+
+# Packaging Linux (CPU) do Ollama Classe A+: tarball reproduzivel + checksum +
+# SBOM + smoke (install/--version/start/stop/data dir). GPU fica no release.
+# Artefato UNSIGNED explicitamente.
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  linux-package:
+    name: Linux package (cpu, amd64)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build reproducible tarball + checksum
+        env:
+          SOURCE_DATE_EPOCH: "0"
+        run: bash scripts/package_linux.sh dist
+
+      - name: Generate SBOM (CycloneDX, Go-native)
+        run: |
+          set -euo pipefail
+          go run github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@v1 mod \
+            -json -licenses -output dist/sbom.cyclonedx.json .
+          echo "SBOM:"; head -c 400 dist/sbom.cyclonedx.json; echo
+
+      - name: Smoke — install, --version, start/stop, data dir
+        run: |
+          set -euo pipefail
+          PKG_DIR=$(find dist -maxdepth 1 -type d -name 'ollama-classe-a-plus-*-linux-amd64' | head -1)
+          echo "pacote: $PKG_DIR"
+          export PREFIX="$RUNNER_TEMP/claseaplus"
+          bash "$PKG_DIR/install.sh"
+          BIN="$PREFIX/bin/ollama"
+          echo "== --version =="; "$BIN" --version
+          echo "== start =="; "$BIN" serve > "$RUNNER_TEMP/serve.log" 2>&1 &
+          SRV=$!
+          ok=0
+          for i in $(seq 1 20); do
+            if curl -fsS http://127.0.0.1:11434/ >/dev/null 2>&1; then ok=1; break; fi
+            sleep 1
+          done
+          echo "== root endpoint =="; curl -fsS http://127.0.0.1:11434/ || true
+          echo "== data dir =="; ls -la "$HOME/.ollama" || echo "(sem ~/.ollama ainda)"
+          echo "== stop =="; kill "$SRV" 2>/dev/null || true; wait "$SRV" 2>/dev/null || true
+          if [ "$ok" -ne 1 ]; then echo "::error::servidor nao respondeu no start"; cat "$RUNNER_TEMP/serve.log" || true; exit 1; fi
+          echo "== uninstall =="; bash "$PKG_DIR/uninstall.sh"
+          test ! -f "$BIN" && echo "uninstall OK"
+
+      - name: Upload Linux package (unsigned)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ollama-classe-a-plus-linux-amd64-unsigned
+          path: |
+            dist/ollama-classe-a-plus-*-linux-amd64.tgz
+            dist/ollama-classe-a-plus-*-linux-amd64.tgz.sha256
+            dist/sbom.cyclonedx.json
+          if-no-files-found: error
