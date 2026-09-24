@@ -39,6 +39,7 @@ type Runtime struct {
 	orchestrator        *AgentOrchestrator
 	research            *ResearchEngine
 	devices             *DeviceStore
+	uploads             *UploadManager
 	ingestion           DocumentIngestor
 	push                *PushService
 	pushOutbox          *PushOutbox
@@ -219,6 +220,10 @@ func NewRuntime(config RuntimeConfig) (*Runtime, error) {
 		}
 	}
 	runtime.devices = devices
+	runtime.uploads, err = NewUploadManager(filepath.Join(dataRoot, ".agent-uploads"), 0, 0)
+	if err != nil {
+		return nil, err
+	}
 	runtime.ingestion = DocumentIngestor{Context: contextStore, Research: runtime.research, WorkspaceRoot: root}
 	return runtime, nil
 }
@@ -404,6 +409,9 @@ func (r *Runtime) TracesForOrganization(organizationID, traceID string) []TraceS
 func (r *Runtime) Media() *MediaManager { return r.media }
 
 func (r *Runtime) Builder() *BuilderService { return r.builder }
+
+// Uploads exposes the large-file upload manager (chunked/resumable, org-scoped).
+func (r *Runtime) Uploads() *UploadManager { return r.uploads }
 
 func (r *Runtime) Collaboration() *CollaborationStore { return r.collaboration }
 
