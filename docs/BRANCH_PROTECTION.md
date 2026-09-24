@@ -1,11 +1,13 @@
 # Proteção da branch `main` — Ollama Classe A+
 
-> **Status: BLOCKED_BY_EXTERNAL_DEPENDENCY — GITHUB_REPOSITORY_ADMIN_PERMISSION**
+> **Status: APLICADO (2026-09-24)** com a conta admin `DZ23-LTDA`.
 >
-> Aplicar proteção de branch/ruleset exige permissão de **admin** no
-> repositório. Na última verificação, a permissão efetiva do executor era
-> `admin:false, maintain:false`. O ruleset abaixo está pronto; **um
-> administrador precisa aplicá-lo**.
+> - `main-protection` [branch] — ruleset **active** (`main.protected = true`).
+> - `release-tag-protection` [tag] — ruleset **active** (protege `refs/tags/v*`).
+> - Private Vulnerability Reporting — **habilitado**.
+>
+> Os JSONs versionados em `.github/rulesets/` são a fonte de verdade; reaplique
+> com os comandos abaixo se precisar recriar.
 
 ## O que o ruleset garante
 
@@ -31,14 +33,13 @@ gh api -X POST repos/DZ23-LTDA/ollama-classe-a-plus/rulesets \
 
 Ou via UI: **Settings → Rules → Rulesets → New ruleset → Import** o JSON acima.
 
-## Itens adicionais que dependem de admin
+## Itens adicionais
 
-- Habilitar **Private Vulnerability Reporting** (Settings → Code security and
-  analysis) — ver [`../SECURITY.md`](../SECURITY.md).
-- Proteção de **tags de release** (ruleset com `target: tag`, `include:
-  refs/tags/v*`, regra `deletion` + `non_fast_forward`).
-- Exigir **commits/tags assinados** para releases (`required_signatures`), se a
-  equipe adotar assinatura GPG/Sigstore.
+- **Private Vulnerability Reporting** — ✅ habilitado (ver [`../SECURITY.md`](../SECURITY.md)).
+- Proteção de **tags de release** — ✅ aplicada via
+  [`.github/rulesets/tag-protection.json`](../.github/rulesets/tag-protection.json).
+- Exigir **commits/tags assinados** para releases (`required_signatures`): ainda
+  não aplicado — depende de a equipe adotar assinatura GPG/Sigstore.
 - `CODEOWNERS`: pode ser adicionado quando os owners reais forem confirmados;
   então habilite `require_code_owner_review: true` no ruleset.
 

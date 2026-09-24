@@ -31,12 +31,9 @@ Inclua sempre: descrição, passos de reprodução, impacto avaliado, mitigaçõ
 possíveis, e a **referência do commit + arquivo afetado**. Nunca coloque
 credenciais reais em relatórios, issues, PRs, screenshots, fixtures ou logs.
 
-> **Nota de habilitação (pendência do mantenedor):** o *GitHub Private
-> Vulnerability Reporting* deste fork estava **desabilitado** na última
-> verificação. Habilitar exige permissão de administrador do repositório
-> (Settings → Code security and analysis → *Private vulnerability reporting*).
-> Enquanto não for habilitado, use o item B.2. Não foi inventado nenhum e-mail
-> de segurança específico do fork.
+> **Nota de habilitação:** o *GitHub Private Vulnerability Reporting* deste fork
+> foi **habilitado em 2026-09-24**. Use o item B.1 (aba **Security → Report a
+> vulnerability**). Não foi criado nenhum e-mail de segurança específico do fork.
 
 Please include the following details in your report:
 - A description of the vulnerability
