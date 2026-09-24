@@ -6,16 +6,19 @@ concurrency:
 
 on:
   pull_request:
-    paths:
-      - 'internal/agent/**'
-      - 'server/agent_routes.go'
-      - 'server/companion_ws.go'
-      - 'app/ui/app/**'
-      - 'apps/mobile-agentic/**'
-      - 'deploy/**'
-      - 'go.mod'
-      - 'go.sum'
-      - '.github/workflows/dz23-agentic-quality.yaml'
+    # Roda em TUDO que NAO for puramente docs (fail-safe: mais CI, nunca menos).
+    # Esta lista e a fonte unica DOCS_ONLY de scripts/classify-ci-surfaces.py e
+    # e validada por scripts/classify_ci_surfaces_test.py (ConsistencyTest).
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+      - '**/*.mdx'
+      - '**/*.markdown'
+      - 'LICENSE'
+      - '**/LICENSE'
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/PULL_REQUEST_TEMPLATE.md'
+      - '.github/*.md'
   push:
     branches:
       - main
