@@ -394,6 +394,39 @@ func (b *BuilderService) PublishLocal(ctx context.Context, id string) (BuilderPr
 	return project, published, err
 }
 
+// ErrBuilderVersionNotPublished indica rollback para uma versao que nunca foi
+// publicada (nao existe published/id/vN).
+var ErrBuilderVersionNotPublished = errors.New("builder version was not published")
+
+// RollbackPublish re-aponta a publicacao ativa para uma versao ja publicada
+// (published/id/vN), sem reconstruir os arquivos. Org-scoped e idempotente:
+// rollback para a versao atual apenas reafirma o estado publicado.
+func (b *BuilderService) RollbackPublish(ctx context.Context, id, organizationID string, version int) (BuilderProject, string, error) {
+	if err := ctx.Err(); err != nil {
+		return BuilderProject{}, "", err
+	}
+	if version < 1 {
+		return BuilderProject{}, "", errors.New("builder rollback version must be >= 1")
+	}
+	project, err := b.GetForOrganization(id, organizationID)
+	if err != nil {
+		return BuilderProject{}, "", err
+	}
+	target := filepath.Join(b.root, "published", id, fmt.Sprintf("v%d", version))
+	info, err := os.Stat(target)
+	if err != nil || !info.IsDir() {
+		return BuilderProject{}, "", ErrBuilderVersionNotPublished
+	}
+	project.PublishedPath = target
+	project.Status = "published"
+	project.UpdatedAt = time.Now().UTC()
+	b.mu.Lock()
+	b.projects[id] = project
+	err = b.persistLocked()
+	b.mu.Unlock()
+	return project, target, err
+}
+
 func (b *BuilderService) List() []BuilderProject {
 	b.mu.Lock()
 	defer b.mu.Unlock()
