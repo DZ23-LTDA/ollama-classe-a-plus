@@ -35,6 +35,29 @@ gh api -X POST repos/DZ23-LTDA/ollama-classe-a-plus/rulesets \
 
 Ou via UI: **Settings → Rules → Rulesets → New ruleset → Import** o JSON acima.
 
+## Revisão independente (single-maintainer)
+
+Colaboradores reais no repo: **DZ23-LTDA** (org/admin) e **LMPrado-DZ23**
+(maintainer) — controlados pela mesma pessoa. **Não há revisor humano
+independente disponível** (projeto single-maintainer).
+
+Por isso, `require_code_owner_review` fica **false** (o único code owner seria o
+próprio autor — seria só cerimônia). Em vez de inventar revisores, aplicamos:
+
+- `required_approving_review_count: 1` + `required_review_thread_resolution`;
+- **`require_last_push_approval: true`** — a conta que fez o último push não pode
+  ser a aprovadora; como existem duas contas reais (DZ23-LTDA e LMPrado-DZ23), o
+  requisito é satisfazível (push por uma, aprovação pela outra) e adiciona
+  fricção real contra self-merge cego;
+- superfícies sensíveis (`.github/workflows/**`, `.github/rulesets/**`,
+  `CODEOWNERS`, `SECURITY.md`, `scripts/check-class-a-plus-integrity.sh`,
+  scripts de release/install) continuam guardadas pelo required check
+  **Preserve Class A+ surfaces** (integrity guard) + **PR gate**.
+
+> **Limitação honesta:** separação de contas ≠ separação de humanos. Revisão
+> independente por um segundo humano permanece **BLOCKED** até haver um segundo
+> mantenedor real.
+
 ## Itens adicionais
 
 - **Private Vulnerability Reporting** — ✅ habilitado (ver [`../SECURITY.md`](../SECURITY.md)).
