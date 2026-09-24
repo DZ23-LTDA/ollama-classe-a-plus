@@ -20,8 +20,8 @@ esac
 
 # Versao derivada do build (tag), sem hardcode.
 if [ -z "${VERSION:-}" ]; then
-  VERSION="$(git describe --tags --first-parent --abbrev=7 --long --dirty --always 2>/dev/null | sed 's/^v//')"
-  [ -n "$VERSION" ] || VERSION="0.0.0-dev"
+  VERSION="$(git describe --tags --match 'v*' --first-parent --abbrev=7 --long --dirty 2>/dev/null | sed 's/^v//')"
+  [ -n "$VERSION" ] || VERSION="0.0.0-dev+$(git rev-parse --short=12 HEAD 2>/dev/null || echo unknown)"
 fi
 COMMIT="$(git rev-parse --short=12 HEAD 2>/dev/null || echo unknown)"
 
