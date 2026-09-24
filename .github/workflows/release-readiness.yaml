@@ -1,0 +1,92 @@
+name: release-readiness
+
+# Gate de release "um mesmo SHA": afirma que o commit candidato tem TODOS os
+# checks reais concluidos com sucesso NAQUELE SHA — evita juntar "parte verde
+# na main" com provas de commits anteriores. Ver docs/RELEASE_READINESS.md.
+#
+# Nao re-executa a matriz pesada; ele VERIFICA que a matriz ja rodou verde no
+# SHA exato. Dispare manualmente (workflow_dispatch) ou automaticamente ao criar
+# uma tag vX.Y.Z(-rc.N).
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Commit SHA ou ref a validar (default: o proprio commit deste run)"
+        required: false
+        default: ""
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+  checks: read
+  statuses: read
+
+jobs:
+  verify-same-sha-gates:
+    name: Verify release gates on one SHA
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve candidate SHA
+        id: sha
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_REF: ${{ github.event.inputs.ref }}
+        run: |
+          set -euo pipefail
+          REF="${INPUT_REF:-}"
+          if [ -z "$REF" ]; then REF="${GITHUB_SHA}"; fi
+          SHA=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${REF}" -q '.sha')
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "Candidate SHA: $SHA"
+
+      - name: Assert required checks are green on the candidate SHA
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ steps.sha.outputs.sha }}
+        run: |
+          set -euo pipefail
+          # Conjunto REAL de provas que rodam no SHA candidato (nomes = contexts
+          # dos jobs). Cada um SO conta com conclusao == success (skipped/failure/
+          # cancelled/timed_out => NAO release-ready). Mantido em sincronia com
+          # docs/RELEASE_READINESS.md.
+          # NOTA: "Agentic release quality gate" pertence ao release.yaml (build
+          # de release), gated separadamente; nao e um check presente no CI de um
+          # SHA comum, por isso NAO entra aqui.
+          REQUIRED=(
+            "Preserve Class A+ surfaces"
+            "PR gate"
+            "Go agentic and server gates"
+            "PostgreSQL RLS, Redis DLQ and OTLP integration"
+            "Web and mobile quality"
+            "Generate SBOM"
+            "test (ubuntu-latest)"
+            "test (windows-latest)"
+            "test (macos-latest)"
+            "race (ubuntu-latest)"
+            "race (macos-latest)"
+            "go_mod_tidy"
+          )
+          gh api --paginate \
+            "repos/${GITHUB_REPOSITORY}/commits/${SHA}/check-runs" \
+            -q '.check_runs[] | [.name, (.conclusion // "pending")] | @tsv' \
+            > checks.tsv || true
+          echo "== check-runs no SHA ${SHA} =="
+          cat checks.tsv || true
+          fail=0
+          for name in "${REQUIRED[@]}"; do
+            concl=$(awk -F'\t' -v n="$name" '$1==n {print $2}' checks.tsv | tail -1)
+            if [ "$concl" = "success" ]; then
+              echo "OK   -> $name"
+            else
+              echo "FAIL -> $name (conclusao='${concl:-ausente}')"
+              fail=1
+            fi
+          done
+          if [ "$fail" -ne 0 ]; then
+            echo "::error::O SHA candidato nao tem todos os gates verdes. Nao e release-ready."
+            exit 1
+          fi
+          echo "Todos os gates obrigatorios estao verdes no SHA ${SHA}."

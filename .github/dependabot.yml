@@ -1,0 +1,45 @@
+# Dependabot — Ollama Classe A+ (fork DZ23)
+# Mantém dependências e GitHub Actions atualizadas com PRs revisáveis.
+# Não faz upgrade automático em produção: cada PR passa pelos gates de CI.
+version: 2
+updates:
+  # Backend Go
+  - package-ecosystem: "gomod"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    groups:
+      go-minor-patch:
+        update-types: ["minor", "patch"]
+
+  # Frontend web (Vite/React)
+  - package-ecosystem: "npm"
+    directory: "/app/ui/app"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    groups:
+      web-dev-tooling:
+        dependency-type: "development"
+        update-types: ["minor", "patch"]
+      web-prod:
+        dependency-type: "production"
+        update-types: ["patch"]
+
+  # Mobile companion (Expo)
+  - package-ecosystem: "npm"
+    directory: "/apps/mobile-agentic"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 3
+    groups:
+      mobile-tooling:
+        update-types: ["minor", "patch"]
+
+  # GitHub Actions (supply chain) — favorece pinagem/atualização controlada
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
