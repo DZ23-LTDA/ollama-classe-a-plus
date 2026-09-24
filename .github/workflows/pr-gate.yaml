@@ -30,7 +30,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Detect changed surfaces
+      - name: Detect changed surfaces (classifier)
         id: detect
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
@@ -40,14 +40,10 @@ jobs:
           git fetch --no-tags --depth=1 origin "$BASE_SHA" 2>/dev/null || true
           CHANGED=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" || git diff --name-only "${BASE_SHA}...${HEAD_SHA}")
           echo "Arquivos alterados:"; echo "$CHANGED"
-          # Mesmos globs de dz23-agentic-quality.yaml (mantenha em sincronia).
-          if echo "$CHANGED" | grep -qE '^(internal/agent/|server/agent_routes\.go|server/companion_ws\.go|app/ui/app/|apps/mobile-agentic/|deploy/|go\.mod|go\.sum|\.github/workflows/dz23-agentic-quality\.yaml)'; then
-            echo "runtime=true" >> "$GITHUB_OUTPUT"
-            echo "-> superficies de runtime/web/mobile alteradas: gates profundos sao obrigatorios."
-          else
-            echo "runtime=false" >> "$GITHUB_OUTPUT"
-            echo "-> PR nao toca runtime/web/mobile: gate passa sem exigir os checks profundos."
-          fi
+          # Fonte unica de classificacao (fail-safe: codigo desconhecido -> exige CI).
+          REQ=$(printf '%s\n' "$CHANGED" | python3 scripts/classify-ci-surfaces.py --require-agentic)
+          echo "Classificacao:"; printf '%s\n' "$CHANGED" | python3 scripts/classify-ci-surfaces.py
+          echo "runtime=$REQ" >> "$GITHUB_OUTPUT"
 
       - name: Verify deep gates on this head SHA
         if: steps.detect.outputs.runtime == 'true'
@@ -72,17 +68,19 @@ jobs:
               st="${line%%|*}"; cc="${line##*|}"
               if [ -z "$line" ] || [ "$st" != "completed" ]; then
                 echo "... aguardando: $name (status='${st:-ausente}')"; pending=1
-              elif [ "$cc" != "success" ] && [ "$cc" != "skipped" ]; then
-                echo "FAIL -> $name (conclusao='$cc')"; fail=1
+              elif [ "$cc" != "success" ]; then
+                # Gate obrigatorio SO aceita success. skipped/cancelled/failure/
+                # timed_out/action_required/stale/neutral => NAO aceita.
+                echo "FAIL -> $name (conclusao='${cc:-none}'; obrigatorio exige success)"; fail=1
               else
-                echo "OK   -> $name ($cc)"
+                echo "OK   -> $name (success)"
               fi
             done
             if [ "$fail" -ne 0 ]; then
-              echo "::error::Um gate profundo aplicavel falhou neste SHA."; exit 1
+              echo "::error::Um gate profundo obrigatorio nao concluiu com success neste SHA."; exit 1
             fi
             if [ "$pending" -eq 0 ]; then
-              echo "Todos os gates profundos aplicaveis concluiram com sucesso."; break
+              echo "Todos os gates profundos obrigatorios concluiram com success."; break
             fi
             if [ "$(date +%s)" -ge "$deadline" ]; then
               echo "::error::Timeout aguardando os gates profundos deste SHA."; exit 1
