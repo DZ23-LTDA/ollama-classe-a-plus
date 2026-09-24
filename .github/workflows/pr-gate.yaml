@@ -1,0 +1,92 @@
+name: pr-gate
+
+# Gate agregador ESTAVEL para branch protection.
+# Roda em TODO pull_request (sem filtro de paths), entao o check "PR gate" e
+# SEMPRE criado -> nao deadlocka PRs docs-only (o problema de required checks
+# com filtro de paths que nunca sao criados).
+#
+# Comportamento:
+#  - detecta se o PR toca superficies de runtime/web/mobile/deploy;
+#  - se NAO toca: passa imediatamente (docs-only nao fica preso);
+#  - se toca: ESPERA e VERIFICA que os gates profundos aplicaveis de
+#    dz23-agentic-quality.yaml concluiram com sucesso NAQUELE head SHA.
+# Assim: (A) docs-only nao trava; (B) runtime nao escapa dos gates;
+#        (C) ha um required gate sempre criado; (D) o estado reflete o aplicavel.
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  checks: read
+
+jobs:
+  gate:
+    name: PR gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed surfaces (classifier)
+        id: detect
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin "$BASE_SHA" 2>/dev/null || true
+          CHANGED=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" || git diff --name-only "${BASE_SHA}...${HEAD_SHA}")
+          echo "Arquivos alterados:"; echo "$CHANGED"
+          # Fonte unica de classificacao (fail-safe: codigo desconhecido -> exige CI).
+          REQ=$(printf '%s\n' "$CHANGED" | python3 scripts/classify-ci-surfaces.py --require-agentic)
+          echo "Classificacao:"; printf '%s\n' "$CHANGED" | python3 scripts/classify-ci-surfaces.py
+          echo "runtime=$REQ" >> "$GITHUB_OUTPUT"
+
+      - name: Verify deep gates on this head SHA
+        if: steps.detect.outputs.runtime == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          REQUIRED=(
+            "Go agentic and server gates"
+            "PostgreSQL RLS, Redis DLQ and OTLP integration"
+            "Web and mobile quality"
+          )
+          deadline=$(( $(date +%s) + 1800 ))   # ate 30 min
+          while :; do
+            gh api --paginate \
+              "repos/${GITHUB_REPOSITORY}/commits/${HEAD_SHA}/check-runs" \
+              -q '.check_runs[] | [.name, .status, (.conclusion // "")] | @tsv' > runs.tsv || true
+            pending=0; fail=0
+            for name in "${REQUIRED[@]}"; do
+              line=$(awk -F'\t' -v n="$name" '$1==n {print $2"|"$3}' runs.tsv | tail -1)
+              st="${line%%|*}"; cc="${line##*|}"
+              if [ -z "$line" ] || [ "$st" != "completed" ]; then
+                echo "... aguardando: $name (status='${st:-ausente}')"; pending=1
+              elif [ "$cc" != "success" ]; then
+                # Gate obrigatorio SO aceita success. skipped/cancelled/failure/
+                # timed_out/action_required/stale/neutral => NAO aceita.
+                echo "FAIL -> $name (conclusao='${cc:-none}'; obrigatorio exige success)"; fail=1
+              else
+                echo "OK   -> $name (success)"
+              fi
+            done
+            if [ "$fail" -ne 0 ]; then
+              echo "::error::Um gate profundo obrigatorio nao concluiu com success neste SHA."; exit 1
+            fi
+            if [ "$pending" -eq 0 ]; then
+              echo "Todos os gates profundos obrigatorios concluiram com success."; break
+            fi
+            if [ "$(date +%s)" -ge "$deadline" ]; then
+              echo "::error::Timeout aguardando os gates profundos deste SHA."; exit 1
+            fi
+            sleep 20
+          done
+
+      - name: Gate summary
+        run: echo "PR gate OK (runtime=${{ steps.detect.outputs.runtime }})."

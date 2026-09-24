@@ -800,11 +800,62 @@ jobs:
         working-directory: ${{ runner.temp }}
 
   # Final release process
+  release-gate:
+    # §8: enforcement tecnico. A publicacao (job `release`) NAO acontece se o SHA
+    # de release nao tiver passado o conjunto release-readiness (single-SHA).
+    # Registra SOURCE_SHA/VERSION/GATE_RESULT no log do run.
+    if: ${{ inputs.enable_release == true && vars.OLLAMA_ENABLE_RELEASE == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Verify release-readiness gate on the release SHA
+        run: |
+          set -euo pipefail
+          SHA="${GITHUB_SHA}"
+          echo "SOURCE_SHA=$SHA"
+          echo "VERSION=${GITHUB_REF_NAME:-manual}"
+          echo "GATE_RUN_ID=${GITHUB_RUN_ID}"
+          REQUIRED=(
+            "Preserve Class A+ surfaces"
+            "PR gate"
+            "Go agentic and server gates"
+            "PostgreSQL RLS, Redis DLQ and OTLP integration"
+            "Web and mobile quality"
+            "Generate SBOM"
+            "test (ubuntu-latest)"
+            "test (windows-latest)"
+            "test (macos-latest)"
+            "race (ubuntu-latest)"
+            "race (macos-latest)"
+            "go_mod_tidy"
+          )
+          gh api --paginate \
+            "repos/${GITHUB_REPOSITORY}/commits/${SHA}/check-runs" \
+            -q '.check_runs[] | [.name, (.conclusion // "pending")] | @tsv' > checks.tsv || true
+          fail=0
+          for name in "${REQUIRED[@]}"; do
+            c=$(awk -F'\t' -v n="$name" '$1==n {print $2}' checks.tsv | tail -1)
+            if [ "$c" = "success" ]; then
+              echo "OK   -> $name"
+            else
+              echo "FAIL -> $name (conclusao='${c:-ausente}'; exige success)"; fail=1
+            fi
+          done
+          if [ "$fail" -ne 0 ]; then
+            echo "::error::GATE_RESULT=failed — SHA ${SHA} nao passou release-readiness; publicacao BLOQUEADA."
+            exit 1
+          fi
+          echo "GATE_RESULT=success — publicacao liberada para ${SHA}."
+
   release:
     if: ${{ inputs.enable_release == true && vars.OLLAMA_ENABLE_RELEASE == 'true' }}
     runs-on: ubuntu-latest
     environment: release
-    needs: [darwin-build, windows-app, docker-build-push, quality]
+    needs: [release-gate, darwin-build, windows-app, docker-build-push, quality]
     concurrency:
       group: release-publish
       queue: max
