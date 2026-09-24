@@ -17,3 +17,11 @@ llama/build
 llama/vendor
 /ollama
 integration/testdata/models/
+
+# Python bytecode
+__pycache__/
+*.pyc
+
+# Playwright artifacts
+app/ui/app/test-results/
+app/ui/app/playwright-report/
