@@ -176,6 +176,7 @@ type Company struct {
 	SocialDrafts      []CompanySocialDraft       `json:"social_drafts,omitempty"`
 	SocialMetrics     []CompanySocialMetric      `json:"social_metrics,omitempty"`
 	TelAgentHistory   []TelAgentExchange         `json:"tel_agent_history,omitempty"`
+	TelAgentSessions  []TelAgentSession          `json:"tel_agent_sessions,omitempty"`
 	Budget            CompanyBudget              `json:"budget"`
 	Risk              CompanyRisk                `json:"risk"`
 	Approvals         []CompanyApproval          `json:"approvals,omitempty"`
