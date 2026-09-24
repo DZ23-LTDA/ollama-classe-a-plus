@@ -1,0 +1,92 @@
+name: dz23-macos-build
+
+# Build macOS (universal, CPU/Metal) UNSIGNED do Ollama Classe A+.
+# Espelha os comandos de build do job darwin-build do release.yaml, SEM
+# assinatura/notarizacao (Apple Developer ID = BLOCKED_BY_EXTERNAL_DEPENDENCY).
+# Dispatch-only (nao pesa o CI de PR); tambem roda em tag v* para o RC.
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  macos-unsigned:
+    name: macOS build (universal, unsigned)
+    runs-on: macos-latest
+    timeout-minutes: 90
+    env:
+      CGO_CFLAGS: "-O3 -mmacosx-version-min=14.0"
+      CGO_CXXFLAGS: "-O3 -mmacosx-version-min=14.0"
+      CGO_LDFLAGS: "-mmacosx-version-min=14.0"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: |
+            go.sum
+            LLAMA_CPP_VERSION
+            MLX_VERSION
+            MLX_C_VERSION
+      - name: Derive version (no hardcode)
+        id: ver
+        run: |
+          set -euo pipefail
+          v="$(git describe --tags --match 'v*' --abbrev=7 --dirty 2>/dev/null | sed 's/^v//')"
+          [ -n "$v" ] || v="0.0.0-dev+$(git rev-parse --short=12 HEAD)"
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "Building $v"
+      - name: Build (go-license + darwin universal)
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -euo pipefail
+          cmake -S . -B build/go-license -DOLLAMA_LLAMA_BACKENDS= -DOLLAMA_MLX_BACKENDS= \
+            -DOLLAMA_PAYLOAD_INSTALL_PREFIX=dist/darwin-arm64 \
+            "-DOLLAMA_GO_LICENSE_TARGETS=darwin/amd64;darwin/arm64"
+          cmake --build build/go-license --target ollama-go-license
+          ./scripts/build_darwin.sh
+          ls -l dist/ || true
+      - name: Package unsigned tarball + checksum + metadata
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -euo pipefail
+          out="dist/pkg"; mkdir -p "$out"
+          pkg="ollama-classe-a-plus-${VERSION}-macos-universal"
+          stage="$out/$pkg"; mkdir -p "$stage/bin" "$stage/lib"
+          # Binario universal + libs geradas pelo build_darwin.sh.
+          if [ -f dist/darwin/ollama ]; then cp dist/darwin/ollama "$stage/bin/ollama"; fi
+          if [ -d dist/darwin/lib ]; then cp -R dist/darwin/lib/. "$stage/lib/"; fi
+          cat > "$stage/VERSION" <<META
+          product=Ollama Classe A+
+          version=${VERSION}
+          commit=$(git rev-parse --short=12 HEAD)
+          arch=universal
+          signed=false
+          META
+          test -x "$stage/bin/ollama" || { echo "::error::binario macOS nao encontrado"; exit 1; }
+          tar --uid 0 --gid 0 -czf "$out/${pkg}.tgz" -C "$out" "$pkg"
+          ( cd "$out" && shasum -a 256 "${pkg}.tgz" > "${pkg}.tgz.sha256" )
+          cat "$out/${pkg}.tgz.sha256"
+      - name: Generate SBOM (CycloneDX, Go-native)
+        run: |
+          set -euo pipefail
+          go run github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@v1 mod \
+            -json -licenses -output dist/pkg/sbom.cyclonedx.json .
+      - name: Upload macOS package (unsigned)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ollama-classe-a-plus-macos-universal-unsigned
+          path: |
+            dist/pkg/ollama-classe-a-plus-*-macos-universal.tgz
+            dist/pkg/ollama-classe-a-plus-*-macos-universal.tgz.sha256
+            dist/pkg/sbom.cyclonedx.json
+          if-no-files-found: error
