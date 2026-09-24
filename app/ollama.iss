@@ -5,14 +5,14 @@
 ; powershell -ExecutionPolicy Bypass -File .\scripts\build_windows.ps
 
 
-#define MyAppName "Ollama DZ23"
+#define MyAppName "Ollama Classe A+"
 #if GetEnv("PKG_VERSION") != ""
   #define MyAppVersion GetEnv("PKG_VERSION")
 #else
   #define MyAppVersion "0.0.0"
 #endif
-#define MyAppPublisher "LMPrado-DZ23"
-#define MyAppURL "https://github.com/LMPrado-DZ23/ollama-dz23"
+#define MyAppPublisher "DZ23-LTDA"
+#define MyAppURL "https://github.com/DZ23-LTDA/ollama-classe-a-plus"
 #define MyAppExeName "ollama app.exe"
 #define LlamaServerExeName "llama-server.exe"
 #define MyIcon ".\assets\app.ico"
@@ -35,7 +35,7 @@ DefaultDirName={localappdata}\Programs\{#MyAppName}
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
-OutputBaseFilename="OllamaDZ23Setup"
+OutputBaseFilename="OllamaClasseAPlusSetup"
 SetupIconFile={#MyIcon}
 UninstallDisplayIcon={uninstallexe}
 Compression=lzma2/ultra64

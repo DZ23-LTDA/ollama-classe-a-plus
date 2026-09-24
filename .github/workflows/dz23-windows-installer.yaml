@@ -24,6 +24,8 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # tags necessarios para git describe (versao derivada do build)
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
@@ -35,13 +37,12 @@ jobs:
           cache-dependency-path: app/ui/app/package-lock.json
       - name: Build CPU runtime, Desktop, and installer
         shell: pwsh
-        env:
-          VERSION: 0.1.0-dz23
+        # Sem VERSION hardcoded: build_windows.ps1 deriva de `git describe --tags`.
         run: ./scripts/build_windows.ps1 cpu ollama app installer
       - name: Upload unsigned installer
         uses: actions/upload-artifact@v4
         with:
-          name: OllamaDZ23Setup-windows-amd64-unsigned
-          path: dist/OllamaDZ23Setup.exe
+          name: OllamaClasseAPlusSetup-windows-amd64-unsigned
+          path: dist/OllamaClasseAPlusSetup.exe
           if-no-files-found: error
           retention-days: 30
