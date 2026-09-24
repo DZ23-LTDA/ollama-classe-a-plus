@@ -48,14 +48,26 @@ jobs:
           SHA: ${{ steps.sha.outputs.sha }}
         run: |
           set -euo pipefail
-          # Contexts reais (nomes dos jobs). Mantenha em sincronia com
-          # docs/RELEASE_READINESS.md e o ruleset de branch protection.
+          # Conjunto REAL de provas que rodam no SHA candidato (nomes = contexts
+          # dos jobs). Cada um SO conta com conclusao == success (skipped/failure/
+          # cancelled/timed_out => NAO release-ready). Mantido em sincronia com
+          # docs/RELEASE_READINESS.md.
+          # NOTA: "Agentic release quality gate" pertence ao release.yaml (build
+          # de release), gated separadamente; nao e um check presente no CI de um
+          # SHA comum, por isso NAO entra aqui.
           REQUIRED=(
             "Preserve Class A+ surfaces"
+            "PR gate"
             "Go agentic and server gates"
             "PostgreSQL RLS, Redis DLQ and OTLP integration"
             "Web and mobile quality"
-            "Agentic release quality gate"
+            "Generate SBOM"
+            "test (ubuntu-latest)"
+            "test (windows-latest)"
+            "test (macos-latest)"
+            "race (ubuntu-latest)"
+            "race (macos-latest)"
+            "go_mod_tidy"
           )
           gh api --paginate \
             "repos/${GITHUB_REPOSITORY}/commits/${SHA}/check-runs" \

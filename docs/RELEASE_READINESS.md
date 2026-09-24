@@ -31,20 +31,35 @@ SHA devem estar verdes.
 ## Gate automatizado (single-SHA)
 
 O workflow [`release-readiness.yaml`](../.github/workflows/release-readiness.yaml)
-**afirma** que o SHA candidato tem todos os checks reais acima verdes **naquele
-commit** (não re-roda a matriz; verifica que ela já passou no SHA exato). Dispare
-por `workflow_dispatch` (input `ref`) ou automaticamente ao criar uma tag `v*`.
+**afirma** que o SHA candidato tem o conjunto real de provas verdes **naquele
+commit** (não re-roda a matriz; verifica que ela já passou no SHA exato). Cada
+check obrigatório só conta com conclusão **`success`** — `skipped`, `cancelled`,
+`failure`, `timed_out`, `stale` ou `neutral` **reprovam** o gate.
 
-## Procedimento de RC (um SHA)
+Conjunto obrigatório verificado (contexts reais que rodam num SHA comum):
+`Preserve Class A+ surfaces`, `PR gate`, `Go agentic and server gates`,
+`PostgreSQL RLS, Redis DLQ and OTLP integration`, `Web and mobile quality`,
+`Generate SBOM`, `test (ubuntu/windows/macos-latest)`,
+`race (ubuntu/macos-latest)`, `go_mod_tidy`.
+
+## Procedimento de RC (um SHA) — VALIDAÇÃO É PRE-TAG
+
+> **Ordem obrigatória.** As tags `v*` são protegidas (sem delete, sem
+> non-fast-forward). Por isso a validação principal acontece **ANTES** de criar
+> a tag — nunca crie a tag para "depois validar", senão uma tag ruim fica presa.
 
 1. Congele o candidato num SHA da `main` já verde.
-2. Crie a tag do RC (versão nova; **não** reciclar `v0.1.0`). Ex.: `v0.2.0-rc.1`
-   **apenas** se semanticamente apropriado após auditar o versionamento atual.
-3. Confirme que **todos** os workflows acima executaram **naquele SHA** e estão
-   verdes (`gh run list --commit <SHA>`), não em commits anteriores.
-4. Gere e anexe os artefatos daquele SHA: instalador(es), **checksums SHA-256**,
-   **SBOM**, metadata de build (versão + commit SHA), release notes verazes.
-5. Marque a release como imutável e vinculada ao SHA testado.
+2. **PRE-TAG:** rode `release-readiness` por `workflow_dispatch` com `ref=<SHA>`
+   e confirme que ele passou (todos os checks obrigatórios `success` naquele SHA).
+3. Gere os artefatos **daquele SHA** (installer + tarball via os workflows de
+   build, por `workflow_dispatch`), rode o smoke, colete **checksums SHA-256** e
+   **SBOM**, e associe a metadata ao SHA.
+4. Só **então** crie a tag do RC (versão nova; **não** reciclar `v0.1.0`). Ex.:
+   `v0.2.0-rc.1`, apenas se semanticamente apropriado.
+5. O disparo de `release-readiness` no push da tag é **verificação defensiva
+   adicional**, não o primeiro gate.
+6. Publique a release imutável vinculada ao SHA testado (via `release.yaml`, que
+   registra `SOURCE_SHA`/`VERSION`/`GATE_RUN_ID` — ver §8 do plano).
 
 ## Estado verdadeiro (não marque PRODUCTION_READY sem prova)
 
