@@ -4,7 +4,39 @@ The Ollama maintainer team takes security seriously and will actively work to re
 
 ## Reporting a vulnerability
 
-If you discover a security vulnerability, please do not open a public issue. Instead, please report it by emailing hello@ollama.com. We ask that you give us sufficient time to investigate and address the vulnerability before disclosing it publicly.
+> **Escolha o canal certo pelo componente afetado.** Este repositório é o fork
+> **Ollama Classe A+** (DZ23), com uma superfície agentic própria sobre o Ollama.
+
+### A) Vulnerabilidade no núcleo do Ollama upstream
+
+Se a falha está no motor Ollama original (não na camada agentic/Classe A+),
+reporte ao canal do upstream, **não** a este repositório: envie para
+hello@ollama.com. Dê tempo hábil para investigação antes da divulgação pública.
+
+### B) Vulnerabilidade específica do Ollama Classe A+ (este fork)
+
+Se a falha está na camada Classe A+ — runtime agentic, connectors, MCP, deploy,
+Company OS, HarnessRouter, companion, UI/mobile deste repositório — **não abra
+issue pública** e **não** use hello@ollama.com. Reporte de forma privada por:
+
+1. **GitHub Private Vulnerability Reporting** — aba **Security** deste
+   repositório → **Report a vulnerability** (recomendado; cria um advisory
+   privado com histórico e correção coordenada).
+2. Se o botão acima não aparecer, o recurso ainda não foi habilitado pelo
+   mantenedor (veja a nota abaixo); nesse caso, contate de forma privada o
+   mantenedor do repositório público **DZ23-LTDA/ollama-classe-a-plus** pelo
+   GitHub para combinar um canal privado antes de qualquer divulgação.
+
+Inclua sempre: descrição, passos de reprodução, impacto avaliado, mitigações
+possíveis, e a **referência do commit + arquivo afetado**. Nunca coloque
+credenciais reais em relatórios, issues, PRs, screenshots, fixtures ou logs.
+
+> **Nota de habilitação (pendência do mantenedor):** o *GitHub Private
+> Vulnerability Reporting* deste fork estava **desabilitado** na última
+> verificação. Habilitar exige permissão de administrador do repositório
+> (Settings → Code security and analysis → *Private vulnerability reporting*).
+> Enquanto não for habilitado, use o item B.2. Não foi inventado nenhum e-mail
+> de segurança específico do fork.
 
 Please include the following details in your report:
 - A description of the vulnerability
