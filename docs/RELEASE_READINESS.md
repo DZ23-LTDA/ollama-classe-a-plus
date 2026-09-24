@@ -28,6 +28,13 @@ SHA devem estar verdes.
 > GPU (CUDA/ROCm/Vulkan/MLX) permanece **manual / runner específico** — não é
 > gate por commit. `release.yaml` cobre os builds pesados quando há runner.
 
+## Gate automatizado (single-SHA)
+
+O workflow [`release-readiness.yaml`](../.github/workflows/release-readiness.yaml)
+**afirma** que o SHA candidato tem todos os checks reais acima verdes **naquele
+commit** (não re-roda a matriz; verifica que ela já passou no SHA exato). Dispare
+por `workflow_dispatch` (input `ref`) ou automaticamente ao criar uma tag `v*`.
+
 ## Procedimento de RC (um SHA)
 
 1. Congele o candidato num SHA da `main` já verde.
