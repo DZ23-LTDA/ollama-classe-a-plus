@@ -28,3 +28,8 @@ dist-ssr
 
 *storybook.log
 storybook-static
+
+# Playwright E2E
+playwright-report
+test-results
+/playwright/.cache
