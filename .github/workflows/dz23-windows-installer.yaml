@@ -3,6 +3,9 @@ name: dz23-windows-installer
 on:
   workflow_dispatch:
   push:
+    # Tags de release (RC): builda o instalador do mesmo RC_SHA (§2).
+    tags:
+      - 'v*'
     branches:
       - feat/dz23-multi-provider-foundation
     paths:
