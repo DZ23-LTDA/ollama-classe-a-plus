@@ -27,9 +27,7 @@
         "strict_required_status_checks_policy": true,
         "required_status_checks": [
           { "context": "Preserve Class A+ surfaces" },
-          { "context": "Go agentic and server gates" },
-          { "context": "PostgreSQL RLS, Redis DLQ and OTLP integration" },
-          { "context": "Web and mobile quality" }
+          { "context": "PR gate" }
         ]
       }
     }

@@ -17,10 +17,12 @@
   precisa estar atualizada antes do merge (`strict`).
 - Dismiss de aprovação stale ao novo push.
 
-Os contexts exigidos usam os **nomes reais** dos jobs (ver
-[`RELEASE_READINESS.md`](RELEASE_READINESS.md)):
-`Preserve Class A+ surfaces`, `Go agentic and server gates`,
-`PostgreSQL RLS, Redis DLQ and OTLP integration`, `Web and mobile quality`.
+Os contexts exigidos sao **estaveis e sempre criados** em todo PR:
+`Preserve Class A+ surfaces` (workflow `class-a-plus-integrity`, sem filtro de
+paths) e `PR gate` (workflow `pr-gate`, agregador que roda em todo PR e, quando
+o PR toca runtime/web/mobile, espera e verifica os gates profundos de
+`dz23-agentic-quality`). Isso evita o deadlock de exigir checks com filtro de
+paths que nao sao criados em PRs docs-only.
 
 ## Como aplicar (admin do repositório)
 
