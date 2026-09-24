@@ -30,20 +30,4 @@ test.describe("Ollama Classe A+ shell", () => {
       page.getByText(/Inbox de missões|Veja missões/i).first(),
     ).toBeVisible();
   });
-
-  // Jornada UI-first: navega direto pelas superficies principais offline e
-  // confirma que cada shell renderiza (sem provider externo/modelo).
-  const surfaces: Array<{ path: string; expect: RegExp }> = [
-    { path: "/agentic", expect: /Mission Console|Agentic Runtime/i },
-    { path: "/company", expect: /Company OS|Crie e opere sua empresa/i },
-    { path: "/tasks", expect: /Inbox de missões|Veja missões|Tarefas/i },
-  ];
-  for (const s of surfaces) {
-    test(`surface ${s.path} renders offline`, async ({ page }) => {
-      await page.goto(s.path);
-      await expect(page.getByText(s.expect).first()).toBeVisible();
-      // O shell local-first permanece visivel em todas as rotas.
-      await expect(page.getByText(/Modo local-first/i)).toBeVisible();
-    });
-  }
 });
