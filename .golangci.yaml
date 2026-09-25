@@ -25,6 +25,12 @@ linters:
       - node_modules/
       - app/ui/app/dist/
   settings:
+    misspell:
+      # Comments in the DZ23 packages are written in Portuguese; these are
+      # correct Portuguese words, not English misspellings.
+      ignore-rules:
+        - inferir
+        - persistente
     depguard:
       rules:
         test-only-packages:
