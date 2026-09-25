@@ -73,6 +73,11 @@ jobs:
       # Windows has no POSIX execute bit or 0600 modes; this job keeps the
       # agent runtime (MCP launch, manifests, artifacts) working on the
       # platform the desktop installer ships to.
+      # The browser operator drives the preinstalled Edge through Python
+      # Playwright, so only the Python package is needed (no browser download).
+      - name: Install Browser Operator dependencies
+        shell: bash
+        run: python -m pip install --user 'playwright==1.63.0'
       - name: Agent runtime tests
         shell: bash
         env:
