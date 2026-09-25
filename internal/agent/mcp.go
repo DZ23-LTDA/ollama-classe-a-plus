@@ -102,7 +102,7 @@ func (m *MCPManager) register(config MCPServerConfig, organizationID string) err
 		return errors.New("MCP command must be an absolute executable path")
 	}
 	commandInfo, err := os.Lstat(config.Command)
-	if err != nil || commandInfo.Mode()&os.ModeSymlink != 0 || commandInfo.IsDir() || commandInfo.Mode()&0o111 == 0 {
+	if err != nil || commandInfo.Mode()&os.ModeSymlink != 0 || commandInfo.IsDir() || !isExecutableMode(config.Command, commandInfo) {
 		return errors.New("MCP command must be an executable regular file")
 	}
 	if len(config.Args) > 64 {
