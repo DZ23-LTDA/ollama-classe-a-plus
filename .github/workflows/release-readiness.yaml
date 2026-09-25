@@ -48,45 +48,63 @@ jobs:
           SHA: ${{ steps.sha.outputs.sha }}
         run: |
           set -euo pipefail
-          # Conjunto REAL de provas que rodam no SHA candidato (nomes = contexts
-          # dos jobs). Cada um SO conta com conclusao == success (skipped/failure/
-          # cancelled/timed_out => NAO release-ready). Mantido em sincronia com
-          # docs/RELEASE_READINESS.md.
-          # NOTA: "Agentic release quality gate" pertence ao release.yaml (build
-          # de release), gated separadamente; nao e um check presente no CI de um
-          # SHA comum, por isso NAO entra aqui.
+          # Conjunto REAL de provas que rodam NO commit candidato (push:main / tag)
+          # e constituem a prova de release DESTE fork (camada agentic Classe A+).
+          # Cada um SO conta com conclusao == success (skipped/failure/cancelled/
+          # timed_out => NAO release-ready). Em sincronia com docs/RELEASE_READINESS.md.
+          #
+          # Por que NAO estao aqui (evita erro de categoria e "verde ausente"):
+          #  - "PR gate": agregador EXCLUSIVO de pull_request; nao existe num commit
+          #    de main/tag. Seu conteudo real (os 3 deep gates abaixo) ja e exigido
+          #    individualmente aqui, entao nada se perde.
+          #  - "test (*)", "race (*)", "go_mod_tidy": matriz UPSTREAM do Ollama,
+          #    disparada so em pull_request pelo design do upstream (test.yaml le
+          #    github.event.pull_request.* e quebra fora de PR). Torna-la tag-aware
+          #    forkearia o CI do upstream e dificultaria puxar updates do Ollama.
+          #    Roda como sinal (advisory) nos PRs; NAO fica vinculada ao SHA do RC.
+          #    Limitacao divulgada honestamente em docs/RELEASE_READINESS.md.
+          # NOTA: "Agentic release quality gate" pertence ao release.yaml (build de
+          # release), gated separadamente; nao e check de um SHA comum -> fora daqui.
           REQUIRED=(
             "Preserve Class A+ surfaces"
-            "PR gate"
             "Go agentic and server gates"
             "PostgreSQL RLS, Redis DLQ and OTLP integration"
             "Web and mobile quality"
             "Generate SBOM"
-            "test (ubuntu-latest)"
-            "test (windows-latest)"
-            "test (macos-latest)"
-            "race (ubuntu-latest)"
-            "race (macos-latest)"
-            "go_mod_tidy"
           )
-          gh api --paginate \
-            "repos/${GITHUB_REPOSITORY}/commits/${SHA}/check-runs" \
-            -q '.check_runs[] | [.name, (.conclusion // "pending")] | @tsv' \
-            > checks.tsv || true
-          echo "== check-runs no SHA ${SHA} =="
-          cat checks.tsv || true
-          fail=0
-          for name in "${REQUIRED[@]}"; do
-            concl=$(awk -F'\t' -v n="$name" '$1==n {print $2}' checks.tsv | tail -1)
-            if [ "$concl" = "success" ]; then
-              echo "OK   -> $name"
-            else
-              echo "FAIL -> $name (conclusao='${concl:-ausente}')"
-              fail=1
+          # Espera ativa: os gates podem ainda estar rodando se a tag for criada
+          # logo apos o merge (push:main dispara os checks). Poll ate concluir,
+          # com timeout. success e a UNICA conclusao aceita.
+          deadline=$(( $(date +%s) + 1800 ))   # ate 30 min
+          while :; do
+            gh api --paginate \
+              "repos/${GITHUB_REPOSITORY}/commits/${SHA}/check-runs" \
+              -q '.check_runs[] | [.name, .status, (.conclusion // "")] | @tsv' \
+              > checks.tsv || true
+            echo "== check-runs no SHA ${SHA} =="
+            cat checks.tsv || true
+            pending=0; fail=0
+            for name in "${REQUIRED[@]}"; do
+              line=$(awk -F'\t' -v n="$name" '$1==n {print $2"|"$3}' checks.tsv | tail -1)
+              st="${line%%|*}"; cc="${line##*|}"
+              if [ -z "$line" ] || [ "$st" != "completed" ]; then
+                echo "... aguardando: $name (status='${st:-ausente}')"; pending=1
+              elif [ "$cc" != "success" ]; then
+                echo "FAIL -> $name (conclusao='${cc:-none}'; obrigatorio exige success)"; fail=1
+              else
+                echo "OK   -> $name (success)"
+              fi
+            done
+            if [ "$fail" -ne 0 ]; then
+              echo "::error::Um gate obrigatorio nao concluiu com success neste SHA. Nao e release-ready."
+              exit 1
             fi
+            if [ "$pending" -eq 0 ]; then
+              echo "Todos os gates obrigatorios estao verdes no SHA ${SHA}."; break
+            fi
+            if [ "$(date +%s)" -ge "$deadline" ]; then
+              echo "::error::Timeout aguardando os gates obrigatorios deste SHA."
+              exit 1
+            fi
+            sleep 20
           done
-          if [ "$fail" -ne 0 ]; then
-            echo "::error::O SHA candidato nao tem todos os gates verdes. Nao e release-ready."
-            exit 1
-          fi
-          echo "Todos os gates obrigatorios estao verdes no SHA ${SHA}."

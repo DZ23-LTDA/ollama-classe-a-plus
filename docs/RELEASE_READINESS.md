@@ -32,15 +32,33 @@ SHA devem estar verdes.
 
 O workflow [`release-readiness.yaml`](../.github/workflows/release-readiness.yaml)
 **afirma** que o SHA candidato tem o conjunto real de provas verdes **naquele
-commit** (não re-roda a matriz; verifica que ela já passou no SHA exato). Cada
+commit**. Ele faz **espera ativa (poll, até 30 min)** para o caso de a tag ser
+criada logo após o merge, pois os checks são disparados pelo `push:main`. Cada
 check obrigatório só conta com conclusão **`success`** — `skipped`, `cancelled`,
 `failure`, `timed_out`, `stale` ou `neutral` **reprovam** o gate.
 
-Conjunto obrigatório verificado (contexts reais que rodam num SHA comum):
-`Preserve Class A+ surfaces`, `PR gate`, `Go agentic and server gates`,
+Conjunto obrigatório verificado — apenas os contexts que **realmente rodam num
+commit de `main`/tag** e constituem a prova de release **deste fork** (camada
+agentic Classe A+): `Preserve Class A+ surfaces`, `Go agentic and server gates`,
 `PostgreSQL RLS, Redis DLQ and OTLP integration`, `Web and mobile quality`,
-`Generate SBOM`, `test (ubuntu/windows/macos-latest)`,
-`race (ubuntu/macos-latest)`, `go_mod_tidy`.
+`Generate SBOM`.
+
+### O que NÃO entra neste gate (e por quê) — divulgação honesta
+
+- **`PR gate`** é um agregador **exclusivo de `pull_request`**: não existe num
+  commit de `main`/tag. Seu conteúdo real (os 3 deep gates acima) já é exigido
+  individualmente aqui, então nenhuma cobertura se perde.
+- **`test (ubuntu/windows/macos-latest)`**, **`race (ubuntu/macos-latest)`** e
+  **`go_mod_tidy`** são a **matriz upstream do Ollama** (`test.yaml`), disparada
+  **só em `pull_request`** pelo design do upstream (o job `changes` lê
+  `github.event.pull_request.*` e quebra fora de PR). Torná-la tag-aware
+  **forkearia o CI do upstream** e dificultaria puxar atualizações do Ollama —
+  um objetivo explícito do projeto. Por isso ela roda como **sinal advisory nos
+  PRs**, mas **não fica vinculada ao SHA exato do RC**.
+  **Limitação conhecida:** a prova cross-OS de build/teste Go do RC vem do head
+  do PR que originou o merge (validado antes do merge), **não** do commit de
+  merge/tag. Quem quiser essa prova vinculada ao SHA do RC precisa rodar a
+  matriz upstream por `workflow_dispatch` naquele SHA e anexar a evidência.
 
 ## Procedimento de RC (um SHA) — VALIDAÇÃO É PRE-TAG
 
