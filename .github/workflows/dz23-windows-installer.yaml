@@ -42,10 +42,21 @@ jobs:
         shell: pwsh
         # Sem VERSION hardcoded: build_windows.ps1 deriva de `git describe --tags`.
         run: ./scripts/build_windows.ps1 cpu ollama app installer
-      - name: Upload unsigned installer
+      - name: Compute SHA-256 checksum
+        shell: pwsh
+        # Formato "<hash>  <arquivo>" (dois espacos) compativel com `sha256sum -c`.
+        run: |
+          $exe = "dist/OllamaClasseAPlusSetup.exe"
+          $hash = (Get-FileHash -Algorithm SHA256 $exe).Hash.ToLower()
+          $line = "$hash  OllamaClasseAPlusSetup.exe"
+          Set-Content -Path "$exe.sha256" -Value $line -NoNewline -Encoding ascii
+          Write-Host $line
+      - name: Upload unsigned installer + checksum
         uses: actions/upload-artifact@v4
         with:
           name: OllamaClasseAPlusSetup-windows-amd64-unsigned
-          path: dist/OllamaClasseAPlusSetup.exe
+          path: |
+            dist/OllamaClasseAPlusSetup.exe
+            dist/OllamaClasseAPlusSetup.exe.sha256
           if-no-files-found: error
           retention-days: 30
