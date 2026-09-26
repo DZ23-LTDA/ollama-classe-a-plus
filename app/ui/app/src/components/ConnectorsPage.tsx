@@ -60,10 +60,7 @@ export function ConnectorsPage() {
       ]);
       setCatalog(catalogResult.connectors ?? []);
       setConnectors(connectorResult.connectors ?? []);
-      setMcpServers([
-        ...(mcpResult.servers ?? []),
-        ...(mcpResult.remote_servers ?? []),
-      ]);
+      setMcpServers(mcpResult.servers ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
