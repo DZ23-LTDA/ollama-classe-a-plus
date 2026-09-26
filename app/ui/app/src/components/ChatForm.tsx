@@ -646,27 +646,17 @@ function ChatForm({
       const results = await window.webview?.selectMultipleFiles();
       if (results && results.length > 0) {
         // Convert native dialog results to File objects
-        const files = results
-          .map((result: ImageData) => {
-            if (result.dataURL) {
-              // Convert dataURL back to File object
-              const base64Data = result.dataURL.split(",")[1];
-              const mimeType = result.dataURL.split(";")[0].split(":")[1];
-              const binaryString = atob(base64Data);
-              const bytes = new Uint8Array(binaryString.length);
-              for (let i = 0; i < binaryString.length; i++) {
-                bytes[i] = binaryString.charCodeAt(i);
-              }
-
-              const blob = new Blob([bytes], { type: mimeType });
-              const file = new File([blob], result.filename, {
-                type: mimeType,
-              });
-              return file;
-            }
-            return null;
-          })
-          .filter(Boolean) as File[];
+        // Decode with the browser's native data: URL handling instead of a
+        // per-byte JavaScript loop, which froze the UI on larger files.
+        const files = (
+          await Promise.all(
+            results.map(async (result: ImageData) => {
+              if (!result.dataURL) return null;
+              const blob = await (await fetch(result.dataURL)).blob();
+              return new File([blob], result.filename, { type: blob.type });
+            }),
+          )
+        ).filter(Boolean) as File[];
 
         if (files.length > 0) {
           const { validFiles, errors } = await processFiles(files, {
