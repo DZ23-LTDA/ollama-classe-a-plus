@@ -102,6 +102,12 @@ function agentHeaders(): Record<string, string> {
 }
 export async function agentFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, { ...init, headers: { "Content-Type": "application/json", ...agentHeaders(), ...(init.headers ?? {}) } });
+  const contentType = response.headers.get("content-type") ?? "";
+  if (response.ok && response.status !== 204 && contentType.includes("text/html")) {
+    // A route that is not proxied to the agent API falls through to the SPA
+    // shell; surface that as an error instead of rendering HTML as data.
+    throw new Error("Agent API indisponível: resposta inesperada do servidor");
+  }
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
     if (response.status === 401) clearAgentSession();

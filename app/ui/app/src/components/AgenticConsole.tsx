@@ -83,7 +83,7 @@ export default function AgenticConsole() {
       ]);
       setMetrics(nextMetrics);
       if (nextMission) setMission(nextMission);
-      setEvents(nextEvents.events);
+      setEvents(nextEvents.events ?? []);
       if (nextOrchestration) setOrchestration(nextOrchestration);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Não foi possível carregar o runtime agentic");
@@ -97,7 +97,7 @@ export default function AgenticConsole() {
   }, [mission?.id, orchestration?.id]);
 
   useEffect(() => {
-    void listProjects().then((result) => setProjects(result.projects)).catch(() => setProjects([]));
+    void listProjects().then((result) => setProjects(result.projects ?? [])).catch(() => setProjects([]));
     void getModels("").then(setAvailableModels).catch(() => setAvailableModels([]));
     const requestedObjective = new URLSearchParams(window.location.search).get("objective");
     if (requestedObjective) setObjective(requestedObjective);

@@ -112,15 +112,15 @@ export function ProductWorkspacePage({ kind }: { kind: ProductPageKind }) {
     setLoading(true);
     setLoadError(null);
     try {
-      if (kind === "projects" || kind === "scheduled") setProjects((await listProjects()).projects);
-      if (kind === "tasks" || kind === "library") setMissions((await listMissions()).missions);
-      if (kind === "scheduled") setSchedules((await listSchedules()).schedules);
-		if (kind === "skills") setSkills((await listSkills()).skills);
+      if (kind === "projects" || kind === "scheduled") setProjects((await listProjects()).projects ?? []);
+      if (kind === "tasks" || kind === "library") setMissions((await listMissions()).missions ?? []);
+      if (kind === "scheduled") setSchedules((await listSchedules()).schedules ?? []);
+		if (kind === "skills") setSkills((await listSkills()).skills ?? []);
 		if (kind === "plugins") {
 			const [connectorResult, catalogResult, mcpResult, cliResult] = await Promise.all([listConnectors(), listConnectorCatalog(), listMCPServers(), listCLIStatus()]);
-			setConnectors(connectorResult.connectors);
-			setConnectorCatalog(catalogResult.connectors);
-			setMcpServers(mcpResult.servers);
+			setConnectors(connectorResult.connectors ?? []);
+			setConnectorCatalog(catalogResult.connectors ?? []);
+			setMcpServers(mcpResult.servers ?? []);
         setCliCount(cliResult.tools.filter((item) => item.installed).length);
       }
     } catch (cause) {

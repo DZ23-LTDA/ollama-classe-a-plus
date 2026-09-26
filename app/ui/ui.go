@@ -308,6 +308,16 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("POST /api/me", ollamaProxy)
 	mux.Handle("POST /api/signout", ollamaProxy)
 	mux.Handle("GET /api/experimental/model-recommendations", ollamaProxy)
+	mux.Handle("GET /api/dz23/cli-catalog", ollamaProxy)
+
+	// Agentic platform API (projects, missions, schedules, company, skills...)
+	// lives on the Ollama server. Without these routes the desktop UI server
+	// answered /api/agent/* with the SPA index.html and every agentic page
+	// crashed. Methods are listed explicitly so they do not conflict with the
+	// "OPTIONS /" preflight pattern.
+	for _, method := range []string{http.MethodGet, http.MethodHead, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete} {
+		mux.Handle(method+" /api/agent/", ollamaProxy)
+	}
 
 	// React app - catch all non-API routes and serve the React app
 	mux.Handle("GET /", s.appHandler())
