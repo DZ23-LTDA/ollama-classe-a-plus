@@ -34,6 +34,22 @@ Cada item diz o estado real hoje e o que falta. "Feito" só é marcado com teste
 | 11 | Anexos grandes (vídeo, PDF grande, planilhas) | Os três | Limite de 10 MB por arquivo, sem xlsx/pptx | Upload por caminho local em streaming + extratores |
 | 12 | Agendamento a partir do chat ("todo dia às 9h...") | Manus/Claude | Página Agendado exige formulário | Interpretar agenda em linguagem natural |
 
+## Ideias do 9Router (MIT) e das configurações pedidas
+
+Referência de produto, não cópia de código: o 9Router usa outra stack.
+
+| # | Função | O que entregar aqui |
+|---|---|---|
+| 13 | Provedores na UI | Lista dos provedores do roteador multi-provider com status (chave ok / sem chave / erro), campo para colar a chave, "Testar" e "Testar todos" |
+| 14 | Provedores personalizados | Adicionar endpoint compatível com OpenAI ou Anthropic (URL + chave + modelos) sem editar JSON |
+| 15 | Rastreador de cota | Limites por provedor/conta, consumo, reset e ligar/desligar provedor |
+| 16 | Uso e analytics | Requisições, tokens de entrada/saída/cache e custo estimado por período e provedor |
+| 17 | Endpoint e chaves | Mostrar a URL local da API, criar/revogar chaves próprias e exigir chave |
+| 18 | Estratégia de roteamento | Prioridade, round robin e combos de modelos com fallback |
+| 19 | Economizador de tokens | Compressão de contexto e cache configuráveis |
+| 20 | Configurações gerais | Tema (claro/escuro/sistema), idioma, backup e restauração do banco, senha do painel, SSO, proxy de saída, observabilidade |
+| 21 | Acesso remoto | Túnel/Tailscale para usar o app de outro dispositivo com autenticação |
+
 ## Regras que continuam valendo
 
 - Segredos nunca aparecem na UI nem em logs.
