@@ -19,6 +19,8 @@ import {
 } from "@heroicons/react/24/outline";
 import { ChatIcon } from "@/components/ChatIcon";
 import { SearchDialog } from "@/components/SearchDialog";
+import { HelpDialog } from "@/components/HelpDialog";
+import { newTaskShortcut } from "@/lib/help";
 import { isTypingTarget } from "@/lib/search";
 
 export type AppSection =
@@ -92,8 +94,14 @@ function TargetLink({
 
 export function AppNavigation({ current }: { current: AppSection }) {
   const [searchOpen, setSearchOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        window.location.assign("/c/new");
+        return;
+      }
       if (
         event.key === "/" &&
         !event.metaKey &&
@@ -111,6 +119,7 @@ export function AppNavigation({ current }: { current: AppSection }) {
   return (
     <div className="flex flex-col gap-0.5">
       <SearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} />
+      <HelpDialog open={helpOpen} onClose={() => setHelpOpen(false)} />
       <div className="mb-3 flex items-center gap-2 px-2.5 pt-1">
         <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-neutral-900 text-xs font-semibold text-white dark:bg-white dark:text-neutral-900">
           A+
@@ -135,9 +144,19 @@ export function AppNavigation({ current }: { current: AppSection }) {
         <PlusIcon className={iconClass} />
         <span>Nova tarefa</span>
         <span className="ml-auto text-[10px] text-white/60 dark:text-neutral-500">
-          ⌘K
+          {newTaskShortcut()}
         </span>
       </Link>
+
+      <button
+        type="button"
+        onClick={() => setSearchOpen(true)}
+        className={itemClass(false)}
+      >
+        <MagnifyingGlassIcon className={iconClass} />
+        <span className="min-w-0 flex-1 truncate">Pesquisar</span>
+        <span className="text-[10px] text-neutral-400">/</span>
+      </button>
 
       <NavLabel>Operação</NavLabel>
       <Link
@@ -257,17 +276,12 @@ export function AppNavigation({ current }: { current: AppSection }) {
       </Link>
       <button
         type="button"
-        onClick={() => setSearchOpen(true)}
+        onClick={() => setHelpOpen(true)}
         className={itemClass(false)}
       >
-        <MagnifyingGlassIcon className={iconClass} />
-        <span className="min-w-0 flex-1 truncate">Pesquisar</span>
-        <span className="text-[10px] text-neutral-400">/</span>
-      </button>
-      <a href="/settings#about" className={itemClass(false)}>
         <Squares2X2Icon className={iconClass} />
         <span className="min-w-0 flex-1 truncate">Ajuda e sobre</span>
-      </a>
+      </button>
 
       <div className="mt-auto border-t border-neutral-200/80 px-2.5 pt-3 text-[10px] leading-4 text-neutral-400 dark:border-neutral-800">
         <div className="font-medium text-neutral-500 dark:text-neutral-500">
