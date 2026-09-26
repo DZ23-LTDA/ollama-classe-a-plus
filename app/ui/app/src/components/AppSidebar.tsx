@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import {
   ArrowPathIcon,
   BookOpenIcon,
@@ -9,12 +10,15 @@ import {
   FolderIcon,
   MagnifyingGlassIcon,
   PlusIcon,
+  LinkIcon,
   PuzzlePieceIcon,
   RectangleGroupIcon,
   Squares2X2Icon,
   UserGroupIcon,
 } from "@heroicons/react/24/outline";
 import { ChatIcon } from "@/components/ChatIcon";
+import { SearchDialog } from "@/components/SearchDialog";
+import { isTypingTarget } from "@/lib/search";
 
 export type AppSection =
   | "apps"
@@ -26,6 +30,7 @@ export type AppSection =
   | "scheduled"
   | "skills"
   | "plugins"
+  | "connectors"
   | "tasks"
   | "company";
 
@@ -84,8 +89,20 @@ function TargetLink({
 }
 
 export function AppNavigation({ current }: { current: AppSection }) {
+  const [searchOpen, setSearchOpen] = useState(false);
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "/" && !event.metaKey && !event.ctrlKey && !event.altKey && !isTypingTarget(event.target)) {
+        event.preventDefault();
+        setSearchOpen(true);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
   return (
     <div className="flex flex-col gap-0.5">
+      <SearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} />
       <div className="mb-3 flex items-center gap-2 px-2.5 pt-1">
         <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-neutral-900 text-xs font-semibold text-white dark:bg-white dark:text-neutral-900">
           A+
@@ -122,6 +139,7 @@ export function AppNavigation({ current }: { current: AppSection }) {
 
       <NavLabel>Construir</NavLabel>
       <TargetLink href="/skills" label="Habilidades" current={current} section="skills" icon={BoltIcon} badge="Novo" />
+      <TargetLink href="/connectors" label="Conectores" current={current} section="connectors" icon={LinkIcon} />
       <TargetLink href="/plugins" label="Plugins" current={current} section="plugins" icon={PuzzlePieceIcon} />
       <TargetLink href="/library" label="Biblioteca" current={current} section="library" icon={BookOpenIcon} />
 
@@ -148,11 +166,11 @@ export function AppNavigation({ current }: { current: AppSection }) {
         <Cog6ToothIcon className={iconClass} />
         <span className="min-w-0 flex-1 truncate">Configurações</span>
       </Link>
-      <a href="/settings#search" className={itemClass(false)}>
+      <button type="button" onClick={() => setSearchOpen(true)} className={itemClass(false)}>
         <MagnifyingGlassIcon className={iconClass} />
         <span className="min-w-0 flex-1 truncate">Pesquisar</span>
         <span className="text-[10px] text-neutral-400">/</span>
-      </a>
+      </button>
       <a href="/settings#about" className={itemClass(false)}>
         <Squares2X2Icon className={iconClass} />
         <span className="min-w-0 flex-1 truncate">Ajuda e sobre</span>
