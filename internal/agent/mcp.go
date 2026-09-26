@@ -497,9 +497,13 @@ func (s *MCPServer) Call(ctx context.Context, method string, params any) (json.R
 		return nil, err
 	}
 	resultChannel := make(chan mcpResponse, 1)
+	// Capture the reader now: stopLocked (on timeout or cancellation) clears
+	// s.stdout, and reading the field from the goroutine raced with it and
+	// could dereference nil or read a restarted process's output.
+	stdout := s.stdout
 	go func() {
 		for {
-			line, err := readMCPMessage(s.stdout)
+			line, err := readMCPMessage(stdout)
 			if err != nil {
 				resultChannel <- mcpResponse{err: err}
 				return
