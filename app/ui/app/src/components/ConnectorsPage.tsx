@@ -8,6 +8,7 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { SidebarLayout } from "@/components/layout/layout";
 import { connectorIcon } from "@/lib/connectorIcons";
 import { ConnectorsManagePanel } from "@/components/ConnectorsManagePanel";
+import { ConnectorQuickConnect } from "@/components/ConnectorQuickConnect";
 import {
   listConnectorCatalog,
   listConnectors,
@@ -28,13 +29,6 @@ const TABS: Array<{ id: ConnectorTab; label: string }> = [
   { id: "mcp", label: "MCP personalizado" },
   { id: "connected", label: "Gerenciar" },
 ];
-
-const AUTH_LABELS: Record<string, string> = {
-  oauth: "OAuth",
-  api_key: "Chave de API",
-  oauth_or_api_key: "OAuth ou chave de API",
-  bot_or_oauth: "Bot ou OAuth",
-};
 
 function ConnectorLogo({ id }: { id: string }) {
   const icon = connectorIcon(id);
@@ -229,25 +223,11 @@ export function ConnectorsPage() {
                     )}
                   </div>
                   {open && (
-                    <div className="mt-4 rounded-xl bg-neutral-50 p-3 text-xs leading-5 text-neutral-600 dark:bg-neutral-900 dark:text-neutral-300">
-                      <p>
-                        Autenticação: {AUTH_LABELS[entry.auth] ?? entry.auth}
-                        {entry.scopes?.length
-                          ? ` · Escopos: ${entry.scopes.join(", ")}`
-                          : ""}
-                      </p>
-                      <p className="mt-1">
-                        {state === "disabled"
-                          ? "Este conector está registrado, mas desativado. Ative-o na aba Gerenciar."
-                          : "Para ativar, registre este conector no registro avançado com a credencial do provedor (variável de ambiente ou OAuth do operador). A conexão nunca é simulada."}
-                      </p>
-                      <a
-                        href="/plugins"
-                        className="mt-2 inline-block font-medium text-violet-600 hover:underline dark:text-violet-300"
-                      >
-                        Registro avançado →
-                      </a>
-                    </div>
+                    <ConnectorQuickConnect
+                      entry={entry}
+                      connected={state === "connected"}
+                      onChanged={() => void load()}
+                    />
                   )}
                 </li>
               );

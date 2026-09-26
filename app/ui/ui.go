@@ -302,6 +302,8 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("DELETE /api/v1/providers/{name}/key", handle(s.removeProviderKey))
 	mux.Handle("GET /api/v1/providers/{name}/models", handle(s.listProviderModels))
 	mux.Handle("PUT /api/v1/providers/{name}/models", handle(s.setProviderModels))
+	mux.Handle("PUT /api/v1/connectors/{id}/key", handle(s.connectConnector))
+	mux.Handle("DELETE /api/v1/connectors/{id}/key", handle(s.disconnectConnector))
 
 	// Ollama proxy endpoints
 	ollamaProxy := s.ollamaProxy()

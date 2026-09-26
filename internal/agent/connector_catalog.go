@@ -1,6 +1,9 @@
 package agent
 
-import "sort"
+import (
+	"sort"
+	"strings"
+)
 
 type ConnectorCatalogEntry struct {
 	ID          string   `json:"id"`
@@ -12,6 +15,38 @@ type ConnectorCatalogEntry struct {
 	Source      string   `json:"source"`
 	Status      string   `json:"status"`
 	Scopes      []string `json:"scopes,omitempty"`
+	// APIBaseURL is set for services that accept a bearer API key, so the
+	// desktop app can connect them from a pasted key in one step.
+	APIBaseURL string `json:"api_base_url,omitempty"`
+}
+
+// quickConnectBaseURLs lists REST APIs that authenticate with
+// "Authorization: Bearer <key>" (personal/API tokens).
+var quickConnectBaseURLs = map[string]string{
+	"airtable":     "https://api.airtable.com/v0",
+	"betterstack":  "https://uptime.betterstack.com/api/v2",
+	"clerk":        "https://api.clerk.com/v1",
+	"cloudflare":   "https://api.cloudflare.com/client/v4",
+	"digitalocean": "https://api.digitalocean.com/v2",
+	"github":       "https://api.github.com",
+	"hubspot":      "https://api.hubapi.com",
+	"mercado-pago": "https://api.mercadopago.com",
+	"neon":         "https://console.neon.tech/api/v2",
+	"netlify":      "https://api.netlify.com/api/v1",
+	"posthog":      "https://us.posthog.com/api",
+	"render":       "https://api.render.com/v1",
+	"resend":       "https://api.resend.com",
+	"sendgrid":     "https://api.sendgrid.com",
+	"sentry":       "https://sentry.io/api/0",
+	"stripe":       "https://api.stripe.com",
+	"supabase":     "https://api.supabase.com/v1",
+	"vercel":       "https://api.vercel.com",
+}
+
+// ConnectorTokenEnv is the credential variable used for a quick-connected
+// catalog entry.
+func ConnectorTokenEnv(id string) string {
+	return "OLLAMA_CONNECTOR_" + strings.ToUpper(strings.ReplaceAll(id, "-", "_")) + "_TOKEN"
 }
 
 // ConnectorCatalog is intentionally a capability catalog, not a claim that every
@@ -131,6 +166,9 @@ func ConnectorCatalog() []ConnectorCatalogEntry {
 		{ID: "asaas", Name: "Asaas", Category: "Pagamentos", Kind: "custom_api", Description: "Cobranças por boleto, Pix e cartão no Brasil; movimentações exigem approval.", Auth: "api_key", Source: "custom_api", Status: "operator_setup_required", Scopes: []string{"payments"}},
 		{ID: "pagseguro", Name: "PagBank / PagSeguro", Category: "Pagamentos", Kind: "custom_api", Description: "Checkout, Pix e cartão; movimentações exigem approval.", Auth: "api_key", Source: "custom_api", Status: "operator_setup_required", Scopes: []string{"orders"}},
 		{ID: "pagarme", Name: "Pagar.me", Category: "Pagamentos", Kind: "custom_api", Description: "Pedidos, cobranças e recebedores; movimentações exigem approval.", Auth: "api_key", Source: "custom_api", Status: "operator_setup_required", Scopes: []string{"orders", "charges"}},
+	}
+	for i := range entries {
+		entries[i].APIBaseURL = quickConnectBaseURLs[entries[i].ID]
 	}
 	sort.Slice(entries, func(i, j int) bool { return entries[i].Name < entries[j].Name })
 	return entries

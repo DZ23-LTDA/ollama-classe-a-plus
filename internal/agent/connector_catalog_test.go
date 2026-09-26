@@ -1,6 +1,9 @@
 package agent
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestConnectorCatalogIncludesOperationalIntegrations(t *testing.T) {
 	entries := ConnectorCatalog()
@@ -55,5 +58,25 @@ func TestConnectorCatalogIDsAreUniqueAndSetupIsExplicit(t *testing.T) {
 		if !seen[id] {
 			t.Errorf("catalog is missing %q", id)
 		}
+	}
+}
+
+func TestQuickConnectEntriesExistWithHTTPS(t *testing.T) {
+	byID := map[string]ConnectorCatalogEntry{}
+	for _, entry := range ConnectorCatalog() {
+		byID[entry.ID] = entry
+	}
+	for id, base := range quickConnectBaseURLs {
+		entry, ok := byID[id]
+		if !ok {
+			t.Errorf("quick connect %q is not in the catalog", id)
+			continue
+		}
+		if entry.APIBaseURL != base || !strings.HasPrefix(base, "https://") {
+			t.Errorf("%s api_base_url = %q", id, entry.APIBaseURL)
+		}
+	}
+	if got := ConnectorTokenEnv("mercado-pago"); got != "OLLAMA_CONNECTOR_MERCADO_PAGO_TOKEN" {
+		t.Fatalf("token env = %q", got)
 	}
 }

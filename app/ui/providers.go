@@ -10,8 +10,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"path/filepath"
-	"runtime"
 	"slices"
 	"strings"
 	"time"
@@ -38,16 +36,11 @@ func providerConfigPath() string {
 }
 
 func providerSecretsDir() (string, error) {
-	if runtime.GOOS == "windows" {
-		if base := os.Getenv("LOCALAPPDATA"); base != "" {
-			return filepath.Join(base, "Ollama DZ23", "secrets"), nil
-		}
+	dir := multillm.DefaultCredentialDir()
+	if dir == "" {
+		return "", errors.New("no directory for saved credentials")
 	}
-	base, err := os.UserConfigDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(base, "Ollama DZ23", "secrets"), nil
+	return dir, nil
 }
 
 func loadProviderConfig() (multillm.Config, error) {

@@ -17,6 +17,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/ollama/ollama/internal/multillm"
 )
 
 type ConnectorConfig struct {
@@ -285,7 +287,7 @@ func (m *ConnectorManager) ListForOrganization(organizationID string) []Connecto
 }
 
 func (m *ConnectorManager) credentialConfigured(config ConnectorConfig, organizationID string) bool {
-	if config.TokenEnv != "" && strings.TrimSpace(os.Getenv(config.TokenEnv)) != "" {
+	if config.TokenEnv != "" && strings.TrimSpace(multillm.CredentialValue(config.TokenEnv)) != "" {
 		return true
 	}
 	return config.OAuthProvider != "" && m.auth != nil && m.auth.HasOAuthCredentialForOrganization(organizationID, config.OAuthProvider)
@@ -439,7 +441,7 @@ func (m *ConnectorManager) call(ctx context.Context, connectorID, operationName,
 	}
 	token := tokenOverride
 	if token == "" && config.TokenEnv != "" {
-		token = os.Getenv(config.TokenEnv)
+		token = multillm.CredentialValue(config.TokenEnv)
 	}
 	if strings.TrimSpace(token) == "" && (config.TokenEnv != "" || config.OAuthProvider != "") {
 		return 0, "", fmt.Errorf("%w for connector %q", ErrConnectorCredentialUnavailable, connectorID)
