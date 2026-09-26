@@ -7,6 +7,7 @@ import {
 import { AppSidebar } from "@/components/AppSidebar";
 import { SidebarLayout } from "@/components/layout/layout";
 import { connectorIcon } from "@/lib/connectorIcons";
+import { ConnectorsManagePanel } from "@/components/ConnectorsManagePanel";
 import {
   listConnectorCatalog,
   listConnectors,
@@ -25,7 +26,7 @@ const TABS: Array<{ id: ConnectorTab; label: string }> = [
   { id: "app", label: "Aplicativos" },
   { id: "custom_api", label: "API personalizada" },
   { id: "mcp", label: "MCP personalizado" },
-  { id: "connected", label: "Conectados" },
+  { id: "connected", label: "Gerenciar" },
 ];
 
 const AUTH_LABELS: Record<string, string> = {
@@ -176,16 +177,19 @@ export function ConnectorsPage() {
             </p>
           )}
 
-          {!loading && !error && visible.length === 0 && (
-            <p className="mt-8 text-sm text-neutral-500">
-              {tab === "connected"
-                ? "Nenhum conector registrado ainda."
-                : "Nenhum conector encontrado."}
-            </p>
-          )}
+          {tab === "connected" && !error && <ConnectorsManagePanel />}
+
+          {tab !== "connected" &&
+            !loading &&
+            !error &&
+            visible.length === 0 && (
+              <p className="mt-8 text-sm text-neutral-500">
+                Nenhum conector encontrado.
+              </p>
+            )}
 
           <ul className="mt-6 grid gap-3 md:grid-cols-2">
-            {visible.map((entry) => {
+            {(tab === "connected" ? [] : visible).map((entry) => {
               const state = connectorState(entry, connectors, mcpServers);
               const open = expanded === entry.id;
               return (
@@ -234,14 +238,14 @@ export function ConnectorsPage() {
                       </p>
                       <p className="mt-1">
                         {state === "disabled"
-                          ? "Este conector está registrado, mas desativado. Ative-o em Plugins."
-                          : "Para ativar, registre este conector em Plugins com a credencial do provedor (variável de ambiente ou OAuth do operador). A conexão nunca é simulada."}
+                          ? "Este conector está registrado, mas desativado. Ative-o na aba Gerenciar."
+                          : "Para ativar, registre este conector no registro avançado com a credencial do provedor (variável de ambiente ou OAuth do operador). A conexão nunca é simulada."}
                       </p>
                       <a
                         href="/plugins"
                         className="mt-2 inline-block font-medium text-violet-600 hover:underline dark:text-violet-300"
                       >
-                        Abrir Plugins →
+                        Registro avançado →
                       </a>
                     </div>
                   )}

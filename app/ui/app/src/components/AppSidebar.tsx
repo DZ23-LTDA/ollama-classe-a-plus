@@ -12,7 +12,6 @@ import {
   PlusIcon,
   KeyIcon,
   LinkIcon,
-  PuzzlePieceIcon,
   RectangleGroupIcon,
   Squares2X2Icon,
   UserGroupIcon,
@@ -209,13 +208,6 @@ export function AppNavigation({ current }: { current: AppSection }) {
         current={current}
         section="connectors"
         icon={LinkIcon}
-      />
-      <TargetLink
-        href="/plugins"
-        label="Plugins"
-        current={current}
-        section="plugins"
-        icon={PuzzlePieceIcon}
       />
       <TargetLink
         href="/library"

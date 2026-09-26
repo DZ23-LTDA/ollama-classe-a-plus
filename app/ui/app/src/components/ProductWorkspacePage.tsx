@@ -47,7 +47,7 @@ const pageCopy: Record<ProductPageKind, { title: string; eyebrow: string; descri
   projects: { title: "Projetos", eyebrow: "Contexto persistente", description: "Organize memória, fontes, tarefas, membros e builders em workspaces isolados.", action: "Novo projeto" },
   scheduled: { title: "Agendado", eyebrow: "Automação controlada", description: "Acompanhe tarefas recorrentes, webhooks, retries e execuções aguardando aprovação.", action: "Agendar tarefa" },
   skills: { title: "Habilidades", eyebrow: "Skills e MCP", description: "Veja manifestos, versões, escopos e confiança das habilidades carregadas pelo runtime.", action: "Abrir configuração" },
-  plugins: { title: "Plugins", eyebrow: "Conectores e providers", description: "Inspecione GitHub, Google Workspace, Claude, Codex, OmniRoute, MCP e outros serviços sem expor segredos.", action: "Abrir configuração" },
+  plugins: { title: "Registro avançado", eyebrow: "Conectores, MCP e skills", description: "Inspecione GitHub, Google Workspace, Claude, Codex, OmniRoute, MCP e outros serviços sem expor segredos.", action: "Abrir configuração" },
   tasks: { title: "Tarefas", eyebrow: "Inbox de missões", description: "Veja missões em execução, aguardando approval, concluídas ou em recuperação.", action: "Nova tarefa" },
 };
 

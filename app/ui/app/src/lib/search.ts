@@ -25,7 +25,6 @@ export const SEARCH_PAGES: SearchItem[] = [
     hint: "Página",
     href: "/connectors",
   },
-  { id: "page-plugins", label: "Plugins", hint: "Página", href: "/plugins" },
   { id: "page-library", label: "Biblioteca", hint: "Página", href: "/library" },
   { id: "page-projects", label: "Projetos", hint: "Página", href: "/projects" },
   {
