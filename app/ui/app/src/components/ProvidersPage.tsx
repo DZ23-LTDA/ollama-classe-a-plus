@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { CheckCircleIcon, KeyIcon } from "@heroicons/react/24/outline";
 import { AppSidebar } from "@/components/AppSidebar";
 import { SidebarLayout } from "@/components/layout/layout";
+import { SettingsTabs } from "@/components/SettingsTabs";
 import {
   listProviderModels,
   listProviders,
@@ -314,9 +315,10 @@ export function ProvidersPage() {
 
   return (
     <SidebarLayout
-      title="Provedores de IA"
+      title="Configurações"
       sidebar={<AppSidebar current="providers" />}
     >
+      <SettingsTabs current="providers" />
       <div className="min-h-0 flex-1 overflow-y-auto bg-neutral-50 dark:bg-neutral-900">
         <div className="mx-auto w-full max-w-6xl px-6 pb-14 pt-10 lg:px-12">
           <h2 className="font-rounded text-3xl font-semibold tracking-tight text-neutral-950 dark:text-white">

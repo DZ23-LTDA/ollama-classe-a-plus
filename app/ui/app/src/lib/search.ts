@@ -40,6 +40,12 @@ export const SEARCH_PAGES: SearchItem[] = [
     href: "/providers",
   },
   {
+    id: "page-endpoint",
+    label: "Endpoint da API",
+    hint: "Configurações",
+    href: "/endpoint",
+  },
+  {
     id: "page-settings",
     label: "Configurações",
     hint: "Página",

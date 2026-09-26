@@ -10,16 +10,14 @@ import {
   FolderIcon,
   MagnifyingGlassIcon,
   PlusIcon,
-  KeyIcon,
   LinkIcon,
-  RectangleGroupIcon,
   Squares2X2Icon,
-  UserGroupIcon,
 } from "@heroicons/react/24/outline";
 import { ChatIcon } from "@/components/ChatIcon";
 import { SearchDialog } from "@/components/SearchDialog";
 import { HelpDialog } from "@/components/HelpDialog";
 import { newTaskShortcut } from "@/lib/help";
+import { SETTINGS_SECTIONS } from "@/lib/settingsTabs";
 import { isTypingTarget } from "@/lib/search";
 
 export type AppSection =
@@ -34,6 +32,7 @@ export type AppSection =
   | "plugins"
   | "connectors"
   | "providers"
+  | "endpoint"
   | "tasks"
   | "company";
 
@@ -157,7 +156,7 @@ export function AppNavigation({ current }: { current: AppSection }) {
         <span className="text-[10px] text-neutral-400">/</span>
       </button>
 
-      <NavLabel>Operação</NavLabel>
+      <NavLabel>Agentes</NavLabel>
       <Link
         to="/agentic"
         className={itemClass(current === "agentic")}
@@ -193,21 +192,20 @@ export function AppNavigation({ current }: { current: AppSection }) {
         badge="Novo"
       />
 
-      <NavLabel>Construir</NavLabel>
-      <TargetLink
-        href="/skills"
-        label="Habilidades"
-        current={current}
-        section="skills"
-        icon={BoltIcon}
-        badge="Novo"
-      />
+      <NavLabel>Ferramentas</NavLabel>
       <TargetLink
         href="/connectors"
         label="Conectores"
         current={current}
         section="connectors"
         icon={LinkIcon}
+      />
+      <TargetLink
+        href="/skills"
+        label="Habilidades"
+        current={current}
+        section="skills"
+        icon={BoltIcon}
       />
       <TargetLink
         href="/library"
@@ -230,37 +228,16 @@ export function AppNavigation({ current }: { current: AppSection }) {
       </div>
       <TargetLink
         href="/projects"
-        label="Novo projeto"
+        label="Todos os projetos"
         current={current}
         section="projects"
         icon={FolderIcon}
       />
-      <TargetLink
-        href="/connect"
-        label="Apps e providers"
-        current={current}
-        section="apps"
-        icon={RectangleGroupIcon}
-      />
-      <TargetLink
-        href="/providers"
-        label="Provedores de IA"
-        current={current}
-        section="providers"
-        icon={KeyIcon}
-      />
 
-      <NavLabel>Conta</NavLabel>
-      <a
-        href="/settings#workspace"
-        className={itemClass(current === "settings")}
-      >
-        <UserGroupIcon className={iconClass} />
-        <span className="min-w-0 flex-1 truncate">Workspace</span>
-      </a>
+      <NavLabel>Sistema</NavLabel>
       <Link
         to="/settings"
-        className={itemClass(current === "settings")}
+        className={itemClass(SETTINGS_SECTIONS.has(current))}
         draggable={false}
       >
         <Cog6ToothIcon className={iconClass} />
