@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { AgentConnectorCatalogEntry } from "@/lib/agenticClient";
 import {
+  connectHint,
   connectWithKey,
   disconnectConnector,
   keyHelpURL,
@@ -19,6 +20,7 @@ export function ConnectorQuickConnect({
   onChanged: () => void;
 }) {
   const [key, setKey] = useState("");
+  const [baseURL, setBaseURL] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,14 +38,18 @@ export function ConnectorQuickConnect({
     }
   };
 
-  if (!entry.api_base_url) {
+  if (!entry.quick_connect) {
     return (
       <div className="mt-4 rounded-xl bg-neutral-50 p-3 text-xs leading-5 text-neutral-600 dark:bg-neutral-900 dark:text-neutral-300">
-        <p>
-          {entry.name} usa login OAuth, que precisa de um app registrado no{" "}
-          {entry.name} pela equipe DZ23. Esse login de um clique ainda não está
-          disponível para este serviço.
-        </p>
+        <p>{connectHint(entry.name, entry.auth)}</p>
+        {entry.auth !== "oauth" && (
+          <a
+            href="/plugins"
+            className="mt-2 inline-block font-medium text-violet-600 hover:underline dark:text-violet-300"
+          >
+            Abrir registro avançado →
+          </a>
+        )}
       </div>
     );
   }
@@ -71,9 +77,25 @@ export function ConnectorQuickConnect({
           className="flex flex-wrap items-center gap-2"
           onSubmit={(event) => {
             event.preventDefault();
-            void run(() => connectWithKey(entry.id, key));
+            void run(() =>
+              connectWithKey(
+                entry.id,
+                key,
+                entry.api_self_hosted ? baseURL : undefined,
+              ),
+            );
           }}
         >
+          {entry.api_self_hosted && (
+            <input
+              type="url"
+              value={baseURL}
+              onChange={(event) => setBaseURL(event.target.value)}
+              placeholder={`URL da sua instância ${entry.name} (https://...)`}
+              aria-label={`URL da instância ${entry.name}`}
+              className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs text-neutral-900 outline-none dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100"
+            />
+          )}
           <input
             type="password"
             autoComplete="off"
@@ -86,7 +108,11 @@ export function ConnectorQuickConnect({
           />
           <button
             type="submit"
-            disabled={busy || !key.trim()}
+            disabled={
+              busy ||
+              !key.trim() ||
+              (!!entry.api_self_hosted && !baseURL.trim())
+            }
             className="rounded-lg bg-neutral-900 px-3 py-1.5 text-xs text-white disabled:opacity-40 dark:bg-white dark:text-neutral-900"
           >
             {busy ? "Conectando…" : "Conectar"}

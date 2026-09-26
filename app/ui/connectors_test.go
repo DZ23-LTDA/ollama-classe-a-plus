@@ -57,6 +57,9 @@ func TestConnectConnectorErrors(t *testing.T) {
 	if rr := providerRequest(t, http.MethodPut, "/api/v1/connectors/gmail/key", `{"key":"x"}`); rr.Code != http.StatusNotFound {
 		t.Fatalf("oauth-only connector status = %d", rr.Code)
 	}
+	if rr := providerRequest(t, http.MethodPut, "/api/v1/connectors/coolify/key", `{"key":"x","base_url":"http://insecure"}`); rr.Code != http.StatusBadRequest {
+		t.Fatalf("self-hosted without https status = %d", rr.Code)
+	}
 	if rr := providerRequest(t, http.MethodPut, "/api/v1/connectors/github/key", `{"key":""}`); rr.Code != http.StatusBadRequest {
 		t.Fatalf("empty key status = %d", rr.Code)
 	}
@@ -69,4 +72,35 @@ func TestConnectConnectorErrors(t *testing.T) {
 // variable that secrets.Save writes, so tests leave no trace.
 func removeTestConnectorEnv(envName string) error {
 	return secrets.Remove(multillm.DefaultCredentialDir(), envName)
+}
+
+func TestConnectConnectorSendsHeaderAndSelfHostedURL(t *testing.T) {
+	var registered map[string]any
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		json.Unmarshal(body, &registered)
+		w.Write([]byte(`{}`))
+	}))
+	defer upstream.Close()
+	t.Setenv("OLLAMA_HOST", upstream.URL)
+	t.Setenv("LOCALAPPDATA", t.TempDir())
+	for _, env := range []string{"OLLAMA_CONNECTOR_APPWRITE_TOKEN", "OLLAMA_CONNECTOR_COOLIFY_TOKEN"} {
+		t.Setenv(env, "")
+		t.Setenv(env+"_FILE", "")
+		t.Cleanup(func() { _ = removeTestConnectorEnv(env) })
+	}
+
+	if rr := providerRequest(t, http.MethodPut, "/api/v1/connectors/appwrite/key", `{"key":"k"}`); rr.Code != http.StatusNoContent {
+		t.Fatalf("appwrite status %d: %s", rr.Code, rr.Body.String())
+	}
+	if registered["auth_header"] != "X-Appwrite-Key" || registered["base_url"] != "https://cloud.appwrite.io/v1" {
+		t.Fatalf("appwrite registered = %v", registered)
+	}
+
+	if rr := providerRequest(t, http.MethodPut, "/api/v1/connectors/coolify/key", `{"key":"k","base_url":"https://coolify.example.com/api/v1/"}`); rr.Code != http.StatusNoContent {
+		t.Fatalf("coolify status %d: %s", rr.Code, rr.Body.String())
+	}
+	if registered["base_url"] != "https://coolify.example.com/api/v1" {
+		t.Fatalf("coolify registered = %v", registered)
+	}
 }

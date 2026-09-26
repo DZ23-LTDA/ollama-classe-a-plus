@@ -22,11 +22,15 @@ import (
 )
 
 type ConnectorConfig struct {
-	ID                   string               `json:"id"`
-	OrganizationID       string               `json:"organization_id,omitempty"`
-	Provider             string               `json:"provider"`
-	BaseURL              string               `json:"base_url"`
-	TokenEnv             string               `json:"token_env,omitempty"`
+	ID             string `json:"id"`
+	OrganizationID string `json:"organization_id,omitempty"`
+	Provider       string `json:"provider"`
+	BaseURL        string `json:"base_url"`
+	TokenEnv       string `json:"token_env,omitempty"`
+	// AuthHeader and AuthScheme describe how the token is sent. The default is
+	// "Authorization: Bearer <token>"; AuthScheme "raw" sends the bare token.
+	AuthHeader           string               `json:"auth_header,omitempty"`
+	AuthScheme           string               `json:"auth_scheme,omitempty"`
 	OAuthProvider        string               `json:"oauth_provider,omitempty"`
 	AllowedOrigins       []string             `json:"allowed_origins,omitempty"`
 	Operations           []ConnectorOperation `json:"operations"`
@@ -177,6 +181,14 @@ func validateConnectorConfig(config *ConnectorConfig) error {
 	}
 	if config.TokenEnv != "" && !validEnvName(config.TokenEnv) {
 		return errors.New("invalid connector token_env")
+	}
+	config.AuthHeader = strings.TrimSpace(config.AuthHeader)
+	config.AuthScheme = strings.TrimSpace(config.AuthScheme)
+	if config.AuthHeader != "" && !validAuthHeader(config.AuthHeader) {
+		return errors.New("invalid connector auth_header")
+	}
+	if config.AuthScheme != "" && !validAuthScheme(config.AuthScheme) {
+		return errors.New("invalid connector auth_scheme")
 	}
 	for i := range config.Operations {
 		operation := &config.Operations[i]
@@ -447,7 +459,8 @@ func (m *ConnectorManager) call(ctx context.Context, connectorID, operationName,
 		return 0, "", fmt.Errorf("%w for connector %q", ErrConnectorCredentialUnavailable, connectorID)
 	}
 	if token != "" {
-		request.Header.Set("Authorization", "Bearer "+token)
+		header, value := connectorAuth(config, token)
+		request.Header.Set(header, value)
 	}
 	client := connectorClientForRequest(m.client, time.Duration(config.TimeoutSeconds)*time.Second)
 	response, err := client.Do(request)
@@ -568,6 +581,58 @@ func connectorDialContext(ctx context.Context, network, address string) (net.Con
 		}
 	}
 	return conn, nil
+}
+
+// connectorAuth returns the header and value carrying the token.
+func connectorAuth(config ConnectorConfig, token string) (string, string) {
+	header := config.AuthHeader
+	if header == "" {
+		header = "Authorization"
+	}
+	switch scheme := config.AuthScheme; scheme {
+	case "raw":
+		return header, token
+	case "":
+		if header == "Authorization" {
+			return header, "Bearer " + token
+		}
+		return header, token
+	default:
+		return header, scheme + " " + token
+	}
+}
+
+// validAuthHeader accepts HTTP header names used for API keys and rejects
+// headers that could change routing or framing.
+func validAuthHeader(value string) bool {
+	if len(value) == 0 || len(value) > 64 {
+		return false
+	}
+	for _, r := range value {
+		if !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '-' || r == '_') {
+			return false
+		}
+	}
+	switch strings.ToLower(value) {
+	case "host", "content-length", "transfer-encoding", "connection", "cookie", "content-type", "accept":
+		return false
+	}
+	return true
+}
+
+func validAuthScheme(value string) bool {
+	if value == "raw" {
+		return true
+	}
+	if len(value) == 0 || len(value) > 32 {
+		return false
+	}
+	for _, r := range value {
+		if !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r == '-' || r == '_') {
+			return false
+		}
+	}
+	return true
 }
 
 func validConnectorPath(value string) bool {

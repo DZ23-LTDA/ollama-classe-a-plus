@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { connectWithKey, keyHelpURL } from "./connectorConnect";
+import { connectHint, connectWithKey, keyHelpURL } from "./connectorConnect";
 
 describe("connector quick connect client", () => {
   afterEach(() => vi.unstubAllGlobals());
@@ -41,5 +41,31 @@ describe("connector quick connect client", () => {
   it("links to where each service issues keys", () => {
     expect(keyHelpURL("stripe")).toMatch(/^https:\/\/dashboard\.stripe\.com/);
     expect(keyHelpURL("gmail")).toBeUndefined();
+  });
+});
+
+describe("connectHint", () => {
+  it("only blames OAuth for OAuth-only services", () => {
+    expect(connectHint("Gmail", "oauth")).toContain("OAuth");
+    expect(connectHint("PostgreSQL", "connection_url")).toContain(
+      "URL de conexão",
+    );
+    expect(connectHint("PostgreSQL", "connection_url")).not.toContain("OAuth");
+  });
+});
+
+describe("connectWithKey self-hosted", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it("sends the instance URL when given", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await connectWithKey("coolify", "k", " https://c.example.com ");
+    const init = fetchMock.mock.calls[0][1] as RequestInit;
+    expect(JSON.parse(init.body as string)).toEqual({
+      key: "k",
+      base_url: "https://c.example.com",
+    });
   });
 });

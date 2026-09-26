@@ -22,48 +22,378 @@ export type AgentSchedule = {
   last_run_at?: string;
 };
 
-export type AgentArtifact = { id: string; name: string; sha256: string; size: number; media_type?: string };
+export type AgentArtifact = {
+  id: string;
+  name: string;
+  sha256: string;
+  size: number;
+  media_type?: string;
+};
 export type AgentMission = {
-  id: string; version: number; objective: string; provider?: string; model?: string; workspace?: string; project_id?: string; organization_id?: string; capabilities?: string[];
-  state: string; plan?: Array<{ id: string; title: string; kind: string; state: string; requires_approval: boolean }>;
-  approvals?: Array<{ id: string; step_id: string; status: string; policy?: string; nonce?: string; reason?: string }>;
-  artifacts?: AgentArtifact[]; last_error?: string; created_at: string; updated_at: string;
+  id: string;
+  version: number;
+  objective: string;
+  provider?: string;
+  model?: string;
+  workspace?: string;
+  project_id?: string;
+  organization_id?: string;
+  capabilities?: string[];
+  state: string;
+  plan?: Array<{
+    id: string;
+    title: string;
+    kind: string;
+    state: string;
+    requires_approval: boolean;
+  }>;
+  approvals?: Array<{
+    id: string;
+    step_id: string;
+    status: string;
+    policy?: string;
+    nonce?: string;
+    reason?: string;
+  }>;
+  artifacts?: AgentArtifact[];
+  last_error?: string;
+  created_at: string;
+  updated_at: string;
 };
-export type AgentEvent = { id: string; type: string; step_id?: string; created_at: string; payload?: unknown };
-export type AgentConnector = { id: string; provider: string; base_url: string; token_env?: string; oauth_provider?: string; allowed_origins?: string[]; operations?: Array<{ name: string; methods: string[]; path_prefixes: string[] }>; disabled?: boolean; credential_configured?: boolean };
-export type AgentConnectorCatalogEntry = { id: string; name: string; category: string; kind: string; description: string; auth: string; source: string; status: string; scopes?: string[]; api_base_url?: string };
-export type AgentMCPServer = { id: string; organization_id?: string; command?: string; url?: string; token_env?: string; headers_env?: Record<string, string>; transport?: string; args?: string[]; allowed_methods?: string[]; environment_vars?: string[]; timeout_seconds?: number; disabled?: boolean };
-export type AgentSkill = { id: string; organization_id?: string; version: string; description: string; scopes?: string[]; tools?: string[]; trusted: boolean; enabled: boolean };
-export type AgentCLIStatus = { id: string; name: string; section: string; visibility: string; mode: string; executables?: string[]; installed: boolean; executable?: string };
+export type AgentEvent = {
+  id: string;
+  type: string;
+  step_id?: string;
+  created_at: string;
+  payload?: unknown;
+};
+export type AgentConnector = {
+  id: string;
+  provider: string;
+  base_url: string;
+  token_env?: string;
+  oauth_provider?: string;
+  allowed_origins?: string[];
+  operations?: Array<{
+    name: string;
+    methods: string[];
+    path_prefixes: string[];
+  }>;
+  disabled?: boolean;
+  credential_configured?: boolean;
+};
+export type AgentConnectorCatalogEntry = {
+  id: string;
+  name: string;
+  category: string;
+  kind: string;
+  description: string;
+  auth: string;
+  source: string;
+  status: string;
+  scopes?: string[];
+  api_base_url?: string;
+  api_auth_header?: string;
+  api_auth_scheme?: string;
+  api_self_hosted?: boolean;
+  quick_connect?: boolean;
+};
+export type AgentMCPServer = {
+  id: string;
+  organization_id?: string;
+  command?: string;
+  url?: string;
+  token_env?: string;
+  headers_env?: Record<string, string>;
+  transport?: string;
+  args?: string[];
+  allowed_methods?: string[];
+  environment_vars?: string[];
+  timeout_seconds?: number;
+  disabled?: boolean;
+};
+export type AgentSkill = {
+  id: string;
+  organization_id?: string;
+  version: string;
+  description: string;
+  scopes?: string[];
+  tools?: string[];
+  trusted: boolean;
+  enabled: boolean;
+};
+export type AgentCLIStatus = {
+  id: string;
+  name: string;
+  section: string;
+  visibility: string;
+  mode: string;
+  executables?: string[];
+  installed: boolean;
+  executable?: string;
+};
 
-export type CompanyDepartment = { id: string; name: string; mandate: string; autonomy: string; approval_required?: string[] };
-export type CompanyRoadmapItem = { id: string; title: string; description?: string; owner_department?: string; priority: number; status: string; due_at?: string };
-export type CompanyGoal = { id: string; title: string; metric: string; target: number; current: number; unit?: string; period: string; owner_department?: string; status: string };
-export type CompanyBacklogItem = { id: string; title: string; description?: string; owner_department?: string; priority: number; status: string; source?: string; estimated_hours?: number };
-export type CompanyCycle = { id: string; name: string; objective: string; frequency: string; interval_seconds: number; schedule_id?: string; enabled: boolean; next_run_at: string; paused_reason?: string };
-export type CompanyAgent = { id: string; department_id: string; name: string; objective: string; budget_cents: number; spent_cents: number; allowed_tools?: string[]; memory_scope: string; metrics?: Record<string, number>; sla?: string; supervisor_id?: string; autonomy: string; pause_condition?: string; approval_required?: string[]; status: string; paused_reason?: string };
-export type CompanySocialAccount = { id: string; provider: string; name: string; status: string; oauth_required: boolean };
-export type CompanySocialDraft = { id: string; provider: string; account_id?: string; title: string; body: string; status: string; approval_required: boolean; approved: boolean; mode: string; published_at?: string };
-export type CompanyApproval = { id: string; company_id: string; organization_id: string; resource_type: string; resource_id: string; policy: string; category?: string; amount_cents?: number; nonce: string; actor_id?: string; status: string; reason?: string; expires_at?: string };
-export type TelAgentExchange = { id: string; channel: string; actor_id: string; organization_id: string; message: string; operation: string; status: string; reply: string; created_resource_id?: string; approval_required: boolean; created_at: string };
-export type TelAgentResult = { company: AgentCompany; exchange: TelAgentExchange; report?: AgentCompanyReport | null };
-export type CompanySocialReport = { company: AgentCompany; connected_accounts: number; pending_oauth: number; drafts: number; approved_drafts: number; published_sandbox: number; impressions: number; clicks: number; conversions: number };
-export type AgentCompany = {
-  id: string; version: number; organization_id: string; name: string; mission?: string; positioning?: string; business_model?: string;
-  target_audience?: string; offer?: string; website?: string; currency: string; status: string;
-  departments: CompanyDepartment[]; agents?: CompanyAgent[]; roadmap?: CompanyRoadmapItem[]; goals?: CompanyGoal[]; backlog?: CompanyBacklogItem[]; cycles?: CompanyCycle[]; campaigns?: CompanyCampaign[]; affiliate_programs?: CompanyAffiliateProgram[]; affiliate_links?: CompanyAffiliateLink[]; products?: CompanyProduct[]; orders?: CompanyOrder[]; social_accounts?: CompanySocialAccount[]; social_drafts?: CompanySocialDraft[]; social_metrics?: Array<{ id: string; draft_id: string; provider: string; impressions: number; clicks: number; conversions: number }>;
-  tel_agent_history?: TelAgentExchange[]; budget: { currency: string; monthly_limit_cents: number; spent_cents: number; approval_threshold_cents: number; require_approval_for_ads: boolean; require_approval_for_sales: boolean };
-  risk: { paused: boolean; pause_reason?: string; anomaly_count: number; last_anomaly?: string }; approvals?: CompanyApproval[];
-  created_at: string; updated_at: string;
+export type CompanyDepartment = {
+  id: string;
+  name: string;
+  mandate: string;
+  autonomy: string;
+  approval_required?: string[];
 };
-export type AgentCompanyReport = { company: AgentCompany; open_backlog: number; completed_backlog: number; goals_on_track: number; goals_at_risk: number; enabled_cycles: number; budget_utilization_pct: number };
-export type CompanyCampaign = { id: string; name: string; channel: string; objective: string; status: string; daily_budget_cents: number; approval_required: boolean; approved: boolean; conversions: number; spend_cents: number };
-export type CompanyAffiliateProgram = { id: string; name: string; network: string; status: string; commission_bps: number; approval_required: boolean; approved: boolean };
-export type CompanyAffiliateLink = { id: string; program_id: string; product_id?: string; destination: string; conversions: number; revenue_cents: number };
-export type CompanyProduct = { id: string; sku: string; name: string; supplier: string; cost_cents: number; price_cents: number; inventory: number; status: string };
-export type CompanyOrder = { id: string; product_id: string; customer_ref: string; quantity: number; total_cents: number; status: string; approved: boolean; tracking_code?: string };
-export type CompanyGrowthReport = { company: AgentCompany; campaigns_total: number; campaigns_active: number; affiliate_programs: number; affiliate_conversions: number; products: number; pending_orders: number; fulfilled_orders: number; revenue_cents: number };
-export type GrokStatus = { provider: string; model: string; state: string; authenticated: boolean; healthy: boolean; last_latency_ms?: number; last_error?: string; checked_at: string };
+export type CompanyRoadmapItem = {
+  id: string;
+  title: string;
+  description?: string;
+  owner_department?: string;
+  priority: number;
+  status: string;
+  due_at?: string;
+};
+export type CompanyGoal = {
+  id: string;
+  title: string;
+  metric: string;
+  target: number;
+  current: number;
+  unit?: string;
+  period: string;
+  owner_department?: string;
+  status: string;
+};
+export type CompanyBacklogItem = {
+  id: string;
+  title: string;
+  description?: string;
+  owner_department?: string;
+  priority: number;
+  status: string;
+  source?: string;
+  estimated_hours?: number;
+};
+export type CompanyCycle = {
+  id: string;
+  name: string;
+  objective: string;
+  frequency: string;
+  interval_seconds: number;
+  schedule_id?: string;
+  enabled: boolean;
+  next_run_at: string;
+  paused_reason?: string;
+};
+export type CompanyAgent = {
+  id: string;
+  department_id: string;
+  name: string;
+  objective: string;
+  budget_cents: number;
+  spent_cents: number;
+  allowed_tools?: string[];
+  memory_scope: string;
+  metrics?: Record<string, number>;
+  sla?: string;
+  supervisor_id?: string;
+  autonomy: string;
+  pause_condition?: string;
+  approval_required?: string[];
+  status: string;
+  paused_reason?: string;
+};
+export type CompanySocialAccount = {
+  id: string;
+  provider: string;
+  name: string;
+  status: string;
+  oauth_required: boolean;
+};
+export type CompanySocialDraft = {
+  id: string;
+  provider: string;
+  account_id?: string;
+  title: string;
+  body: string;
+  status: string;
+  approval_required: boolean;
+  approved: boolean;
+  mode: string;
+  published_at?: string;
+};
+export type CompanyApproval = {
+  id: string;
+  company_id: string;
+  organization_id: string;
+  resource_type: string;
+  resource_id: string;
+  policy: string;
+  category?: string;
+  amount_cents?: number;
+  nonce: string;
+  actor_id?: string;
+  status: string;
+  reason?: string;
+  expires_at?: string;
+};
+export type TelAgentExchange = {
+  id: string;
+  channel: string;
+  actor_id: string;
+  organization_id: string;
+  message: string;
+  operation: string;
+  status: string;
+  reply: string;
+  created_resource_id?: string;
+  approval_required: boolean;
+  created_at: string;
+};
+export type TelAgentResult = {
+  company: AgentCompany;
+  exchange: TelAgentExchange;
+  report?: AgentCompanyReport | null;
+};
+export type CompanySocialReport = {
+  company: AgentCompany;
+  connected_accounts: number;
+  pending_oauth: number;
+  drafts: number;
+  approved_drafts: number;
+  published_sandbox: number;
+  impressions: number;
+  clicks: number;
+  conversions: number;
+};
+export type AgentCompany = {
+  id: string;
+  version: number;
+  organization_id: string;
+  name: string;
+  mission?: string;
+  positioning?: string;
+  business_model?: string;
+  target_audience?: string;
+  offer?: string;
+  website?: string;
+  currency: string;
+  status: string;
+  departments: CompanyDepartment[];
+  agents?: CompanyAgent[];
+  roadmap?: CompanyRoadmapItem[];
+  goals?: CompanyGoal[];
+  backlog?: CompanyBacklogItem[];
+  cycles?: CompanyCycle[];
+  campaigns?: CompanyCampaign[];
+  affiliate_programs?: CompanyAffiliateProgram[];
+  affiliate_links?: CompanyAffiliateLink[];
+  products?: CompanyProduct[];
+  orders?: CompanyOrder[];
+  social_accounts?: CompanySocialAccount[];
+  social_drafts?: CompanySocialDraft[];
+  social_metrics?: Array<{
+    id: string;
+    draft_id: string;
+    provider: string;
+    impressions: number;
+    clicks: number;
+    conversions: number;
+  }>;
+  tel_agent_history?: TelAgentExchange[];
+  budget: {
+    currency: string;
+    monthly_limit_cents: number;
+    spent_cents: number;
+    approval_threshold_cents: number;
+    require_approval_for_ads: boolean;
+    require_approval_for_sales: boolean;
+  };
+  risk: {
+    paused: boolean;
+    pause_reason?: string;
+    anomaly_count: number;
+    last_anomaly?: string;
+  };
+  approvals?: CompanyApproval[];
+  created_at: string;
+  updated_at: string;
+};
+export type AgentCompanyReport = {
+  company: AgentCompany;
+  open_backlog: number;
+  completed_backlog: number;
+  goals_on_track: number;
+  goals_at_risk: number;
+  enabled_cycles: number;
+  budget_utilization_pct: number;
+};
+export type CompanyCampaign = {
+  id: string;
+  name: string;
+  channel: string;
+  objective: string;
+  status: string;
+  daily_budget_cents: number;
+  approval_required: boolean;
+  approved: boolean;
+  conversions: number;
+  spend_cents: number;
+};
+export type CompanyAffiliateProgram = {
+  id: string;
+  name: string;
+  network: string;
+  status: string;
+  commission_bps: number;
+  approval_required: boolean;
+  approved: boolean;
+};
+export type CompanyAffiliateLink = {
+  id: string;
+  program_id: string;
+  product_id?: string;
+  destination: string;
+  conversions: number;
+  revenue_cents: number;
+};
+export type CompanyProduct = {
+  id: string;
+  sku: string;
+  name: string;
+  supplier: string;
+  cost_cents: number;
+  price_cents: number;
+  inventory: number;
+  status: string;
+};
+export type CompanyOrder = {
+  id: string;
+  product_id: string;
+  customer_ref: string;
+  quantity: number;
+  total_cents: number;
+  status: string;
+  approved: boolean;
+  tracking_code?: string;
+};
+export type CompanyGrowthReport = {
+  company: AgentCompany;
+  campaigns_total: number;
+  campaigns_active: number;
+  affiliate_programs: number;
+  affiliate_conversions: number;
+  products: number;
+  pending_orders: number;
+  fulfilled_orders: number;
+  revenue_cents: number;
+};
+export type GrokStatus = {
+  provider: string;
+  model: string;
+  state: string;
+  authenticated: boolean;
+  healthy: boolean;
+  last_latency_ms?: number;
+  last_error?: string;
+  checked_at: string;
+};
 
 type AgentSession = { token: string; organization?: string };
 let agentSession: AgentSession | null = null;
@@ -71,12 +401,18 @@ let agentSession: AgentSession | null = null;
 export function setAgentSession(token: string, organization?: string): void {
   const normalizedToken = token.trim();
   if (!normalizedToken) throw new Error("agent session token is required");
-  agentSession = { token: normalizedToken, ...(organization?.trim() ? { organization: organization.trim() } : {}) };
+  agentSession = {
+    token: normalizedToken,
+    ...(organization?.trim() ? { organization: organization.trim() } : {}),
+  };
 }
 
 export function clearAgentSession(): void {
   agentSession = null;
-  if (typeof window !== "undefined" && typeof window.dispatchEvent === "function") {
+  if (
+    typeof window !== "undefined" &&
+    typeof window.dispatchEvent === "function"
+  ) {
     window.dispatchEvent(new CustomEvent("ollama-agent-session-cleared"));
   }
 }
@@ -87,25 +423,64 @@ export function hasAgentSession(): boolean {
 
 export async function logoutAgentSession(): Promise<void> {
   try {
-    await agentFetch("/api/agent/v1/auth/logout", { method: "POST", body: "{}" });
+    await agentFetch("/api/agent/v1/auth/logout", {
+      method: "POST",
+      body: "{}",
+    });
   } finally {
     clearAgentSession();
   }
 }
 
-export const refreshOAuthCredential = (provider: string, credentialID: string) => agentFetch<{ credential_id: string; provider: string; expires_at?: string; updated_at: string; revoked_at?: string | null }>(`/api/agent/v1/auth/oauth/${encodeURIComponent(provider)}/refresh`, { method: "POST", body: JSON.stringify({ credential_id: credentialID }) });
-export const revokeOAuthCredential = (provider: string, credentialID: string) => agentFetch<void>(`/api/agent/v1/auth/oauth/${encodeURIComponent(provider)}/revoke`, { method: "POST", body: JSON.stringify({ credential_id: credentialID }) });
+export const refreshOAuthCredential = (
+  provider: string,
+  credentialID: string,
+) =>
+  agentFetch<{
+    credential_id: string;
+    provider: string;
+    expires_at?: string;
+    updated_at: string;
+    revoked_at?: string | null;
+  }>(`/api/agent/v1/auth/oauth/${encodeURIComponent(provider)}/refresh`, {
+    method: "POST",
+    body: JSON.stringify({ credential_id: credentialID }),
+  });
+export const revokeOAuthCredential = (provider: string, credentialID: string) =>
+  agentFetch<void>(
+    `/api/agent/v1/auth/oauth/${encodeURIComponent(provider)}/revoke`,
+    { method: "POST", body: JSON.stringify({ credential_id: credentialID }) },
+  );
 
 function agentHeaders(): Record<string, string> {
   if (!agentSession) return {};
-  return { Authorization: `Bearer ${agentSession.token}`, ...(agentSession.organization ? { "X-Ollama-Organization": agentSession.organization } : {}) };
+  return {
+    Authorization: `Bearer ${agentSession.token}`,
+    ...(agentSession.organization
+      ? { "X-Ollama-Organization": agentSession.organization }
+      : {}),
+  };
 }
 export const AGENT_LOGIN_REQUIRED_MESSAGE =
-  "O Ollama está exposto na rede, então os recursos de agente exigem login. Entre em Configurações → Workspace ou desative \"Expose Ollama to the network\" em Configurações.";
-export async function agentFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`, { ...init, headers: { "Content-Type": "application/json", ...agentHeaders(), ...(init.headers ?? {}) } });
+  'O Ollama está exposto na rede, então os recursos de agente exigem login. Entre em Configurações → Workspace ou desative "Expose Ollama to the network" em Configurações.';
+export async function agentFetch<T>(
+  path: string,
+  init: RequestInit = {},
+): Promise<T> {
+  const response = await fetch(`${API_BASE}${path}`, {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      ...agentHeaders(),
+      ...(init.headers ?? {}),
+    },
+  });
   const contentType = response.headers.get("content-type") ?? "";
-  if (response.ok && response.status !== 204 && contentType.includes("text/html")) {
+  if (
+    response.ok &&
+    response.status !== 204 &&
+    contentType.includes("text/html")
+  ) {
     // A route that is not proxied to the agent API falls through to the SPA
     // shell; surface that as an error instead of rendering HTML as data.
     throw new Error("Agent API indisponível: resposta inesperada do servidor");
@@ -117,76 +492,539 @@ export async function agentFetch<T>(path: string, init: RequestInit = {}): Promi
       // The server only demands a bearer when it listens beyond loopback.
       throw new Error(AGENT_LOGIN_REQUIRED_MESSAGE);
     }
-    throw new Error(typeof body?.error === "string" ? body.error : response.statusText || "Agent API request failed");
+    throw new Error(
+      typeof body?.error === "string"
+        ? body.error
+        : response.statusText || "Agent API request failed",
+    );
   }
   return body as T;
 }
-export const listProjects = () => agentFetch<{ projects: AgentProject[] }>("/api/agent/v1/projects");
-export const createProject = (name: string, root = "") => agentFetch<AgentProject>("/api/agent/v1/projects", { method: "POST", body: JSON.stringify({ name, root }) });
-export const updateProject = (id: string, name: string, root = "") => agentFetch<AgentProject>(`/api/agent/v1/projects/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ name, root }) });
-export const deleteProject = (id: string) => agentFetch<void>(`/api/agent/v1/projects/${encodeURIComponent(id)}`, { method: "DELETE" });
-export const listMissions = () => agentFetch<{ missions: AgentMission[] }>("/api/agent/v1/missions");
-export const getMission = (id: string) => agentFetch<AgentMission>(`/api/agent/v1/missions/${encodeURIComponent(id)}`);
-export const listMissionEvents = (id: string) => agentFetch<{ events: AgentEvent[] }>(`/api/agent/v1/missions/${encodeURIComponent(id)}/events`);
-export const createMission = (payload: { objective: string; provider?: string; model?: string; project_id?: string; workspace?: string; capabilities?: string[]; auto_run?: boolean }) => agentFetch<AgentMission>("/api/agent/v1/missions", { method: "POST", body: JSON.stringify(payload) });
-export const runMission = (id: string) => agentFetch<AgentMission>(`/api/agent/v1/missions/${encodeURIComponent(id)}/run`, { method: "POST", body: "{}" });
-export const decideMissionApproval = (missionID: string, approvalID: string, approved: boolean, nonce?: string) => agentFetch<AgentMission>(`/api/agent/v1/missions/${encodeURIComponent(missionID)}/approvals/${encodeURIComponent(approvalID)}`, { method: "POST", body: JSON.stringify({ approved, nonce, reason: approved ? "Aprovado no Agentic Console" : "Rejeitado no Agentic Console" }) });
-export const listSchedules = () => agentFetch<{ schedules: AgentSchedule[] }>("/api/agent/v1/schedules");
-export const createSchedule = (payload: Partial<AgentSchedule>) => agentFetch<AgentSchedule>("/api/agent/v1/schedules", { method: "POST", body: JSON.stringify(payload) });
-export const updateSchedule = (id: string, payload: Partial<AgentSchedule>) => agentFetch<AgentSchedule>(`/api/agent/v1/schedules/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(payload) });
-export const deleteSchedule = (id: string) => agentFetch<void>(`/api/agent/v1/schedules/${encodeURIComponent(id)}`, { method: "DELETE" });
-export const listSkills = async () => { const result = await agentFetch<{ skills?: AgentSkill[] | null }>("/api/agent/v1/skills"); return { skills: Array.isArray(result.skills) ? result.skills : [] }; };
-export const listConnectors = async () => { const result = await agentFetch<{ connectors?: AgentConnector[] | null }>("/api/agent/v1/connectors"); return { connectors: Array.isArray(result.connectors) ? result.connectors : [] }; };
-export const listConnectorCatalog = async () => { const result = await agentFetch<{ connectors?: AgentConnectorCatalogEntry[] | null }>("/api/agent/v1/connector-catalog"); return { connectors: Array.isArray(result.connectors) ? result.connectors : [] }; };
-export const listMCPServers = async () => { const result = await agentFetch<{ servers?: AgentMCPServer[] | null; remote_servers?: AgentMCPServer[] | null }>("/api/agent/v1/mcp"); return { servers: [...(Array.isArray(result.servers) ? result.servers : []), ...(Array.isArray(result.remote_servers) ? result.remote_servers.map((server) => ({ ...server, transport: "streamable-http" })) : [])] }; };
-export const listCLIStatus = async () => { const result = await agentFetch<{ tools?: AgentCLIStatus[] | null }>("/api/dz23/cli-catalog"); return { tools: Array.isArray(result.tools) ? result.tools : [] }; };
-export const registerConnector = (payload: { id: string; provider: string; base_url: string; token_env?: string; oauth_provider?: string; operations: Array<{ name: string; methods: string[]; path_prefixes: string[] }> }) => agentFetch<{ connectors: AgentConnector[]; mcp: AgentMCPServer[]; remote_mcp: AgentMCPServer[]; skills: AgentSkill[] }>("/api/agent/v1/connectors", { method: "POST", body: JSON.stringify(payload) });
-export const registerMCP = (payload: { id: string; command: string; args?: string[]; working_directory?: string; allowed_methods: string[]; environment_vars?: string[]; timeout_seconds?: number }) => agentFetch<{ connectors: AgentConnector[]; mcp: AgentMCPServer[]; remote_mcp: AgentMCPServer[]; skills: AgentSkill[] }>("/api/agent/v1/mcp", { method: "POST", body: JSON.stringify(payload) });
-export const registerRemoteMCP = (payload: { id: string; url: string; token_env?: string; headers_env?: Record<string, string>; allowed_methods: string[]; timeout_seconds?: number }) => agentFetch<{ connectors: AgentConnector[]; mcp: AgentMCPServer[]; remote_mcp: AgentMCPServer[]; skills: AgentSkill[] }>("/api/agent/v1/remote-mcp", { method: "POST", body: JSON.stringify(payload) });
-export const registerSkill = (payload: { id: string; version: string; description?: string; scopes?: string[]; tools?: string[] }) => agentFetch<{ connectors: AgentConnector[]; mcp: AgentMCPServer[]; remote_mcp: AgentMCPServer[]; skills: AgentSkill[] }>("/api/agent/v1/skills", { method: "POST", body: JSON.stringify(payload) });
-export const setConnectorEnabled = (id: string, enabled: boolean) => agentFetch(`/api/agent/v1/connectors/${encodeURIComponent(id)}/${enabled ? "enable" : "disable"}`, { method: "POST", body: "{}" });
-export const removeConnector = (id: string) => agentFetch(`/api/agent/v1/connectors/${encodeURIComponent(id)}`, { method: "DELETE" });
-export const setMCPEnabled = (id: string, enabled: boolean, remote = false) => agentFetch(`/api/agent/v1/${remote ? "remote-mcp" : "mcp"}/${encodeURIComponent(id)}/${enabled ? "enable" : "disable"}`, { method: "POST", body: "{}" });
-export const removeMCP = (id: string, remote = false) => agentFetch(`/api/agent/v1/${remote ? "remote-mcp" : "mcp"}/${encodeURIComponent(id)}`, { method: "DELETE" });
-export const setSkillEnabled = (id: string, enabled: boolean) => agentFetch(`/api/agent/v1/skills/${encodeURIComponent(id)}/${enabled ? "enable" : "disable"}`, { method: "POST", body: "{}" });
-export const removeSkill = (id: string) => agentFetch(`/api/agent/v1/skills/${encodeURIComponent(id)}`, { method: "DELETE" });
+export const listProjects = () =>
+  agentFetch<{ projects: AgentProject[] }>("/api/agent/v1/projects");
+export const createProject = (name: string, root = "") =>
+  agentFetch<AgentProject>("/api/agent/v1/projects", {
+    method: "POST",
+    body: JSON.stringify({ name, root }),
+  });
+export const updateProject = (id: string, name: string, root = "") =>
+  agentFetch<AgentProject>(`/api/agent/v1/projects/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ name, root }),
+  });
+export const deleteProject = (id: string) =>
+  agentFetch<void>(`/api/agent/v1/projects/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+export const listMissions = () =>
+  agentFetch<{ missions: AgentMission[] }>("/api/agent/v1/missions");
+export const getMission = (id: string) =>
+  agentFetch<AgentMission>(`/api/agent/v1/missions/${encodeURIComponent(id)}`);
+export const listMissionEvents = (id: string) =>
+  agentFetch<{ events: AgentEvent[] }>(
+    `/api/agent/v1/missions/${encodeURIComponent(id)}/events`,
+  );
+export const createMission = (payload: {
+  objective: string;
+  provider?: string;
+  model?: string;
+  project_id?: string;
+  workspace?: string;
+  capabilities?: string[];
+  auto_run?: boolean;
+}) =>
+  agentFetch<AgentMission>("/api/agent/v1/missions", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+export const runMission = (id: string) =>
+  agentFetch<AgentMission>(
+    `/api/agent/v1/missions/${encodeURIComponent(id)}/run`,
+    { method: "POST", body: "{}" },
+  );
+export const decideMissionApproval = (
+  missionID: string,
+  approvalID: string,
+  approved: boolean,
+  nonce?: string,
+) =>
+  agentFetch<AgentMission>(
+    `/api/agent/v1/missions/${encodeURIComponent(missionID)}/approvals/${encodeURIComponent(approvalID)}`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        approved,
+        nonce,
+        reason: approved
+          ? "Aprovado no Agentic Console"
+          : "Rejeitado no Agentic Console",
+      }),
+    },
+  );
+export const listSchedules = () =>
+  agentFetch<{ schedules: AgentSchedule[] }>("/api/agent/v1/schedules");
+export const createSchedule = (payload: Partial<AgentSchedule>) =>
+  agentFetch<AgentSchedule>("/api/agent/v1/schedules", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+export const updateSchedule = (id: string, payload: Partial<AgentSchedule>) =>
+  agentFetch<AgentSchedule>(
+    `/api/agent/v1/schedules/${encodeURIComponent(id)}`,
+    { method: "PATCH", body: JSON.stringify(payload) },
+  );
+export const deleteSchedule = (id: string) =>
+  agentFetch<void>(`/api/agent/v1/schedules/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+export const listSkills = async () => {
+  const result = await agentFetch<{ skills?: AgentSkill[] | null }>(
+    "/api/agent/v1/skills",
+  );
+  return { skills: Array.isArray(result.skills) ? result.skills : [] };
+};
+export const listConnectors = async () => {
+  const result = await agentFetch<{ connectors?: AgentConnector[] | null }>(
+    "/api/agent/v1/connectors",
+  );
+  return {
+    connectors: Array.isArray(result.connectors) ? result.connectors : [],
+  };
+};
+export const listConnectorCatalog = async () => {
+  const result = await agentFetch<{
+    connectors?: AgentConnectorCatalogEntry[] | null;
+  }>("/api/agent/v1/connector-catalog");
+  return {
+    connectors: Array.isArray(result.connectors) ? result.connectors : [],
+  };
+};
+export const listMCPServers = async () => {
+  const result = await agentFetch<{
+    servers?: AgentMCPServer[] | null;
+    remote_servers?: AgentMCPServer[] | null;
+  }>("/api/agent/v1/mcp");
+  return {
+    servers: [
+      ...(Array.isArray(result.servers) ? result.servers : []),
+      ...(Array.isArray(result.remote_servers)
+        ? result.remote_servers.map((server) => ({
+            ...server,
+            transport: "streamable-http",
+          }))
+        : []),
+    ],
+  };
+};
+export const listCLIStatus = async () => {
+  const result = await agentFetch<{ tools?: AgentCLIStatus[] | null }>(
+    "/api/dz23/cli-catalog",
+  );
+  return { tools: Array.isArray(result.tools) ? result.tools : [] };
+};
+export const registerConnector = (payload: {
+  id: string;
+  provider: string;
+  base_url: string;
+  token_env?: string;
+  oauth_provider?: string;
+  operations: Array<{
+    name: string;
+    methods: string[];
+    path_prefixes: string[];
+  }>;
+}) =>
+  agentFetch<{
+    connectors: AgentConnector[];
+    mcp: AgentMCPServer[];
+    remote_mcp: AgentMCPServer[];
+    skills: AgentSkill[];
+  }>("/api/agent/v1/connectors", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+export const registerMCP = (payload: {
+  id: string;
+  command: string;
+  args?: string[];
+  working_directory?: string;
+  allowed_methods: string[];
+  environment_vars?: string[];
+  timeout_seconds?: number;
+}) =>
+  agentFetch<{
+    connectors: AgentConnector[];
+    mcp: AgentMCPServer[];
+    remote_mcp: AgentMCPServer[];
+    skills: AgentSkill[];
+  }>("/api/agent/v1/mcp", { method: "POST", body: JSON.stringify(payload) });
+export const registerRemoteMCP = (payload: {
+  id: string;
+  url: string;
+  token_env?: string;
+  headers_env?: Record<string, string>;
+  allowed_methods: string[];
+  timeout_seconds?: number;
+}) =>
+  agentFetch<{
+    connectors: AgentConnector[];
+    mcp: AgentMCPServer[];
+    remote_mcp: AgentMCPServer[];
+    skills: AgentSkill[];
+  }>("/api/agent/v1/remote-mcp", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+export const registerSkill = (payload: {
+  id: string;
+  version: string;
+  description?: string;
+  scopes?: string[];
+  tools?: string[];
+}) =>
+  agentFetch<{
+    connectors: AgentConnector[];
+    mcp: AgentMCPServer[];
+    remote_mcp: AgentMCPServer[];
+    skills: AgentSkill[];
+  }>("/api/agent/v1/skills", { method: "POST", body: JSON.stringify(payload) });
+export const setConnectorEnabled = (id: string, enabled: boolean) =>
+  agentFetch(
+    `/api/agent/v1/connectors/${encodeURIComponent(id)}/${enabled ? "enable" : "disable"}`,
+    { method: "POST", body: "{}" },
+  );
+export const removeConnector = (id: string) =>
+  agentFetch(`/api/agent/v1/connectors/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+export const setMCPEnabled = (id: string, enabled: boolean, remote = false) =>
+  agentFetch(
+    `/api/agent/v1/${remote ? "remote-mcp" : "mcp"}/${encodeURIComponent(id)}/${enabled ? "enable" : "disable"}`,
+    { method: "POST", body: "{}" },
+  );
+export const removeMCP = (id: string, remote = false) =>
+  agentFetch(
+    `/api/agent/v1/${remote ? "remote-mcp" : "mcp"}/${encodeURIComponent(id)}`,
+    { method: "DELETE" },
+  );
+export const setSkillEnabled = (id: string, enabled: boolean) =>
+  agentFetch(
+    `/api/agent/v1/skills/${encodeURIComponent(id)}/${enabled ? "enable" : "disable"}`,
+    { method: "POST", body: "{}" },
+  );
+export const removeSkill = (id: string) =>
+  agentFetch(`/api/agent/v1/skills/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
 
-export const listCompanies = () => agentFetch<{ companies: AgentCompany[] }>("/api/agent/v1/companies");
-export const createCompany = (payload: Record<string, unknown>) => agentFetch<AgentCompany>("/api/agent/v1/companies", { method: "POST", body: JSON.stringify(payload) });
-export const updateCompany = (id: string, payload: Record<string, unknown>) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(payload) });
-export const getCompanyReport = (id: string) => agentFetch<AgentCompanyReport>(`/api/agent/v1/companies/${encodeURIComponent(id)}/report`);
-export const executeCompanyTelAgent = (id: string, payload: { message: string; operation: "report.read" | "backlog.create" | "campaign.draft"; title?: string; description?: string; priority?: number; daily_budget_cents?: number }, idempotencyKey?: string) => agentFetch<TelAgentResult>(`/api/agent/v1/companies/${encodeURIComponent(id)}/tel-agent`, { method: "POST", headers: idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}, body: JSON.stringify(payload) });
-export const getCompanyTelAgentHistory = (id: string) => agentFetch<{ history: TelAgentExchange[]; channel: string; telephony: string }>(`/api/agent/v1/companies/${encodeURIComponent(id)}/tel-agent/history`);
-export const addCompanyRoadmap = (id: string, payload: Record<string, unknown>) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/roadmap`, { method: "POST", body: JSON.stringify(payload) });
-export const addCompanyGoal = (id: string, payload: Record<string, unknown>) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/goals`, { method: "POST", body: JSON.stringify(payload) });
-export const addCompanyBacklog = (id: string, payload: Record<string, unknown>) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/backlog`, { method: "POST", body: JSON.stringify(payload) });
-export const addCompanyCycle = (id: string, payload: Record<string, unknown>) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/cycles`, { method: "POST", body: JSON.stringify(payload) });
-export const pauseCompany = (id: string, reason: string) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/pause`, { method: "POST", body: JSON.stringify({ reason }) });
-export const resumeCompany = (id: string) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/resume`, { method: "POST", body: "{}" });
-export const recordCompanyAnomaly = (id: string, severity: string, reason: string) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/anomalies`, { method: "POST", body: JSON.stringify({ severity, reason }) });
-export const recordCompanySpend = (id: string, category: string, amount_cents: number) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/spend`, { method: "POST", body: JSON.stringify({ category, amount_cents }) });
-export const decideCompanyApproval = (id: string, approvalID: string, approved: boolean, nonce: string) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/approvals/${encodeURIComponent(approvalID)}/decide`, { method: "POST", body: JSON.stringify({ approved, nonce, reason: approved ? "Aprovado no Company OS" : "Rejeitado no Company OS" }) });
-export const getCompanyGrowthReport = (id: string) => agentFetch<CompanyGrowthReport>(`/api/agent/v1/companies/${encodeURIComponent(id)}/growth/report`);
-export const getGrokStatus = () => agentFetch<GrokStatus>("/api/agent/v1/grok/status");
-export const listCompanyAgents = (id: string) => agentFetch<{ agents: CompanyAgent[] }>(`/api/agent/v1/companies/${encodeURIComponent(id)}/agents`);
-export const pauseCompanyAgent = (id: string, agentID: string, reason: string) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/agents/${encodeURIComponent(agentID)}/pause`, { method: "POST", body: JSON.stringify({ reason }) });
-export const resumeCompanyAgent = (id: string, agentID: string) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/agents/${encodeURIComponent(agentID)}/resume`, { method: "POST", body: "{}" });
-export const recordCompanyAgentSpend = (id: string, agentID: string, amount_cents: number) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/agents/${encodeURIComponent(agentID)}/spend`, { method: "POST", body: JSON.stringify({ amount_cents }) });
-export const getCompanySocialReport = (id: string) => agentFetch<CompanySocialReport>(`/api/agent/v1/companies/${encodeURIComponent(id)}/social/report`);
-export const addCompanySocialAccount = (id: string, payload: Record<string, unknown>) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/social/accounts`, { method: "POST", body: JSON.stringify(payload) });
-export const createCompanySocialDraft = (id: string, payload: Record<string, unknown>) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/social/drafts`, { method: "POST", body: JSON.stringify(payload) });
-export const approveCompanySocialDraft = (id: string, draftID: string, nonce: string) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/social/drafts/${encodeURIComponent(draftID)}/approve`, { method: "POST", body: JSON.stringify({ approved: true, nonce, reason: "Aprovado no Company OS" }) });
-export const publishCompanySocialDraft = (id: string, draftID: string) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/social/drafts/${encodeURIComponent(draftID)}/publish`, { method: "POST", body: "{}" });
-export const recordCompanySocialMetric = (id: string, payload: Record<string, unknown>) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/social/metrics`, { method: "POST", body: JSON.stringify(payload) });
-export const addCompanyCampaign = (id: string, payload: Record<string, unknown>) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/campaigns`, { method: "POST", body: JSON.stringify(payload) });
-export const approveCompanyCampaign = (id: string, campaignID: string, nonce: string) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/campaigns/${encodeURIComponent(campaignID)}/approve`, { method: "POST", body: JSON.stringify({ approved: true, nonce, reason: "Aprovado no Company OS" }) });
-export const launchCompanyCampaign = (id: string, campaignID: string) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/campaigns/${encodeURIComponent(campaignID)}/launch`, { method: "POST", body: "{}" });
-export const pauseCompanyCampaign = (id: string, campaignID: string) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/campaigns/${encodeURIComponent(campaignID)}/pause`, { method: "POST", body: "{}" });
-export const addCompanyAffiliateProgram = (id: string, payload: Record<string, unknown>) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/affiliate-programs`, { method: "POST", body: JSON.stringify(payload) });
-export const approveCompanyAffiliateProgram = (id: string, programID: string, nonce: string) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/affiliate-programs/${encodeURIComponent(programID)}/approve`, { method: "POST", body: JSON.stringify({ approved: true, nonce, reason: "Aprovado no Company OS" }) });
-export const addCompanyAffiliateLink = (id: string, payload: Record<string, unknown>) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/affiliate-links`, { method: "POST", body: JSON.stringify(payload) });
-export const recordCompanyAffiliateConversion = (id: string, linkID: string, revenue_cents: number) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/affiliate-links/${encodeURIComponent(linkID)}/conversion`, { method: "POST", body: JSON.stringify({ revenue_cents }) });
-export const addCompanyProduct = (id: string, payload: Record<string, unknown>) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/products`, { method: "POST", body: JSON.stringify(payload) });
-export const createCompanyOrder = (id: string, payload: Record<string, unknown>) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/orders`, { method: "POST", body: JSON.stringify(payload) });
-export const approveCompanyOrder = (id: string, orderID: string, nonce: string) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/orders/${encodeURIComponent(orderID)}/approve`, { method: "POST", body: JSON.stringify({ approved: true, nonce, reason: "Aprovado no Company OS" }) });
-export const fulfillCompanyOrder = (id: string, orderID: string, tracking_code: string) => agentFetch<AgentCompany>(`/api/agent/v1/companies/${encodeURIComponent(id)}/orders/${encodeURIComponent(orderID)}/fulfill`, { method: "POST", body: JSON.stringify({ tracking_code }) });
+export const listCompanies = () =>
+  agentFetch<{ companies: AgentCompany[] }>("/api/agent/v1/companies");
+export const createCompany = (payload: Record<string, unknown>) =>
+  agentFetch<AgentCompany>("/api/agent/v1/companies", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+export const updateCompany = (id: string, payload: Record<string, unknown>) =>
+  agentFetch<AgentCompany>(
+    `/api/agent/v1/companies/${encodeURIComponent(id)}`,
+    { method: "PATCH", body: JSON.stringify(payload) },
+  );
+export const getCompanyReport = (id: string) =>
+  agentFetch<AgentCompanyReport>(
+    `/api/agent/v1/companies/${encodeURIComponent(id)}/report`,
+  );
+export const executeCompanyTelAgent = (
+  id: string,
+  payload: {
+    message: string;
+    operation: "report.read" | "backlog.create" | "campaign.draft";
+    title?: string;
+    description?: string;
+    priority?: number;
+    daily_budget_cents?: number;
+  },
+  idempotencyKey?: string,
+) =>
+  agentFetch<TelAgentResult>(
+    `/api/agent/v1/companies/${encodeURIComponent(id)}/tel-agent`,
+    {
+      method: "POST",
+      headers: idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {},
+      body: JSON.stringify(payload),
+    },
+  );
+export const getCompanyTelAgentHistory = (id: string) =>
+  agentFetch<{
+    history: TelAgentExchange[];
+    channel: string;
+    telephony: string;
+  }>(`/api/agent/v1/companies/${encodeURIComponent(id)}/tel-agent/history`);
+export const addCompanyRoadmap = (
+  id: string,
+  payload: Record<string, unknown>,
+) =>
+  agentFetch<AgentCompany>(
+    `/api/agent/v1/companies/${encodeURIComponent(id)}/roadmap`,
+    { method: "POST", body: JSON.stringify(payload) },
+  );
+export const addCompanyGoal = (id: string, payload: Record<string, unknown>) =>
+  agentFetch<AgentCompany>(
+    `/api/agent/v1/companies/${encodeURIComponent(id)}/goals`,
+    { method: "POST", body: JSON.stringify(payload) },
+  );
+export const addCompanyBacklog = (
+  id: string,
+  payload: Record<string, unknown>,
+) =>
+  agentFetch<AgentCompany>(
+    `/api/agent/v1/companies/${encodeURIComponent(id)}/backlog`,
+    { method: "POST", body: JSON.stringify(payload) },
+  );
+export const addCompanyCycle = (id: string, payload: Record<string, unknown>) =>
+  agentFetch<AgentCompany>(
+    `/api/agent/v1/companies/${encodeURIComponent(id)}/cycles`,
+    { method: "POST", body: JSON.stringify(payload) },
+  );
+export const pauseCompany = (id: string, reason: string) =>
+  agentFetch<AgentCompany>(
+    `/api/agent/v1/companies/${encodeURIComponent(id)}/pause`,
+    { method: "POST", body: JSON.stringify({ reason }) },
+  );
+export const resumeCompany = (id: string) =>
+  agentFetch<AgentCompany>(
+    `/api/agent/v1/companies/${encodeURIComponent(id)}/resume`,
+    { method: "POST", body: "{}" },
+  );
+export const recordCompanyAnomaly = (
+  id: string,
+  severity: string,
+  reason: string,
+) =>
+  agentFetch<AgentCompany>(
+    `/api/agent/v1/companies/${encodeURIComponent(id)}/anomalies`,
+    { method: "POST", body: JSON.stringify({ severity, reason }) },
+  );
+export const recordCompanySpend = (
+  id: string,
+  category: string,
+  amount_cents: number,
+) =>
+  agentFetch<AgentCompany>(
+    `/api/agent/v1/companies/${encodeURIComponent(id)}/spend`,
+    { method: "POST", body: JSON.stringify({ category, amount_cents }) },
+  );
+export const decideCompanyApproval = (
+  id: string,
+  approvalID: string,
+  approved: boolean,
+  nonce: string,
+) =>
+  agentFetch<AgentCompany>(
+    `/api/agent/v1/companies/${encodeURIComponent(id)}/approvals/${encodeURIComponent(approvalID)}/decide`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        approved,
+        nonce,
+        reason: approved ? "Aprovado no Company OS" : "Rejeitado no Company OS",
+      }),
+    },
+  );
+export const getCompanyGrowthReport = (id: string) =>
+  agentFetch<CompanyGrowthReport>(
+    `/api/agent/v1/companies/${encodeURIComponent(id)}/growth/report`,
+  );
+export const getGrokStatus = () =>
+  agentFetch<GrokStatus>("/api/agent/v1/grok/status");
+export const listCompanyAgents = (id: string) =>
+  agentFetch<{ agents: CompanyAgent[] }>(
+    `/api/agent/v1/companies/${encodeURIComponent(id)}/agents`,
+  );
+export const pauseCompanyAgent = (
+  id: string,
+  agentID: string,
+  reason: string,
+) =>
+  agentFetch<AgentCompany>(
+    `/api/agent/v1/companies/${encodeURIComponent(id)}/agents/${encodeURIComponent(agentID)}/pause`,
+    { method: "POST", body: JSON.stringify({ reason }) },
+  );
+export const resumeCompanyAgent = (id: string, agentID: string) =>
+  agentFetch<AgentCompany>(
+    `/api/agent/v1/companies/${encodeURIComponent(id)}/agents/${encodeURIComponent(agentID)}/resume`,
+    { method: "POST", body: "{}" },
+  );
+export const recordCompanyAgentSpend = (
+  id: string,
+  agentID: string,
+  amount_cents: number,
+) =>
+  agentFetch<AgentCompany>(
+    `/api/agent/v1/companies/${encodeURIComponent(id)}/agents/${encodeURIComponent(agentID)}/spend`,
+    { method: "POST", body: JSON.stringify({ amount_cents }) },
+  );
+export const getCompanySocialReport = (id: string) =>
+  agentFetch<CompanySocialReport>(
+    `/api/agent/v1/companies/${encodeURIComponent(id)}/social/report`,
+  );
+export const addCompanySocialAccount = (
+  id: string,
+  payload: Record<string, unknown>,
+) =>
+  agentFetch<AgentCompany>(
+    `/api/agent/v1/companies/${encodeURIComponent(id)}/social/accounts`,
+    { method: "POST", body: JSON.stringify(payload) },
+  );
+export const createCompanySocialDraft = (
+  id: string,
+  payload: Record<string, unknown>,
+) =>
+  agentFetch<AgentCompany>(
+    `/api/agent/v1/companies/${encodeURIComponent(id)}/social/drafts`,
+    { method: "POST", body: JSON.stringify(payload) },
+  );
+export const approveCompanySocialDraft = (
+  id: string,
+  draftID: string,
+  nonce: string,
+) =>
+  agentFetch<AgentCompany>(
+    `/api/agent/v1/companies/${encodeURIComponent(id)}/social/drafts/${encodeURIComponent(draftID)}/approve`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        approved: true,
+        nonce,
+        reason: "Aprovado no Company OS",
+      }),
+    },
+  );
+export const publishCompanySocialDraft = (id: string, draftID: string) =>
+  agentFetch<AgentCompany>(
+    `/api/agent/v1/companies/${encodeURIComponent(id)}/social/drafts/${encodeURIComponent(draftID)}/publish`,
+    { method: "POST", body: "{}" },
+  );
+export const recordCompanySocialMetric = (
+  id: string,
+  payload: Record<string, unknown>,
+) =>
+  agentFetch<AgentCompany>(
+    `/api/agent/v1/companies/${encodeURIComponent(id)}/social/metrics`,
+    { method: "POST", body: JSON.stringify(payload) },
+  );
+export const addCompanyCampaign = (
+  id: string,
+  payload: Record<string, unknown>,
+) =>
+  agentFetch<AgentCompany>(
+    `/api/agent/v1/companies/${encodeURIComponent(id)}/campaigns`,
+    { method: "POST", body: JSON.stringify(payload) },
+  );
+export const approveCompanyCampaign = (
+  id: string,
+  campaignID: string,
+  nonce: string,
+) =>
+  agentFetch<AgentCompany>(
+    `/api/agent/v1/companies/${encodeURIComponent(id)}/campaigns/${encodeURIComponent(campaignID)}/approve`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        approved: true,
+        nonce,
+        reason: "Aprovado no Company OS",
+      }),
+    },
+  );
+export const launchCompanyCampaign = (id: string, campaignID: string) =>
+  agentFetch<AgentCompany>(
+    `/api/agent/v1/companies/${encodeURIComponent(id)}/campaigns/${encodeURIComponent(campaignID)}/launch`,
+    { method: "POST", body: "{}" },
+  );
+export const pauseCompanyCampaign = (id: string, campaignID: string) =>
+  agentFetch<AgentCompany>(
+    `/api/agent/v1/companies/${encodeURIComponent(id)}/campaigns/${encodeURIComponent(campaignID)}/pause`,
+    { method: "POST", body: "{}" },
+  );
+export const addCompanyAffiliateProgram = (
+  id: string,
+  payload: Record<string, unknown>,
+) =>
+  agentFetch<AgentCompany>(
+    `/api/agent/v1/companies/${encodeURIComponent(id)}/affiliate-programs`,
+    { method: "POST", body: JSON.stringify(payload) },
+  );
+export const approveCompanyAffiliateProgram = (
+  id: string,
+  programID: string,
+  nonce: string,
+) =>
+  agentFetch<AgentCompany>(
+    `/api/agent/v1/companies/${encodeURIComponent(id)}/affiliate-programs/${encodeURIComponent(programID)}/approve`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        approved: true,
+        nonce,
+        reason: "Aprovado no Company OS",
+      }),
+    },
+  );
+export const addCompanyAffiliateLink = (
+  id: string,
+  payload: Record<string, unknown>,
+) =>
+  agentFetch<AgentCompany>(
+    `/api/agent/v1/companies/${encodeURIComponent(id)}/affiliate-links`,
+    { method: "POST", body: JSON.stringify(payload) },
+  );
+export const recordCompanyAffiliateConversion = (
+  id: string,
+  linkID: string,
+  revenue_cents: number,
+) =>
+  agentFetch<AgentCompany>(
+    `/api/agent/v1/companies/${encodeURIComponent(id)}/affiliate-links/${encodeURIComponent(linkID)}/conversion`,
+    { method: "POST", body: JSON.stringify({ revenue_cents }) },
+  );
+export const addCompanyProduct = (
+  id: string,
+  payload: Record<string, unknown>,
+) =>
+  agentFetch<AgentCompany>(
+    `/api/agent/v1/companies/${encodeURIComponent(id)}/products`,
+    { method: "POST", body: JSON.stringify(payload) },
+  );
+export const createCompanyOrder = (
+  id: string,
+  payload: Record<string, unknown>,
+) =>
+  agentFetch<AgentCompany>(
+    `/api/agent/v1/companies/${encodeURIComponent(id)}/orders`,
+    { method: "POST", body: JSON.stringify(payload) },
+  );
+export const approveCompanyOrder = (
+  id: string,
+  orderID: string,
+  nonce: string,
+) =>
+  agentFetch<AgentCompany>(
+    `/api/agent/v1/companies/${encodeURIComponent(id)}/orders/${encodeURIComponent(orderID)}/approve`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        approved: true,
+        nonce,
+        reason: "Aprovado no Company OS",
+      }),
+    },
+  );
+export const fulfillCompanyOrder = (
+  id: string,
+  orderID: string,
+  tracking_code: string,
+) =>
+  agentFetch<AgentCompany>(
+    `/api/agent/v1/companies/${encodeURIComponent(id)}/orders/${encodeURIComponent(orderID)}/fulfill`,
+    { method: "POST", body: JSON.stringify({ tracking_code }) },
+  );

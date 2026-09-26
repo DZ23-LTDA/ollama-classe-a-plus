@@ -15,32 +15,83 @@ type ConnectorCatalogEntry struct {
 	Source      string   `json:"source"`
 	Status      string   `json:"status"`
 	Scopes      []string `json:"scopes,omitempty"`
-	// APIBaseURL is set for services that accept a bearer API key, so the
-	// desktop app can connect them from a pasted key in one step.
-	APIBaseURL string `json:"api_base_url,omitempty"`
+	// Quick connect: services that accept an API key in a header can be
+	// connected from the desktop app with a pasted key. APISelfHosted means
+	// the user supplies the base URL of their own instance.
+	APIBaseURL    string `json:"api_base_url,omitempty"`
+	APIAuthHeader string `json:"api_auth_header,omitempty"`
+	APIAuthScheme string `json:"api_auth_scheme,omitempty"`
+	APISelfHosted bool   `json:"api_self_hosted,omitempty"`
+	QuickConnect  bool   `json:"quick_connect,omitempty"`
 }
 
-// quickConnectBaseURLs lists REST APIs that authenticate with
-// "Authorization: Bearer <key>" (personal/API tokens).
-var quickConnectBaseURLs = map[string]string{
-	"airtable":     "https://api.airtable.com/v0",
-	"betterstack":  "https://uptime.betterstack.com/api/v2",
-	"clerk":        "https://api.clerk.com/v1",
-	"cloudflare":   "https://api.cloudflare.com/client/v4",
-	"digitalocean": "https://api.digitalocean.com/v2",
-	"github":       "https://api.github.com",
-	"hubspot":      "https://api.hubapi.com",
-	"mercado-pago": "https://api.mercadopago.com",
-	"neon":         "https://console.neon.tech/api/v2",
-	"netlify":      "https://api.netlify.com/api/v1",
-	"posthog":      "https://us.posthog.com/api",
-	"render":       "https://api.render.com/v1",
-	"resend":       "https://api.resend.com",
-	"sendgrid":     "https://api.sendgrid.com",
-	"sentry":       "https://sentry.io/api/0",
-	"stripe":       "https://api.stripe.com",
-	"supabase":     "https://api.supabase.com/v1",
-	"vercel":       "https://api.vercel.com",
+type quickConnect struct {
+	base       string
+	header     string // default Authorization
+	scheme     string // default Bearer for Authorization, bare token otherwise; "raw" forces bare
+	selfHosted bool
+}
+
+// quickConnects lists services whose API key can be pasted to connect them.
+var quickConnects = map[string]quickConnect{
+	"airtable":        {base: "https://api.airtable.com/v0"},
+	"algolia":         {selfHosted: true, header: "X-Algolia-API-Key"},
+	"appwrite":        {base: "https://cloud.appwrite.io/v1", header: "X-Appwrite-Key"},
+	"asaas":           {base: "https://api.asaas.com/v3", header: "access_token"},
+	"asana":           {base: "https://app.asana.com/api/1.0"},
+	"auth0":           {selfHosted: true},
+	"betterstack":     {base: "https://uptime.betterstack.com/api/v2"},
+	"bitbucket":       {base: "https://api.bitbucket.org/2.0"},
+	"brevo":           {base: "https://api.brevo.com/v3", header: "api-key"},
+	"calendly":        {base: "https://api.calendly.com"},
+	"circleci":        {base: "https://circleci.com/api/v2", header: "Circle-Token"},
+	"clerk":           {base: "https://api.clerk.com/v1"},
+	"cloudflare":      {base: "https://api.cloudflare.com/client/v4"},
+	"contentful":      {base: "https://api.contentful.com"},
+	"coolify":         {selfHosted: true},
+	"datadog":         {base: "https://api.datadoghq.com/api", header: "DD-API-KEY"},
+	"deepgram":        {base: "https://api.deepgram.com/v1", scheme: "Token"},
+	"digitalocean":    {base: "https://api.digitalocean.com/v2"},
+	"dropbox":         {base: "https://api.dropboxapi.com/2"},
+	"elevenlabs":      {base: "https://api.elevenlabs.io/v1", header: "xi-api-key"},
+	"expo":            {base: "https://api.expo.dev"},
+	"figma":           {base: "https://api.figma.com/v1", header: "X-Figma-Token"},
+	"flyio":           {base: "https://api.machines.dev/v1"},
+	"github":          {base: "https://api.github.com"},
+	"gitlab":          {base: "https://gitlab.com/api/v4"},
+	"grafana":         {selfHosted: true},
+	"hetzner":         {base: "https://api.hetzner.cloud/v1"},
+	"hubspot":         {base: "https://api.hubapi.com"},
+	"huggingface-hub": {base: "https://huggingface.co/api"},
+	"intercom":        {base: "https://api.intercom.io"},
+	"lemon-squeezy":   {base: "https://api.lemonsqueezy.com/v1"},
+	"linear":          {base: "https://api.linear.app", scheme: "raw"},
+	"meilisearch":     {selfHosted: true},
+	"mercado-pago":    {base: "https://api.mercadopago.com"},
+	"neon":            {base: "https://console.neon.tech/api/v2"},
+	"netlify":         {base: "https://api.netlify.com/api/v1"},
+	"novu":            {base: "https://api.novu.co/v1", scheme: "ApiKey"},
+	"paddle":          {base: "https://api.paddle.com"},
+	"pagseguro":       {base: "https://api.pagseguro.com"},
+	"pinecone":        {base: "https://api.pinecone.io", header: "Api-Key"},
+	"pocketbase":      {selfHosted: true},
+	"posthog":         {base: "https://us.posthog.com/api"},
+	"postmark":        {base: "https://api.postmarkapp.com", header: "X-Postmark-Server-Token"},
+	"qdrant":          {selfHosted: true, header: "api-key"},
+	"railway":         {base: "https://backboard.railway.app/graphql/v2"},
+	"render":          {base: "https://api.render.com/v1"},
+	"replicate":       {base: "https://api.replicate.com/v1"},
+	"resend":          {base: "https://api.resend.com"},
+	"sanity":          {base: "https://api.sanity.io"},
+	"sendgrid":        {base: "https://api.sendgrid.com"},
+	"sentry":          {base: "https://sentry.io/api/0"},
+	"shopify":         {selfHosted: true, header: "X-Shopify-Access-Token"},
+	"strapi":          {selfHosted: true},
+	"stripe":          {base: "https://api.stripe.com"},
+	"supabase":        {base: "https://api.supabase.com/v1"},
+	"typeform":        {base: "https://api.typeform.com"},
+	"vercel":          {base: "https://api.vercel.com"},
+	"whatsapp":        {base: "https://graph.facebook.com/v21.0"},
 }
 
 // ConnectorTokenEnv is the credential variable used for a quick-connected
@@ -168,7 +219,13 @@ func ConnectorCatalog() []ConnectorCatalogEntry {
 		{ID: "pagarme", Name: "Pagar.me", Category: "Pagamentos", Kind: "custom_api", Description: "Pedidos, cobranças e recebedores; movimentações exigem approval.", Auth: "api_key", Source: "custom_api", Status: "operator_setup_required", Scopes: []string{"orders", "charges"}},
 	}
 	for i := range entries {
-		entries[i].APIBaseURL = quickConnectBaseURLs[entries[i].ID]
+		if qc, ok := quickConnects[entries[i].ID]; ok {
+			entries[i].QuickConnect = true
+			entries[i].APIBaseURL = qc.base
+			entries[i].APIAuthHeader = qc.header
+			entries[i].APIAuthScheme = qc.scheme
+			entries[i].APISelfHosted = qc.selfHosted
+		}
 	}
 	sort.Slice(entries, func(i, j int) bool { return entries[i].Name < entries[j].Name })
 	return entries

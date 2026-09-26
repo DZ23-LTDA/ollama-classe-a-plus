@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -24,7 +25,7 @@ var errAgentLoginRequired = errors.New(`o Ollama está exposto na rede, então c
 
 func quickConnectEntry(id string) (agent.ConnectorCatalogEntry, bool) {
 	for _, entry := range agent.ConnectorCatalog() {
-		if entry.ID == id && entry.APIBaseURL != "" {
+		if entry.ID == id && entry.QuickConnect {
 			return entry, true
 		}
 	}
@@ -69,6 +70,15 @@ func callAgentAPI(ctx context.Context, method, path string, body any) error {
 	return nil
 }
 
+// selfHostedBaseURL validates the address of a user's own instance.
+func selfHostedBaseURL(raw string) (string, error) {
+	u, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil {
+		return "", errors.New("informe a URL https da sua instância, por exemplo https://meu-servidor.com/api")
+	}
+	return strings.TrimRight(u.String(), "/"), nil
+}
+
 // connectConnector saves a pasted API key for a catalog service and
 // registers the connector in the agent runtime in one step.
 func (s *Server) connectConnector(w http.ResponseWriter, r *http.Request) error {
@@ -78,10 +88,20 @@ func (s *Server) connectConnector(w http.ResponseWriter, r *http.Request) error 
 		return fmt.Errorf("connector %q cannot be connected with an API key", r.PathValue("id"))
 	}
 	var body struct {
-		Key string `json:"key"`
+		Key     string `json:"key"`
+		BaseURL string `json:"base_url"`
 	}
 	if err := json.NewDecoder(io.LimitReader(r.Body, secrets.MaxKeyBytes+1024)).Decode(&body); err != nil {
 		return fmt.Errorf("invalid request body: %w", err)
+	}
+	var err error
+	baseURL := entry.APIBaseURL
+	if entry.APISelfHosted {
+		baseURL, err = selfHostedBaseURL(body.BaseURL)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return err
+		}
 	}
 	dir, err := providerSecretsDir()
 	if err != nil {
@@ -95,10 +115,12 @@ func (s *Server) connectConnector(w http.ResponseWriter, r *http.Request) error 
 		return err
 	}
 	err = callAgentAPI(r.Context(), http.MethodPost, "/api/agent/v1/connectors", agent.ConnectorConfig{
-		ID:       entry.ID,
-		Provider: entry.ID,
-		BaseURL:  entry.APIBaseURL,
-		TokenEnv: envName,
+		ID:         entry.ID,
+		Provider:   entry.ID,
+		BaseURL:    baseURL,
+		TokenEnv:   envName,
+		AuthHeader: entry.APIAuthHeader,
+		AuthScheme: entry.APIAuthScheme,
 		Operations: []agent.ConnectorOperation{
 			{Name: "read", Methods: []string{http.MethodGet}, PathPrefixes: []string{"/"}},
 			{Name: "write", Methods: []string{http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete}, PathPrefixes: []string{"/"}},
