@@ -49,3 +49,23 @@ func TestConfiguredReadsFileVariable(t *testing.T) {
 		t.Fatal("missing file must not count as configured")
 	}
 }
+
+func TestAdoptOnlyFillsMissingVariables(t *testing.T) {
+	const env = "DZ23_SECRETS_ADOPT_KEY"
+	dir := t.TempDir()
+	t.Setenv(env, "")
+	t.Setenv(env+"_FILE", "")
+	if Adopt(dir, env) {
+		t.Fatal("nothing saved yet, must not adopt")
+	}
+	if err := os.WriteFile(Path(dir, env), []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if !Adopt(dir, env) || os.Getenv(env+"_FILE") != Path(dir, env) {
+		t.Fatal("expected adoption of the saved file")
+	}
+	t.Setenv(env+"_FILE", "/elsewhere")
+	if Adopt(dir, env) || os.Getenv(env+"_FILE") != "/elsewhere" {
+		t.Fatal("must not override an explicit _FILE")
+	}
+}

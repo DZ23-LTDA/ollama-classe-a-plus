@@ -3,6 +3,7 @@ import {
   listProviders,
   saveProviderKey,
   sortProviders,
+  staleModels,
   type ProviderStatus,
 } from "./providers";
 
@@ -37,7 +38,10 @@ describe("providers client", () => {
           new Response(JSON.stringify({ providers: null }), { status: 200 }),
         ),
     );
-    await expect(listProviders()).resolves.toEqual({ configPath: "", providers: [] });
+    await expect(listProviders()).resolves.toEqual({
+      configPath: "",
+      providers: [],
+    });
   });
 
   it("sends the trimmed key and surfaces server errors", async () => {
@@ -45,7 +49,9 @@ describe("providers client", () => {
       .fn()
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
       .mockResolvedValueOnce(
-        new Response(JSON.stringify({ error: "invalid credential" }), { status: 400 }),
+        new Response(JSON.stringify({ error: "invalid credential" }), {
+          status: 400,
+        }),
       );
     vi.stubGlobal("fetch", fetchMock);
 
@@ -57,6 +63,23 @@ describe("providers client", () => {
     await expect(saveProviderKey("openai", "sk-abc")).rejects.toThrow(
       "invalid credential",
     );
-    await expect(saveProviderKey("openai", "   ")).rejects.toThrow("Cole a chave");
+    await expect(saveProviderKey("openai", "   ")).rejects.toThrow(
+      "Cole a chave",
+    );
+  });
+});
+
+describe("staleModels", () => {
+  it("flags configured models the provider no longer offers", () => {
+    expect(
+      staleModels({ configured: ["a", "gone"], available: ["a", "b"] }),
+    ).toEqual(["gone"]);
+  });
+
+  it("does not guess when the listing failed or is empty", () => {
+    expect(
+      staleModels({ configured: ["a"], available: [], error: "401" }),
+    ).toEqual([]);
+    expect(staleModels({ configured: ["a"], available: [] })).toEqual([]);
   });
 });

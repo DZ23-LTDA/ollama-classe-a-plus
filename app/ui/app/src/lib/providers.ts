@@ -27,7 +27,8 @@ export async function listProviders(): Promise<{
   providers: ProviderStatus[];
 }> {
   const response = await fetch(`${API_BASE}/api/v1/providers`);
-  if (!response.ok) throw await failure(response, "Falha ao carregar provedores");
+  if (!response.ok)
+    throw await failure(response, "Falha ao carregar provedores");
   const body = (await response.json()) as {
     config_path?: string;
     providers?: ProviderStatus[] | null;
@@ -38,7 +39,10 @@ export async function listProviders(): Promise<{
   };
 }
 
-export async function saveProviderKey(name: string, key: string): Promise<void> {
+export async function saveProviderKey(
+  name: string,
+  key: string,
+): Promise<void> {
   const trimmed = key.trim();
   if (!trimmed) throw new Error("Cole a chave de API");
   const response = await fetch(
@@ -64,6 +68,52 @@ export async function removeProviderKey(name: string): Promise<void> {
 export function sortProviders(providers: ProviderStatus[]): ProviderStatus[] {
   return [...providers].sort(
     (a, b) =>
-      Number(b.configured) - Number(a.configured) || a.name.localeCompare(b.name),
+      Number(b.configured) - Number(a.configured) ||
+      a.name.localeCompare(b.name),
   );
+}
+
+export type ProviderModels = {
+  configured: string[];
+  available: string[];
+  error?: string;
+};
+
+export async function listProviderModels(
+  name: string,
+): Promise<ProviderModels> {
+  const response = await fetch(
+    `${API_BASE}/api/v1/providers/${encodeURIComponent(name)}/models`,
+  );
+  if (!response.ok) throw await failure(response, "Falha ao consultar modelos");
+  const body = (await response.json()) as Partial<ProviderModels>;
+  return {
+    configured: Array.isArray(body.configured) ? body.configured : [],
+    available: Array.isArray(body.available) ? body.available : [],
+    error: body.error,
+  };
+}
+
+export async function saveProviderModels(
+  name: string,
+  models: string[],
+): Promise<void> {
+  if (models.length === 0) throw new Error("Selecione ao menos um modelo");
+  const response = await fetch(
+    `${API_BASE}/api/v1/providers/${encodeURIComponent(name)}/models`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ models }),
+    },
+  );
+  if (!response.ok) throw await failure(response, "Falha ao salvar modelos");
+}
+
+// staleModels lists configured ids the provider no longer offers, which is
+// what makes chats fail with 404 "model does not exist".
+export function staleModels(models: ProviderModels): string[] {
+  if (models.error || models.available.length === 0) return [];
+  const available = new Set(models.available);
+  return models.configured.filter((id) => !available.has(id));
 }

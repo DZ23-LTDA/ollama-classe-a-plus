@@ -80,6 +80,24 @@ func Remove(dir, envName string) error {
 	return persistUserEnv(envName, "")
 }
 
+// Adopt points <envName>_FILE at a credential previously saved under dir
+// when neither variable is set, so a process started without the user's
+// updated environment still finds saved keys. It reports whether it did.
+func Adopt(dir, envName string) bool {
+	if !envNamePattern.MatchString(envName) {
+		return false
+	}
+	if strings.TrimSpace(os.Getenv(envName)) != "" || strings.TrimSpace(os.Getenv(envName+"_FILE")) != "" {
+		return false
+	}
+	path := Path(dir, envName)
+	if info, err := os.Stat(path); err != nil || info.IsDir() || info.Size() == 0 {
+		return false
+	}
+	os.Setenv(envName+"_FILE", path)
+	return true
+}
+
 // Configured reports whether a credential is available for envName, either
 // directly in the environment or through an existing <envName>_FILE.
 func Configured(envName string) bool {
