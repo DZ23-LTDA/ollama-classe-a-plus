@@ -39,3 +39,21 @@ func TestConnectorCatalogDoesNotClaimFiscalIssuerByDefault(t *testing.T) {
 		}
 	}
 }
+
+func TestConnectorCatalogIDsAreUniqueAndSetupIsExplicit(t *testing.T) {
+	seen := map[string]bool{}
+	for _, entry := range ConnectorCatalog() {
+		if seen[entry.ID] {
+			t.Fatalf("duplicate connector id %q", entry.ID)
+		}
+		seen[entry.ID] = true
+		if entry.Name == "" || entry.Description == "" || entry.Auth == "" {
+			t.Fatalf("connector %q is missing name, description or auth", entry.ID)
+		}
+	}
+	for _, id := range []string{"pinterest", "youtube", "linkedin", "telegram", "gmail", "mercado-pago"} {
+		if !seen[id] {
+			t.Errorf("catalog is missing %q", id)
+		}
+	}
+}

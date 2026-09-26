@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { CheckIcon, MagnifyingGlassIcon } from "@heroicons/react/24/outline";
 import { AppSidebar } from "@/components/AppSidebar";
 import { SidebarLayout } from "@/components/layout/layout";
+import { connectorIcon } from "@/lib/connectorIcons";
 import {
   listConnectorCatalog,
   listConnectors,
@@ -37,6 +38,29 @@ function initials(name: string) {
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase() ?? "")
     .join("");
+}
+
+function ConnectorLogo({ id, name }: { id: string; name: string }) {
+  const icon = connectorIcon(id);
+  return (
+    <div
+      aria-hidden="true"
+      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-neutral-100 text-sm font-semibold text-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"
+    >
+      {icon ? (
+        <svg
+          viewBox="0 0 24 24"
+          className="h-6 w-6"
+          fill={icon.color}
+          role="img"
+        >
+          <path d={icon.path} />
+        </svg>
+      ) : (
+        initials(name)
+      )}
+    </div>
+  );
 }
 
 export function ConnectorsPage() {
@@ -168,12 +192,7 @@ export function ConnectorsPage() {
                   className="rounded-2xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-950"
                 >
                   <div className="flex items-start gap-4">
-                    <div
-                      aria-hidden="true"
-                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-neutral-100 text-sm font-semibold text-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"
-                    >
-                      {initials(entry.name)}
-                    </div>
+                    <ConnectorLogo id={entry.id} name={entry.name} />
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">
