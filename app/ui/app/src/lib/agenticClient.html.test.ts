@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { agentFetch, listProjects } from "./agenticClient";
+import {
+  AGENT_LOGIN_REQUIRED_MESSAGE,
+  agentFetch,
+  listProjects,
+} from "./agenticClient";
 
 describe("agentFetch response validation", () => {
   afterEach(() => vi.unstubAllGlobals());
@@ -36,5 +40,20 @@ describe("agentFetch response validation", () => {
     await expect(
       agentFetch("/api/agent/v1/projects/p1", { method: "DELETE" }),
     ).resolves.toEqual({});
+  });
+
+  it("explains how to proceed when network exposure requires login", async () => {
+    vi.stubGlobal("window", { dispatchEvent: vi.fn() });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ error: "bearer token is required" }), {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        }),
+      ),
+    );
+
+    await expect(listProjects()).rejects.toThrow(AGENT_LOGIN_REQUIRED_MESSAGE);
   });
 });
