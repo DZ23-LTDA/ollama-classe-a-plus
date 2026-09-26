@@ -15,6 +15,7 @@ import { Route as TasksImport } from './routes/tasks'
 import { Route as SkillsImport } from './routes/skills'
 import { Route as SettingsImport } from './routes/settings'
 import { Route as ScheduledImport } from './routes/scheduled'
+import { Route as ProvidersImport } from './routes/providers'
 import { Route as ProjectsImport } from './routes/projects'
 import { Route as PluginsImport } from './routes/plugins'
 import { Route as OnboardingImport } from './routes/onboarding'
@@ -49,6 +50,12 @@ const SettingsRoute = SettingsImport.update({
 const ScheduledRoute = ScheduledImport.update({
   id: '/scheduled',
   path: '/scheduled',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const ProvidersRoute = ProvidersImport.update({
+  id: '/providers',
+  path: '/providers',
   getParentRoute: () => rootRoute,
 } as any)
 
@@ -179,6 +186,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProjectsImport
       parentRoute: typeof rootRoute
     }
+    '/providers': {
+      id: '/providers'
+      path: '/providers'
+      fullPath: '/providers'
+      preLoaderRoute: typeof ProvidersImport
+      parentRoute: typeof rootRoute
+    }
     '/scheduled': {
       id: '/scheduled'
       path: '/scheduled'
@@ -229,6 +243,7 @@ export interface FileRoutesByFullPath {
   '/onboarding': typeof OnboardingRoute
   '/plugins': typeof PluginsRoute
   '/projects': typeof ProjectsRoute
+  '/providers': typeof ProvidersRoute
   '/scheduled': typeof ScheduledRoute
   '/settings': typeof SettingsRoute
   '/skills': typeof SkillsRoute
@@ -246,6 +261,7 @@ export interface FileRoutesByTo {
   '/onboarding': typeof OnboardingRoute
   '/plugins': typeof PluginsRoute
   '/projects': typeof ProjectsRoute
+  '/providers': typeof ProvidersRoute
   '/scheduled': typeof ScheduledRoute
   '/settings': typeof SettingsRoute
   '/skills': typeof SkillsRoute
@@ -264,6 +280,7 @@ export interface FileRoutesById {
   '/onboarding': typeof OnboardingRoute
   '/plugins': typeof PluginsRoute
   '/projects': typeof ProjectsRoute
+  '/providers': typeof ProvidersRoute
   '/scheduled': typeof ScheduledRoute
   '/settings': typeof SettingsRoute
   '/skills': typeof SkillsRoute
@@ -283,6 +300,7 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/plugins'
     | '/projects'
+    | '/providers'
     | '/scheduled'
     | '/settings'
     | '/skills'
@@ -299,6 +317,7 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/plugins'
     | '/projects'
+    | '/providers'
     | '/scheduled'
     | '/settings'
     | '/skills'
@@ -315,6 +334,7 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/plugins'
     | '/projects'
+    | '/providers'
     | '/scheduled'
     | '/settings'
     | '/skills'
@@ -333,6 +353,7 @@ export interface RootRouteChildren {
   OnboardingRoute: typeof OnboardingRoute
   PluginsRoute: typeof PluginsRoute
   ProjectsRoute: typeof ProjectsRoute
+  ProvidersRoute: typeof ProvidersRoute
   ScheduledRoute: typeof ScheduledRoute
   SettingsRoute: typeof SettingsRoute
   SkillsRoute: typeof SkillsRoute
@@ -350,6 +371,7 @@ const rootRouteChildren: RootRouteChildren = {
   OnboardingRoute: OnboardingRoute,
   PluginsRoute: PluginsRoute,
   ProjectsRoute: ProjectsRoute,
+  ProvidersRoute: ProvidersRoute,
   ScheduledRoute: ScheduledRoute,
   SettingsRoute: SettingsRoute,
   SkillsRoute: SkillsRoute,
@@ -376,6 +398,7 @@ export const routeTree = rootRoute
         "/onboarding",
         "/plugins",
         "/projects",
+        "/providers",
         "/scheduled",
         "/settings",
         "/skills",
@@ -409,6 +432,9 @@ export const routeTree = rootRoute
     },
     "/projects": {
       "filePath": "projects.tsx"
+    },
+    "/providers": {
+      "filePath": "providers.tsx"
     },
     "/scheduled": {
       "filePath": "scheduled.tsx"

@@ -35,6 +35,12 @@ export const SEARCH_PAGES: SearchItem[] = [
     href: "/connect",
   },
   {
+    id: "page-providers",
+    label: "Provedores de IA",
+    hint: "Página",
+    href: "/providers",
+  },
+  {
     id: "page-settings",
     label: "Configurações",
     hint: "Página",
@@ -71,7 +77,8 @@ export function searchItems(
 
 // isTypingTarget avoids hijacking "/" while the user types in a field.
 export function isTypingTarget(target: EventTarget | null): boolean {
-  if (typeof HTMLElement === "undefined" || !(target instanceof HTMLElement)) return false;
+  if (typeof HTMLElement === "undefined" || !(target instanceof HTMLElement))
+    return false;
   const tag = target.tagName;
   return (
     tag === "INPUT" ||

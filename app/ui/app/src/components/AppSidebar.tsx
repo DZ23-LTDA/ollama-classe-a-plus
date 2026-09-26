@@ -10,6 +10,7 @@ import {
   FolderIcon,
   MagnifyingGlassIcon,
   PlusIcon,
+  KeyIcon,
   LinkIcon,
   PuzzlePieceIcon,
   RectangleGroupIcon,
@@ -31,6 +32,7 @@ export type AppSection =
   | "skills"
   | "plugins"
   | "connectors"
+  | "providers"
   | "tasks"
   | "company";
 
@@ -92,7 +94,13 @@ export function AppNavigation({ current }: { current: AppSection }) {
   const [searchOpen, setSearchOpen] = useState(false);
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "/" && !event.metaKey && !event.ctrlKey && !event.altKey && !isTypingTarget(event.target)) {
+      if (
+        event.key === "/" &&
+        !event.metaKey &&
+        !event.ctrlKey &&
+        !event.altKey &&
+        !isTypingTarget(event.target)
+      ) {
         event.preventDefault();
         setSearchOpen(true);
       }
@@ -111,7 +119,9 @@ export function AppNavigation({ current }: { current: AppSection }) {
           <div className="truncate text-[12px] font-semibold text-neutral-900 dark:text-white">
             Ollama Classe A+
           </div>
-          <div className="truncate text-[10px] text-neutral-400">Local-first workspace</div>
+          <div className="truncate text-[10px] text-neutral-400">
+            Local-first workspace
+          </div>
         </div>
       </div>
 
@@ -124,24 +134,77 @@ export function AppNavigation({ current }: { current: AppSection }) {
       >
         <PlusIcon className={iconClass} />
         <span>Nova tarefa</span>
-        <span className="ml-auto text-[10px] text-white/60 dark:text-neutral-500">⌘K</span>
+        <span className="ml-auto text-[10px] text-white/60 dark:text-neutral-500">
+          ⌘K
+        </span>
       </Link>
 
       <NavLabel>Operação</NavLabel>
-      <Link to="/agentic" className={itemClass(current === "agentic")} draggable={false}>
+      <Link
+        to="/agentic"
+        className={itemClass(current === "agentic")}
+        draggable={false}
+      >
         <BoltIcon className={iconClass} />
         <span className="min-w-0 flex-1 truncate">Agente</span>
-        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" title="Runtime local" />
+        <span
+          className="h-1.5 w-1.5 rounded-full bg-emerald-500"
+          title="Runtime local"
+        />
       </Link>
-      <TargetLink href="/tasks" label="Tarefas" current={current} section="tasks" icon={ArrowPathIcon} />
-      <TargetLink href="/scheduled" label="Agendado" current={current} section="scheduled" icon={ClockIcon} />
-      <TargetLink href="/company" label="Empresa" current={current} section="company" icon={BuildingOffice2Icon} badge="Novo" />
+      <TargetLink
+        href="/tasks"
+        label="Tarefas"
+        current={current}
+        section="tasks"
+        icon={ArrowPathIcon}
+      />
+      <TargetLink
+        href="/scheduled"
+        label="Agendado"
+        current={current}
+        section="scheduled"
+        icon={ClockIcon}
+      />
+      <TargetLink
+        href="/company"
+        label="Empresa"
+        current={current}
+        section="company"
+        icon={BuildingOffice2Icon}
+        badge="Novo"
+      />
 
       <NavLabel>Construir</NavLabel>
-      <TargetLink href="/skills" label="Habilidades" current={current} section="skills" icon={BoltIcon} badge="Novo" />
-      <TargetLink href="/connectors" label="Conectores" current={current} section="connectors" icon={LinkIcon} />
-      <TargetLink href="/plugins" label="Plugins" current={current} section="plugins" icon={PuzzlePieceIcon} />
-      <TargetLink href="/library" label="Biblioteca" current={current} section="library" icon={BookOpenIcon} />
+      <TargetLink
+        href="/skills"
+        label="Habilidades"
+        current={current}
+        section="skills"
+        icon={BoltIcon}
+        badge="Novo"
+      />
+      <TargetLink
+        href="/connectors"
+        label="Conectores"
+        current={current}
+        section="connectors"
+        icon={LinkIcon}
+      />
+      <TargetLink
+        href="/plugins"
+        label="Plugins"
+        current={current}
+        section="plugins"
+        icon={PuzzlePieceIcon}
+      />
+      <TargetLink
+        href="/library"
+        label="Biblioteca"
+        current={current}
+        section="library"
+        icon={BookOpenIcon}
+      />
 
       <div className="mt-2 flex items-center justify-between px-2.5 pt-2">
         <NavLabel>Projetos</NavLabel>
@@ -154,19 +217,49 @@ export function AppNavigation({ current }: { current: AppSection }) {
           <PlusIcon className="h-4 w-4" />
         </a>
       </div>
-      <TargetLink href="/projects" label="Novo projeto" current={current} section="projects" icon={FolderIcon} />
-      <TargetLink href="/connect" label="Apps e providers" current={current} section="apps" icon={RectangleGroupIcon} />
+      <TargetLink
+        href="/projects"
+        label="Novo projeto"
+        current={current}
+        section="projects"
+        icon={FolderIcon}
+      />
+      <TargetLink
+        href="/connect"
+        label="Apps e providers"
+        current={current}
+        section="apps"
+        icon={RectangleGroupIcon}
+      />
+      <TargetLink
+        href="/providers"
+        label="Provedores de IA"
+        current={current}
+        section="providers"
+        icon={KeyIcon}
+      />
 
       <NavLabel>Conta</NavLabel>
-      <a href="/settings#workspace" className={itemClass(current === "settings")}>
+      <a
+        href="/settings#workspace"
+        className={itemClass(current === "settings")}
+      >
         <UserGroupIcon className={iconClass} />
         <span className="min-w-0 flex-1 truncate">Workspace</span>
       </a>
-      <Link to="/settings" className={itemClass(current === "settings")} draggable={false}>
+      <Link
+        to="/settings"
+        className={itemClass(current === "settings")}
+        draggable={false}
+      >
         <Cog6ToothIcon className={iconClass} />
         <span className="min-w-0 flex-1 truncate">Configurações</span>
       </Link>
-      <button type="button" onClick={() => setSearchOpen(true)} className={itemClass(false)}>
+      <button
+        type="button"
+        onClick={() => setSearchOpen(true)}
+        className={itemClass(false)}
+      >
         <MagnifyingGlassIcon className={iconClass} />
         <span className="min-w-0 flex-1 truncate">Pesquisar</span>
         <span className="text-[10px] text-neutral-400">/</span>
@@ -177,7 +270,9 @@ export function AppNavigation({ current }: { current: AppSection }) {
       </a>
 
       <div className="mt-auto border-t border-neutral-200/80 px-2.5 pt-3 text-[10px] leading-4 text-neutral-400 dark:border-neutral-800">
-        <div className="font-medium text-neutral-500 dark:text-neutral-500">Modo local-first</div>
+        <div className="font-medium text-neutral-500 dark:text-neutral-500">
+          Modo local-first
+        </div>
         <div>Approvals e secrets protegidos</div>
       </div>
     </div>
