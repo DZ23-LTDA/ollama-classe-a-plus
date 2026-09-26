@@ -25,8 +25,8 @@ linters:
       - node_modules/
       - app/ui/app/dist/
     rules:
-      # The connector catalog is user-facing Portuguese copy.
-      - path: internal/agent/connector_catalog\.go
+      # User-facing Portuguese copy (connector catalog, prompts for attached files).
+      - path: (internal/agent/connector_catalog|app/ui/attachment_budget)\.go
         linters:
           - misspell
   settings:

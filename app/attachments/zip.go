@@ -71,6 +71,9 @@ func ReadZipText(zipPath string, allowed []string, limits ZipLimits) (ZipReport,
 		case !allow[ext]:
 			report.Skipped = append(report.Skipped, name+" (tipo não suportado)")
 			continue
+		case Noisy(clean):
+			report.Skipped = append(report.Skipped, name+" (dependências ou build)")
+			continue
 		}
 		if len(report.Entries) >= limits.MaxEntries {
 			return report, fmt.Errorf("%w: mais de %d arquivos", ErrZipLimit, limits.MaxEntries)

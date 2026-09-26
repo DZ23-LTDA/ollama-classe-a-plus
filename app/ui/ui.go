@@ -932,6 +932,22 @@ func (s *Server) chat(w http.ResponseWriter, r *http.Request) error {
 		thinkValue = think
 	}
 
+	// Attached projects larger than the context window are analyzed in
+	// batches first; the final answer receives the batch findings.
+	attachmentBudget := attachmentCharBudget(details)
+	var lastDigest *attachmentDigest
+	if n := len(chat.Messages); n > 0 && chat.Messages[n-1].Role == "user" && len(chat.Messages[n-1].Attachments) > 0 {
+		last := chat.Messages[n-1]
+		texts, _ := splitMessageAttachments(last.Attachments)
+		if _, _, overflow := splitAttachments(texts, attachmentBudget); len(overflow) > 0 {
+			digest := digestAttachments(ctx, c.Chat, req.Model, last.Content, overflow, attachmentBudget, func(status string) {
+				json.NewEncoder(w).Encode(responses.ChatEvent{EventName: "thinking", Thinking: &status})
+				flusher.Flush()
+			})
+			lastDigest = &digest
+		}
+	}
+
 	// Check if the last user message has attachments
 	// TODO (parthsareen): this logic will change with directory drag and drop
 	hasAttachments := false
@@ -1008,7 +1024,7 @@ func (s *Server) chat(w http.ResponseWriter, r *http.Request) error {
 				reqChat = &temp
 			}
 		}
-		chatReq, err := s.buildChatRequest(reqChat, req.Model, thinkValue, availableTools)
+		chatReq, err := s.buildChatRequest(reqChat, req.Model, thinkValue, availableTools, attachmentBudget, lastDigest)
 		if err != nil {
 			return err
 		}
@@ -1882,10 +1898,25 @@ func supportsBrowserTools(model string) bool {
 	return strings.HasPrefix(strings.ToLower(model), "gpt-oss")
 }
 
+// splitMessageAttachments separates images from text files and extracts the
+// text content of the latter.
+func splitMessageAttachments(files []store.File) ([]attachmentText, []api.ImageData) {
+	var texts []attachmentText
+	var images []api.ImageData
+	for _, a := range files {
+		if isImageAttachment(a.Filename) {
+			images = append(images, api.ImageData(a.Data))
+			continue
+		}
+		texts = append(texts, attachmentText{name: a.Filename, content: convertBytesToText(a.Data, a.Filename)})
+	}
+	return texts, images
+}
+
 // buildChatRequest converts store.Chat to api.ChatRequest
-func (s *Server) buildChatRequest(chat *store.Chat, model string, think any, availableTools []map[string]any) (*api.ChatRequest, error) {
+func (s *Server) buildChatRequest(chat *store.Chat, model string, think any, availableTools []map[string]any, attachmentBudget int, lastDigest *attachmentDigest) (*api.ChatRequest, error) {
 	var msgs []api.Message
-	for _, m := range chat.Messages {
+	for i, m := range chat.Messages {
 		// Skip empty messages if present
 		if m.Content == "" && m.Thinking == "" && len(m.ToolCalls) == 0 && len(m.Attachments) == 0 {
 			continue
@@ -1898,14 +1929,16 @@ func (s *Server) buildChatRequest(chat *store.Chat, model string, think any, ava
 
 		var images []api.ImageData
 		if m.Role == "user" && len(m.Attachments) > 0 {
-			for _, a := range m.Attachments {
-				if isImageAttachment(a.Filename) {
-					images = append(images, api.ImageData(a.Data))
-				} else {
-					content := convertBytesToText(a.Data, a.Filename)
-					sb.WriteString(fmt.Sprintf("\n--- File: %s ---\n%s\n--- End of %s ---",
-						a.Filename, content, a.Filename))
-				}
+			texts, imgs := splitMessageAttachments(m.Attachments)
+			images = append(images, imgs...)
+			// Keep attached files within the model's context window instead of
+			// failing the whole request with "prompt is too long".
+			kept, noisy, overflow := splitAttachments(texts, attachmentBudget)
+			writeFiles(&sb, kept)
+			if i == len(chat.Messages)-1 && lastDigest != nil {
+				sb.WriteString(attachmentNote(noisy, lastDigest.omitted, lastDigest.text))
+			} else {
+				sb.WriteString(attachmentNote(noisy, fileNames(overflow), ""))
 			}
 		}
 
