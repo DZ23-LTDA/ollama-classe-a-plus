@@ -69,3 +69,19 @@ func TestAdoptOnlyFillsMissingVariables(t *testing.T) {
 		t.Fatal("must not override an explicit _FILE")
 	}
 }
+
+func TestAdoptFromLegacyName(t *testing.T) {
+	const env = "DZ23_SECRETS_LEGACY_KEY"
+	dir := t.TempDir()
+	t.Setenv(env, "")
+	t.Setenv(env+"_FILE", "")
+	if err := os.WriteFile(Path(dir, "OLLAMA_DZ23_"+env), []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if Adopt(dir, env) {
+		t.Fatal("no file under the current name")
+	}
+	if !AdoptFrom(dir, "OLLAMA_DZ23_"+env, env) || os.Getenv(env+"_FILE") != Path(dir, "OLLAMA_DZ23_"+env) {
+		t.Fatal("expected the legacy file to be adopted")
+	}
+}

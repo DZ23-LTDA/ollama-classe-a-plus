@@ -184,7 +184,10 @@ func AdoptProviderCredentials() {
 	}
 	for _, p := range cfg.Providers {
 		if p.APIKeyEnv != "" {
-			secrets.Adopt(dir, p.APIKeyEnv)
+			if !secrets.Adopt(dir, p.APIKeyEnv) {
+				// Keys saved by older builds used an OLLAMA_DZ23_ prefix.
+				secrets.AdoptFrom(dir, "OLLAMA_DZ23_"+p.APIKeyEnv, p.APIKeyEnv)
+			}
 		}
 	}
 }

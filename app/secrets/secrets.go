@@ -84,13 +84,19 @@ func Remove(dir, envName string) error {
 // when neither variable is set, so a process started without the user's
 // updated environment still finds saved keys. It reports whether it did.
 func Adopt(dir, envName string) bool {
-	if !envNamePattern.MatchString(envName) {
+	return AdoptFrom(dir, envName, envName)
+}
+
+// AdoptFrom points <envName>_FILE at the credential saved under a different
+// (legacy) variable name, with the same rules as Adopt.
+func AdoptFrom(dir, savedName, envName string) bool {
+	if !envNamePattern.MatchString(savedName) || !envNamePattern.MatchString(envName) {
 		return false
 	}
 	if strings.TrimSpace(os.Getenv(envName)) != "" || strings.TrimSpace(os.Getenv(envName+"_FILE")) != "" {
 		return false
 	}
-	path := Path(dir, envName)
+	path := Path(dir, savedName)
 	if info, err := os.Stat(path); err != nil || info.IsDir() || info.Size() == 0 {
 		return false
 	}
