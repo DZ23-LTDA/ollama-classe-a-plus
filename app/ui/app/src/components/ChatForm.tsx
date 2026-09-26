@@ -27,6 +27,7 @@ import { ErrorEvent, Message } from "@/gotypes";
 import { useSettings } from "@/hooks/useSettings";
 import { useCloudStatus } from "@/hooks/useCloudStatus";
 import { ThinkButton } from "./ThinkButton";
+import { AnonymousChatToggle } from "./AnonymousChatToggle";
 import { ErrorMessage } from "./ErrorMessage";
 import { processFiles } from "@/utils/fileValidation";
 import type { ImageData } from "@/types/webview";
@@ -688,6 +689,7 @@ function ChatForm({
   return (
     <div className={`pb-3 px-3 ${hasMessages ? "mt-auto" : "my-auto"}`}>
       {chatId === "new" && <Logo />}
+      <AnonymousChatToggle chatId={chatId} />
 
       {shouldShowLoginBanner && (
         <DisplayLogin

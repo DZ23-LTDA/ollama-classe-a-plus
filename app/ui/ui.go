@@ -743,6 +743,13 @@ func (s *Server) chat(w http.ResponseWriter, r *http.Request) error {
 		return fmt.Errorf("empty message")
 	}
 
+	// Anonymous chats live only in memory: they are created with
+	// temporary=true and later turns are recognized by their id.
+	var chats chatPersistence = s.Store
+	if (createdChat && req.Temporary) || anonymousChats.has(cid) {
+		chats = anonymousChats
+	}
+
 	if createdChat {
 		// send message to the client that the chat has been created
 		json.NewEncoder(w).Encode(responses.ChatEvent{
@@ -759,7 +766,7 @@ func (s *Server) chat(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	// Load chat with attachments since we need them for processing
-	chat, err := s.Store.ChatWithOptions(cid, true)
+	chat, err := chats.ChatWithOptions(cid, true)
 	if err != nil {
 		if !errors.Is(err, not.Found) {
 			return err
@@ -816,7 +823,7 @@ func (s *Server) chat(w http.ResponseWriter, r *http.Request) error {
 			chat.Messages = append(chat.Messages, userMsg)
 		}
 
-		if err := s.Store.SetChat(*chat); err != nil {
+		if err := chats.SetChat(*chat); err != nil {
 			return err
 		}
 	}
@@ -837,7 +844,7 @@ func (s *Server) chat(w http.ResponseWriter, r *http.Request) error {
 		// Create an empty assistant message to store the model information
 		// This will be overwritten when the model responds
 		chat.Messages = append(chat.Messages, store.NewMessage("assistant", "", &store.MessageOptions{Model: req.Model}))
-		if err := s.Store.SetChat(*chat); err != nil {
+		if err := chats.SetChat(*chat); err != nil {
 			cancelLoading()
 			return err
 		}
@@ -1048,7 +1055,7 @@ func (s *Server) chat(w http.ResponseWriter, r *http.Request) error {
 						lastMsg := &chat.Messages[len(chat.Messages)-1]
 						lastMsg.ThinkingTimeEnd = thinkingTimeEnd
 						lastMsg.UpdatedAt = time.Now()
-						s.Store.UpdateLastMessage(chat.ID, *lastMsg)
+						chats.UpdateLastMessage(chat.ID, *lastMsg)
 					}
 					thinkingTimeStart = nil
 					thinkingTimeEnd = nil
@@ -1071,7 +1078,7 @@ func (s *Server) chat(w http.ResponseWriter, r *http.Request) error {
 						}
 						lastMsg := &chat.Messages[len(chat.Messages)-1]
 						lastMsg.ToolCalls = toolCalls
-						if err := s.Store.UpdateLastMessage(chat.ID, *lastMsg); err != nil {
+						if err := chats.UpdateLastMessage(chat.ID, *lastMsg); err != nil {
 							return err
 						}
 					} else {
@@ -1097,7 +1104,7 @@ func (s *Server) chat(w http.ResponseWriter, r *http.Request) error {
 
 							synth := store.NewMessage("assistant", "", &store.MessageOptions{Model: req.Model, ToolCalls: toolCalls})
 							chat.Messages = append(chat.Messages, synth)
-							if err := s.Store.AppendMessage(chat.ID, synth); err != nil {
+							if err := chats.AppendMessage(chat.ID, synth); err != nil {
 								return err
 							}
 
@@ -1116,7 +1123,7 @@ func (s *Server) chat(w http.ResponseWriter, r *http.Request) error {
 						toolErrMsg := store.NewMessage("tool", errContent, nil)
 						toolErrMsg.ToolName = toolCall.Function.Name
 						chat.Messages = append(chat.Messages, toolErrMsg)
-						if err := s.Store.AppendMessage(chat.ID, toolErrMsg); err != nil {
+						if err := chats.AppendMessage(chat.ID, toolErrMsg); err != nil {
 							return err
 						}
 
@@ -1151,7 +1158,7 @@ func (s *Server) chat(w http.ResponseWriter, r *http.Request) error {
 						if err != nil {
 							return fmt.Errorf("failed to marshal browser state: %w", err)
 						}
-						if err := s.Store.UpdateChatBrowserState(chat.ID, json.RawMessage(stateBytes)); err != nil {
+						if err := chats.UpdateChatBrowserState(chat.ID, json.RawMessage(stateBytes)); err != nil {
 							return fmt.Errorf("failed to persist browser state to chat: %w", err)
 						}
 						// tool result is not added to the tool message for the browser tool
@@ -1179,7 +1186,7 @@ func (s *Server) chat(w http.ResponseWriter, r *http.Request) error {
 					toolMsg.ToolName = toolCall.Function.Name
 					chat.Messages = append(chat.Messages, toolMsg)
 
-					s.Store.AppendMessage(chat.ID, toolMsg)
+					chats.AppendMessage(chat.ID, toolMsg)
 
 					// Emit tool message event (matching agent pattern)
 					toolResult := true
@@ -1213,7 +1220,7 @@ func (s *Server) chat(w http.ResponseWriter, r *http.Request) error {
 					newMsg := store.NewMessage("assistant", "", &store.MessageOptions{Model: req.Model})
 					chat.Messages = append(chat.Messages, newMsg)
 					// Append new message to database
-					if err := s.Store.AppendMessage(chat.ID, newMsg); err != nil {
+					if err := chats.AppendMessage(chat.ID, newMsg); err != nil {
 						return err
 					}
 					// Attach any buffered tool_calls (request-only) now that assistant has started
@@ -1222,7 +1229,7 @@ func (s *Server) chat(w http.ResponseWriter, r *http.Request) error {
 						lastMsg.ToolCalls = pendingAssistantToolCalls
 
 						pendingAssistantToolCalls = nil
-						if err := s.Store.UpdateLastMessage(chat.ID, *lastMsg); err != nil {
+						if err := chats.UpdateLastMessage(chat.ID, *lastMsg); err != nil {
 							return err
 						}
 					}
@@ -1240,7 +1247,7 @@ func (s *Server) chat(w http.ResponseWriter, r *http.Request) error {
 					lastMsg.ThinkingTimeEnd = thinkingTimeEnd
 				}
 				// Use optimized update for streaming
-				if err := s.Store.UpdateLastMessage(chat.ID, *lastMsg); err != nil {
+				if err := chats.UpdateLastMessage(chat.ID, *lastMsg); err != nil {
 					return err
 				}
 			case EventThinking:
@@ -1252,7 +1259,7 @@ func (s *Server) chat(w http.ResponseWriter, r *http.Request) error {
 					})
 					chat.Messages = append(chat.Messages, newMsg)
 					// Append new message to database
-					if err := s.Store.AppendMessage(chat.ID, newMsg); err != nil {
+					if err := chats.AppendMessage(chat.ID, newMsg); err != nil {
 						return err
 					}
 					// Attach any buffered tool_calls now that assistant exists
@@ -1261,7 +1268,7 @@ func (s *Server) chat(w http.ResponseWriter, r *http.Request) error {
 						lastMsg.ToolCalls = pendingAssistantToolCalls
 
 						pendingAssistantToolCalls = nil
-						if err := s.Store.UpdateLastMessage(chat.ID, *lastMsg); err != nil {
+						if err := chats.UpdateLastMessage(chat.ID, *lastMsg); err != nil {
 							return err
 						}
 					}
@@ -1279,7 +1286,7 @@ func (s *Server) chat(w http.ResponseWriter, r *http.Request) error {
 					}
 
 					// Use optimized update for streaming
-					if err := s.Store.UpdateLastMessage(chat.ID, *lastMsg); err != nil {
+					if err := chats.UpdateLastMessage(chat.ID, *lastMsg); err != nil {
 						return err
 					}
 				}
@@ -1312,7 +1319,7 @@ func (s *Server) chat(w http.ResponseWriter, r *http.Request) error {
 			lastMsg := &chat.Messages[len(chat.Messages)-1]
 			lastMsg.ThinkingTimeEnd = thinkingTimeEnd
 			lastMsg.UpdatedAt = time.Now()
-			s.Store.UpdateLastMessage(chat.ID, *lastMsg)
+			chats.UpdateLastMessage(chat.ID, *lastMsg)
 		}
 	}
 
@@ -1322,7 +1329,7 @@ func (s *Server) chat(w http.ResponseWriter, r *http.Request) error {
 	if len(chat.Messages) > 0 {
 		chat.Messages[len(chat.Messages)-1].Stream = false
 	}
-	return s.Store.SetChat(*chat)
+	return chats.SetChat(*chat)
 }
 
 func (s *Server) getChat(w http.ResponseWriter, r *http.Request) error {
@@ -1332,7 +1339,13 @@ func (s *Server) getChat(w http.ResponseWriter, r *http.Request) error {
 		return fmt.Errorf("chat ID is required")
 	}
 
-	chat, err := s.Store.Chat(cid)
+	var chat *store.Chat
+	var err error
+	if anonymousChats.has(cid) {
+		chat, err = anonymousChats.ChatWithOptions(cid, true)
+	} else {
+		chat, err = s.Store.Chat(cid)
+	}
 	if err != nil {
 		// Return empty chat if not found
 		data := responses.ChatResponse{
@@ -1419,6 +1432,11 @@ func (s *Server) deleteChat(w http.ResponseWriter, r *http.Request) error {
 	cid := r.PathValue("id")
 	if cid == "" {
 		return fmt.Errorf("chat ID is required")
+	}
+
+	if anonymousChats.DeleteChat(cid) {
+		w.WriteHeader(http.StatusOK)
+		return nil
 	}
 
 	// Check if the chat exists (no need to load attachments)
