@@ -76,8 +76,18 @@ func TestJobQueueWorkerAcknowledgesJobs(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("worker did not claim job")
 	}
-	if status := queue.List(QueueSucceeded); len(status) != 1 {
-		t.Fatalf("succeeded = %+v", status)
+	// The handler returns before the worker records the acknowledgement, so
+	// wait for the state transition instead of reading it immediately.
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		status := queue.List(QueueSucceeded)
+		if len(status) == 1 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("succeeded = %+v", status)
+		}
+		time.Sleep(5 * time.Millisecond)
 	}
 }
 
