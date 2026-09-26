@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CheckIcon, MagnifyingGlassIcon } from "@heroicons/react/24/outline";
+import {
+  CheckIcon,
+  DocumentTextIcon,
+  MagnifyingGlassIcon,
+} from "@heroicons/react/24/outline";
 import { AppSidebar } from "@/components/AppSidebar";
 import { SidebarLayout } from "@/components/layout/layout";
 import { connectorIcon } from "@/lib/connectorIcons";
@@ -31,23 +35,14 @@ const AUTH_LABELS: Record<string, string> = {
   bot_or_oauth: "Bot ou OAuth",
 };
 
-function initials(name: string) {
-  return name
-    .split(/[\s/]+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? "")
-    .join("");
-}
-
-function ConnectorLogo({ id, name }: { id: string; name: string }) {
+function ConnectorLogo({ id }: { id: string }) {
   const icon = connectorIcon(id);
   return (
     <div
       aria-hidden="true"
-      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-neutral-100 text-sm font-semibold text-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"
+      className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"
     >
-      {icon ? (
+      {icon.kind === "svg" && (
         <svg
           viewBox="0 0 24 24"
           className="h-6 w-6"
@@ -56,9 +51,16 @@ function ConnectorLogo({ id, name }: { id: string; name: string }) {
         >
           <path d={icon.path} />
         </svg>
-      ) : (
-        initials(name)
       )}
+      {icon.kind === "image" && (
+        <img
+          src={icon.src}
+          alt=""
+          className="h-7 w-7 rounded-md object-contain"
+          loading="lazy"
+        />
+      )}
+      {icon.kind === "generic" && <DocumentTextIcon className="h-6 w-6" />}
     </div>
   );
 }
@@ -192,7 +194,7 @@ export function ConnectorsPage() {
                   className="rounded-2xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-950"
                 >
                   <div className="flex items-start gap-4">
-                    <ConnectorLogo id={entry.id} name={entry.name} />
+                    <ConnectorLogo id={entry.id} />
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <h3 className="text-sm font-semibold text-neutral-900 dark:text-white">

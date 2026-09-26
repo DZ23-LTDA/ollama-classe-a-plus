@@ -1,5 +1,56 @@
 import type { SimpleIcon } from "simple-icons";
 import {
+  siAlgolia,
+  siAppwrite,
+  siAuth0,
+  siBetterstack,
+  siBitbucket,
+  siBrevo,
+  siCircleci,
+  siClerk,
+  siCloudinary,
+  siContentful,
+  siCoolify,
+  siDatadog,
+  siDeepgram,
+  siDigitalocean,
+  siDocker,
+  siElevenlabs,
+  siExpo,
+  siFirebase,
+  siFlydotio,
+  siGooglecloud,
+  siGrafana,
+  siHetzner,
+  siHostinger,
+  siHuggingface,
+  siLemonsqueezy,
+  siLivekit,
+  siMeilisearch,
+  siMixpanel,
+  siMongodb,
+  siNeon,
+  siNovu,
+  siPaddle,
+  siPagseguro,
+  siPlanetscale,
+  siPocketbase,
+  siPostgresql,
+  siPosthog,
+  siPrisma,
+  siPusher,
+  siQdrant,
+  siRailway,
+  siRedis,
+  siRender,
+  siReplicate,
+  siResend,
+  siSanity,
+  siSentry,
+  siStrapi,
+  siUpstash,
+} from "simple-icons";
+import {
   siAirtable,
   siAsana,
   siCalendly,
@@ -47,10 +98,58 @@ import {
   siZoom,
 } from "simple-icons";
 
-// Brand marks from simple-icons (CC0). Brands whose owners asked simple-icons
-// to remove their logo (Slack, LinkedIn, Amazon, Salesforce, Canva, Twilio,
-// Microsoft) fall back to initials.
+// Brand marks from simple-icons (CC0). Brands it does not distribute use the
+// bundled images in IMAGE_ICONS below.
 const ICONS: Record<string, SimpleIcon> = {
+  resend: siResend,
+  brevo: siBrevo,
+  firebase: siFirebase,
+  appwrite: siAppwrite,
+  pocketbase: siPocketbase,
+  postgresql: siPostgresql,
+  mongodb: siMongodb,
+  neon: siNeon,
+  planetscale: siPlanetscale,
+  redis: siRedis,
+  upstash: siUpstash,
+  prisma: siPrisma,
+  qdrant: siQdrant,
+  "huggingface-hub": siHuggingface,
+  replicate: siReplicate,
+  elevenlabs: siElevenlabs,
+  deepgram: siDeepgram,
+  "google-cloud": siGooglecloud,
+  digitalocean: siDigitalocean,
+  railway: siRailway,
+  render: siRender,
+  flyio: siFlydotio,
+  hetzner: siHetzner,
+  hostinger: siHostinger,
+  coolify: siCoolify,
+  "docker-hub": siDocker,
+  bitbucket: siBitbucket,
+  circleci: siCircleci,
+  sentry: siSentry,
+  datadog: siDatadog,
+  grafana: siGrafana,
+  betterstack: siBetterstack,
+  posthog: siPosthog,
+  mixpanel: siMixpanel,
+  auth0: siAuth0,
+  clerk: siClerk,
+  algolia: siAlgolia,
+  meilisearch: siMeilisearch,
+  cloudinary: siCloudinary,
+  contentful: siContentful,
+  sanity: siSanity,
+  strapi: siStrapi,
+  pusher: siPusher,
+  livekit: siLivekit,
+  novu: siNovu,
+  expo: siExpo,
+  "lemon-squeezy": siLemonsqueezy,
+  paddle: siPaddle,
+  pagseguro: siPagseguro,
   airtable: siAirtable,
   asana: siAsana,
   calendly: siCalendly,
@@ -99,18 +198,49 @@ const ICONS: Record<string, SimpleIcon> = {
   zoom: siZoom,
 };
 
-export type ConnectorIcon = { path: string; color: string; title: string };
+// Official favicons, fetched once from each brand's own site and shipped in
+// public/connector-icons, for brands that simple-icons does not distribute.
+const IMAGE_ICONS: Record<string, string> = {
+  "amazon-seller": "amazon-seller.png",
+  asaas: "asaas.png",
+  aws: "aws.png",
+  azure: "azure.png",
+  canva: "canva.jpg",
+  composio: "composio.png",
+  "fiscal-ai": "fiscal-ai.png",
+  linkedin: "linkedin.png",
+  outlook: "outlook.jpg",
+  pagarme: "pagarme.png",
+  pinecone: "pinecone.png",
+  postmark: "postmark.png",
+  salesforce: "salesforce.png",
+  sendgrid: "sendgrid.png",
+  slack: "slack.png",
+  twilio: "twilio.png",
+  "woovi-openpix": "woovi-openpix.png",
+};
 
-// connectorIcon returns the brand mark for a catalog id. Near-black brand
-// colors return "currentColor" so the mark stays visible in dark mode.
-export function connectorIcon(id: string): ConnectorIcon | null {
+export type ConnectorIcon =
+  | { kind: "svg"; path: string; color: string; title: string }
+  | { kind: "image"; src: string }
+  | { kind: "generic" };
+
+// connectorIcon returns the mark for a catalog id: a simple-icons SVG, a
+// bundled brand image, or a generic document icon for non-brand entries.
+// Near-black SVG colors return "currentColor" to stay visible in dark mode.
+export function connectorIcon(id: string): ConnectorIcon {
   const icon = ICONS[id];
-  if (!icon) return null;
-  const hex = icon.hex.toLowerCase();
-  const dark = hex === "000000" || hex === "181717" || hex === "010101";
-  return {
-    path: icon.path,
-    color: dark ? "currentColor" : `#${icon.hex}`,
-    title: icon.title,
-  };
+  if (icon) {
+    const hex = icon.hex.toLowerCase();
+    const dark = hex === "000000" || hex === "181717" || hex === "010101";
+    return {
+      kind: "svg",
+      path: icon.path,
+      color: dark ? "currentColor" : `#${icon.hex}`,
+      title: icon.title,
+    };
+  }
+  const image = IMAGE_ICONS[id];
+  if (image) return { kind: "image", src: `/connector-icons/${image}` };
+  return { kind: "generic" };
 }
