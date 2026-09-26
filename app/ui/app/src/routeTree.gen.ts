@@ -15,10 +15,13 @@ import { Route as TasksImport } from './routes/tasks'
 import { Route as SkillsImport } from './routes/skills'
 import { Route as SettingsImport } from './routes/settings'
 import { Route as ScheduledImport } from './routes/scheduled'
+import { Route as ProvidersImport } from './routes/providers'
 import { Route as ProjectsImport } from './routes/projects'
 import { Route as PluginsImport } from './routes/plugins'
 import { Route as OnboardingImport } from './routes/onboarding'
 import { Route as LibraryImport } from './routes/library'
+import { Route as EndpointImport } from './routes/endpoint'
+import { Route as ConnectorsImport } from './routes/connectors'
 import { Route as ConnectImport } from './routes/connect'
 import { Route as CompanyImport } from './routes/company'
 import { Route as AgenticImport } from './routes/agentic'
@@ -51,6 +54,12 @@ const ScheduledRoute = ScheduledImport.update({
   getParentRoute: () => rootRoute,
 } as any)
 
+const ProvidersRoute = ProvidersImport.update({
+  id: '/providers',
+  path: '/providers',
+  getParentRoute: () => rootRoute,
+} as any)
+
 const ProjectsRoute = ProjectsImport.update({
   id: '/projects',
   path: '/projects',
@@ -72,6 +81,18 @@ const OnboardingRoute = OnboardingImport.update({
 const LibraryRoute = LibraryImport.update({
   id: '/library',
   path: '/library',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const EndpointRoute = EndpointImport.update({
+  id: '/endpoint',
+  path: '/endpoint',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const ConnectorsRoute = ConnectorsImport.update({
+  id: '/connectors',
+  path: '/connectors',
   getParentRoute: () => rootRoute,
 } as any)
 
@@ -137,6 +158,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ConnectImport
       parentRoute: typeof rootRoute
     }
+    '/connectors': {
+      id: '/connectors'
+      path: '/connectors'
+      fullPath: '/connectors'
+      preLoaderRoute: typeof ConnectorsImport
+      parentRoute: typeof rootRoute
+    }
+    '/endpoint': {
+      id: '/endpoint'
+      path: '/endpoint'
+      fullPath: '/endpoint'
+      preLoaderRoute: typeof EndpointImport
+      parentRoute: typeof rootRoute
+    }
     '/library': {
       id: '/library'
       path: '/library'
@@ -163,6 +198,13 @@ declare module '@tanstack/react-router' {
       path: '/projects'
       fullPath: '/projects'
       preLoaderRoute: typeof ProjectsImport
+      parentRoute: typeof rootRoute
+    }
+    '/providers': {
+      id: '/providers'
+      path: '/providers'
+      fullPath: '/providers'
+      preLoaderRoute: typeof ProvidersImport
       parentRoute: typeof rootRoute
     }
     '/scheduled': {
@@ -210,10 +252,13 @@ export interface FileRoutesByFullPath {
   '/agentic': typeof AgenticRoute
   '/company': typeof CompanyRoute
   '/connect': typeof ConnectRoute
+  '/connectors': typeof ConnectorsRoute
+  '/endpoint': typeof EndpointRoute
   '/library': typeof LibraryRoute
   '/onboarding': typeof OnboardingRoute
   '/plugins': typeof PluginsRoute
   '/projects': typeof ProjectsRoute
+  '/providers': typeof ProvidersRoute
   '/scheduled': typeof ScheduledRoute
   '/settings': typeof SettingsRoute
   '/skills': typeof SkillsRoute
@@ -226,10 +271,13 @@ export interface FileRoutesByTo {
   '/agentic': typeof AgenticRoute
   '/company': typeof CompanyRoute
   '/connect': typeof ConnectRoute
+  '/connectors': typeof ConnectorsRoute
+  '/endpoint': typeof EndpointRoute
   '/library': typeof LibraryRoute
   '/onboarding': typeof OnboardingRoute
   '/plugins': typeof PluginsRoute
   '/projects': typeof ProjectsRoute
+  '/providers': typeof ProvidersRoute
   '/scheduled': typeof ScheduledRoute
   '/settings': typeof SettingsRoute
   '/skills': typeof SkillsRoute
@@ -243,10 +291,13 @@ export interface FileRoutesById {
   '/agentic': typeof AgenticRoute
   '/company': typeof CompanyRoute
   '/connect': typeof ConnectRoute
+  '/connectors': typeof ConnectorsRoute
+  '/endpoint': typeof EndpointRoute
   '/library': typeof LibraryRoute
   '/onboarding': typeof OnboardingRoute
   '/plugins': typeof PluginsRoute
   '/projects': typeof ProjectsRoute
+  '/providers': typeof ProvidersRoute
   '/scheduled': typeof ScheduledRoute
   '/settings': typeof SettingsRoute
   '/skills': typeof SkillsRoute
@@ -261,10 +312,13 @@ export interface FileRouteTypes {
     | '/agentic'
     | '/company'
     | '/connect'
+    | '/connectors'
+    | '/endpoint'
     | '/library'
     | '/onboarding'
     | '/plugins'
     | '/projects'
+    | '/providers'
     | '/scheduled'
     | '/settings'
     | '/skills'
@@ -276,10 +330,13 @@ export interface FileRouteTypes {
     | '/agentic'
     | '/company'
     | '/connect'
+    | '/connectors'
+    | '/endpoint'
     | '/library'
     | '/onboarding'
     | '/plugins'
     | '/projects'
+    | '/providers'
     | '/scheduled'
     | '/settings'
     | '/skills'
@@ -291,10 +348,13 @@ export interface FileRouteTypes {
     | '/agentic'
     | '/company'
     | '/connect'
+    | '/connectors'
+    | '/endpoint'
     | '/library'
     | '/onboarding'
     | '/plugins'
     | '/projects'
+    | '/providers'
     | '/scheduled'
     | '/settings'
     | '/skills'
@@ -308,10 +368,13 @@ export interface RootRouteChildren {
   AgenticRoute: typeof AgenticRoute
   CompanyRoute: typeof CompanyRoute
   ConnectRoute: typeof ConnectRoute
+  ConnectorsRoute: typeof ConnectorsRoute
+  EndpointRoute: typeof EndpointRoute
   LibraryRoute: typeof LibraryRoute
   OnboardingRoute: typeof OnboardingRoute
   PluginsRoute: typeof PluginsRoute
   ProjectsRoute: typeof ProjectsRoute
+  ProvidersRoute: typeof ProvidersRoute
   ScheduledRoute: typeof ScheduledRoute
   SettingsRoute: typeof SettingsRoute
   SkillsRoute: typeof SkillsRoute
@@ -324,10 +387,13 @@ const rootRouteChildren: RootRouteChildren = {
   AgenticRoute: AgenticRoute,
   CompanyRoute: CompanyRoute,
   ConnectRoute: ConnectRoute,
+  ConnectorsRoute: ConnectorsRoute,
+  EndpointRoute: EndpointRoute,
   LibraryRoute: LibraryRoute,
   OnboardingRoute: OnboardingRoute,
   PluginsRoute: PluginsRoute,
   ProjectsRoute: ProjectsRoute,
+  ProvidersRoute: ProvidersRoute,
   ScheduledRoute: ScheduledRoute,
   SettingsRoute: SettingsRoute,
   SkillsRoute: SkillsRoute,
@@ -349,10 +415,13 @@ export const routeTree = rootRoute
         "/agentic",
         "/company",
         "/connect",
+        "/connectors",
+        "/endpoint",
         "/library",
         "/onboarding",
         "/plugins",
         "/projects",
+        "/providers",
         "/scheduled",
         "/settings",
         "/skills",
@@ -372,6 +441,12 @@ export const routeTree = rootRoute
     "/connect": {
       "filePath": "connect.tsx"
     },
+    "/connectors": {
+      "filePath": "connectors.tsx"
+    },
+    "/endpoint": {
+      "filePath": "endpoint.tsx"
+    },
     "/library": {
       "filePath": "library.tsx"
     },
@@ -383,6 +458,9 @@ export const routeTree = rootRoute
     },
     "/projects": {
       "filePath": "projects.tsx"
+    },
+    "/providers": {
+      "filePath": "providers.tsx"
     },
     "/scheduled": {
       "filePath": "scheduled.tsx"
